@@ -6,3 +6,12 @@ Generate the dotnet function interface of common opensource vision algorithms. E
 ### PCL
 ### OpenCV
 ### And so on
+
+# Dir
+### 2D
+#### Filter
+#### Fit
+#### IO
+#### Process
+### 3D
+
