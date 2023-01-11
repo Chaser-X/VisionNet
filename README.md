@@ -7,9 +7,6 @@ Currently, There so many fantastic opensource vision projects here. But there ar
 So the project want to just supply a more simple way to user to deploy and call. Quickly to focouse on applaction function realize itself. 
 
 # Includes
-### PCL
-### OpenCV
-### And so on
 
 # Dir
 ### 2D
