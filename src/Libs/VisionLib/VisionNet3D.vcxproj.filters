@@ -14,9 +14,12 @@
     <ClInclude Include="DataType.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="CxUniformGridSampler.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Test.cpp">
+    <ClCompile Include="Export.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>

@@ -11,9 +11,9 @@ namespace Test
     {
         static void Main(string[] args)
         {
-            List<Point3D> pts = new List<Point3D>();
-            pts.Add(new Point3D());
-            pts.Add(new Point3D(1,1,2));
+            List<CxPoint3D> pts = new List<CxPoint3D>();
+            pts.Add(new CxPoint3D());
+            pts.Add(new CxPoint3D(1,1,2));
             var  p = VisionOperator.GetPoint3DArrayCenter(pts);
             Console.ReadKey();
         }
