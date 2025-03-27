@@ -59,6 +59,9 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="CxCamera.cs" />
+    <Compile Include="CxDisplay.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
     <Compile Include="RenderItem\CxColorBarItem.cs" />
     <Compile Include="RenderItem\CxCoordinateSystemItem.cs" />
     <Compile Include="RenderItem\CxPoint3DItem.cs" />
@@ -69,6 +72,11 @@
     <Compile Include="RenderItem\IRenderItem.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Service Include="{94E38DFF-614B-4cbd-B67C-F211BB35CE8B}" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="CxDisplay.resx">
+      <DependentUpon>CxDisplay.cs</DependentUpon>
+    </EmbeddedResource>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

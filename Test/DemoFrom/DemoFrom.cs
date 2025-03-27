@@ -19,13 +19,13 @@ namespace DemoFrom
 {
     public partial class DemoFrom : Form
     {
-        private CxCamera camera;
+        //private CxCamera camera;
         public DemoFrom()
         {
             InitializeComponent();
             GocatorHandle.GocatorHandle.Instance.Connect("127.0.0.1", false);
             GocatorHandle.GocatorHandle.Instance.SetDataHandler(onData);
-            camera = new CxCamera(openGLControl1);
+            //camera = new CxCamera(openGLControl1);
         }
         CxSurface surface = null;
         private void onData(GoDataSet obj)
@@ -101,13 +101,14 @@ namespace DemoFrom
                     }
                 }
             }
-            camera.SetPointCloud(surface, SurfaceMode.Mesh | SurfaceMode.Intensity);
+            cxDisplay1.SetPointCloud(surface, SurfaceMode.Mesh | SurfaceMode.HeightMap);
         }
 
         private void DemoFrom_FormClosing(object sender, FormClosingEventArgs e)
         {
             GocatorHandle.GocatorHandle.Instance.DisConnect();
-            openGLControl1.Dispose();
+            cxDisplay1.Dispose();
+            cxDisplay2.Dispose();
             Environment.Exit(0);
         }
 
@@ -125,16 +126,16 @@ namespace DemoFrom
             var surfacemap = VisionOperator.UniformSuface(points, surface.Intensity, 200,3500,
                 0.1f, 0.1f, surface.ZScale, -10, -175, surface.ZOffset);
 
-            camera.SetPointCloud(surfacemap, SurfaceMode.Mesh | SurfaceMode.Intensity);
+            cxDisplay1.SetPointCloud(surfacemap, SurfaceMode.Mesh | SurfaceMode.Intensity);
         }
 
         private void btn_addSeg3D_Click(object sender, EventArgs e)
         {
             //添加Segment3D线段
-            camera.SetSegment(new Segment3D(new CxPoint3D(0, 0, 0), new CxPoint3D(1, 1, 1)), Color.Red);
-            camera.SetSegment(new Segment3D(new CxPoint3D(0, 0, 0), new CxPoint3D(0, 1, 1)), Color.Yellow);
+            cxDisplay2.SetSegment(new Segment3D(new CxPoint3D(0, 0, 0), new CxPoint3D(1, 1, 1)), Color.Red);
+            cxDisplay2.SetSegment(new Segment3D(new CxPoint3D(0, 0, 0), new CxPoint3D(0, 1, 1)), Color.Yellow);
 
-            camera.SetPoint(new CxPoint3D(2, 1, 1), Color.White);
+            cxDisplay2.SetPoint(new CxPoint3D(2, 1, 1), Color.White);
 
             //添加多边形
             List<CxPoint3D> pts = new List<CxPoint3D>();
@@ -143,7 +144,7 @@ namespace DemoFrom
             pts.Add(new CxPoint3D(1, 1, 0));
             pts.Add(new CxPoint3D(1, 1, 1));
             var polygon = new Polygon3D(pts.ToArray(),false);
-            camera.SetPolygon(polygon, Color.Blue);
+            cxDisplay2.SetPolygon(polygon, Color.Blue);
         }
     }
 }

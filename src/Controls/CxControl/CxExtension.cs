@@ -1,4 +1,6 @@
-﻿using System;
+﻿using SharpGL.SceneGraph;
+using SharpGL;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -71,5 +73,65 @@ namespace VisionNet.Controls
             return (r, g, b);
         }
 
+        private void DrawTextLabel3D(OpenGL gl, float x, float y, float z, float size, string text)
+        {
+            // 将3D坐标转换为屏幕坐标（包括深度信息）
+            var objCoord = new Vertex(x, y, z);
+            var screenCoord = gl.Project(objCoord);
+            // 判断是否在屏幕范围内
+            if (screenCoord.X < 0 || screenCoord.X > gl.RenderContextProvider.Width ||
+                screenCoord.Y < 0 || screenCoord.Y > gl.RenderContextProvider.Height)
+            {
+                return;
+            }
+
+            // 如果需要考虑透视范围，可以检查 screenCoord.Z（假设其为归一化深度：0～1）
+            if (screenCoord.Z < 0 || screenCoord.Z > 1)
+            {
+                return;
+            }
+
+            float newScale = size * (1 + screenCoord.Z);//1 / (size / (screenCoord.Z + epsilon))* 100;
+
+            // 保存当前矩阵
+            gl.PushMatrix();
+
+            // 移动到文字位置
+            gl.Translate(x, y, z);
+
+            // 使文字始终面向相机
+            //gl.Rotate(-rotateY, 0.0f, 1.0f, 0.0f);
+            //gl.Rotate(-rotateX, 1.0f, 0.0f, 0.0f);
+
+            // 应用缩放，使文字在屏幕上保持固定像素大小
+            gl.Scale(newScale, newScale, newScale);
+
+            // 绘制文字
+            gl.Color(1.0f, 1.0f, 1.0f);
+            foreach (char c in text)
+            {
+                gl.DrawText3D("Arial", 0.1f, 0.0f, c.ToString());
+            }
+
+            gl.PopMatrix();
+        }
+        private void DrawTextLabel2D(OpenGL gl, float x, float y, float z, float size, string text)
+        {
+            // 将3D坐标转换为屏幕坐标（包括深度信息）
+            var objCoord = new Vertex(x, y, z);
+            var screenCoord = gl.Project(objCoord);
+            // 判断是否在屏幕范围内
+            if (screenCoord.X < 0 || screenCoord.X > gl.RenderContextProvider.Width ||
+                screenCoord.Y < 0 || screenCoord.Y > gl.RenderContextProvider.Height)
+            {
+                return;
+            }
+            // 如果需要考虑透视范围，可以检查 screenCoord.Z（假设其为归一化深度：0～1）
+            if (screenCoord.Z < 0 || screenCoord.Z > 1)
+            {
+                return;
+            }
+            gl.DrawText((int)screenCoord.X, (int)screenCoord.Y, 1, 1, 1, "Arial", size, text);
+        }
     }
 }
