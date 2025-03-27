@@ -42,6 +42,7 @@
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.DirectoryServices" />
+    <Reference Include="System.Numerics" />
     <Reference Include="System.Xml.Linq" />
     <Reference Include="System.Data.DataSetExtensions" />
     <Reference Include="Microsoft.CSharp" />
@@ -58,6 +59,14 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="CxCamera.cs" />
+    <Compile Include="RenderItem\CxColorBarItem.cs" />
+    <Compile Include="RenderItem\CxCoordinateSystemItem.cs" />
+    <Compile Include="RenderItem\CxPoint3DItem.cs" />
+    <Compile Include="RenderItem\CxPolygon3DItem.cs" />
+    <Compile Include="RenderItem\CxSegment3DItem.cs" />
+    <Compile Include="RenderItem\CxSurfaceItem.cs" />
+    <Compile Include="CxExtension.cs" />
+    <Compile Include="RenderItem\IRenderItem.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Service Include="{94E38DFF-614B-4cbd-B67C-F211BB35CE8B}" />
   </ItemGroup>

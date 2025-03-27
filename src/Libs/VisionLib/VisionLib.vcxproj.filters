@@ -4,7 +4,19 @@
     <ClCompile Include="Export.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="CxUniformGridSampler.h" />
-    <ClInclude Include="DataType.h" />
+    <ClInclude Include="CxUniformGridSampler.h">
+      <Filter>headfile</Filter>
+    </ClInclude>
+    <ClInclude Include="DataType.h">
+      <Filter>headfile</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="headfile">
+      <UniqueIdentifier>{1087d61b-b3c9-42d9-b274-6d1e61092981}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="classfile">
+      <UniqueIdentifier>{800946c2-fee5-4f75-b1db-ac95aca2023f}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
 </Project>

@@ -5,7 +5,7 @@
 #include <limits>
 #include <omp.h>
 #include "DataType.h"
-
+using namespace VisionLib::DataType;
 #pragma once
 class CxUniformGridSampler {
 public:
@@ -19,12 +19,15 @@ public:
 	void processPointCloud(const std::vector<Point3D>& points, const std::vector<uint8_t>& intensity = std::vector<uint8_t>()) {
 		// 预分配高度图数组
 		m_heightMap.resize(m_wdith * m_height, std::numeric_limits<float>::quiet_NaN());
+		std::vector<uint32_t> temp_intensity;
 		if (!intensity.empty())
 		{
-			m_intensityMap.resize(m_wdith * m_height, std::numeric_limits<float>::quiet_NaN());
+			temp_intensity.resize(m_wdith * m_height, std::numeric_limits<uint32_t>::quiet_NaN());
+			m_intensityMap.resize(m_wdith * m_height, std::numeric_limits<uint8_t>::quiet_NaN());
 		}
 		else
 		{
+			temp_intensity = std::vector<uint32_t>();
 			m_intensityMap = std::vector<uint8_t>();
 		}
 		m_pointCount.resize(m_wdith * m_height, 0);
@@ -44,18 +47,22 @@ public:
 
 #pragma omp critical
 				{
+					//增加p.Z为负无穷的判定
+					if (std::isinf(p.Z)) {
+						continue; // 忽略该点
+					}
 					// 如果是第一个点，直接赋值
 					if (m_pointCount[index] == 0) {
 						m_heightMap[index] = p.Z;
 						if (!intensity.empty()) {
-							m_intensityMap[index] = intensity[i];
+							temp_intensity[index] = intensity[i];
 						}
 					}
 					else {
 						// 否则累加（后面会计算平均值）
 						m_heightMap[index] += p.Z;
 						if (!intensity.empty()) {
-							m_intensityMap[index] += intensity[i];
+							temp_intensity[index] += intensity[i];
 						}
 					}
 					m_pointCount[index]++;
@@ -69,7 +76,7 @@ public:
 			if (m_pointCount[i] > 0) {
 				m_heightMap[i] /= m_pointCount[i];
 				if (!intensity.empty()) {
-					m_intensityMap[i] = static_cast<uint8_t>(m_intensityMap[i] / m_pointCount[i]);
+					m_intensityMap[i] = static_cast<uint8_t>(temp_intensity[i]*1.0f / m_pointCount[i]);
 				}
 			}
 		}

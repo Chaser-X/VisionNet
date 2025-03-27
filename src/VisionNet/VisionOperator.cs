@@ -18,10 +18,10 @@ namespace VisionNet
             return center;
         }
 
-        public static CxSuface UniformSuface(CxPoint3D[] points, byte[] intensity, int width, int height,
+        public static CxSurface UniformSuface(CxPoint3D[] points, byte[] intensity, int width, int height,
             float xScale, float yScale, float zScale, float xOffset, float yOffset, float zOffset)
         {
-            CxSuface suface = new CxSuface();
+            CxSurface suface = new CxSurface();
             var sizeMap = width * height;
             float[] heightMap = new float[sizeMap];
             byte[] intensityMap = new byte[sizeMap];
@@ -41,7 +41,7 @@ namespace VisionNet
                     heighData[i] = (short)(data);
                 }
             }
-            suface = new CxSuface(width, height, heighData, intensityMap, xOffset, yOffset, zOffset, xScale, yScale, zScale);
+            suface = new CxSurface(width, height, heighData, intensityMap, xOffset, yOffset, zOffset, xScale, yScale, zScale);
             return suface;
         }
     }

@@ -1,12 +1,15 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net.Http;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace VisionNet.DataType
 {
+    #region 3d datatype
     [StructLayout(LayoutKind.Explicit)]
     public struct CxPoint3D
     {
@@ -38,18 +41,33 @@ namespace VisionNet.DataType
         public float Z;
         public float Intensity;
     }
-
-    public struct Segment
+    //向量
+    [StructLayout(LayoutKind.Sequential)]
+    public struct CxVector3D
+    {
+        public CxVector3D(float x, float y, float z)
+        {
+            X = x;
+            Y = y;
+            Z = z;
+        }
+        public float X;
+        public float Y;
+        public float Z;
+    }
+    //线段
+    public struct Segment3D
     {
         public CxPoint3D Start;
         public CxPoint3D End;
 
-        public Segment(CxPoint3D start, CxPoint3D end)
+        public Segment3D(CxPoint3D start, CxPoint3D end)
         {
             Start = start;
             End = end;
         }
     }
+    //文本信息
     public struct TextInfo
     {
         public CxPoint3D Location;
@@ -61,6 +79,122 @@ namespace VisionNet.DataType
             Text = text;
         }
     }
+    //球体
+    public struct Sphere
+    {
+        public CxPoint3D Center;
+        public float Radius;
+        public Sphere(CxPoint3D center, float radius)
+        {
+            Center = center;
+            Radius = radius;
+        }
+    }
+    //多边形
+    public struct Polygon3D
+    {
+        public CxPoint3D[] Points;
+        public bool IsClosed;
+        public Polygon3D(CxPoint3D[] points,bool isClosed = true)
+        {
+            Points = points;
+            IsClosed = isClosed;
+        }
+    }
+    //圆形
+    public struct Circle3D
+    {
+        public CxPoint3D Center;
+        public float Radius;
+        public CxVector3D Normal;
+        public Circle3D(CxPoint3D center, CxVector3D normal, float radius)
+        {
+            Center = center;
+            Radius = radius;
+            Normal = normal;
+        }
+    }
+    //平面
+    public struct Plane3D
+    {
+        public CxPoint3D Point;
+        public CxVector3D Normal;
+        public Plane3D(CxPoint3D point, CxVector3D normal)
+        {
+            Point = point;
+            Normal = normal;
+        }
+    }
+    //Box3D
+    public struct Box3D
+    {
+        public CxPoint3D Center;
+        public CxVector3D Size;
+        public Box3D(CxPoint3D center, CxVector3D size)
+        {
+            Center = center;
+            Size = size;
+        }
+    }
+    #endregion
+
+    #region 2d datatype
+    //2D点
+    public struct CxPoint2D
+    {
+        public CxPoint2D(float x, float y)
+        {
+            X = x;
+            Y = y;
+        }
+        public float X;
+        public float Y;
+    }
+    //2D向量
+    public struct CxVector2D
+    {
+        public CxVector2D(float x, float y)
+        {
+            X = x;
+            Y = y;
+        }
+        public float X;
+        public float Y;
+    }
+    //2D线段
+    public struct Segment2D
+    {
+        public CxPoint2D Start;
+        public CxPoint2D End;
+        public Segment2D(CxPoint2D start, CxPoint2D end)
+        {
+            Start = start;
+            End = end;
+        }
+    }
+    //2D多边形
+    public struct Polygon2D
+    {
+        public CxPoint2D[] Points;
+        public bool IsClosed;
+        public Polygon2D(CxPoint2D[] points, bool isClosed = true)
+        {
+            Points = points;
+            IsClosed = isClosed;
+        }
+    }
+    //2D圆形
+    public struct Circle2D
+    {
+        public CxPoint2D Center;
+        public float Radius;
+        public Circle2D(CxPoint2D center, float radius)
+        {
+            Center = center;
+            Radius = radius;
+        }
+    }
+    #endregion
     public enum SurfaceType
     {
         //点云
@@ -69,11 +203,11 @@ namespace VisionNet.DataType
         Surface,
         //曲线
     }
-    public class CxSuface
+    public class CxSurface
     {
         private object lockObj = new object();
-        public CxSuface() { }
-        public CxSuface(int width, int length, SurfaceType type = SurfaceType.Surface)
+        public CxSurface() { }
+        public CxSurface(int width, int length, SurfaceType type = SurfaceType.Surface)
         {
             Width = width;
             Length = length;
@@ -81,7 +215,7 @@ namespace VisionNet.DataType
             //Intensity = new byte[width * length];
             Type = type;
         }
-        public CxSuface(int width, int length, short[] data, byte[] intensity, float xOffset, float yOffset, float zOffset, float xScale, float yScale, float zScale, SurfaceType type = SurfaceType.Surface) : this(width, length, type)
+        public CxSurface(int width, int length, short[] data, byte[] intensity, float xOffset, float yOffset, float zOffset, float xScale, float yScale, float zScale, SurfaceType type = SurfaceType.Surface) : this(width, length, type)
         {
             Data = data;
             Intensity = intensity;
@@ -114,6 +248,7 @@ namespace VisionNet.DataType
         public float YScale { get; set; }
         //点云的z缩放
         public float ZScale { get; set; }
+
         public void SetData(IntPtr dataPtr)
         {
             lock (lockObj)
@@ -169,4 +304,26 @@ namespace VisionNet.DataType
             }
         }
     }
+
+    //2D图像，数据类型可选byte,ushort,float
+    public class CxImage<T>
+    {
+        public CxImage() { }
+        public CxImage(int width, int height)
+        {
+            Width = width;
+            Height = height;
+            Data = new T[width * height];
+        }
+        public int Width { get; set; }
+        public int Height { get; set; }
+        public T[] Data { get; set; }
+        //public void SetData(IntPtr dataPtr)
+        //{
+        //    var size = Width * Height;
+        //    Data = new T[size];
+        //    Marshal.Copy(dataPtr, Data, 0, size);
+        //}
+    }
+
 }

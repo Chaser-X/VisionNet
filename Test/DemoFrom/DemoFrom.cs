@@ -27,7 +27,7 @@ namespace DemoFrom
             GocatorHandle.GocatorHandle.Instance.SetDataHandler(onData);
             camera = new CxCamera(openGLControl1);
         }
-        CxSuface surface = null;
+        CxSurface surface = null;
         private void onData(GoDataSet obj)
         {
             surface = null;
@@ -55,7 +55,6 @@ namespace DemoFrom
                         break;
                 }
             }
-
             //surfaceMsg和surfaceIntensityMsg都获取到了，转换到点云数据
             if (msg != null)
             {
@@ -72,7 +71,7 @@ namespace DemoFrom
                     float yscale = surfaceMsg.YResolution / 1000000.0f;
                     float zscale = surfaceMsg.ZResolution / 1000000.0f;
                     IntPtr surfacePtr = surfaceMsg.Data;
-                    surface = new CxSuface((int)width, (int)length, new short[bufferSize], new byte[0], xoffset, yoffset, zoffset, xscale, yscale, zscale, SurfaceType.Surface);
+                    surface = new CxSurface((int)width, (int)length, new short[bufferSize], new byte[0], xoffset, yoffset, zoffset, xscale, yscale, zscale, SurfaceType.Surface);
                     surface.SetData(surfacePtr);
                     if (surfaceIntensityMsg != null)
                     {
@@ -93,7 +92,7 @@ namespace DemoFrom
                     float yscale = surfaceMsg.YResolution / 1000000.0f;
                     float zscale = surfaceMsg.ZResolution / 1000000.0f;
                     IntPtr surfacePtr = surfaceMsg.Data;
-                    surface = new CxSuface((int)width, (int)length, new short[bufferSize * 3], new byte[0], xoffset, yoffset, zoffset, xscale, yscale, zscale, SurfaceType.PointCloud);
+                    surface = new CxSurface((int)width, (int)length, new short[bufferSize * 3], new byte[0], xoffset, yoffset, zoffset, xscale, yscale, zscale, SurfaceType.PointCloud);
                     surface.SetData(surfacePtr);
                     if (surfaceIntensityMsg != null)
                     {
@@ -102,8 +101,7 @@ namespace DemoFrom
                     }
                 }
             }
-            camera.SufaceMode = SufaceMode.Mesh;
-            camera.SetPointCloud(surface);
+            camera.SetPointCloud(surface, SurfaceMode.Mesh | SurfaceMode.Intensity);
         }
 
         private void DemoFrom_FormClosing(object sender, FormClosingEventArgs e)
@@ -124,38 +122,28 @@ namespace DemoFrom
             var points = surface.ToPoints();
             var heights = new float[points.Length];
             var intensitys = new byte[points.Length];
-            var surfacemap = VisionOperator.UniformSuface(points, null,500,750,
-                0.5f, 0.5f, surface.ZScale, -50, -75, surface.ZOffset);
+            var surfacemap = VisionOperator.UniformSuface(points, surface.Intensity, 200,3500,
+                0.1f, 0.1f, surface.ZScale, -10, -175, surface.ZOffset);
 
-            camera.SetPointCloud(surfacemap);
-            //var points = new CxPoint3D[]
-            //{
-            //    new CxPoint3D { X = 1.0f, Y = 1.0f, Z = 2.0f },
-            //    new CxPoint3D { X = 2.0f, Y = 2.0f, Z = 3.0f }
-            //};
+            camera.SetPointCloud(surfacemap, SurfaceMode.Mesh | SurfaceMode.Intensity);
+        }
 
-            //var intensitys = new byte[]
-            //{
-            //100, 150
-            //};
+        private void btn_addSeg3D_Click(object sender, EventArgs e)
+        {
+            //添加Segment3D线段
+            camera.SetSegment(new Segment3D(new CxPoint3D(0, 0, 0), new CxPoint3D(1, 1, 1)), Color.Red);
+            camera.SetSegment(new Segment3D(new CxPoint3D(0, 0, 0), new CxPoint3D(0, 1, 1)), Color.Yellow);
 
-            //int size = points.Length;
-            //float xScale = 1.0f;
-            //float yScale = 1.0f;
-            //float xMin = 0.0f;
-            //float xMax = 10.0f;
-            //float yMin = 0.0f;
-            //float yMax = 10.0f;
+            camera.SetPoint(new CxPoint3D(2, 1, 1), Color.White);
 
-            //float[] heightMap = new float[size];
-            //byte[] intensityMap = new byte[size];
-
-            //VisionOperator.UniformGridSample(points, intensitys, size, xScale, yScale, xMin, xMax, yMin, yMax, heightMap, intensityMap);
-
-            //for (int i = 0; i < size; i++)
-            //{
-            //    Console.WriteLine($"Height: {heightMap[i]}, Intensity: {intensityMap[i]}");
-            //}
+            //添加多边形
+            List<CxPoint3D> pts = new List<CxPoint3D>();
+            pts.Add(new CxPoint3D(0, 0, 0));
+            pts.Add(new CxPoint3D(1, 0, 0));
+            pts.Add(new CxPoint3D(1, 1, 0));
+            pts.Add(new CxPoint3D(1, 1, 1));
+            var polygon = new Polygon3D(pts.ToArray(),false);
+            camera.SetPolygon(polygon, Color.Blue);
         }
     }
 }
