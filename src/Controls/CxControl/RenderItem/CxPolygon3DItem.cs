@@ -5,19 +5,15 @@ using VisionNet.DataType;
 
 namespace VisionNet.Controls
 {
-    public class CxPolygon3DItem : IRenderItem
+    public class CxPolygon3DItem : RenderAbstractItem
     {
         public Dictionary<Polygon3D, Color> PolygonColors { get; set; } = new Dictionary<Polygon3D, Color>();
-
-        public string ID { get; set; }
-        public float LineWidth { get; set; } = 1.0f;
-
         public CxPolygon3DItem(Dictionary<Polygon3D, Color> polygonColors)
         {
             this.PolygonColors = polygonColors;
         }
 
-        public void Draw(OpenGL gl)
+        public override void Draw(OpenGL gl)
         {
             if (PolygonColors.Count == 0) return;
 

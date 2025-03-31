@@ -16,6 +16,15 @@ using static System.Net.Mime.MediaTypeNames;
 
 namespace VisionNet.Controls
 {
+    public enum ViewMode
+    {
+        None,
+        Top,
+        Front,
+        Left,
+        Right,
+    }
+
     public class CxCamera
     {
         #region 私有字段
@@ -28,8 +37,12 @@ namespace VisionNet.Controls
         private int lastMouseX, lastMouseY;
         private float rotateX = 0.0f;
         private float rotateY = 0.0f;
+        private float rotateZ = 0.0f;
         private float translateSpeed = 1f;
         private float zoomSpeed = 1f;
+        #endregion
+        #region 属性
+        public ViewMode ViewMode { get; set; } = ViewMode.Front;
         #endregion
         #region 构造函数
         public CxCamera(OpenGLControl openGLControl)
@@ -45,13 +58,13 @@ namespace VisionNet.Controls
         #region 鼠标事件处理
         private void OpenGLControl_MouseDown(object sender, MouseEventArgs e)
         {
-            if (e.Button == MouseButtons.Left)
+            if (e.Button == MouseButtons.Middle)
             {
                 isDragging = true;
                 lastMouseX = e.X;
                 lastMouseY = e.Y;
             }
-            else if (e.Button == MouseButtons.Right)
+            else if (e.Button == MouseButtons.Left)
             {
                 isRotating = true;
                 lastMouseX = e.X;
@@ -80,6 +93,7 @@ namespace VisionNet.Controls
 
                 rotateX += deltaY * 0.5f;
                 rotateY += deltaX * 0.5f;
+                rotateZ += (deltaX + deltaY) * 0.1f; // 新增
 
                 lastMouseX = e.X;
                 lastMouseY = e.Y;
@@ -89,11 +103,11 @@ namespace VisionNet.Controls
 
         private void OpenGLControl_MouseUp(object sender, MouseEventArgs e)
         {
-            if (e.Button == MouseButtons.Left)
+            if (e.Button == MouseButtons.Middle)
             {
                 isDragging = false;
             }
-            else if (e.Button == MouseButtons.Right)
+            else if (e.Button == MouseButtons.Left)
             {
                 isRotating = false;
             }
@@ -107,7 +121,7 @@ namespace VisionNet.Controls
         #endregion
         #region 渲染方法
         /// <summary>
-        /// 自适应视图
+        /// 设置视图模式
         /// </summary>
         public void FitView(Box3D? viewBox)
         {
@@ -116,8 +130,8 @@ namespace VisionNet.Controls
                 return;
             }
             // 计算点云的宽度和高度
-            double pointCloudWidth = viewBox.Value.Size.X;
-            double pointCloudHeight = viewBox.Value.Size.Y;
+            double pointCloudWidth = viewBox.Value.Size.Width;
+            double pointCloudHeight = viewBox.Value.Size.Height;
 
             //计算平移缩放的速度系数
             translateSpeed = zoomSpeed = (float)Math.Min(pointCloudWidth, pointCloudHeight) / 400.0f;
@@ -128,8 +142,32 @@ namespace VisionNet.Controls
             translateX = (float)-viewBox.Value.Center.X;
             translateY = (float)-viewBox.Value.Center.Y;
             zoom = (float)-viewBox.Value.Center.Z - (float)zoomFactor * 1.5f; //  适当调整视距
-            rotateX = 0.0f;
-            rotateY = 0.0f;
+
+            switch (ViewMode)
+            {
+                case ViewMode.None:
+                    break;
+                case ViewMode.Top:
+                    rotateX = 0.0f;
+                    rotateY = 0.0f;
+                    rotateZ = 0.0f;
+                    break;
+                case ViewMode.Front:
+                    rotateX = -90.0f;
+                    rotateY = 0.0f;
+                    rotateZ = 0.0f;
+                    break;
+                case ViewMode.Left:
+                    rotateX = 0;
+                    rotateY = 90.0f;
+                    rotateZ = 0.0f;
+                    break;
+                case ViewMode.Right:
+                    rotateX = 0f;
+                    rotateY = -90.0f;
+                    rotateZ = 0.0f;
+                    break;
+            }
         }
         /// <summary>
         /// 视图空间设置
@@ -157,6 +195,7 @@ namespace VisionNet.Controls
             gl.Translate(translateX, translateY, zoom);
             gl.Rotate(rotateX, 1.0f, 0.0f, 0.0f);
             gl.Rotate(rotateY, 0.0f, 1.0f, 0.0f);
+            gl.Rotate(rotateZ, 0.0f, 0.0f, 1.0f);
         }
         #endregion
     }

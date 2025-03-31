@@ -3,13 +3,10 @@ using System;
 
 namespace VisionNet.Controls
 {
-    public class CxColorBarItem : IRenderItem
+    public class CxColorBarItem : RenderAbstractItem
     {
         private float zMin;
         private float zMax;
-
-        public string ID { get; set; }
-
         public CxColorBarItem(float zMin = 0, float zMax = 0)
         {
             this.zMin = zMin;
@@ -20,7 +17,7 @@ namespace VisionNet.Controls
             this.zMin = zMin;
             this.zMax = zMax;
         }
-        public void Draw(OpenGL gl)
+        public override void Draw(OpenGL gl)
         {
             if (zMax - zMin <= 0)
                 return;

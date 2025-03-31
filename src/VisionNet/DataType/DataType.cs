@@ -54,6 +54,52 @@ namespace VisionNet.DataType
         public float X;
         public float Y;
         public float Z;
+        public float Length => (float)Math.Sqrt(X * X + Y * Y + Z * Z);
+        public static CxVector3D operator +(CxVector3D v1, CxVector3D v2)
+        {
+            return new CxVector3D(v1.X + v2.X, v1.Y + v2.Y, v1.Z + v2.Z);
+        }
+        public static CxVector3D operator -(CxVector3D v1, CxVector3D v2)
+        {
+            return new CxVector3D(v1.X - v2.X, v1.Y - v2.Y, v1.Z - v2.Z);
+        }
+        public static CxVector3D operator *(CxVector3D v, float scale)
+        {
+            return new CxVector3D(v.X * scale, v.Y * scale, v.Z * scale);
+        }
+        public static CxVector3D operator /(CxVector3D v, float scale)
+        {
+            return new CxVector3D(v.X / scale, v.Y / scale, v.Z / scale);
+        }
+        //向量点乘
+        public float Dot(CxVector3D v2)
+        {
+            return X * v2.X + Y * v2.Y + Z * v2.Z;
+        }
+        //向量叉乘
+        public CxVector3D Cross(CxVector3D v2)
+        {
+            return new CxVector3D(Y * v2.Z - Z * v2.Y, Z * v2.X - X * v2.Z, X * v2.Y - Y * v2.X);
+        }
+        //向量归一化
+        public CxVector3D Normalize()
+        {
+            return new CxVector3D(X / Length, Y / Length, Z / Length);
+        }
+    }
+    //尺寸
+    [StructLayout(LayoutKind.Sequential)]
+    public struct CxSize3D
+    {
+        public CxSize3D(float width, float height, float depth)
+        {
+            Width = width;
+            Height = height;
+            Depth = depth;
+        }
+        public float Width;
+        public float Height;
+        public float Depth;
     }
     //线段
     public struct Segment3D
@@ -129,8 +175,8 @@ namespace VisionNet.DataType
     public struct Box3D
     {
         public CxPoint3D Center;
-        public CxVector3D Size;
-        public Box3D(CxPoint3D center, CxVector3D size)
+        public CxSize3D Size;
+        public Box3D(CxPoint3D center, CxSize3D size)
         {
             Center = center;
             Size = size;

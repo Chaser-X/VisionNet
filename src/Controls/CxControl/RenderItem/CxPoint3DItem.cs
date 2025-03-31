@@ -5,23 +5,19 @@ using VisionNet.DataType;
 
 namespace VisionNet.Controls
 {
-    public class CxPoint3DItem : IRenderItem
+    public class CxPoint3DItem : RenderAbstractItem
     {
         public Dictionary<CxPoint3D, Color> PointColors { get; set; } = new Dictionary<CxPoint3D, Color>();
-
-        public string ID { get; set; }
-        public float PointSize { get; set; } = 1.0f;
-
         public CxPoint3DItem(Dictionary<CxPoint3D, Color> pointColors)
         {
             this.PointColors = pointColors;
         }
 
-        public void Draw(OpenGL gl)
+        public override void Draw(OpenGL gl)
         {
             if (PointColors.Count == 0) return;
 
-            gl.PointSize(PointSize);
+            gl.PointSize(LineWidth);
             gl.Begin(OpenGL.GL_POINTS);
             foreach (var kvp in PointColors)
             {

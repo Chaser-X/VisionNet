@@ -8,14 +8,12 @@ namespace VisionNet.Controls
     /// <summary>
     /// 坐标系管理类
     /// </summary>
-    public class CxCoordinateSystemItem : IRenderItem
+    public class CxCoordinateSystemItem : RenderAbstractItem
     {
         private readonly float axisLength; 
         private readonly float axisRadius;
         private readonly float coneHeight;
         private readonly float coneRadius;
-        public string ID { get; set; }
-
         public CxCoordinateSystemItem(float axisLength = 5.0f, float axisRadius = 0.1f, float coneHeight = 0.5f, float coneRadius = 0.2f)
         {
             this.axisLength = axisLength;
@@ -24,7 +22,7 @@ namespace VisionNet.Controls
             this.coneRadius = coneRadius;
         }
 
-        public void Draw(OpenGL gl)
+        public override void Draw(OpenGL gl)
         {
             // 绘制X轴
             gl.PushMatrix();

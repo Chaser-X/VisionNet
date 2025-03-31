@@ -9,17 +9,23 @@ namespace VisionNet.Controls
     {
         PointCloud = 1,
         Mesh = 2,
-        HeightMap = 4,
-        Intensity = 8,
+        //HeightMap = 4,
+        //Intensity = 8,
     }
-    public class CxSurfaceItem : IRenderItem
+    public enum SurfaceColorMode
+    {
+        Color,
+        Intensity,
+        ColorWithIntensity,
+    }
+
+    public class CxSurfaceItem : RenderAbstractItem
     {
         public CxSurface Surface { get; private set; }
         private uint[] vboIds = new uint[2];
         private bool vboInitialized = false;
         private bool pointCloudUpdated = false;
         private List<uint> meshIndexs = new List<uint>();
-        public string ID { get; set; }
         public float ZMin { get; set; }
         public float ZMax { get; set; }
         public Box3D? BoundingBox { get; private set; }
@@ -36,16 +42,31 @@ namespace VisionNet.Controls
                 surfaceMode = value;
             }
         }
-        public CxSurfaceItem(CxSurface surface, SurfaceMode surfaceMode = SurfaceMode.PointCloud)
+        private SurfaceColorMode surfaceColorMode;
+        public SurfaceColorMode SurfaceColorMode
+        {
+            get
+            {
+                return surfaceColorMode;
+            }
+            set
+            {
+                pointCloudUpdated = value != surfaceColorMode;
+                surfaceColorMode = value;
+            }
+        }
+        public CxSurfaceItem(CxSurface surface, SurfaceMode surfaceMode = SurfaceMode.PointCloud,
+            SurfaceColorMode surfaceColorMode = SurfaceColorMode.Color)
         {
             this.Surface = surface;
             this.SurfaceMode = surfaceMode;
+            this.SurfaceColorMode = surfaceColorMode;
             BoundingBox = GetBoundingBox();
-            ZMax = (float)(BoundingBox?.Center.Z + BoundingBox?.Size.Z / 2);
-            ZMin = (float)(BoundingBox?.Center.Z - BoundingBox?.Size.Z / 2);
+            ZMax = (float)(BoundingBox?.Center.Z + BoundingBox?.Size.Depth / 2);
+            ZMin = (float)(BoundingBox?.Center.Z - BoundingBox?.Size.Depth / 2);
             pointCloudUpdated = false;
         }
-        public void Draw(OpenGL gl)
+        public override void Draw(OpenGL gl)
         {
             if (Surface == null || Surface.Data.Length == 0) return;
 
@@ -67,7 +88,7 @@ namespace VisionNet.Controls
                 float[] vertices = null;
                 float[] colors = null;
                 CxPoint3D[] vertexs = Surface.ToPoints();
-                if (((int)SurfaceMode & (int)SurfaceMode.Mesh) != 0)
+                if (SurfaceMode == SurfaceMode.Mesh)
                 {
                     meshIndexs = GenerateMeshIndexFromPointCloud(Surface);
                 }
@@ -90,7 +111,7 @@ namespace VisionNet.Controls
                         intensity = (float)Surface.Intensity[i] / 255.0f; // 亮度因子
                     }
 
-                    if (((int)SurfaceMode & (int)SurfaceMode.Intensity) != 0)
+                    if (SurfaceColorMode == SurfaceColorMode.Intensity)
                     {
                         colors[i * 3] = Math.Min(intensity, 1.0f);
                         colors[i * 3 + 1] = Math.Min(intensity, 1.0f);
@@ -99,6 +120,10 @@ namespace VisionNet.Controls
                     else
                     {
                         var color = CxExtension.GetColorByHeight(vertexs[i].Z, ZMin, ZMax);
+                        if (surfaceColorMode == SurfaceColorMode.Color)
+                        {
+                            intensity = 1;
+                        }
                         colors[i * 3] = Math.Min(color.r * intensity, 1.0f);
                         colors[i * 3 + 1] = Math.Min(color.g * intensity, 1.0f);
                         colors[i * 3 + 2] = Math.Min(color.b * intensity, 1.0f);
@@ -122,9 +147,9 @@ namespace VisionNet.Controls
             gl.BindBuffer(OpenGL.GL_ARRAY_BUFFER, vboIds[1]);
             gl.ColorPointer(3, OpenGL.GL_FLOAT, 0, IntPtr.Zero);
 
-            if (((int)SurfaceMode & (int)SurfaceMode.PointCloud) != 0)
+            if (SurfaceMode == SurfaceMode.PointCloud)
                 gl.DrawArrays(OpenGL.GL_POINTS, 0, Surface.Data.Length);
-            else if (((int)SurfaceMode & (int)SurfaceMode.Mesh) != 0)
+            else if (SurfaceMode == SurfaceMode.Mesh)
             {
                 gl.DrawElements(OpenGL.GL_TRIANGLES, meshIndexs.Count, meshIndexs.ToArray());
             }
@@ -187,7 +212,7 @@ namespace VisionNet.Controls
             var z = (float)(maxZ + minZ) / 2;
             var center = new CxPoint3D(x, y, z);
 
-            var size = new CxVector3D(Surface.Width * Surface.XScale, Surface.Length * Surface.YScale, (float)(maxZ - minZ));
+            var size = new CxSize3D(Surface.Width * Surface.XScale, Surface.Length * Surface.YScale, (float)(maxZ - minZ));
             return new Box3D(center, size);
         }
     }

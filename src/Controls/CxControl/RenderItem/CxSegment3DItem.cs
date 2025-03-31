@@ -5,18 +5,15 @@ using VisionNet.DataType;
 
 namespace VisionNet.Controls
 {
-    public class CxSegment3DItem : IRenderItem
+    public class CxSegment3DItem : RenderAbstractItem
     {
         public Dictionary<Segment3D, Color> SegmentColors { get; set; } = new Dictionary<Segment3D, Color>();
-
-        public string ID { get; set; }
-        public float LineWidth { get; set; } = 1.0f;
         public CxSegment3DItem(Dictionary<Segment3D, Color> segmentColors)
         {
             this.SegmentColors = segmentColors;
         }
 
-        public void Draw(OpenGL gl)
+        public override void Draw(OpenGL gl)
         {
             if (SegmentColors.Count == 0) return;
 

@@ -101,7 +101,17 @@ namespace DemoFrom
                     }
                 }
             }
-            cxDisplay1.SetPointCloud(surface, SurfaceMode.Mesh | SurfaceMode.HeightMap);
+            cxDisplay1.SetPointCloud(surface);
+            ////添加平面 Plane3D
+            //var plane = new Plane3D(new CxPoint3D(0, 0, 0), new CxVector3D(1, 1, 1));
+            //cxDisplay1.SetPlane(plane, Color.FromArgb(100, Color.Blue));
+
+            //添加Box3D
+            var box = new Box3D(new CxPoint3D(0, 0, 0), new CxSize3D(10, 10, 10));
+            cxDisplay1.SetBox(box, Color.Yellow);
+
+            //添加Box3D
+            cxDisplay2.SetBox(box, Color.Yellow);
         }
 
         private void DemoFrom_FormClosing(object sender, FormClosingEventArgs e)
@@ -109,7 +119,7 @@ namespace DemoFrom
             GocatorHandle.GocatorHandle.Instance.DisConnect();
             cxDisplay1.Dispose();
             cxDisplay2.Dispose();
-            Environment.Exit(0);
+          //  Environment.Exit(0);
         }
 
         private void btn_test_Click(object sender, EventArgs e)
@@ -126,7 +136,7 @@ namespace DemoFrom
             var surfacemap = VisionOperator.UniformSuface(points, surface.Intensity, 200,3500,
                 0.1f, 0.1f, surface.ZScale, -10, -175, surface.ZOffset);
 
-            cxDisplay1.SetPointCloud(surfacemap, SurfaceMode.Mesh | SurfaceMode.Intensity);
+            cxDisplay1.SetPointCloud(surfacemap);
         }
 
         private void btn_addSeg3D_Click(object sender, EventArgs e)
@@ -145,6 +155,14 @@ namespace DemoFrom
             pts.Add(new CxPoint3D(1, 1, 1));
             var polygon = new Polygon3D(pts.ToArray(),false);
             cxDisplay2.SetPolygon(polygon, Color.Blue);
+
+            //添加平面 Plane3D
+            var plane = new Plane3D(new CxPoint3D(0, 0, 0), new CxVector3D(1, 1, 1));
+            cxDisplay2.SetPlane(plane, Color.FromArgb(20,Color.Blue) );
+
+            //添加Box3D
+            var box = new Box3D(new CxPoint3D(0, 0, 0), new CxSize3D(10, 10, 10));
+            cxDisplay2.SetBox(box, Color.Yellow);
         }
     }
 }

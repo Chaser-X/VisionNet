@@ -41,8 +41,7 @@ public:
 			int xIdx = static_cast<int>((p.X - m_xMin) / m_xScale);
 			int yIdx = static_cast<int>((p.Y - m_yMin) / m_yScale);
 
-			// 检查是否在有效范围内
-			if (xIdx >= 0 && xIdx < m_wdith && yIdx >= 0 && yIdx < m_height) {
+  			if (xIdx >= 0 && xIdx < m_wdith && yIdx >= 0 && yIdx < m_height) {
 				int index = yIdx * m_wdith + xIdx;
 
 #pragma omp critical

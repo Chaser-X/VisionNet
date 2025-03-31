@@ -1,49 +1,100 @@
 using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Drawing.Drawing2D;
+using System.Numerics;
+using System.Runtime.InteropServices;
 using System.Windows.Forms;
 using SharpGL;
+using SharpGL.SceneGraph;
+using SharpGL.SceneGraph.Cameras;
 using VisionNet.DataType;
 
 namespace VisionNet.Controls
 {
-    public class CxDisplay : OpenGLControl
+    public partial class CxDisplay : OpenGLControl, IDisposable
     {
-        private CxCamera camera;
-
+        private CxTrackBallCamera camera;
         // 渲染数据
         private CxSurfaceItem surfaceItem = null;
         private CxCoordinateSystemItem coordinationItem = new CxCoordinateSystemItem();
         private CxColorBarItem colorBarItem = new CxColorBarItem();
-        private ContextMenuStrip menu_right;
-        private System.ComponentModel.IContainer components;
-        private ToolStripMenuItem autoFitToolStripMenuItem;
-        private ToolStripMenuItem viewModeToolStripMenuItem;
-        private ToolStripMenuItem pointCloudToolStripMenuItem;
-        private ToolStripMenuItem meshToolStripMenuItem;
-        private ToolStripMenuItem heightMapToolStripMenuItem;
-        private ToolStripMenuItem intensityToolStripMenuItem;
-        private ToolStripMenuItem lineWidthToolStripMenuItem;
         private List<IRenderItem> renderItem = new List<IRenderItem>();
+        private ViewMode pViewMode = ViewMode.Top;
+        public ViewMode ViewMode
+        {
+            get { return pViewMode; }
+            set
+            {
+                pViewMode = value;
+                if (camera != null)
+                    camera.ViewMode = value;
+            }
+        }
+        private SurfaceMode pSufaceMode = VisionNet.Controls.SurfaceMode.PointCloud;
+        public SurfaceMode SurfaceMode
+        {
+            get { return pSufaceMode; }
+            set
+            {
+                pSufaceMode = value;
+                if (surfaceItem != null)
+                    surfaceItem.SurfaceMode = value;
+            }
+        }
+        private SurfaceColorMode pSurfaceColorMode = VisionNet.Controls.SurfaceColorMode.ColorWithIntensity;
+        public SurfaceColorMode SurfaceColorMode
+        {
+            get { return pSurfaceColorMode; }
+            set
+            {
+                pSurfaceColorMode = value;
+                if (surfaceItem != null)
+                    surfaceItem.SurfaceColorMode = value;
+            }
+        }
+        public CxDisplay() : this(ViewMode.Top, SurfaceMode.PointCloud, SurfaceColorMode.ColorWithIntensity)
+        {
 
-        public CxDisplay()
+        }
+        public CxDisplay(ViewMode viewMode = ViewMode.Top,
+            SurfaceMode surfaceMode = SurfaceMode.PointCloud,
+            SurfaceColorMode surfaceColorMode = SurfaceColorMode.ColorWithIntensity)
         {
             if (!DesignMode)
             {
-                camera = new CxCamera(this);
+                camera = new CxTrackBallCamera(this);
+                camera.ViewMode = ViewMode = viewMode;
                 InitializeComponent();
+
+                foreach (var item in viewModeToolStripMenuItem.DropDownItems)
+                {
+                    var tripItem = (ToolStripMenuItem)item;
+                    tripItem.Checked = tripItem.Text == ViewMode.ToString();
+                }
+                SurfaceMode = surfaceMode;
+                foreach (var item in surfaceModeToolStripMenuItem.DropDownItems)
+                {
+                    var tripItem = (ToolStripMenuItem)item;
+                    tripItem.Checked = tripItem.Text == SurfaceMode.ToString();
+                }
+                SurfaceColorMode = surfaceColorMode;
+                foreach (var item in surfaceColorModeToolStripMenuItem.DropDownItems)
+                {
+                    var tripItem = (ToolStripMenuItem)item;
+                    tripItem.Checked = tripItem.Text == SurfaceColorMode.ToString();
+                }
             }
         }
-
         #region 操作方法
         /// <summary>
         /// 设置点云数据并自适应Z显示范围
         /// </summary>
-        public void SetPointCloud(CxSurface inpointCloud, SurfaceMode surfaceMode)
+        public void SetPointCloud(CxSurface inpointCloud)
         {
             var tempSuface = new CxSurface();
             var size = inpointCloud.Width * inpointCloud.Length;
-            if (size > 6000000)
+            if (size > 10000000)
             {
                 var points = inpointCloud.ToPoints();
                 var ratio = points.Length / 6000000.0f;
@@ -58,7 +109,8 @@ namespace VisionNet.Controls
                 tempSuface = inpointCloud;
             }
 
-            surfaceItem = new CxSurfaceItem(tempSuface ?? new CxSurface(), surfaceMode);
+            surfaceItem = new CxSurfaceItem(tempSuface ?? new CxSurface(), SurfaceMode, SurfaceColorMode);
+            camera.ViewMode = ViewMode;
             camera.FitView(surfaceItem.BoundingBox); // 调整视图以适应点云数据
         }
         /// <summary>
@@ -129,6 +181,52 @@ namespace VisionNet.Controls
                 }
             }
         }
+        //添加平面
+        public void SetPlane(Plane3D plane, Color color)
+        {
+            var planeItem = renderItem.Find(x => x.GetType() == typeof(CxPlane3DItem));
+            if (planeItem == null)
+            {
+                planeItem = new CxPlane3DItem(new Dictionary<Plane3D, Color> { { plane, color } });
+                renderItem.Add(planeItem);
+            }
+            else
+            {
+                var cxplaneItem = planeItem as CxPlane3DItem;
+                if (cxplaneItem.PlaneColors.ContainsKey(plane))
+                {
+                    cxplaneItem.PlaneColors[plane] = color;
+                }
+                else
+                {
+                    cxplaneItem.PlaneColors.Add(plane, color);
+                }
+            }
+        }
+        //添加Box3D
+        public void SetBox(Box3D box, Color color)
+        {
+            var boxItem = renderItem.Find(x => x.GetType() == typeof(CxBox3DItem));
+            if (boxItem == null)
+            {
+                boxItem = new CxBox3DItem(new Dictionary<Box3D, Color> { { box, color } });
+                renderItem.Add(boxItem);
+            }
+            else
+            {
+                var cxboxItem = boxItem as CxBox3DItem;
+                if (cxboxItem.BoxColors.ContainsKey(box))
+                {
+                    cxboxItem.BoxColors[box] = color;
+                }
+                else
+                {
+                    cxboxItem.BoxColors.Add(box, color);
+                }
+            }
+        }
+
+
         /// <summary>
         /// 添加3D文本
         /// </summary>
@@ -138,8 +236,9 @@ namespace VisionNet.Controls
             //textInfos.Add(text);
         }
         #endregion
+        #region 渲染方法
         /// <summary>
-        /// 可视化元素渲染
+        /// 渲染图元
         /// </summary>
         private void Render(OpenGL gl)
         {
@@ -147,7 +246,7 @@ namespace VisionNet.Controls
             coordinationItem.Draw(gl);
             surfaceItem?.Draw(gl);
             if (surfaceItem != null &&
-                ((int)surfaceItem.SurfaceMode & (int)SurfaceMode.HeightMap) == (int)SurfaceMode.HeightMap)
+                surfaceItem.SurfaceColorMode != SurfaceColorMode.Intensity)
             {
                 colorBarItem.SetRange(surfaceItem.ZMin, surfaceItem.ZMax);
                 colorBarItem.Draw(gl);
@@ -157,7 +256,14 @@ namespace VisionNet.Controls
                 item.Draw(gl);
             }
         }
-
+        /// <summary>
+        /// 清空图元
+        /// </summary>
+        public void ResetView()
+        {
+            renderItem.Clear();
+            Invalidate();
+        }
         protected override void DoOpenGLInitialized()
         {
             base.DoOpenGLInitialized();
@@ -170,9 +276,12 @@ namespace VisionNet.Controls
             base.DoOpenGLDraw(e);
             OpenGL gl = OpenGL;
             gl.Clear(OpenGL.GL_COLOR_BUFFER_BIT | OpenGL.GL_DEPTH_BUFFER_BIT);
-            //// 启用深度测试
+            // 启用深度测试
             gl.Enable(OpenGL.GL_DEPTH_TEST);
             gl.DepthFunc(OpenGL.GL_LESS);
+            // 启用混合
+            gl.Enable(OpenGL.GL_BLEND);
+            gl.BlendFunc(OpenGL.GL_SRC_ALPHA, OpenGL.GL_ONE_MINUS_SRC_ALPHA);
             gl.LoadIdentity();
             // 设置投影矩阵
             camera.LookAtMatrix(gl);
@@ -180,6 +289,8 @@ namespace VisionNet.Controls
             Render(gl);
             // 禁用深度测试
             gl.Disable(OpenGL.GL_DEPTH_TEST);
+            // 禁用混合
+            gl.Disable(OpenGL.GL_BLEND);
         }
         protected override void DoGDIDraw(RenderEventArgs e)
         {
@@ -190,99 +301,81 @@ namespace VisionNet.Controls
             base.OnResize(e);
             camera.LookAtMatrix(OpenGL);
         }
-        public void Clear()
+        #endregion 渲染方法
+        private void toolStripMenuItem_ViewModeClick(object sender, EventArgs e)
         {
-            renderItem.Clear();
-            Invalidate();
-        }
-        private void toolStripMenuItem_Click(object sender, EventArgs e)
-        {
+            foreach (var item in viewModeToolStripMenuItem.DropDownItems)
+                ((ToolStripMenuItem)item).Checked = false;
+            var selectedItem = (ToolStripMenuItem)sender;
+            selectedItem.Checked = true;
+            camera.ViewMode = ViewMode = (ViewMode)Enum.Parse(typeof(ViewMode), selectedItem.Text);
             camera?.FitView(surfaceItem?.BoundingBox);
         }
-
-        private void InitializeComponent()
+        private void toolStripMenuItem_SurfaceModeClick(object sender, EventArgs e)
         {
-            this.components = new System.ComponentModel.Container();
-            this.menu_right = new System.Windows.Forms.ContextMenuStrip(this.components);
-            this.autoFitToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.viewModeToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.pointCloudToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.meshToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.heightMapToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.intensityToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.lineWidthToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.menu_right.SuspendLayout();
-            ((System.ComponentModel.ISupportInitialize)(this)).BeginInit();
-            this.SuspendLayout();
-            // 
-            // menu_right
-            // 
-            this.menu_right.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
-            this.autoFitToolStripMenuItem,
-            this.viewModeToolStripMenuItem,
-            this.lineWidthToolStripMenuItem});
-            this.menu_right.Name = "menu_right";
-            this.menu_right.Size = new System.Drawing.Size(181, 92);
-            // 
-            // autoFitToolStripMenuItem
-            // 
-            this.autoFitToolStripMenuItem.Name = "autoFitToolStripMenuItem";
-            this.autoFitToolStripMenuItem.Size = new System.Drawing.Size(180, 22);
-            this.autoFitToolStripMenuItem.Text = "Auto Fit";
-            this.autoFitToolStripMenuItem.Click += new System.EventHandler(this.toolStripMenuItem_Click);
-            // 
-            // viewModeToolStripMenuItem
-            // 
-            this.viewModeToolStripMenuItem.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
-            this.pointCloudToolStripMenuItem,
-            this.meshToolStripMenuItem,
-            this.heightMapToolStripMenuItem,
-            this.intensityToolStripMenuItem});
-            this.viewModeToolStripMenuItem.Name = "viewModeToolStripMenuItem";
-            this.viewModeToolStripMenuItem.Size = new System.Drawing.Size(180, 22);
-            this.viewModeToolStripMenuItem.Text = "ViewMode";
-            // 
-            // pointCloudToolStripMenuItem
-            // 
-            this.pointCloudToolStripMenuItem.Name = "pointCloudToolStripMenuItem";
-            this.pointCloudToolStripMenuItem.Size = new System.Drawing.Size(180, 22);
-            this.pointCloudToolStripMenuItem.Text = "Point Cloud";
-            // 
-            // meshToolStripMenuItem
-            // 
-            this.meshToolStripMenuItem.Name = "meshToolStripMenuItem";
-            this.meshToolStripMenuItem.Size = new System.Drawing.Size(180, 22);
-            this.meshToolStripMenuItem.Text = "Mesh";
-            // 
-            // heightMapToolStripMenuItem
-            // 
-            this.heightMapToolStripMenuItem.Name = "heightMapToolStripMenuItem";
-            this.heightMapToolStripMenuItem.Size = new System.Drawing.Size(180, 22);
-            this.heightMapToolStripMenuItem.Text = "HeightMap";
-            // 
-            // intensityToolStripMenuItem
-            // 
-            this.intensityToolStripMenuItem.Name = "intensityToolStripMenuItem";
-            this.intensityToolStripMenuItem.Size = new System.Drawing.Size(180, 22);
-            this.intensityToolStripMenuItem.Text = "Intensity";
-            // 
-            // lineWidthToolStripMenuItem
-            // 
-            this.lineWidthToolStripMenuItem.Name = "lineWidthToolStripMenuItem";
-            this.lineWidthToolStripMenuItem.Size = new System.Drawing.Size(180, 22);
-            this.lineWidthToolStripMenuItem.Text = "LineWidth";
-            // 
-            // CxDisplay
-            // 
-            this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
-            this.BackColor = System.Drawing.SystemColors.ActiveCaptionText;
-            this.ContextMenuStrip = this.menu_right;
-            this.Name = "CxDisplay";
-            this.RenderContextType = SharpGL.RenderContextType.FBO;
-            this.menu_right.ResumeLayout(false);
-            ((System.ComponentModel.ISupportInitialize)(this)).EndInit();
-            this.ResumeLayout(false);
+            foreach (var item in surfaceModeToolStripMenuItem.DropDownItems)
+                ((ToolStripMenuItem)item).Checked = false;
+            var selectedItem = (ToolStripMenuItem)sender;
+            selectedItem.Checked = true;
+            SurfaceMode = (SurfaceMode)Enum.Parse(typeof(SurfaceMode), selectedItem.Text);
+        }
+        private void toolStripMenuItem_SurfaceColorModeClick(object sender, EventArgs e)
+        {
+            foreach (var item in surfaceColorModeToolStripMenuItem.DropDownItems)
+                ((ToolStripMenuItem)item).Checked = false;
+            var selectedItem = (ToolStripMenuItem)sender;
+            selectedItem.Checked = true;
+            SurfaceColorMode = (SurfaceColorMode)Enum.Parse(typeof(SurfaceColorMode), selectedItem.Text);
+        }
+        private void lineWidthToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            var state = float.TryParse(lineWidthToolStripTextBox.Text, out float lineWidth);
+            if (!state)
+            {
+                lineWidth = 1;
+                lineWidthToolStripTextBox.Text = "1";
+            }
+            foreach (var item in renderItem)
+                item.LineWidth = lineWidth;
+        }
 
+        protected override void OnMouseClick(MouseEventArgs e)
+        {
+            //base.OnMouseClick(e);
+            var pos = GetPointCloudCoordinate(e.X, e.Y);
+            if(e.Button == MouseButtons.Left)
+            {
+                if (pos.HasValue)
+                    SetPoint(pos.Value, Color.Red);
+            }
+        }
+
+        private CxPoint3D? GetPointCloudCoordinate(int mouseX, int mouseY)
+        {
+            OpenGL gl = OpenGL;
+
+            // 获取当前视口
+            int[] viewport = new int[4];
+            gl.GetInteger(OpenGL.GL_VIEWPORT, viewport);
+
+            // 调整Y坐标（OpenGL坐标系原点在左下角）
+            int adjustedY = viewport[3] - mouseY;
+
+            // 为深度值创建byte数组
+            byte[] depthBuffer = new byte[4]; // 单个float值需要4个字节
+            // 读取深度值到byte数组
+            gl.ReadPixels(mouseX, adjustedY, 1, 1, OpenGL.GL_DEPTH_COMPONENT, OpenGL.GL_FLOAT, depthBuffer);
+            // 将byte数组转换为float
+            float depth = BitConverter.ToSingle(depthBuffer, 0);
+            // 在转换坐标之前检查深度值
+            if (Math.Abs(depth - 1.0f) < 0.000001f)
+            {
+                // 深度值为1.0，表示点击了背景
+                return null; // 或者返回一个特殊值表示无效点击
+            }
+            // 将屏幕坐标转换为世界坐标
+            var obj = gl.UnProject((double)mouseX, (double)adjustedY, (double)depth);
+            return new CxPoint3D((float)obj[0], (float)obj[1], (float)obj[2]);
         }
     }
 }

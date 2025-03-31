@@ -58,21 +58,15 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="CxDisplay.Designer.cs">
+		<DependentUpon>DemoFrom.cs</DependentUpon>
+	</Comile>
     <Compile Include="CxCamera.cs" />
     <Compile Include="CxDisplay.cs">
       <SubType>UserControl</SubType>
     </Compile>
-    <Compile Include="CxDisplay.Designer.cs">
-      <DependentUpon>CxDisplay.cs</DependentUpon>
-    </Compile>
-    <EmbeddedResource Include="CxDisplay.resx">
-      <DependentUpon>CxDisplay.cs</DependentUpon>
-    </EmbeddedResource>
-    <Compile Include="CxTrackBallCamera.cs" />
-    <Compile Include="RenderItem\CxBox3DItem.cs" />
     <Compile Include="RenderItem\CxColorBarItem.cs" />
     <Compile Include="RenderItem\CxCoordinateSystemItem.cs" />
-    <Compile Include="RenderItem\CxPlane3DItem.cs" />
     <Compile Include="RenderItem\CxPoint3DItem.cs" />
     <Compile Include="RenderItem\CxPolygon3DItem.cs" />
     <Compile Include="RenderItem\CxSegment3DItem.cs" />
@@ -81,6 +75,11 @@
     <Compile Include="RenderItem\IRenderItem.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Service Include="{94E38DFF-614B-4cbd-B67C-F211BB35CE8B}" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="CxDisplay.resx">
+      <DependentUpon>CxDisplay.cs</DependentUpon>
+    </EmbeddedResource>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>
