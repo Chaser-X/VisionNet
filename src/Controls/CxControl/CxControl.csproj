@@ -24,10 +24,10 @@
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
     <Optimize>true</Optimize>
-    <OutputPath>bin\Release\</OutputPath>
+    <OutputPath>..\..\..\bin\Release\</OutputPath>
     <DefineConstants>TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
-    <WarningLevel>4</WarningLevel>
+    <WarningLevel>5</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="SharpGL">
@@ -72,12 +72,14 @@
     <Compile Include="RenderItem\CxBox3DItem.cs" />
     <Compile Include="RenderItem\CxColorBarItem.cs" />
     <Compile Include="RenderItem\CxCoordinateSystemItem.cs" />
+    <Compile Include="RenderItem\CxCoordinationTagItem.cs" />
     <Compile Include="RenderItem\CxPlane3DItem.cs" />
     <Compile Include="RenderItem\CxPoint3DItem.cs" />
     <Compile Include="RenderItem\CxPolygon3DItem.cs" />
     <Compile Include="RenderItem\CxSegment3DItem.cs" />
     <Compile Include="RenderItem\CxSurfaceItem.cs" />
     <Compile Include="CxExtension.cs" />
+    <Compile Include="RenderItem\CxTextInfoItem.cs" />
     <Compile Include="RenderItem\IRenderItem.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Service Include="{94E38DFF-614B-4cbd-B67C-F211BB35CE8B}" />

@@ -15,22 +15,29 @@ namespace VisionNet.Controls
     public partial class CxDisplay : OpenGLControl, IDisposable
     {
         private CxTrackBallCamera camera;
+        bool isMouseDown = false;
         // 渲染数据
         private CxSurfaceItem surfaceItem = null;
         private CxCoordinateSystemItem coordinationItem = new CxCoordinateSystemItem();
         private CxColorBarItem colorBarItem = new CxColorBarItem();
+        private CxCoordinationTagItem coorTagItem = new CxCoordinationTagItem();
         private List<IRenderItem> renderItem = new List<IRenderItem>();
-        private ViewMode pViewMode = ViewMode.Top;
-        public ViewMode ViewMode
-        {
-            get { return pViewMode; }
-            set
-            {
-                pViewMode = value;
-                if (camera != null)
-                    camera.ViewMode = value;
-            }
-        }
+
+        //相机属性
+        public CxTrackBallCamera Camera => camera;
+
+        //private ViewMode pViewMode = ViewMode.Top;
+        //public ViewMode ViewMode
+        //{
+        //    get { return pViewMode; }
+        //    set
+        //    {
+        //        pViewMode = value;
+        //        if (camera != null)
+        //            camera.ViewMode = value;
+        //    }
+        //}
+
         private SurfaceMode pSufaceMode = VisionNet.Controls.SurfaceMode.PointCloud;
         public SurfaceMode SurfaceMode
         {
@@ -53,6 +60,7 @@ namespace VisionNet.Controls
                     surfaceItem.SurfaceColorMode = value;
             }
         }
+
         public CxDisplay() : this(ViewMode.Top, SurfaceMode.PointCloud, SurfaceColorMode.ColorWithIntensity)
         {
 
@@ -64,13 +72,13 @@ namespace VisionNet.Controls
             if (!DesignMode)
             {
                 camera = new CxTrackBallCamera(this);
-                camera.ViewMode = ViewMode = viewMode;
+                camera.ViewMode = viewMode;
                 InitializeComponent();
 
                 foreach (var item in viewModeToolStripMenuItem.DropDownItems)
                 {
                     var tripItem = (ToolStripMenuItem)item;
-                    tripItem.Checked = tripItem.Text == ViewMode.ToString();
+                    tripItem.Checked = tripItem.Text == camera.ViewMode.ToString();
                 }
                 SurfaceMode = surfaceMode;
                 foreach (var item in surfaceModeToolStripMenuItem.DropDownItems)
@@ -110,7 +118,7 @@ namespace VisionNet.Controls
             }
 
             surfaceItem = new CxSurfaceItem(tempSuface ?? new CxSurface(), SurfaceMode, SurfaceColorMode);
-            camera.ViewMode = ViewMode;
+            //camera.ViewMode = ViewMode;
             camera.FitView(surfaceItem.BoundingBox); // 调整视图以适应点云数据
         }
         /// <summary>
@@ -226,15 +234,29 @@ namespace VisionNet.Controls
             }
         }
 
-
-        /// <summary>
-        /// 添加3D文本
-        /// </summary>
-        public void SetText(TextInfo text)
+        //添加Textinfo
+        public void SetTextInfo(TextInfo textInfo, Color color)
         {
-            if (string.IsNullOrEmpty(text.Text)) return;
-            //textInfos.Add(text);
+            var textItem = renderItem.Find(x => x.GetType() == typeof(CxTextInfoItem));
+            if (textItem == null)
+            {
+                textItem = new CxTextInfoItem(new Dictionary<TextInfo, Color> { { textInfo, color } });
+                renderItem.Add(textItem);
+            }
+            else
+            {
+                var cxtextItem = textItem as CxTextInfoItem;
+                if (cxtextItem.TextInfoColors.ContainsKey(textInfo))
+                {
+                    cxtextItem.TextInfoColors[textInfo] = color;
+                }
+                else
+                {
+                    cxtextItem.TextInfoColors.Add(textInfo, color);
+                }
+            }
         }
+
         #endregion
         #region 渲染方法
         /// <summary>
@@ -244,6 +266,7 @@ namespace VisionNet.Controls
         {
             coordinationItem.DrawScreenPositionedAxes(gl);
             coordinationItem.Draw(gl);
+
             surfaceItem?.Draw(gl);
             if (surfaceItem != null &&
                 surfaceItem.SurfaceColorMode != SurfaceColorMode.Intensity)
@@ -255,7 +278,12 @@ namespace VisionNet.Controls
             {
                 item.Draw(gl);
             }
+
+            if (surfaceItem != null)
+                coorTagItem.Draw(gl);
         }
+
+
         /// <summary>
         /// 清空图元
         /// </summary>
@@ -302,13 +330,21 @@ namespace VisionNet.Controls
             camera.LookAtMatrix(OpenGL);
         }
         #endregion 渲染方法
+
+        private void d2DToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            var selectedItem = (ToolStripMenuItem)sender;
+            selectedItem.Checked = !selectedItem.Checked;
+            camera.Enable2DView = selectedItem.Checked;
+            camera?.FitView(surfaceItem?.BoundingBox);
+        }
         private void toolStripMenuItem_ViewModeClick(object sender, EventArgs e)
         {
             foreach (var item in viewModeToolStripMenuItem.DropDownItems)
                 ((ToolStripMenuItem)item).Checked = false;
             var selectedItem = (ToolStripMenuItem)sender;
             selectedItem.Checked = true;
-            camera.ViewMode = ViewMode = (ViewMode)Enum.Parse(typeof(ViewMode), selectedItem.Text);
+            camera.ViewMode = (ViewMode)Enum.Parse(typeof(ViewMode), selectedItem.Text);
             camera?.FitView(surfaceItem?.BoundingBox);
         }
         private void toolStripMenuItem_SurfaceModeClick(object sender, EventArgs e)
@@ -318,6 +354,7 @@ namespace VisionNet.Controls
             var selectedItem = (ToolStripMenuItem)sender;
             selectedItem.Checked = true;
             SurfaceMode = (SurfaceMode)Enum.Parse(typeof(SurfaceMode), selectedItem.Text);
+
         }
         private void toolStripMenuItem_SurfaceColorModeClick(object sender, EventArgs e)
         {
@@ -338,29 +375,36 @@ namespace VisionNet.Controls
             foreach (var item in renderItem)
                 item.LineWidth = lineWidth;
         }
-
-        protected override void OnMouseClick(MouseEventArgs e)
+        protected override void OnMouseDown(MouseEventArgs e)
         {
-            //base.OnMouseClick(e);
-            var pos = GetPointCloudCoordinate(e.X, e.Y);
-            if(e.Button == MouseButtons.Left)
-            {
-                if (pos.HasValue)
-                    SetPoint(pos.Value, Color.Red);
-            }
+            isMouseDown = true;
+            base.OnMouseDown(e);
         }
-
+        protected override void OnMouseUp(MouseEventArgs e)
+        {
+            isMouseDown = false;
+            base.OnMouseUp(e);
+        }
+        protected override void OnMouseMove(MouseEventArgs e)
+        {
+            var pos = GetPointCloudCoordinate(e.X, e.Y);
+            if (pos.HasValue && !isMouseDown)
+            {
+                coorTagItem.Visible = true;
+                coorTagItem.SetCoordinates(pos.Value);
+            }
+            else
+                coorTagItem.Visible = false;
+            base.OnMouseMove(e);
+        }
         private CxPoint3D? GetPointCloudCoordinate(int mouseX, int mouseY)
         {
             OpenGL gl = OpenGL;
-
             // 获取当前视口
             int[] viewport = new int[4];
             gl.GetInteger(OpenGL.GL_VIEWPORT, viewport);
-
             // 调整Y坐标（OpenGL坐标系原点在左下角）
             int adjustedY = viewport[3] - mouseY;
-
             // 为深度值创建byte数组
             byte[] depthBuffer = new byte[4]; // 单个float值需要4个字节
             // 读取深度值到byte数组
@@ -368,7 +412,7 @@ namespace VisionNet.Controls
             // 将byte数组转换为float
             float depth = BitConverter.ToSingle(depthBuffer, 0);
             // 在转换坐标之前检查深度值
-            if (Math.Abs(depth - 1.0f) < 0.000001f)
+            if (Math.Abs(depth - 1.0f) < 0.00001f)
             {
                 // 深度值为1.0，表示点击了背景
                 return null; // 或者返回一个特殊值表示无效点击
@@ -377,6 +421,7 @@ namespace VisionNet.Controls
             var obj = gl.UnProject((double)mouseX, (double)adjustedY, (double)depth);
             return new CxPoint3D((float)obj[0], (float)obj[1], (float)obj[2]);
         }
+
     }
 }
 

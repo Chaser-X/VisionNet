@@ -73,7 +73,7 @@ namespace VisionNet.Controls
             return (r, g, b);
         }
 
-        private void DrawTextLabel3D(OpenGL gl, float x, float y, float z, float size, string text)
+        public static void DrawTextLabel3D(OpenGL gl, float x, float y, float z, float size, string text)
         {
             // 将3D坐标转换为屏幕坐标（包括深度信息）
             var objCoord = new Vertex(x, y, z);
@@ -115,7 +115,7 @@ namespace VisionNet.Controls
 
             gl.PopMatrix();
         }
-        private void DrawTextLabel2D(OpenGL gl, float x, float y, float z, float size, string text)
+        public static void DrawTextLabel2D(OpenGL gl, float x, float y, float z, float size, string text)
         {
             // 将3D坐标转换为屏幕坐标（包括深度信息）
             var objCoord = new Vertex(x, y, z);

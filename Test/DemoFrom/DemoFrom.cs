@@ -158,11 +158,15 @@ namespace DemoFrom
 
             //添加平面 Plane3D
             var plane = new Plane3D(new CxPoint3D(0, 0, 0), new CxVector3D(1, 1, 1));
-            cxDisplay2.SetPlane(plane, Color.FromArgb(20,Color.Blue) );
+            cxDisplay2.SetPlane(plane, Color.FromArgb(100,Color.Red) );
 
             //添加Box3D
             var box = new Box3D(new CxPoint3D(0, 0, 0), new CxSize3D(10, 10, 10));
             cxDisplay2.SetBox(box, Color.Yellow);
+
+            //添加TextInfo
+            var text = new TextInfo(new CxPoint3D(0, 0, 0), "this is a test!",10);
+            cxDisplay2.SetTextInfo(text,Color.Yellow);
         }
     }
 }

@@ -10,7 +10,7 @@ namespace VisionNet.Controls
     /// </summary>
     public class CxCoordinateSystemItem : RenderAbstractItem
     {
-        private readonly float axisLength; 
+        private readonly float axisLength;
         private readonly float axisRadius;
         private readonly float coneHeight;
         private readonly float coneRadius;
@@ -44,6 +44,8 @@ namespace VisionNet.Controls
         /// </summary>
         public void DrawScreenPositionedAxes(OpenGL gl)
         {
+            //关闭深度测试
+            gl.Disable(OpenGL.GL_DEPTH_TEST);
             // 保存当前矩阵状态
             gl.PushAttrib(OpenGL.GL_ALL_ATTRIB_BITS);
 
@@ -63,6 +65,10 @@ namespace VisionNet.Controls
             modelViewMatrix[12] = 0.0f;
             modelViewMatrix[13] = 0.0f;
             modelViewMatrix[14] = 0.0f;
+            // 移除缩放部分：归一化旋转矩阵的列向量
+            NormalizeColumn(modelViewMatrix, 0); // 归一化第 0 列
+            NormalizeColumn(modelViewMatrix, 1); // 归一化第 1 列
+            NormalizeColumn(modelViewMatrix, 2); // 归一化第 2 列
 
             // 切换到正交投影
             gl.MatrixMode(OpenGL.GL_PROJECTION);
@@ -82,7 +88,7 @@ namespace VisionNet.Controls
             // 设置坐标轴大小
             float axisScale = 10.0f;
             gl.Scale(axisScale, axisScale, axisScale);
-
+            
             // 应用旋转（但不应用平移）
             gl.MultMatrix(modelViewMatrix);
 
@@ -98,12 +104,14 @@ namespace VisionNet.Controls
 
             // 恢复属性
             gl.PopAttrib();
+            // 恢复深度测试
+            gl.Enable(OpenGL.GL_DEPTH_TEST);
 
         }
         private void DrawAxis(OpenGL gl, float length, float radius, float coneHeight, float coneRadius, float r, float g, float b)
         {
             gl.Color(r, g, b);
-          
+
             // 绘制圆柱
             Cylinder cylinder = new Cylinder();
             cylinder.BaseRadius = radius;
@@ -147,6 +155,21 @@ namespace VisionNet.Controls
                 gl.Vertex(x, y, 0.0f);
             }
             gl.End();
+        }
+        // 归一化矩阵的列向量
+        private void NormalizeColumn(float[] matrix, int columnIndex)
+        {
+            float x = matrix[columnIndex];
+            float y = matrix[4 + columnIndex];
+            float z = matrix[8 + columnIndex];
+
+            float length = (float)Math.Sqrt(x * x + y * y + z * z);
+            if (length > 0.0f)
+            {
+                matrix[columnIndex] /= length;
+                matrix[4 + columnIndex] /= length;
+                matrix[8 + columnIndex] /= length;
+            }
         }
     }
 }

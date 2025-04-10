@@ -27,6 +27,8 @@ namespace VisionNet.Controls
             int startX = gl.RenderContextProvider.Width - colorBarWidth - 10; // 颜色条的起始位置（右侧，留出一些边距）
             int startY = (gl.RenderContextProvider.Height - colorBarHeight) / 2; // 颜色条竖直居中
 
+            // 关闭深度测试
+            gl.Disable(OpenGL.GL_DEPTH_TEST);
             // 设置 2D 正交投影模式
             gl.MatrixMode(OpenGL.GL_PROJECTION);
             gl.PushMatrix();
@@ -38,7 +40,7 @@ namespace VisionNet.Controls
 
             // 绘制颜色条
             gl.Begin(OpenGL.GL_QUADS);
-
+           
             for (int i = 0; i < colorBarHeight; i++)
             {
                 // 计算归一化值和当前高度
@@ -59,7 +61,7 @@ namespace VisionNet.Controls
             // 绘制刻度和文字
             int numDivisions = 7; // 7 等分
             gl.Color(1.0f, 1.0f, 1.0f); // 刻度和文字用白色
-
+            gl.LineWidth(1.0f); // 设置线宽
             for (int i = 0; i <= numDivisions; i++)
             {
                 // 计算刻度位置和对应高度
@@ -73,12 +75,14 @@ namespace VisionNet.Controls
                 // 绘制高度文字
                 gl.DrawText(startX - 45, tickY - 5, 1, 1, 1, "", 10, $"{heightValue:F2}");
             }
-
+       
             // 恢复矩阵设置
             gl.PopMatrix();
             gl.MatrixMode(OpenGL.GL_PROJECTION);
             gl.PopMatrix();
             gl.MatrixMode(OpenGL.GL_MODELVIEW);
+            // 恢复深度测试
+            gl.Enable(OpenGL.GL_DEPTH_TEST);
         }
     }
 }

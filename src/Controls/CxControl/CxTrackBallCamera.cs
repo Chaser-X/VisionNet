@@ -24,6 +24,7 @@ namespace VisionNet.Controls
         #endregion
         #region 属性
         public ViewMode ViewMode { get; set; } = ViewMode.Front;
+        public bool Enable2DView { get; set; } = false;
         #endregion
         #region 构造函数
         public CxTrackBallCamera(OpenGLControl openGLControl)
@@ -80,8 +81,9 @@ namespace VisionNet.Controls
                 float angleX = deltaY * 0.5f;
                 float angleY = deltaX * 0.5f;
 
-                // 更新旋转矩阵
-                UpdateRotationMatrix(angleX, angleY);
+                if(!Enable2DView)
+                    // 更新旋转矩阵
+                    UpdateRotationMatrix(angleX, angleY);
 
                 lastMouseX = e.X;
                 lastMouseY = e.Y;
@@ -101,8 +103,9 @@ namespace VisionNet.Controls
         }
         private void OpenGLControl_MouseWheel(object sender, MouseEventArgs e)
         {
-            translateZ += e.Delta * (translateZSpeed * (1 - (-translateZ) / 10000.0f));
-            //translateZ += e.Delta * translateZSpeed * Math.Abs(translateZ) * 2.0f;
+            // translateZ += e.Delta * (translateZSpeed * (1 - (-translateZ) / 10000.0f));
+            float delta = e.Delta > 0 ? 0.9f : 1.1f;
+            translateZ *= delta;
             openGLControl.Invalidate();
         }
         #endregion
@@ -128,7 +131,16 @@ namespace VisionNet.Controls
 
             translateX = (float)-viewBox.Value.Center.X;
             translateY = (float)-viewBox.Value.Center.Y;
-            translateZ = (float)-viewBox.Value.Center.Z - (float)zoomFactor * 1.5f; //  适当调整视距
+            if(!Enable2DView)
+                translateZ = (float)-viewBox.Value.Center.Z - (float)zoomFactor * 1.2f; //  适当调整视距
+            else
+            {
+                var scaleWdith = pointCloudWidth / aspectRatio;
+                if(scaleWdith > pointCloudHeight)
+                    translateZ = (float)(openGLControl.Width / scaleWdith); //  适当调整视距
+                else
+                    translateZ = (float)(openGLControl.Height / pointCloudHeight); //  适当调整视距
+            }
 
             // 重置旋转矩阵
             for (int i = 0; i < 16; i++)
@@ -161,14 +173,37 @@ namespace VisionNet.Controls
 
             gl.MatrixMode(OpenGL.GL_PROJECTION);
             gl.LoadIdentity();
-            double nearPlane = 0.01; // 近裁剪面
-            double farPlane = 1000.0; // 远裁剪面
-            double aspectRatio = (double)openGLControl.Width / (double)openGLControl.Height;
-            double fov = 60.0; // 视场角
-            gl.Perspective(fov, aspectRatio, nearPlane, farPlane); // 设置透视投影
+
+            if (!Enable2DView)
+            {
+                // 设置透视投影
+                double nearPlane = 0.01; // 近裁剪面
+                double farPlane = 1000.0; // 远裁剪面
+                double aspectRatio = (double)openGLControl.Width / (double)openGLControl.Height;
+                double fov = 60.0; // 视场角
+                gl.Perspective(fov, aspectRatio, nearPlane, farPlane); // 设置透视投影
+            }
+            else
+            {
+                // 设置正交投影
+                double left = -openGLControl.Width / 2;
+                double right = openGLControl.Width / 2;
+                double bottom = -openGLControl.Height / 2;
+                double top = openGLControl.Height / 2;
+                gl.Ortho(left, right, bottom, top, -1000.0, 1000.0); // 设置正交投影
+            }
+
             gl.MatrixMode(OpenGL.GL_MODELVIEW);
             gl.LoadIdentity();
-            gl.Translate(translateX, translateY, translateZ);
+            if (!Enable2DView)
+            {
+                gl.Translate(translateX, translateY, translateZ);
+            }
+            else
+            {
+                gl.Translate(translateX, translateY, 0);
+                gl.Scale(translateZ, -translateZ, 1);
+            }
             gl.MultMatrix(rotationMatrix);
         }
         private void UpdateRotationMatrix(float angleX, float angleY)
