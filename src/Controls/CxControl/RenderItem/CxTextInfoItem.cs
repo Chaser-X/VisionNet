@@ -9,19 +9,17 @@ namespace VisionNet.Controls
 {
     public class CxTextInfoItem : RenderAbstractItem
     {
-        public Dictionary<TextInfo, Color> TextInfoColors { get; set; } = new Dictionary<TextInfo, Color>();
-        public CxTextInfoItem(Dictionary<TextInfo, Color> textInfoColors)
+        public TextInfo[] TextInfos { get; private set; }
+        public CxTextInfoItem(TextInfo[] textInfos, Color color, float size = 1.0f) : base(color, size)
         {
-            this.TextInfoColors = textInfoColors;
+            this.TextInfos = textInfos;
         }
         public override void Draw(OpenGL gl)
         {
-            if (TextInfoColors.Count == 0) return;
+            if (TextInfos == null || TextInfos.Length == 0) return;
 
-            foreach (var kvp in TextInfoColors)
+            foreach (var textInfo in TextInfos)
             {
-                var textInfo = kvp.Key;
-                var color = kvp.Value;
                 // 将3D坐标转换为屏幕坐标（包括深度信息）
                 var objCoord = new Vertex(textInfo.Location.X, textInfo.Location.Y, textInfo.Location.Z);
                 var screenCoord = gl.Project(objCoord);
@@ -36,7 +34,7 @@ namespace VisionNet.Controls
                 {
                     return;
                 }
-                gl.DrawText((int)screenCoord.X, (int)screenCoord.Y, (float)(color.R / 255.0), (float)(color.G / 255.0), (float)(color.B / 255.0), "Arial", textInfo.Size, textInfo.Text);
+                gl.DrawText((int)screenCoord.X, (int)screenCoord.Y, (float)(Color.R / 255.0), (float)(Color.G / 255.0), (float)(Color.B / 255.0), "Arial", textInfo.Size, textInfo.Text);
             }
         }
     }

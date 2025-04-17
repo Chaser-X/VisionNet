@@ -7,24 +7,20 @@ namespace VisionNet.Controls
 {
     public class CxSegment3DItem : RenderAbstractItem
     {
-        public Dictionary<Segment3D, Color> SegmentColors { get; set; } = new Dictionary<Segment3D, Color>();
-        public CxSegment3DItem(Dictionary<Segment3D, Color> segmentColors)
+        public Segment3D[] Segment3Ds { get; private set; }
+        public CxSegment3DItem(Segment3D[] segments, Color color, float size = 1.0f) : base(color, size)
         {
-            this.SegmentColors = segmentColors;
+            this.Segment3Ds = segments;
         }
-
         public override void Draw(OpenGL gl)
         {
-            if (SegmentColors.Count == 0) return;
+            if (Segment3Ds == null || Segment3Ds.Length == 0) return;
 
-            gl.LineWidth(LineWidth);
+            gl.LineWidth(Size);
             gl.Begin(OpenGL.GL_LINES);
-            foreach (var kvp in SegmentColors)
+            foreach (var segment in Segment3Ds)
             {
-                var segment = kvp.Key;
-                var color = kvp.Value;
-
-                gl.Color(color.R / 255.0, color.G /255.0, color.B / 255.0); // 设置颜色
+                gl.Color(Color.R / 255.0, Color.G / 255.0, Color.B / 255.0); // 设置颜色
                 gl.Vertex(segment.Start.X, segment.Start.Y, segment.Start.Z);
                 gl.Vertex(segment.End.X, segment.End.Y, segment.End.Z);
             }

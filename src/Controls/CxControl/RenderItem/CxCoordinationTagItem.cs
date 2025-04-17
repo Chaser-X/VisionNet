@@ -8,13 +8,15 @@ namespace VisionNet.Controls
     public class CxCoordinationTagItem : RenderAbstractItem
     {
         public CxPoint3D Point { get; set; } = new CxPoint3D();
+        public byte? Intensity { get; set; } = null; // 点的强度值
         public bool Visible { get; set; } = true; // 控制标签是否可见
 
         public Color TextColor { get; set; } = Color.White;
 
-        public void SetCoordinates(CxPoint3D point)
+        public void SetCoordinates(CxPoint3D point , byte? intesity = null)
         {
             Point = point;
+            Intensity = intesity;
         }
 
         public override void Draw(OpenGL gl)
@@ -37,7 +39,7 @@ namespace VisionNet.Controls
             }
 
             int rectWidth = 80; // 矩形宽度
-            int rectHeight = 80; // 矩形高度
+            int rectHeight = Intensity.HasValue ? 90 : 80; // 矩形高度
             int startX = (int)screenCoord.X; // 矩形左上角X坐标
             int startY = (int)screenCoord.Y; // 矩形左上角Y坐标
 
@@ -83,9 +85,11 @@ namespace VisionNet.Controls
             int textOffsetX = 10; // 文本的X偏移
             int textOffsetY = 20; // 文本的Y偏移
             var (R, G, B) = (TextColor.R / 255.0f, TextColor.G / 255.0f, TextColor.B / 255.0f);
-            gl.DrawText(startX + textOffsetX, startY - textOffsetY, R, G, B, "Helvetica", 12, $"X: {Point.X:F2}");
-            gl.DrawText(startX + textOffsetX, startY - textOffsetY * 2, R, B, B, "Helvetica", 12, $"Y: {Point.Y:F2}");
-            gl.DrawText(startX + textOffsetX, startY - textOffsetY * 3, R, G, B, "Helvetica", 12, $"Z: {Point.Z:F2}");
+            gl.DrawText(startX + textOffsetX, startY - textOffsetY, R, G, B, "Helvetica", 12, $"X: {Point.X:F3}");
+            gl.DrawText(startX + textOffsetX, startY - textOffsetY * 2, R, B, B, "Helvetica", 12, $"Y: {Point.Y:F3}");
+            gl.DrawText(startX + textOffsetX, startY - textOffsetY * 3, R, G, B, "Helvetica", 12, $"Z: {Point.Z:F3}");
+            if (Intensity.HasValue)
+                gl.DrawText(startX + textOffsetX, startY - textOffsetY * 4, R, G, B, "Helvetica", 12, $"I: {Intensity.Value}");
 
             // 恢复模型视图矩阵
             gl.PopMatrix();

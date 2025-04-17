@@ -20,7 +20,6 @@ namespace VisionNet.Controls
         private int lastMouseX, lastMouseY;
         private float[] rotationMatrix = new float[16];
         private float translateSpeed = 0.5f;
-        private float translateZSpeed = 0.001f;
         #endregion
         #region 属性
         public ViewMode ViewMode { get; set; } = ViewMode.Front;
@@ -124,7 +123,7 @@ namespace VisionNet.Controls
             double pointCloudHeight = viewBox.Value.Size.Height;
 
             //计算平移缩放的速度系数
-            translateSpeed = translateZSpeed = (float)Math.Min(pointCloudWidth, pointCloudHeight) / 400.0f;
+            translateSpeed = (float)Math.Min(pointCloudWidth, pointCloudHeight) / 100.0f;
             // 根据窗体大小和点云的大小自适应设置 zoom
             double aspectRatio = (double)openGLControl.Width / (double)openGLControl.Height;
             double zoomFactor = Math.Max(pointCloudWidth / aspectRatio, pointCloudHeight);

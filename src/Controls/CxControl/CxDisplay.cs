@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Numerics;
+using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
 using SharpGL;
@@ -22,21 +23,8 @@ namespace VisionNet.Controls
         private CxColorBarItem colorBarItem = new CxColorBarItem();
         private CxCoordinationTagItem coorTagItem = new CxCoordinationTagItem();
         private List<IRenderItem> renderItem = new List<IRenderItem>();
-
         //相机属性
         public CxTrackBallCamera Camera => camera;
-
-        //private ViewMode pViewMode = ViewMode.Top;
-        //public ViewMode ViewMode
-        //{
-        //    get { return pViewMode; }
-        //    set
-        //    {
-        //        pViewMode = value;
-        //        if (camera != null)
-        //            camera.ViewMode = value;
-        //    }
-        //}
 
         private SurfaceMode pSufaceMode = VisionNet.Controls.SurfaceMode.PointCloud;
         public SurfaceMode SurfaceMode
@@ -60,7 +48,6 @@ namespace VisionNet.Controls
                     surfaceItem.SurfaceColorMode = value;
             }
         }
-
         public CxDisplay() : this(ViewMode.Top, SurfaceMode.PointCloud, SurfaceColorMode.ColorWithIntensity)
         {
 
@@ -124,139 +111,41 @@ namespace VisionNet.Controls
         /// <summary>
         /// 添加线段
         /// </summary>
-        public void SetSegment(Segment3D segment, Color color)
+        public void SetSegment(Segment3D[] segment, Color color, float size = 1.0f)
         {
-            var segmentItem = renderItem.Find(x => x.GetType() == typeof(CxSegment3DItem));
-            if (segmentItem == null)
-            {
-                segmentItem = new CxSegment3DItem(new Dictionary<Segment3D, Color> { { segment, color } });
-                renderItem.Add(segmentItem);
-            }
-            else
-            {
-                var cxsegmentItem = segmentItem as CxSegment3DItem;
-                if (cxsegmentItem.SegmentColors.ContainsKey(segment))
-                {
-                    cxsegmentItem.SegmentColors[segment] = color;
-                }
-                else
-                {
-                    cxsegmentItem.SegmentColors.Add(segment, color);
-                }
-            }
+            var segmentItem = new CxSegment3DItem(segment, color, size);
+            renderItem.Add(segmentItem);
         }
         //添加点
-        public void SetPoint(CxPoint3D point, Color color)
+        public void SetPoint(CxPoint3D[] point, Color color, float size = 1.0f)
         {
-            var pointItem = renderItem.Find(x => x.GetType() == typeof(CxPoint3DItem));
-            if (pointItem == null)
-            {
-                pointItem = new CxPoint3DItem(new Dictionary<CxPoint3D, Color> { { point, color } });
-                renderItem.Add(pointItem);
-            }
-            else
-            {
-                var cxpointItem = pointItem as CxPoint3DItem;
-                if (cxpointItem.PointColors.ContainsKey(point))
-                {
-                    cxpointItem.PointColors[point] = color;
-                }
-                else
-                {
-                    cxpointItem.PointColors.Add(point, color);
-                }
-            }
+            var pointItem = new CxPoint3DItem(point, color, size);
+            renderItem.Add(pointItem);
         }
         //添加多边形
-        public void SetPolygon(Polygon3D polygon, Color color)
+        public void SetPolygon(Polygon3D[] polygon, Color color, float size = 1.0f)
         {
-            var polygonItem = renderItem.Find(x => x.GetType() == typeof(CxPolygon3DItem));
-            if (polygonItem == null)
-            {
-                polygonItem = new CxPolygon3DItem(new Dictionary<Polygon3D, Color> { { polygon, color } });
-                renderItem.Add(polygonItem);
-            }
-            else
-            {
-                var cxpolygonItem = polygonItem as CxPolygon3DItem;
-                if (cxpolygonItem.PolygonColors.ContainsKey(polygon))
-                {
-                    cxpolygonItem.PolygonColors[polygon] = color;
-                }
-                else
-                {
-                    cxpolygonItem.PolygonColors.Add(polygon, color);
-                }
-            }
+            var polygonItem = new CxPolygon3DItem(polygon, color, size);
+            renderItem.Add(polygonItem);
         }
         //添加平面
-        public void SetPlane(Plane3D plane, Color color)
+        public void SetPlane(Plane3D[] plane, Color color, float size = 100.0f)
         {
-            var planeItem = renderItem.Find(x => x.GetType() == typeof(CxPlane3DItem));
-            if (planeItem == null)
-            {
-                planeItem = new CxPlane3DItem(new Dictionary<Plane3D, Color> { { plane, color } });
-                renderItem.Add(planeItem);
-            }
-            else
-            {
-                var cxplaneItem = planeItem as CxPlane3DItem;
-                if (cxplaneItem.PlaneColors.ContainsKey(plane))
-                {
-                    cxplaneItem.PlaneColors[plane] = color;
-                }
-                else
-                {
-                    cxplaneItem.PlaneColors.Add(plane, color);
-                }
-            }
+            var planeItem = new CxPlane3DItem(plane, color, size);
+            renderItem.Add(planeItem);
         }
         //添加Box3D
-        public void SetBox(Box3D box, Color color)
+        public void SetBox(Box3D[] box, Color color, float size = 1.0f)
         {
-            var boxItem = renderItem.Find(x => x.GetType() == typeof(CxBox3DItem));
-            if (boxItem == null)
-            {
-                boxItem = new CxBox3DItem(new Dictionary<Box3D, Color> { { box, color } });
-                renderItem.Add(boxItem);
-            }
-            else
-            {
-                var cxboxItem = boxItem as CxBox3DItem;
-                if (cxboxItem.BoxColors.ContainsKey(box))
-                {
-                    cxboxItem.BoxColors[box] = color;
-                }
-                else
-                {
-                    cxboxItem.BoxColors.Add(box, color);
-                }
-            }
+            var boxItem = new CxBox3DItem(box, color, size);
+            renderItem.Add(boxItem);
         }
-
         //添加Textinfo
-        public void SetTextInfo(TextInfo textInfo, Color color)
+        public void SetTextInfo(TextInfo[] textInfo, Color color, float size = 1.0f)
         {
-            var textItem = renderItem.Find(x => x.GetType() == typeof(CxTextInfoItem));
-            if (textItem == null)
-            {
-                textItem = new CxTextInfoItem(new Dictionary<TextInfo, Color> { { textInfo, color } });
-                renderItem.Add(textItem);
-            }
-            else
-            {
-                var cxtextItem = textItem as CxTextInfoItem;
-                if (cxtextItem.TextInfoColors.ContainsKey(textInfo))
-                {
-                    cxtextItem.TextInfoColors[textInfo] = color;
-                }
-                else
-                {
-                    cxtextItem.TextInfoColors.Add(textInfo, color);
-                }
-            }
+            var textItem = new CxTextInfoItem(textInfo, color, size);
+            renderItem.Add(textItem);
         }
-
         #endregion
         #region 渲染方法
         /// <summary>
@@ -264,8 +153,11 @@ namespace VisionNet.Controls
         /// </summary>
         private void Render(OpenGL gl)
         {
-            coordinationItem.DrawScreenPositionedAxes(gl);
-            coordinationItem.Draw(gl);
+            if (!camera.Enable2DView)
+            {
+                coordinationItem.DrawScreenPositionedAxes(gl);
+                coordinationItem.Draw(gl);
+            }
 
             surfaceItem?.Draw(gl);
             if (surfaceItem != null &&
@@ -278,12 +170,9 @@ namespace VisionNet.Controls
             {
                 item.Draw(gl);
             }
-
             if (surfaceItem != null)
                 coorTagItem.Draw(gl);
         }
-
-
         /// <summary>
         /// 清空图元
         /// </summary>
@@ -330,7 +219,6 @@ namespace VisionNet.Controls
             camera.LookAtMatrix(OpenGL);
         }
         #endregion 渲染方法
-
         private void d2DToolStripMenuItem_Click(object sender, EventArgs e)
         {
             var selectedItem = (ToolStripMenuItem)sender;
@@ -364,17 +252,17 @@ namespace VisionNet.Controls
             selectedItem.Checked = true;
             SurfaceColorMode = (SurfaceColorMode)Enum.Parse(typeof(SurfaceColorMode), selectedItem.Text);
         }
-        private void lineWidthToolStripMenuItem_Click(object sender, EventArgs e)
-        {
-            var state = float.TryParse(lineWidthToolStripTextBox.Text, out float lineWidth);
-            if (!state)
-            {
-                lineWidth = 1;
-                lineWidthToolStripTextBox.Text = "1";
-            }
-            foreach (var item in renderItem)
-                item.LineWidth = lineWidth;
-        }
+        //private void lineWidthToolStripMenuItem_Click(object sender, EventArgs e)
+        //{
+        //    var state = float.TryParse(lineWidthToolStripTextBox.Text, out float lineWidth);
+        //    if (!state)
+        //    {
+        //        lineWidth = 1;
+        //        lineWidthToolStripTextBox.Text = "1";
+        //    }
+        //    foreach (var item in renderItem)
+        //        item.LineWidth = lineWidth;
+        //}
         protected override void OnMouseDown(MouseEventArgs e)
         {
             isMouseDown = true;
@@ -387,17 +275,17 @@ namespace VisionNet.Controls
         }
         protected override void OnMouseMove(MouseEventArgs e)
         {
-            var pos = GetPointCloudCoordinate(e.X, e.Y);
-            if (pos.HasValue && !isMouseDown)
+            var pos = GetNearestSurfacePoint(e.X, e.Y);
+            if (pos.Location.HasValue && !isMouseDown)
             {
                 coorTagItem.Visible = true;
-                coorTagItem.SetCoordinates(pos.Value);
+                coorTagItem.SetCoordinates(pos.Location.Value, pos.Intensity);
             }
             else
                 coorTagItem.Visible = false;
             base.OnMouseMove(e);
         }
-        private CxPoint3D? GetPointCloudCoordinate(int mouseX, int mouseY)
+        private CxPoint3D? ScreenToWorldCoordinate(int mouseX, int mouseY)
         {
             OpenGL gl = OpenGL;
             // 获取当前视口
@@ -419,9 +307,80 @@ namespace VisionNet.Controls
             }
             // 将屏幕坐标转换为世界坐标
             var obj = gl.UnProject((double)mouseX, (double)adjustedY, (double)depth);
-            return new CxPoint3D((float)obj[0], (float)obj[1], (float)obj[2]);
+            return new CxPoint3D((float)obj[0], (float)obj[1], (float)obj[2]); ;
         }
+        private (CxPoint3D? Location, byte? Intensity) GetNearestSurfacePoint(int mouseX, int mouseY)
+        {
+            if (surfaceItem == null || surfaceItem.Surface == null)
+                return (null, null);
+            var surface = surfaceItem.Surface;
+            var obj = ScreenToWorldCoordinate(mouseX, mouseY);
+            if (!obj.HasValue)
+                return (null, null);
+            var worldObj = obj.Value;
+            // 计算 worldObj 在网格中的索引
+            int xIndex = (int)((worldObj.X - surface.XOffset) / surface.XScale);
+            int yIndex = (int)((worldObj.Y - surface.YOffset) / surface.YScale);
+            // 检查索引是否在范围内
+            if (xIndex < 0 || xIndex >= surface.Width || yIndex < 0 || yIndex >= surface.Length)
+                return (null, null);
+            // 初始化最近点和最小距离
+            CxPoint3D? nearestPoint = null;
+            byte? nearestIntensity = null;
+            float minDistanceSquared = float.MaxValue;
+            if (surface.Type == SurfaceType.Surface)
+            {
+                var minDis = 3 * (surface.XScale * surface.XScale +
+                             surface.YScale * surface.YScale +
+                             surface.ZScale * surface.ZScale);
+                // 遍历附近的点（3x3 邻域）
+                for (int dy = -1; dy <= 1; dy++)
+                {
+                    for (int dx = -1; dx <= 1; dx++)
+                    {
+                        int nx = xIndex + dx;
+                        int ny = yIndex + dy;
 
+                        // 检查邻域点是否在范围内
+                        if (nx < 0 || nx >= surface.Width || ny < 0 || ny >= surface.Length)
+                            continue;
+
+                        // 获取点的索引
+                        int index = ny * surface.Width + nx;
+                        // 计算点的实际坐标
+                        float x = surface.XOffset + nx * surface.XScale;
+                        float y = surface.YOffset + ny * surface.YScale;
+                        float z = surface.Data[index] == -32768
+                           ? float.NegativeInfinity
+                           : surface.ZOffset + surface.Data[index] * surface.ZScale;
+
+                        if (float.IsInfinity(z)) // 跳过无效点
+                            continue;
+
+                        // 计算欧几里得距离的平方
+                        float distanceSquared = (x - worldObj.X) * (x - worldObj.X) +
+                                                (y - worldObj.Y) * (y - worldObj.Y) +
+                                                (z - worldObj.Z) * (z - worldObj.Z);
+
+                        // 更新最近点
+                        if (distanceSquared < minDistanceSquared && distanceSquared < minDis)
+                        {
+                            minDistanceSquared = distanceSquared;
+                            nearestPoint = new CxPoint3D(x, y, z);
+                            if (surface.Intensity != null)
+                                nearestIntensity = surface.Intensity[index];
+                        }
+                    }
+                }
+            }
+            else
+            {
+                //PointCloud类型
+                nearestPoint = worldObj;
+                nearestIntensity = null;
+            }
+            return (nearestPoint, nearestIntensity);
+        }
     }
 }
 

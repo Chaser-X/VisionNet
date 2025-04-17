@@ -7,22 +7,20 @@ namespace VisionNet.Controls
 {
     public class CxPolygon3DItem : RenderAbstractItem
     {
-        public Dictionary<Polygon3D, Color> PolygonColors { get; set; } = new Dictionary<Polygon3D, Color>();
-        public CxPolygon3DItem(Dictionary<Polygon3D, Color> polygonColors)
+        public Polygon3D[] Polygon3Ds { get; private set; }
+        public CxPolygon3DItem(Polygon3D[] polygons, Color color, float size) : base(color, size)
         {
-            this.PolygonColors = polygonColors;
+            Polygon3Ds = polygons;
         }
 
         public override void Draw(OpenGL gl)
         {
-            if (PolygonColors.Count == 0) return;
+            if (Polygon3Ds == null || Polygon3Ds.Length == 0) return;
 
-            gl.LineWidth(LineWidth);
-            foreach (var polygonItem in PolygonColors)
+            gl.LineWidth(Size);
+            foreach (var polygon in Polygon3Ds)
             {
-                var polygon = polygonItem.Key;
-                var color = polygonItem.Value;
-                gl.Color(color.R / 255.0, color.G / 255.0, color.B / 255.0); // 设置颜色
+                gl.Color(Color.R / 255.0, Color.G / 255.0, Color.B / 255.0); // 设置颜色
 
                 gl.Begin(polygon.IsClosed ? OpenGL.GL_LINE_LOOP : OpenGL.GL_LINE_STRIP);
                 foreach (var point in polygon.Points)

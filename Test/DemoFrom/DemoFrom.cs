@@ -108,10 +108,10 @@ namespace DemoFrom
 
             //添加Box3D
             var box = new Box3D(new CxPoint3D(0, 0, 0), new CxSize3D(10, 10, 10));
-            cxDisplay1.SetBox(box, Color.Yellow);
+            cxDisplay1.SetBox(new Box3D[] { box }, Color.Yellow, 1);
 
             //添加Box3D
-            cxDisplay2.SetBox(box, Color.Yellow);
+            cxDisplay2.SetBox(new Box3D[] { box }, Color.Yellow, 10);
         }
 
         private void DemoFrom_FormClosing(object sender, FormClosingEventArgs e)
@@ -119,7 +119,7 @@ namespace DemoFrom
             GocatorHandle.GocatorHandle.Instance.DisConnect();
             cxDisplay1.Dispose();
             cxDisplay2.Dispose();
-          //  Environment.Exit(0);
+            //  Environment.Exit(0);
         }
 
         private void btn_test_Click(object sender, EventArgs e)
@@ -133,7 +133,7 @@ namespace DemoFrom
             var points = surface.ToPoints();
             var heights = new float[points.Length];
             var intensitys = new byte[points.Length];
-            var surfacemap = VisionOperator.UniformSuface(points, surface.Intensity, 200,3500,
+            var surfacemap = VisionOperator.UniformSuface(points, surface.Intensity, 200, 3500,
                 0.1f, 0.1f, surface.ZScale, -10, -175, surface.ZOffset);
 
             cxDisplay1.SetPointCloud(surfacemap);
@@ -142,10 +142,10 @@ namespace DemoFrom
         private void btn_addSeg3D_Click(object sender, EventArgs e)
         {
             //添加Segment3D线段
-            cxDisplay2.SetSegment(new Segment3D(new CxPoint3D(0, 0, 0), new CxPoint3D(1, 1, 1)), Color.Red);
-            cxDisplay2.SetSegment(new Segment3D(new CxPoint3D(0, 0, 0), new CxPoint3D(0, 1, 1)), Color.Yellow);
+            cxDisplay2.SetSegment(new Segment3D[] {new Segment3D(new CxPoint3D(0, 0, 0), new CxPoint3D(1, 1, 1)) }, Color.Red);
+            cxDisplay2.SetSegment(new Segment3D[] { new Segment3D(new CxPoint3D(0, 0, 0), new CxPoint3D(0, 1, 1)) }, Color.Yellow);
 
-            cxDisplay2.SetPoint(new CxPoint3D(2, 1, 1), Color.White);
+            cxDisplay2.SetPoint(new CxPoint3D[] {new CxPoint3D(2, 1, 1) }, Color.White,20);
 
             //添加多边形
             List<CxPoint3D> pts = new List<CxPoint3D>();
@@ -153,20 +153,20 @@ namespace DemoFrom
             pts.Add(new CxPoint3D(1, 0, 0));
             pts.Add(new CxPoint3D(1, 1, 0));
             pts.Add(new CxPoint3D(1, 1, 1));
-            var polygon = new Polygon3D(pts.ToArray(),false);
-            cxDisplay2.SetPolygon(polygon, Color.Blue);
+            var polygon = new Polygon3D(pts.ToArray(), false);
+            cxDisplay2.SetPolygon(new Polygon3D[] { polygon }, Color.Blue);
 
             //添加平面 Plane3D
             var plane = new Plane3D(new CxPoint3D(0, 0, 0), new CxVector3D(1, 1, 1));
-            cxDisplay2.SetPlane(plane, Color.FromArgb(100,Color.Red) );
+            cxDisplay2.SetPlane(new Plane3D[] { plane }, Color.FromArgb(100, Color.Red));
 
             //添加Box3D
-            var box = new Box3D(new CxPoint3D(0, 0, 0), new CxSize3D(10, 10, 10));
-            cxDisplay2.SetBox(box, Color.Yellow);
+            var box = new Box3D(new CxPoint3D(10, 0, 0), new CxSize3D(10, 10, 10));
+            cxDisplay2.SetBox(new Box3D[] { box }, Color.Yellow);
 
             //添加TextInfo
-            var text = new TextInfo(new CxPoint3D(0, 0, 0), "this is a test!",10);
-            cxDisplay2.SetTextInfo(text,Color.Yellow);
+            var text = new TextInfo(new CxPoint3D(0, 0, 0), "this is a test!", 10);
+            cxDisplay2.SetTextInfo(new TextInfo[] { text }, Color.Yellow);
         }
     }
 }

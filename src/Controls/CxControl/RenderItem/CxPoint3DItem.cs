@@ -1,4 +1,5 @@
 using SharpGL;
+using SharpGL.SceneGraph.Quadrics;
 using System.Collections.Generic;
 using System.Drawing;
 using VisionNet.DataType;
@@ -7,24 +8,21 @@ namespace VisionNet.Controls
 {
     public class CxPoint3DItem : RenderAbstractItem
     {
-        public Dictionary<CxPoint3D, Color> PointColors { get; set; } = new Dictionary<CxPoint3D, Color>();
-        public CxPoint3DItem(Dictionary<CxPoint3D, Color> pointColors)
+        public CxPoint3D[] Point3Ds { get;private set; }
+        public CxPoint3DItem(CxPoint3D[] points,Color color,float size):base(color, size)
         {
-            this.PointColors = pointColors;
+            this.Point3Ds = points;
         }
 
         public override void Draw(OpenGL gl)
         {
-            if (PointColors.Count == 0) return;
+            if (Point3Ds == null || Point3Ds.Length == 0) return;
 
-            gl.PointSize(LineWidth);
+            gl.PointSize(Size);
             gl.Begin(OpenGL.GL_POINTS);
-            foreach (var kvp in PointColors)
+            foreach (var point in Point3Ds)
             {
-                var point = kvp.Key;
-                var color = kvp.Value;
-
-                gl.Color(color.R / 255.0, color.G / 255.0, color.B / 255.0); // 设置颜色
+                gl.Color(Color.R / 255.0, Color.G / 255.0, Color.B / 255.0); // 设置颜色
                 gl.Vertex(point.X, point.Y, point.Z);
             }
             gl.End();

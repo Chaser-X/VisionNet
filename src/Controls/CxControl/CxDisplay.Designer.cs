@@ -15,7 +15,6 @@ namespace VisionNet.Controls
         private ToolStripMenuItem surfaceModeToolStripMenuItem;
         private ToolStripMenuItem pointCloudToolStripMenuItem;
         private ToolStripMenuItem meshToolStripMenuItem;
-        private ToolStripMenuItem lineWidthToolStripMenuItem;
         private ToolStripMenuItem orthographicToolStripMenuItem;
         private ToolStripMenuItem topToolStripMenuItem1;
         private ToolStripMenuItem frontToolStripMenuItem;
@@ -44,6 +43,7 @@ namespace VisionNet.Controls
         {
             this.components = new System.ComponentModel.Container();
             this.menu_right = new System.Windows.Forms.ContextMenuStrip(this.components);
+            this.d2DToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.viewModeToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.orthographicToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.topToolStripMenuItem1 = new System.Windows.Forms.ToolStripMenuItem();
@@ -57,9 +57,6 @@ namespace VisionNet.Controls
             this.colorMapToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.itensityToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.colorWithIntensityToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.lineWidthToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.lineWidthToolStripTextBox = new System.Windows.Forms.ToolStripTextBox();
-            this.d2DToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.menu_right.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this)).BeginInit();
             this.SuspendLayout();
@@ -70,10 +67,16 @@ namespace VisionNet.Controls
             this.d2DToolStripMenuItem,
             this.viewModeToolStripMenuItem,
             this.surfaceModeToolStripMenuItem,
-            this.surfaceColorModeToolStripMenuItem,
-            this.lineWidthToolStripMenuItem});
+            this.surfaceColorModeToolStripMenuItem});
             this.menu_right.Name = "menu_right";
-            this.menu_right.Size = new System.Drawing.Size(187, 136);
+            this.menu_right.Size = new System.Drawing.Size(187, 114);
+            // 
+            // d2DToolStripMenuItem
+            // 
+            this.d2DToolStripMenuItem.Name = "d2DToolStripMenuItem";
+            this.d2DToolStripMenuItem.Size = new System.Drawing.Size(186, 22);
+            this.d2DToolStripMenuItem.Text = "2D View";
+            this.d2DToolStripMenuItem.Click += new System.EventHandler(this.d2DToolStripMenuItem_Click);
             // 
             // viewModeToolStripMenuItem
             // 
@@ -90,14 +93,14 @@ namespace VisionNet.Controls
             // orthographicToolStripMenuItem
             // 
             this.orthographicToolStripMenuItem.Name = "orthographicToolStripMenuItem";
-            this.orthographicToolStripMenuItem.Size = new System.Drawing.Size(180, 22);
+            this.orthographicToolStripMenuItem.Size = new System.Drawing.Size(108, 22);
             this.orthographicToolStripMenuItem.Text = "None";
             this.orthographicToolStripMenuItem.Click += new System.EventHandler(this.toolStripMenuItem_ViewModeClick);
             // 
             // topToolStripMenuItem1
             // 
             this.topToolStripMenuItem1.Name = "topToolStripMenuItem1";
-            this.topToolStripMenuItem1.Size = new System.Drawing.Size(180, 22);
+            this.topToolStripMenuItem1.Size = new System.Drawing.Size(108, 22);
             this.topToolStripMenuItem1.Text = "Top";
             this.topToolStripMenuItem1.Click += new System.EventHandler(this.toolStripMenuItem_ViewModeClick);
             // 
@@ -106,21 +109,21 @@ namespace VisionNet.Controls
             this.frontToolStripMenuItem.Checked = true;
             this.frontToolStripMenuItem.CheckState = System.Windows.Forms.CheckState.Checked;
             this.frontToolStripMenuItem.Name = "frontToolStripMenuItem";
-            this.frontToolStripMenuItem.Size = new System.Drawing.Size(180, 22);
+            this.frontToolStripMenuItem.Size = new System.Drawing.Size(108, 22);
             this.frontToolStripMenuItem.Text = "Front";
             this.frontToolStripMenuItem.Click += new System.EventHandler(this.toolStripMenuItem_ViewModeClick);
             // 
             // leftToolStripMenuItem
             // 
             this.leftToolStripMenuItem.Name = "leftToolStripMenuItem";
-            this.leftToolStripMenuItem.Size = new System.Drawing.Size(180, 22);
+            this.leftToolStripMenuItem.Size = new System.Drawing.Size(108, 22);
             this.leftToolStripMenuItem.Text = "Left";
             this.leftToolStripMenuItem.Click += new System.EventHandler(this.toolStripMenuItem_ViewModeClick);
             // 
             // rightToolStripMenuItem
             // 
             this.rightToolStripMenuItem.Name = "rightToolStripMenuItem";
-            this.rightToolStripMenuItem.Size = new System.Drawing.Size(180, 22);
+            this.rightToolStripMenuItem.Size = new System.Drawing.Size(108, 22);
             this.rightToolStripMenuItem.Text = "Right";
             this.rightToolStripMenuItem.Click += new System.EventHandler(this.toolStripMenuItem_ViewModeClick);
             // 
@@ -136,7 +139,7 @@ namespace VisionNet.Controls
             // pointCloudToolStripMenuItem
             // 
             this.pointCloudToolStripMenuItem.Name = "pointCloudToolStripMenuItem";
-            this.pointCloudToolStripMenuItem.Size = new System.Drawing.Size(180, 22);
+            this.pointCloudToolStripMenuItem.Size = new System.Drawing.Size(139, 22);
             this.pointCloudToolStripMenuItem.Tag = "1";
             this.pointCloudToolStripMenuItem.Text = "PointCloud";
             this.pointCloudToolStripMenuItem.Click += new System.EventHandler(this.toolStripMenuItem_SurfaceModeClick);
@@ -144,7 +147,7 @@ namespace VisionNet.Controls
             // meshToolStripMenuItem
             // 
             this.meshToolStripMenuItem.Name = "meshToolStripMenuItem";
-            this.meshToolStripMenuItem.Size = new System.Drawing.Size(180, 22);
+            this.meshToolStripMenuItem.Size = new System.Drawing.Size(139, 22);
             this.meshToolStripMenuItem.Tag = "2";
             this.meshToolStripMenuItem.Text = "Mesh";
             this.meshToolStripMenuItem.Click += new System.EventHandler(this.toolStripMenuItem_SurfaceModeClick);
@@ -180,29 +183,6 @@ namespace VisionNet.Controls
             this.colorWithIntensityToolStripMenuItem.Text = "ColorWithIntensity";
             this.colorWithIntensityToolStripMenuItem.Click += new System.EventHandler(this.toolStripMenuItem_SurfaceColorModeClick);
             // 
-            // lineWidthToolStripMenuItem
-            // 
-            this.lineWidthToolStripMenuItem.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
-            this.lineWidthToolStripTextBox});
-            this.lineWidthToolStripMenuItem.Name = "lineWidthToolStripMenuItem";
-            this.lineWidthToolStripMenuItem.Size = new System.Drawing.Size(186, 22);
-            this.lineWidthToolStripMenuItem.Text = "LineWidth";
-            this.lineWidthToolStripMenuItem.Click += new System.EventHandler(this.lineWidthToolStripMenuItem_Click);
-            // 
-            // lineWidthToolStripTextBox
-            // 
-            this.lineWidthToolStripTextBox.Font = new System.Drawing.Font("Microsoft YaHei UI", 9F);
-            this.lineWidthToolStripTextBox.Name = "lineWidthToolStripTextBox";
-            this.lineWidthToolStripTextBox.Size = new System.Drawing.Size(180, 23);
-            this.lineWidthToolStripTextBox.Text = "1";
-            // 
-            // d2DToolStripMenuItem
-            // 
-            this.d2DToolStripMenuItem.Name = "d2DToolStripMenuItem";
-            this.d2DToolStripMenuItem.Size = new System.Drawing.Size(186, 22);
-            this.d2DToolStripMenuItem.Text = "2D View";
-            this.d2DToolStripMenuItem.Click += new System.EventHandler(this.d2DToolStripMenuItem_Click);
-            // 
             // CxDisplay
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
@@ -215,8 +195,6 @@ namespace VisionNet.Controls
             this.ResumeLayout(false);
 
         }
-
-        private ToolStripTextBox lineWidthToolStripTextBox;
         private ToolStripMenuItem surfaceColorModeToolStripMenuItem;
         private ToolStripMenuItem colorMapToolStripMenuItem;
         private ToolStripMenuItem itensityToolStripMenuItem;
