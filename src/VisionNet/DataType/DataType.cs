@@ -119,7 +119,7 @@ namespace VisionNet.DataType
         public CxPoint3D Location;
         public string Text;
         public float Size;
-        public TextInfo(CxPoint3D location, string text , float size = 15f)
+        public TextInfo(CxPoint3D location, string text, float size = 15f)
         {
             Location = location;
             Text = text;
@@ -142,7 +142,7 @@ namespace VisionNet.DataType
     {
         public CxPoint3D[] Points;
         public bool IsClosed;
-        public Polygon3D(CxPoint3D[] points,bool isClosed = true)
+        public Polygon3D(CxPoint3D[] points, bool isClosed = true)
         {
             Points = points;
             IsClosed = isClosed;
@@ -340,9 +340,9 @@ namespace VisionNet.DataType
                         {
                             points[index] = new CxPoint3D
                             {
-                                X = XOffset + Data[index * 3] * XScale,
-                                Y = YOffset + Data[index * 3 + 1] * YScale,
-                                Z = ZOffset + Data[index * 3 + 2] * ZScale
+                                X = Data[index * 3] == -32768 ? float.NegativeInfinity : XOffset + Data[index * 3] * XScale,
+                                Y = Data[index * 3 + 1] == -32768 ? float.NegativeInfinity : YOffset + Data[index * 3 + 1] * YScale,
+                                Z = Data[index * 3 + 2] == -32768 ? float.NegativeInfinity : ZOffset + Data[index * 3 + 2] * ZScale
                             };
                         }
                     }
@@ -352,7 +352,7 @@ namespace VisionNet.DataType
         }
     }
 
-    //2D图像，数据类型可选byte,ushort,float
+    //2D图像，数据类型可选byte,short,float
     public class CxImage<T>
     {
         public CxImage() { }
@@ -372,5 +372,15 @@ namespace VisionNet.DataType
         //    Marshal.Copy(dataPtr, Data, 0, size);
         //}
     }
-
+    //Mesh网格对象
+    public class CxMesh
+    {
+        public CxMesh() { }
+        //网格点
+        public CxPoint3D[] Vertexs { get; set; }
+        //网格面
+        public uint[] Indices { get; set; }
+        //亮度纹理
+        public byte[] Intensity { get; set; }
+    }
 }

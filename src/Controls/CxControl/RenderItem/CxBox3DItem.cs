@@ -6,7 +6,7 @@ using VisionNet.DataType;
 
 namespace VisionNet.Controls
 {
-    public class CxBox3DItem : RenderAbstractItem
+    public class CxBox3DItem : AbstractRenderItem
     {
         public Box3D[] Box3Ds { get; private set; }
         public CxBox3DItem(Box3D[] box3Ds, Color color, float size = 1f) : base(color, size)
@@ -34,7 +34,7 @@ namespace VisionNet.Controls
                 // 绘制盒子的六个面
                 //     gl.Enable(OpenGL.GL_BLEND);
                 //     gl.BlendFunc(OpenGL.GL_SRC_ALPHA, OpenGL.GL_ONE_MINUS_SRC_ALPHA);
-                gl.Color(Color.R / 255.0, Color.G / 255.0, Color.B / 255.0, 0.2); // 半透明颜色
+                gl.Color(Color.R / 255.0, Color.G / 255.0, Color.B / 255.0, Color.A / 255.0); // 半透明颜色
 
                 gl.Begin(OpenGL.GL_QUADS);
 

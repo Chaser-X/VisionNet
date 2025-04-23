@@ -6,7 +6,7 @@ using VisionNet.DataType;
 
 namespace VisionNet.Controls
 {
-    public class CxPlane3DItem : RenderAbstractItem
+    public class CxPlane3DItem : AbstractRenderItem
     {
         public Plane3D[] Planes { get; private set; }
         public CxPlane3DItem(Plane3D[] planes, Color color, float size = 100.0f) : base(color, size)

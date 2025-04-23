@@ -80,7 +80,7 @@ namespace VisionNet.Controls
                 float angleX = deltaY * 0.5f;
                 float angleY = deltaX * 0.5f;
 
-                if(!Enable2DView)
+                if (!Enable2DView)
                     // 更新旋转矩阵
                     UpdateRotationMatrix(angleX, angleY);
 
@@ -121,21 +121,31 @@ namespace VisionNet.Controls
             // 计算点云的宽度和高度
             double pointCloudWidth = viewBox.Value.Size.Width;
             double pointCloudHeight = viewBox.Value.Size.Height;
+            double pointCloudDepth = viewBox.Value.Size.Depth;
 
             //计算平移缩放的速度系数
-            translateSpeed = (float)Math.Min(pointCloudWidth, pointCloudHeight) / 100.0f;
+            var min1 = Math.Min(pointCloudWidth, pointCloudHeight);
+            var min2 = Math.Min(pointCloudHeight, pointCloudDepth);
+            var min3 = Math.Min(pointCloudDepth, pointCloudWidth);
+            if (min1 == min2) // height min
+                translateSpeed = (float)min3 / 400.0f;
+            if (min2 == min3) // depth min
+                translateSpeed = (float)min1 / 400.0f;
+            if (min1 == min3) // width min
+                translateSpeed = (float)min2 / 400.0f;
+
             // 根据窗体大小和点云的大小自适应设置 zoom
             double aspectRatio = (double)openGLControl.Width / (double)openGLControl.Height;
             double zoomFactor = Math.Max(pointCloudWidth / aspectRatio, pointCloudHeight);
 
             translateX = (float)-viewBox.Value.Center.X;
             translateY = (float)-viewBox.Value.Center.Y;
-            if(!Enable2DView)
+            if (!Enable2DView)
                 translateZ = (float)-viewBox.Value.Center.Z - (float)zoomFactor * 1.2f; //  适当调整视距
             else
             {
                 var scaleWdith = pointCloudWidth / aspectRatio;
-                if(scaleWdith > pointCloudHeight)
+                if (scaleWdith > pointCloudHeight)
                     translateZ = (float)(openGLControl.Width / scaleWdith); //  适当调整视距
                 else
                     translateZ = (float)(openGLControl.Height / pointCloudHeight); //  适当调整视距
@@ -241,7 +251,7 @@ namespace VisionNet.Controls
             float cos = (float)Math.Cos(radians);
             float sin = (float)Math.Sin(radians);
             float oneMinusCos = 1.0f - cos;
-           
+
             rotationMatrix[0] = cos + x * x * oneMinusCos;
             rotationMatrix[1] = x * y * oneMinusCos - z * sin;
             rotationMatrix[2] = x * z * oneMinusCos + y * sin;

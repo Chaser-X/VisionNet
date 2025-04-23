@@ -18,7 +18,7 @@ namespace VisionNet.Controls
         private CxTrackBallCamera camera;
         bool isMouseDown = false;
         // 渲染数据
-        private CxSurfaceItem surfaceItem = null;
+        private ICxObjRenderItem surfaceItem = null;
         private CxCoordinateSystemItem coordinationItem = new CxCoordinateSystemItem();
         private CxColorBarItem colorBarItem = new CxColorBarItem();
         private CxCoordinationTagItem coorTagItem = new CxCoordinationTagItem();
@@ -48,6 +48,9 @@ namespace VisionNet.Controls
                     surfaceItem.SurfaceColorMode = value;
             }
         }
+        //是否显示坐标系
+        public bool ShowCoordinateSystem { get; set; } = false;
+
         public CxDisplay() : this(ViewMode.Top, SurfaceMode.PointCloud, SurfaceColorMode.ColorWithIntensity)
         {
 
@@ -92,7 +95,7 @@ namespace VisionNet.Controls
             if (size > 10000000)
             {
                 var points = inpointCloud.ToPoints();
-                var ratio = points.Length / 6000000.0f;
+                var ratio = points.Length / 10000000F;
                 var width = inpointCloud.Width / ratio;
                 var height = inpointCloud.Length / ratio;
                 var xScale = inpointCloud.XScale * ratio;
@@ -105,9 +108,15 @@ namespace VisionNet.Controls
             }
 
             surfaceItem = new CxSurfaceItem(tempSuface ?? new CxSurface(), SurfaceMode, SurfaceColorMode);
-            //camera.ViewMode = ViewMode;
             camera.FitView(surfaceItem.BoundingBox); // 调整视图以适应点云数据
         }
+        //添加Mesh
+        public void SetMesh(CxMesh mesh)
+        {
+            surfaceItem = new CxMeshItem(mesh, SurfaceMode, SurfaceColorMode);
+            camera.FitView(surfaceItem.BoundingBox);
+        }
+
         /// <summary>
         /// 添加线段
         /// </summary>
@@ -117,9 +126,9 @@ namespace VisionNet.Controls
             renderItem.Add(segmentItem);
         }
         //添加点
-        public void SetPoint(CxPoint3D[] point, Color color, float size = 1.0f)
+        public void SetPoint(CxPoint3D[] point, Color color, float size = 1.0f, PointShape shape = PointShape.Point)
         {
-            var pointItem = new CxPoint3DItem(point, color, size);
+            var pointItem = new CxPoint3DItem(point, color, size, shape);
             renderItem.Add(pointItem);
         }
         //添加多边形
@@ -153,12 +162,8 @@ namespace VisionNet.Controls
         /// </summary>
         private void Render(OpenGL gl)
         {
-            if (!camera.Enable2DView)
-            {
-                coordinationItem.DrawScreenPositionedAxes(gl);
+            if (!camera.Enable2DView && ShowCoordinateSystem)
                 coordinationItem.Draw(gl);
-            }
-
             surfaceItem?.Draw(gl);
             if (surfaceItem != null &&
                 surfaceItem.SurfaceColorMode != SurfaceColorMode.Intensity)
@@ -172,6 +177,8 @@ namespace VisionNet.Controls
             }
             if (surfaceItem != null)
                 coorTagItem.Draw(gl);
+            if (!camera.Enable2DView)
+                coordinationItem.DrawScreenPositionedAxes(gl);
         }
         /// <summary>
         /// 清空图元
@@ -311,9 +318,10 @@ namespace VisionNet.Controls
         }
         private (CxPoint3D? Location, byte? Intensity) GetNearestSurfacePoint(int mouseX, int mouseY)
         {
-            if (surfaceItem == null || surfaceItem.Surface == null)
+            var tempsurfaceItem = surfaceItem as CxSurfaceItem;
+            if (tempsurfaceItem == null || tempsurfaceItem.Surface == null)
                 return (null, null);
-            var surface = surfaceItem.Surface;
+            var surface = tempsurfaceItem.Surface;
             var obj = ScreenToWorldCoordinate(mouseX, mouseY);
             if (!obj.HasValue)
                 return (null, null);
@@ -367,7 +375,7 @@ namespace VisionNet.Controls
                         {
                             minDistanceSquared = distanceSquared;
                             nearestPoint = new CxPoint3D(x, y, z);
-                            if (surface.Intensity != null)
+                            if (surface.Intensity != null && surface.Intensity.Length != 0)
                                 nearestIntensity = surface.Intensity[index];
                         }
                     }

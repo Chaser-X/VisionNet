@@ -3,7 +3,7 @@ using System;
 
 namespace VisionNet.Controls
 {
-    public class CxColorBarItem : RenderAbstractItem
+    public class CxColorBarItem : AbstractRenderItem
     {
         private float zMin;
         private float zMax;

@@ -5,7 +5,7 @@ using VisionNet.DataType;
 
 namespace VisionNet.Controls
 {
-    public class CxCoordinationTagItem : RenderAbstractItem
+    public class CxCoordinationTagItem : AbstractRenderItem
     {
         public CxPoint3D Point { get; set; } = new CxPoint3D();
         public byte? Intensity { get; set; } = null; // 点的强度值
@@ -13,7 +13,7 @@ namespace VisionNet.Controls
 
         public Color TextColor { get; set; } = Color.White;
 
-        public void SetCoordinates(CxPoint3D point , byte? intesity = null)
+        public void SetCoordinates(CxPoint3D point, byte? intesity = null)
         {
             Point = point;
             Intensity = intesity;
@@ -41,7 +41,7 @@ namespace VisionNet.Controls
             int rectWidth = 80; // 矩形宽度
             int rectHeight = Intensity.HasValue ? 90 : 80; // 矩形高度
             int startX = (int)screenCoord.X; // 矩形左上角X坐标
-            int startY = (int)screenCoord.Y; // 矩形左上角Y坐标
+            int startY = (int)screenCoord.Y - 10; // 矩形左上角Y坐标
 
             //关闭深度测试
             gl.Disable(OpenGL.GL_DEPTH_TEST);

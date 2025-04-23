@@ -5,7 +5,7 @@ using VisionNet.DataType;
 
 namespace VisionNet.Controls
 {
-    public class CxSegment3DItem : RenderAbstractItem
+    public class CxSegment3DItem : AbstractRenderItem
     {
         public Segment3D[] Segment3Ds { get; private set; }
         public CxSegment3DItem(Segment3D[] segments, Color color, float size = 1.0f) : base(color, size)

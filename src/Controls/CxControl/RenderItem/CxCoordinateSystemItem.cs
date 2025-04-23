@@ -8,7 +8,7 @@ namespace VisionNet.Controls
     /// <summary>
     /// 坐标系管理类
     /// </summary>
-    public class CxCoordinateSystemItem : RenderAbstractItem
+    public class CxCoordinateSystemItem : AbstractRenderItem
     {
         private readonly float axisLength;
         private readonly float axisRadius;

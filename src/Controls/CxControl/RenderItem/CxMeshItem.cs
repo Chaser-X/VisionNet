@@ -1,20 +1,19 @@
-Ôªøusing SharpGL;
+using SharpGL;
 using System;
 using System.Collections.Generic;
-using System.Threading.Tasks;
 using VisionNet.DataType;
 
 namespace VisionNet.Controls
 {
-    public class CxSurfaceItem : ICxObjRenderItem
+    public class CxMeshItem : ICxObjRenderItem
     {
-        public CxSurface Surface { get; private set; }
-        private uint[] vboIds = new uint[2];
+        public CxMesh Mesh { get; set; }
+        private uint[] vboIds = new uint[2]; // ”√”⁄¥Ê¥¢∂•µ„∫Õ—’…´µƒ VBO
         private bool vboInitialized = false;
-        private bool pointCloudUpdated = false;
-        private List<uint> meshIndexs = new List<uint>();
+        private bool meshUpdated = false;
         public float ZMin { get; set; }
         public float ZMax { get; set; }
+        // –¬‘ˆ£∫BoundingBox  Ù–‘
         public Box3D? BoundingBox { get; private set; }
         private SurfaceMode surfaceMode;
         public SurfaceMode SurfaceMode
@@ -25,7 +24,7 @@ namespace VisionNet.Controls
             }
             set
             {
-                pointCloudUpdated = value != surfaceMode;
+                meshUpdated = value != surfaceMode;
                 surfaceMode = value;
             }
         }
@@ -38,26 +37,28 @@ namespace VisionNet.Controls
             }
             set
             {
-                pointCloudUpdated = value != surfaceColorMode;
+                meshUpdated = value != surfaceColorMode;
                 surfaceColorMode = value;
             }
         }
-        public CxSurfaceItem(CxSurface surface, SurfaceMode surfaceMode = SurfaceMode.PointCloud,
+        public CxMeshItem(CxMesh mesh, SurfaceMode surfaceMode = SurfaceMode.PointCloud,
             SurfaceColorMode surfaceColorMode = SurfaceColorMode.Color)
         {
-            this.Surface = surface;
+            this.Mesh = mesh;
             this.SurfaceMode = surfaceMode;
             this.SurfaceColorMode = surfaceColorMode;
-            BoundingBox = GetBoundingBox();
+            meshUpdated = true; // ≥ı¥Œ≥ı ºªØ ±±Íº«Œ™“—∏¸–¬
+            BoundingBox = CalculateBoundingBox(); // ≥ı ºªØ ±º∆À„∞¸Œß∫–
             ZMax = (float)(BoundingBox?.Center.Z + BoundingBox?.Size.Depth / 2);
             ZMin = (float)(BoundingBox?.Center.Z - BoundingBox?.Size.Depth / 2);
-            pointCloudUpdated = false;
+            meshUpdated = false;
         }
         public void Draw(OpenGL gl)
         {
-            if (Surface == null || Surface.Data.Length == 0) return;
+            if (Mesh == null || Mesh.Vertexs == null || Mesh.Vertexs.Length == 0 || Mesh.Indices == null || Mesh.Indices.Length == 0)
+                return;
 
-            if (vboInitialized && pointCloudUpdated)
+            if (vboInitialized && meshUpdated)
             {
                 gl.DeleteBuffers(2, vboIds);
                 vboInitialized = false;
@@ -67,35 +68,28 @@ namespace VisionNet.Controls
             {
                 gl.GenBuffers(2, vboIds);
                 vboInitialized = true;
-                pointCloudUpdated = true; // ÂàùÊ¨°ÂàùÂßãÂåñÊó∂Ê†áËÆ∞‰∏∫Â∑≤Êõ¥Êñ∞
+                meshUpdated = true; // ≥ı¥Œ≥ı ºªØ ±±Íº«Œ™“—∏¸–¬
             }
 
-            if (pointCloudUpdated)
+            if (meshUpdated)
             {
-                float[] vertices = null;
-                float[] colors = null;
-                CxPoint3D[] vertexs = Surface.ToPoints();
-                if (SurfaceMode == SurfaceMode.Mesh)
+                // ◊º±∏∂•µ„ ˝æ›
+                float[] vertices = new float[Mesh.Vertexs.Length * 3];
+                float[] colors = new float[Mesh.Vertexs.Length * 3];
+                for (int i = 0; i < Mesh.Vertexs.Length; i++)
                 {
-                    meshIndexs = GenerateMeshIndexFromPointCloud(Surface);
-                }
-                vertices = new float[vertexs.Length * 3];
-                colors = new float[vertexs.Length * 3];
-
-                for (int i = 0; i < vertexs.Length; i++)
-                {
-                    vertices[i * 3] = (float)vertexs[i].X;
-                    vertices[i * 3 + 1] = (float)vertexs[i].Y;
-                    vertices[i * 3 + 2] = (float)vertexs[i].Z;
+                    vertices[i * 3] = Mesh.Vertexs[i].X;
+                    vertices[i * 3 + 1] = Mesh.Vertexs[i].Y;
+                    vertices[i * 3 + 2] = Mesh.Vertexs[i].Z;
 
                     float intensity = 1;
-                    if (Surface.Intensity.Length == 0)
+                    if (Mesh.Intensity.Length == 0)
                     {
                         intensity = 1;
                     }
                     else
                     {
-                        intensity = (float)Surface.Intensity[i] / 255.0f; // ‰∫ÆÂ∫¶Âõ†Â≠ê
+                        intensity = (float)Mesh.Intensity[i] / 255.0f; // ¡¡∂»“Ú◊”
                     }
 
                     if (SurfaceColorMode == SurfaceColorMode.Intensity)
@@ -106,7 +100,7 @@ namespace VisionNet.Controls
                     }
                     else
                     {
-                        var color = CxExtension.GetColorByHeight(vertexs[i].Z, ZMin, ZMax);
+                        var color = CxExtension.GetColorByHeight(Mesh.Vertexs[i].Z, ZMin, ZMax);
                         if (surfaceColorMode == SurfaceColorMode.Color)
                         {
                             intensity = 1;
@@ -117,109 +111,64 @@ namespace VisionNet.Controls
                     }
                 }
 
+                // …œ¥´∂•µ„ ˝æ›µΩ VBO
                 gl.BindBuffer(OpenGL.GL_ARRAY_BUFFER, vboIds[0]);
                 gl.BufferData(OpenGL.GL_ARRAY_BUFFER, vertices, OpenGL.GL_STATIC_DRAW);
 
+                // …œ¥´—’…´ ˝æ›µΩ VBO
                 gl.BindBuffer(OpenGL.GL_ARRAY_BUFFER, vboIds[1]);
                 gl.BufferData(OpenGL.GL_ARRAY_BUFFER, colors, OpenGL.GL_STATIC_DRAW);
-                pointCloudUpdated = false; // ÈáçÁΩÆÊ†áËÆ∞
+
+                meshUpdated = false; // ÷ÿ÷√∏¸–¬±Íº«
             }
 
+            // ∆Ù”√∂•µ„∫Õ—’…´ ˝◊È
             gl.EnableClientState(OpenGL.GL_VERTEX_ARRAY);
             gl.EnableClientState(OpenGL.GL_COLOR_ARRAY);
 
+            // ∞Û∂®∂•µ„ ˝æ›
             gl.BindBuffer(OpenGL.GL_ARRAY_BUFFER, vboIds[0]);
             gl.VertexPointer(3, OpenGL.GL_FLOAT, 0, IntPtr.Zero);
 
+            // ∞Û∂®—’…´ ˝æ›
             gl.BindBuffer(OpenGL.GL_ARRAY_BUFFER, vboIds[1]);
             gl.ColorPointer(3, OpenGL.GL_FLOAT, 0, IntPtr.Zero);
 
+
             if (SurfaceMode == SurfaceMode.PointCloud)
-                gl.DrawArrays(OpenGL.GL_POINTS, 0, Surface.Data.Length);
+                gl.DrawArrays(OpenGL.GL_POINTS, 0, Mesh.Vertexs.Length);
             else if (SurfaceMode == SurfaceMode.Mesh)
             {
-                gl.DrawElements(OpenGL.GL_TRIANGLES, meshIndexs.Count, meshIndexs.ToArray());
+                gl.DrawElements(OpenGL.GL_TRIANGLES, Mesh.Indices.Length, Mesh.Indices);
             }
 
+            // Ω˚”√∂•µ„∫Õ—’…´ ˝◊È
             gl.DisableClientState(OpenGL.GL_VERTEX_ARRAY);
             gl.DisableClientState(OpenGL.GL_COLOR_ARRAY);
         }
-        /// <summary>
-        /// ÁîüÊàêÁÇπ‰∫ëÁΩëÊ†ºÁ¥¢Âºï
-        /// </summary>
-        private List<uint> GenerateMeshIndexFromPointCloud(CxSurface pointCloud)
+        // –¬‘ˆ£∫º∆À„∞¸Œß∫–
+        private Box3D? CalculateBoundingBox()
         {
-            if (pointCloud == null || pointCloud.Data.Length == 0)
-                return new List<uint>();
-
-            int totalTriangles = (pointCloud.Width - 1) * (pointCloud.Length - 1) * 2;
-            int totalIndices = totalTriangles * 3;
-
-            List<uint> meshIndices = new List<uint>(totalIndices);
-            object lockObj = new object();
-
-            // ‰ΩøÁî®Âπ∂Ë°åÂæ™ÁéØ
-            Parallel.For(0, pointCloud.Length - 1, y =>
-            {
-                uint rowStart = (uint)y * (uint)pointCloud.Width;
-                uint nextRowStart = (uint)(y + 1) * (uint)pointCloud.Width;
-
-                List<uint> localIndices = new List<uint>();
-
-                for (uint x = 0; x < pointCloud.Width - 1; x++)
-                {
-                    uint topLeft = rowStart + x;
-                    uint topRight = topLeft + 1;
-                    uint bottomLeft = nextRowStart + x;
-                    uint bottomRight = bottomLeft + 1;
-
-                    // Ê∑ªÂä†Á¨¨‰∏Ä‰∏™‰∏âËßíÂΩ¢
-                    localIndices.Add(topLeft);
-                    localIndices.Add(bottomLeft);
-                    localIndices.Add(topRight);
-
-                    // Ê∑ªÂä†Á¨¨‰∫å‰∏™‰∏âËßíÂΩ¢
-                    localIndices.Add(topRight);
-                    localIndices.Add(bottomLeft);
-                    localIndices.Add(bottomRight);
-                }
-
-                // ÂêàÂπ∂ÁªìÊûú
-                lock (lockObj)
-                {
-                    meshIndices.AddRange(localIndices);
-                }
-            });
-
-            return meshIndices;
-        }
-
-        /// <summary>
-        /// Ëé∑ÂèñÁÇπ‰∫ëÁöÑËæπÁïå
-        /// </summary>
-        private Box3D? GetBoundingBox()
-        {
-            if (Surface == null || Surface.Data.Length == 0) return null;
-            // ËÆ°ÁÆóÁÇπ‰∫ëÁöÑËæπÁïå
-            var data = Surface.ToPoints();
+            if (Mesh == null || Mesh.Vertexs == null || Mesh.Vertexs.Length == 0)
+                return null;
 
             float minX = float.MaxValue, minY = float.MaxValue, minZ = float.MaxValue;
             float maxX = float.MinValue, maxY = float.MinValue, maxZ = float.MinValue;
 
-            foreach (var point in data)
+            foreach (var point in Mesh.Vertexs)
             {
-
                 if (float.IsInfinity(point.X) || float.IsInfinity(point.Y) || float.IsInfinity(point.Z))
                     continue;
                 if (point.X < minX) minX = point.X;
                 if (point.Y < minY) minY = point.Y;
                 if (point.Z < minZ) minZ = point.Z;
+
                 if (point.X > maxX) maxX = point.X;
                 if (point.Y > maxY) maxY = point.Y;
                 if (point.Z > maxZ) maxZ = point.Z;
-                
             }
-            // ËÆ°ÁÆó‰∏≠ÂøÉÁÇπÂíåÂ∞∫ÂØ∏
+
+            // º∆À„÷––ƒµ„∫Õ≥ﬂ¥Á
             var center = new CxPoint3D(
                 (minX + maxX) / 2,
                 (minY + maxY) / 2,
@@ -231,6 +180,7 @@ namespace VisionNet.Controls
                 maxY - minY,
                 maxZ - minZ
             );
+
             return new Box3D(center, size);
         }
     }

@@ -7,7 +7,7 @@ using static System.Net.Mime.MediaTypeNames;
 
 namespace VisionNet.Controls
 {
-    public class CxTextInfoItem : RenderAbstractItem
+    public class CxTextInfoItem : AbstractRenderItem
     {
         public TextInfo[] TextInfos { get; private set; }
         public CxTextInfoItem(TextInfo[] textInfos, Color color, float size = 1.0f) : base(color, size)
