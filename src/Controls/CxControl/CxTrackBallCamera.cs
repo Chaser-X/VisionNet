@@ -20,6 +20,8 @@ namespace VisionNet.Controls
         private int lastMouseX, lastMouseY;
         private float[] rotationMatrix = new float[16];
         private float translateSpeed = 0.5f;
+        private float scale = 1.0f;
+        private CxPoint3D pointCloudCenter = new CxPoint3D();
         #endregion
         #region 属性
         public ViewMode ViewMode { get; set; } = ViewMode.Front;
@@ -38,6 +40,8 @@ namespace VisionNet.Controls
             this.openGLControl.MouseMove += OpenGLControl_MouseMove;
             this.openGLControl.MouseUp += OpenGLControl_MouseUp;
             this.openGLControl.MouseWheel += OpenGLControl_MouseWheel;
+            this.openGLControl.MouseDoubleClick += OpenGLControl_MouseDoubleClick; // 添加双击事件
+
         }
         #endregion
         #region 鼠标事件处理
@@ -77,8 +81,8 @@ namespace VisionNet.Controls
                 int deltaY = e.Y - lastMouseY;
 
                 // 计算旋转角度
-                float angleX = deltaY * 0.5f;
-                float angleY = deltaX * 0.5f;
+                float angleX = -deltaY * 0.5f;
+                float angleY = -deltaX * 0.5f;
 
                 if (!Enable2DView)
                     // 更新旋转矩阵
@@ -102,28 +106,60 @@ namespace VisionNet.Controls
         }
         private void OpenGLControl_MouseWheel(object sender, MouseEventArgs e)
         {
-            // translateZ += e.Delta * (translateZSpeed * (1 - (-translateZ) / 10000.0f));
+            /*  // translateZ += e.Delta * (translateZSpeed * (1 - (-translateZ) / 10000.0f));
+              float delta = e.Delta > 0 ? 0.9f : 1.1f;
+              //translateZ *= delta;
+              scale *= delta;*/
+            // 计算缩放因子
             float delta = e.Delta > 0 ? 0.9f : 1.1f;
             translateZ *= delta;
-            openGLControl.Invalidate();
+          
         }
+        private void OpenGLControl_MouseDoubleClick(object sender, MouseEventArgs e)
+        {
+            if (e.Button == MouseButtons.Left)
+            {
+                // 假设深度值为 0.5（可以根据实际情况调整）
+                float depth = 0.5f;
+
+                // 获取鼠标点击位置的世界坐标
+                CxPoint3D? targetPosition = GetMouseWorldPosition(e.X, e.Y);
+
+                // 将相机移动到目标位置
+                if (targetPosition.HasValue)
+                {
+                    translateX = -targetPosition.Value.X;
+                    translateY = -targetPosition.Value.Y;
+                    //translateZ = -targetPosition.Value.Z;
+                }
+                // 触发重绘
+                openGLControl.Invalidate();
+            }
+        }
+
         #endregion
         #region 渲染方法
         /// <summary>
-        /// 设置视图模式
-        /// </summary>
         public void FitView(Box3D? viewBox)
         {
             if (!viewBox.HasValue || ViewMode == ViewMode.None)
             {
                 return;
             }
-            // 计算点云的宽度和高度
+
+            // 更新点云中心
+            pointCloudCenter = new CxPoint3D(
+                (float)viewBox.Value.Center.X,
+                (float)viewBox.Value.Center.Y,
+                (float)viewBox.Value.Center.Z
+            );
+
+            // 计算点云的宽度、高度和深度
             double pointCloudWidth = viewBox.Value.Size.Width;
             double pointCloudHeight = viewBox.Value.Size.Height;
             double pointCloudDepth = viewBox.Value.Size.Depth;
 
-            //计算平移缩放的速度系数
+            // 计算平移缩放的速度系数
             var min1 = Math.Min(pointCloudWidth, pointCloudHeight);
             var min2 = Math.Min(pointCloudHeight, pointCloudDepth);
             var min3 = Math.Min(pointCloudDepth, pointCloudWidth);
@@ -141,14 +177,16 @@ namespace VisionNet.Controls
             translateX = (float)-viewBox.Value.Center.X;
             translateY = (float)-viewBox.Value.Center.Y;
             if (!Enable2DView)
-                translateZ = (float)-viewBox.Value.Center.Z - (float)zoomFactor * 1.2f; //  适当调整视距
+            {
+                translateZ = (float)-viewBox.Value.Center.Z - (float)zoomFactor * 1.2f; // 适当调整视距
+            }
             else
             {
                 var scaleWdith = pointCloudWidth / aspectRatio;
                 if (scaleWdith > pointCloudHeight)
-                    translateZ = (float)(openGLControl.Width / scaleWdith); //  适当调整视距
+                    translateZ = (float)(openGLControl.Width / scaleWdith); // 适当调整视距
                 else
-                    translateZ = (float)(openGLControl.Height / pointCloudHeight); //  适当调整视距
+                    translateZ = (float)(openGLControl.Height / pointCloudHeight); // 适当调整视距
             }
 
             // 重置旋转矩阵
@@ -156,19 +194,23 @@ namespace VisionNet.Controls
                 rotationMatrix[i] = (i % 5 == 0) ? 1.0f : 0.0f;
 
             // 根据视图模式设置初始旋转矩阵
+            //scale = 1;
             switch (ViewMode)
             {
                 case ViewMode.Top:
-                    SetRotationMatrix(0, 1, 0, 0);
+                    //SetRotationMatrix(0, 1, 0, 0);
                     break;
                 case ViewMode.Front:
-                    SetRotationMatrix(90, 1, 0, 0);
+                    //SetRotationMatrix(90, 1, 0, 0);
+                    UpdateRotationMatrix(90, 0);
                     break;
                 case ViewMode.Left:
-                    SetRotationMatrix(90, 0, 1, 0);
+                    //SetRotationMatrix(90, 0, 1, 0);
+                    UpdateRotationMatrix(0, -90);
                     break;
                 case ViewMode.Right:
-                    SetRotationMatrix(-90, 0, 1, 0);
+                    //SetRotationMatrix(-90, 0, 1, 0);
+                    UpdateRotationMatrix(0, 90);
                     break;
             }
         }
@@ -217,10 +259,25 @@ namespace VisionNet.Controls
         }
         private void UpdateRotationMatrix(float angleX, float angleY)
         {
+            // 平移到点云中心
+            float[] translateToCenter = new float[16];
+            for (int i = 0; i < 16; i++)
+                translateToCenter[i] = (i % 5 == 0) ? 1.0f : 0.0f;
+            translateToCenter[12] = -pointCloudCenter.X;
+            translateToCenter[13] = -pointCloudCenter.Y;
+            translateToCenter[14] = -pointCloudCenter.Z;
+
+            // 平移回原点
+            float[] translateBack = new float[16];
+            for (int i = 0; i < 16; i++)
+                translateBack[i] = (i % 5 == 0) ? 1.0f : 0.0f;
+            translateBack[12] = pointCloudCenter.X;
+            translateBack[13] = pointCloudCenter.Y;
+            translateBack[14] = pointCloudCenter.Z;
+
             // 计算旋转矩阵
             float[] rotationX = new float[16];
             float[] rotationY = new float[16];
-
             for (int i = 0; i < 16; i++)
             {
                 rotationX[i] = (i % 5 == 0) ? 1.0f : 0.0f;
@@ -241,9 +298,12 @@ namespace VisionNet.Controls
             rotationY[2] = sinY;
             rotationY[8] = -sinY;
             rotationY[10] = cosY;
+
             // 更新旋转矩阵
+            MultiplyMatrix(rotationMatrix, translateToCenter);
             MultiplyMatrix(rotationMatrix, rotationX);
             MultiplyMatrix(rotationMatrix, rotationY);
+            MultiplyMatrix(rotationMatrix, translateBack);
         }
         private void SetRotationMatrix(float angle, float x, float y, float z)
         {
@@ -272,6 +332,7 @@ namespace VisionNet.Controls
             rotationMatrix[14] = 0.0f;
             rotationMatrix[15] = 1.0f;
         }
+
         private void MultiplyMatrix(float[] result, float[] matrix)
         {
             float[] temp = new float[16];
@@ -288,6 +349,32 @@ namespace VisionNet.Controls
             }
             Array.Copy(temp, result, 16);
         }
+        private CxPoint3D? GetMouseWorldPosition(int mouseX, int mouseY)
+        {
+            OpenGL gl = openGLControl.OpenGL;
+
+            int[] viewport = new int[4];
+            gl.GetInteger(OpenGL.GL_VIEWPORT, viewport);
+            // 调整Y坐标（OpenGL坐标系原点在左下角）
+            int adjustedY = viewport[3] - mouseY;
+            // 为深度值创建byte数组
+            byte[] depthBuffer = new byte[4]; // 单个float值需要4个字节
+            // 读取深度值到byte数组
+            gl.ReadPixels(mouseX, adjustedY, 1, 1, OpenGL.GL_DEPTH_COMPONENT, OpenGL.GL_FLOAT, depthBuffer);
+            // 将byte数组转换为float
+            float depth = BitConverter.ToSingle(depthBuffer, 0);
+            // 在转换坐标之前检查深度值
+            if (Math.Abs(depth - 1.0f) < 0.00001f)
+            {
+                // 深度值为1.0，表示点击了背景
+                return null; // 或者返回一个特殊值表示无效点击
+            }
+
+            // 将屏幕坐标转换为世界坐标
+            var obj = gl.UnProject((double)mouseX, (double)adjustedY, (double)depth);
+            return new CxPoint3D((float)obj[0], (float)obj[1], (float)obj[2]);
+        }
+
         #endregion
     }
 }

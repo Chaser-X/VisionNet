@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -22,7 +23,7 @@ namespace VisionNet.Controls
         private CxCoordinateSystemItem coordinationItem = new CxCoordinateSystemItem();
         private CxColorBarItem colorBarItem = new CxColorBarItem();
         private CxCoordinationTagItem coorTagItem = new CxCoordinationTagItem();
-        private List<IRenderItem> renderItem = new List<IRenderItem>();
+        private ConcurrentBag<IRenderItem> renderItem = new ConcurrentBag<IRenderItem>();
         //相机属性
         public CxTrackBallCamera Camera => camera;
 
@@ -35,6 +36,7 @@ namespace VisionNet.Controls
                 pSufaceMode = value;
                 if (surfaceItem != null)
                     surfaceItem.SurfaceMode = value;
+                updataMenuItem();
             }
         }
         private SurfaceColorMode pSurfaceColorMode = VisionNet.Controls.SurfaceColorMode.ColorWithIntensity;
@@ -46,6 +48,7 @@ namespace VisionNet.Controls
                 pSurfaceColorMode = value;
                 if (surfaceItem != null)
                     surfaceItem.SurfaceColorMode = value;
+                updataMenuItem();
             }
         }
         //是否显示坐标系
@@ -64,24 +67,28 @@ namespace VisionNet.Controls
                 camera = new CxTrackBallCamera(this);
                 camera.ViewMode = viewMode;
                 InitializeComponent();
-
-                foreach (var item in viewModeToolStripMenuItem.DropDownItems)
-                {
-                    var tripItem = (ToolStripMenuItem)item;
-                    tripItem.Checked = tripItem.Text == camera.ViewMode.ToString();
-                }
                 SurfaceMode = surfaceMode;
-                foreach (var item in surfaceModeToolStripMenuItem.DropDownItems)
-                {
-                    var tripItem = (ToolStripMenuItem)item;
-                    tripItem.Checked = tripItem.Text == SurfaceMode.ToString();
-                }
-                SurfaceColorMode = surfaceColorMode;
-                foreach (var item in surfaceColorModeToolStripMenuItem.DropDownItems)
-                {
-                    var tripItem = (ToolStripMenuItem)item;
-                    tripItem.Checked = tripItem.Text == SurfaceColorMode.ToString();
-                }
+                SurfaceColorMode = surfaceColorMode; 
+                updataMenuItem();
+            }
+        }
+        //刷新menu
+        private void updataMenuItem()
+        {
+            foreach (var item in viewModeToolStripMenuItem.DropDownItems)
+            {
+                var tripItem = (ToolStripMenuItem)item;
+                tripItem.Checked = tripItem.Text == camera.ViewMode.ToString();
+            }
+            foreach (var item in surfaceModeToolStripMenuItem.DropDownItems)
+            {
+                var tripItem = (ToolStripMenuItem)item;
+                tripItem.Checked = tripItem.Text == pSufaceMode.ToString();
+            }
+            foreach (var item in surfaceColorModeToolStripMenuItem.DropDownItems)
+            {
+                var tripItem = (ToolStripMenuItem)item;
+                tripItem.Checked = tripItem.Text == pSurfaceColorMode.ToString();
             }
         }
         #region 操作方法
@@ -171,9 +178,10 @@ namespace VisionNet.Controls
                 colorBarItem.SetRange(surfaceItem.ZMin, surfaceItem.ZMax);
                 colorBarItem.Draw(gl);
             }
-            foreach (var item in renderItem)
+            var items = renderItem.ToArray();
+            foreach (var item in items)
             {
-                item.Draw(gl);
+                item.Draw(gl); 
             }
             if (surfaceItem != null)
                 coorTagItem.Draw(gl);
@@ -185,7 +193,10 @@ namespace VisionNet.Controls
         /// </summary>
         public void ResetView()
         {
-            renderItem.Clear();
+            while (!renderItem.IsEmpty)
+            {
+                renderItem.TryTake(out _);
+            }
             Invalidate();
         }
         protected override void DoOpenGLInitialized()
@@ -314,30 +325,36 @@ namespace VisionNet.Controls
             }
             // 将屏幕坐标转换为世界坐标
             var obj = gl.UnProject((double)mouseX, (double)adjustedY, (double)depth);
-            return new CxPoint3D((float)obj[0], (float)obj[1], (float)obj[2]); ;
+            return new CxPoint3D((float)obj[0], (float)obj[1], (float)obj[2]); 
         }
         private (CxPoint3D? Location, byte? Intensity) GetNearestSurfacePoint(int mouseX, int mouseY)
         {
-            var tempsurfaceItem = surfaceItem as CxSurfaceItem;
-            if (tempsurfaceItem == null || tempsurfaceItem.Surface == null)
-                return (null, null);
-            var surface = tempsurfaceItem.Surface;
+
             var obj = ScreenToWorldCoordinate(mouseX, mouseY);
             if (!obj.HasValue)
                 return (null, null);
             var worldObj = obj.Value;
-            // 计算 worldObj 在网格中的索引
-            int xIndex = (int)((worldObj.X - surface.XOffset) / surface.XScale);
-            int yIndex = (int)((worldObj.Y - surface.YOffset) / surface.YScale);
-            // 检查索引是否在范围内
-            if (xIndex < 0 || xIndex >= surface.Width || yIndex < 0 || yIndex >= surface.Length)
+            //mesh图元
+            var tempmeshItem = surfaceItem as CxMeshItem;
+            if (tempmeshItem != null)
+                return (worldObj, null);
+            //surface图元
+            var tempsurfaceItem = surfaceItem as CxSurfaceItem;
+            if (tempsurfaceItem == null || tempsurfaceItem.Surface == null)
                 return (null, null);
+            var surface = tempsurfaceItem.Surface;
             // 初始化最近点和最小距离
             CxPoint3D? nearestPoint = null;
             byte? nearestIntensity = null;
             float minDistanceSquared = float.MaxValue;
             if (surface.Type == SurfaceType.Surface)
             {
+                // 计算 worldObj 在网格中的索引
+                int xIndex = (int)((worldObj.X - surface.XOffset) / surface.XScale);
+                int yIndex = (int)((worldObj.Y - surface.YOffset) / surface.YScale);
+                // 检查索引是否在范围内
+                if (xIndex < 0 || xIndex >= surface.Width || yIndex < 0 || yIndex >= surface.Length)
+                    return (null, null);
                 var minDis = 3 * (surface.XScale * surface.XScale +
                              surface.YScale * surface.YScale +
                              surface.ZScale * surface.ZScale);
