@@ -23,15 +23,28 @@ namespace VisionNet.Controls
         ColorWithIntensity,
     }
 
-    public interface IRenderItem
+    public interface IRenderItem : IDisposable
     {
         Color Color { get; set; }
         float Size { get; set; }
         void Draw(OpenGL gL);
     }
 
-    public abstract class AbstractRenderItem : IRenderItem
+    public abstract class AbstractRenderItem : IRenderItem 
     {
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+        protected virtual void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                // free managed resources
+            }
+            // free native resources if there are any.
+        }
         public AbstractRenderItem()
         {
         }
@@ -43,6 +56,10 @@ namespace VisionNet.Controls
         public float Size { get; set; } = 1.0f;
         public Color Color { get; set; } = Color.White;
         public abstract void Draw(OpenGL gL);
+        //~AbstractRenderItem()
+        //{
+        //    Dispose(false);
+        //}
     }
 
     //mesh surface pointcloud 等obj公用接口

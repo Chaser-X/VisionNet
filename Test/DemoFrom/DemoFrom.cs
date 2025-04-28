@@ -148,7 +148,7 @@ namespace DemoFrom
             cxDisplay2.SetSegment(new Segment3D[] { new Segment3D(new CxPoint3D(0, 0, 0), new CxPoint3D(1, 1, 1)) }, Color.Red);
             cxDisplay2.SetSegment(new Segment3D[] { new Segment3D(new CxPoint3D(0, 0, 0), new CxPoint3D(0, 1, 1)) }, Color.Yellow);
 
-            cxDisplay2.SetPoint(new CxPoint3D[] { new CxPoint3D(2, 1, 1) }, Color.Green, 1f, PointShape.Sphere);
+            cxDisplay2.SetPoint(new CxPoint3D[] { new CxPoint3D(2, 3, 1), new CxPoint3D(5, 1, 1) }, Color.Green, 1f, PointShape.Sphere);
 
             //添加多边形
             List<CxPoint3D> pts = new List<CxPoint3D>();

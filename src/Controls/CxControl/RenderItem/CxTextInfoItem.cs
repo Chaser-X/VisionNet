@@ -27,12 +27,12 @@ namespace VisionNet.Controls
                 if (screenCoord.X < 0 || screenCoord.X > gl.RenderContextProvider.Width ||
                     screenCoord.Y < 0 || screenCoord.Y > gl.RenderContextProvider.Height)
                 {
-                    return;
+                    continue;
                 }
-                // 如果需要考虑透视范围，可以检查 screenCoord.Z（假设其为归一化深度：0～1）
+                //// 如果需要考虑透视范围，可以检查 screenCoord.Z（假设其为归一化深度：0～1）
                 if (screenCoord.Z < 0 || screenCoord.Z > 1)
                 {
-                    return;
+                    continue;
                 }
                 gl.DrawText((int)screenCoord.X, (int)screenCoord.Y, (float)(Color.R / 255.0), (float)(Color.G / 255.0), (float)(Color.B / 255.0), "Arial", textInfo.Size, textInfo.Text);
             }

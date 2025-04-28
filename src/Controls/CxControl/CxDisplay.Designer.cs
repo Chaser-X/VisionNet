@@ -69,7 +69,7 @@ namespace VisionNet.Controls
             this.surfaceModeToolStripMenuItem,
             this.surfaceColorModeToolStripMenuItem});
             this.menu_right.Name = "menu_right";
-            this.menu_right.Size = new System.Drawing.Size(187, 114);
+            this.menu_right.Size = new System.Drawing.Size(187, 92);
             // 
             // d2DToolStripMenuItem
             // 

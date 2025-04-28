@@ -23,7 +23,7 @@ namespace VisionNet.Controls
         private CxCoordinateSystemItem coordinationItem = new CxCoordinateSystemItem();
         private CxColorBarItem colorBarItem = new CxColorBarItem();
         private CxCoordinationTagItem coorTagItem = new CxCoordinationTagItem();
-        private ConcurrentBag<IRenderItem> renderItem = new ConcurrentBag<IRenderItem>();
+        private List<IRenderItem> renderItem = new List<IRenderItem>();
         //Ïà»úÊôÐÔ
         public CxTrackBallCamera Camera => camera;
 
@@ -193,11 +193,8 @@ namespace VisionNet.Controls
         /// </summary>
         public void ResetView()
         {
-            while (!renderItem.IsEmpty)
-            {
-                renderItem.TryTake(out _);
-            }
-            Invalidate();
+            renderItem.ForEach(item => item.Dispose());
+            renderItem.Clear();
         }
         protected override void DoOpenGLInitialized()
         {

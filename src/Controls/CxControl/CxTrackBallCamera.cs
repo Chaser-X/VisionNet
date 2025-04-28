@@ -113,27 +113,26 @@ namespace VisionNet.Controls
             // 计算缩放因子
             float delta = e.Delta > 0 ? 0.9f : 1.1f;
             translateZ *= delta;
-          
+
         }
         private void OpenGLControl_MouseDoubleClick(object sender, MouseEventArgs e)
         {
             if (e.Button == MouseButtons.Left)
             {
-                // 假设深度值为 0.5（可以根据实际情况调整）
-                float depth = 0.5f;
-
                 // 获取鼠标点击位置的世界坐标
-                CxPoint3D? targetPosition = GetMouseWorldPosition(e.X, e.Y);
-
-                // 将相机移动到目标位置
-                if (targetPosition.HasValue)
+                var worldPosition= GetMouseWorldPosition(e.X, e.Y);
+                if (worldPosition != null)
                 {
-                    translateX = -targetPosition.Value.X;
-                    translateY = -targetPosition.Value.Y;
-                    //translateZ = -targetPosition.Value.Z;
+                    // 将世界坐标转换到旋转后的坐标系
+                    var adjustedPosition = ApplyInverseRotation(worldPosition.Value);
+
+                    // 根据调整后的坐标计算平移量
+                    translateX = -adjustedPosition.X;
+                    translateY = -adjustedPosition.Y;
+
+                    // 触发重绘
+                    openGLControl.Invalidate();
                 }
-                // 触发重绘
-                openGLControl.Invalidate();
             }
         }
 
@@ -374,7 +373,45 @@ namespace VisionNet.Controls
             var obj = gl.UnProject((double)mouseX, (double)adjustedY, (double)depth);
             return new CxPoint3D((float)obj[0], (float)obj[1], (float)obj[2]);
         }
+        // 将点应用逆旋转矩阵
+        private CxPoint3D ApplyInverseRotation(CxPoint3D point)
+        {
+            // 计算旋转矩阵的逆矩阵
+            float[] inverseRotationMatrix = new float[16];
+            Array.Copy(rotationMatrix, inverseRotationMatrix, 16);
+            InvertMatrix(inverseRotationMatrix);
 
+            // 将点转换为齐次坐标
+            float[] pointVector = { point.X, point.Y, point.Z, 1.0f };
+            float[] resultVector = new float[4];
+
+            // 应用逆旋转矩阵
+            for (int i = 0; i < 4; i++)
+            {
+                resultVector[i] = 0;
+                for (int j = 0; j < 4; j++)
+                {
+                    resultVector[i] += inverseRotationMatrix[i * 4 + j] * pointVector[j];
+                }
+            }
+
+            // 返回转换后的点
+            return new CxPoint3D(resultVector[0], resultVector[1], resultVector[2]);
+        }
+        // 矩阵求逆
+        private void InvertMatrix(float[] matrix)
+        {
+            // 为了简化，这里假设矩阵是正交矩阵，直接转置即可
+            for (int i = 0; i < 3; i++)
+            {
+                for (int j = i + 1; j < 3; j++)
+                {
+                    float temp = matrix[i * 4 + j];
+                    matrix[i * 4 + j] = matrix[j * 4 + i];
+                    matrix[j * 4 + i] = temp;
+                }
+            }
+        }
         #endregion
     }
 }
