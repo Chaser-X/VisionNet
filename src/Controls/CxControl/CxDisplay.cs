@@ -64,9 +64,9 @@ namespace VisionNet.Controls
         {
             if (!DesignMode)
             {
+                InitializeComponent();
                 camera = new CxTrackBallCamera(this);
                 camera.ViewMode = viewMode;
-                InitializeComponent();
                 SurfaceMode = surfaceMode;
                 SurfaceColorMode = surfaceColorMode; 
                 updataMenuItem();
@@ -157,9 +157,15 @@ namespace VisionNet.Controls
             renderItem.Add(boxItem);
         }
         //添加Textinfo
-        public void SetTextInfo(TextInfo[] textInfo, Color color, float size = 1.0f)
+        public void SetTextInfo(TextInfo[] textInfo, Color color)
         {
-            var textItem = new CxTextInfoItem(textInfo, color, size);
+            var textItem = new CxTextInfoItem(textInfo, color, 1);
+            renderItem.Add(textItem);
+        }
+        //添加2D文本
+        public void SetText2D(Text2D[] text2Ds, Color color)
+        {
+            var textItem = new CxText2DItem(text2Ds, color, 1);
             renderItem.Add(textItem);
         }
         #endregion
@@ -231,7 +237,7 @@ namespace VisionNet.Controls
         protected override void OnResize(EventArgs e)
         {
             base.OnResize(e);
-            camera.LookAtMatrix(OpenGL);
+            camera?.LookAtMatrix(OpenGL);
         }
         #endregion 渲染方法
         private void d2DToolStripMenuItem_Click(object sender, EventArgs e)

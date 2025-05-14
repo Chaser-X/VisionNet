@@ -20,7 +20,6 @@ namespace VisionNet.Controls
         private int lastMouseX, lastMouseY;
         private float[] rotationMatrix = new float[16];
         private float translateSpeed = 0.5f;
-        private float scale = 1.0f;
         private CxPoint3D pointCloudCenter = new CxPoint3D();
         #endregion
         #region 属性
@@ -120,7 +119,7 @@ namespace VisionNet.Controls
             if (e.Button == MouseButtons.Left)
             {
                 // 获取鼠标点击位置的世界坐标
-                var worldPosition= GetMouseWorldPosition(e.X, e.Y);
+                var worldPosition = GetMouseWorldPosition(e.X, e.Y);
                 if (worldPosition != null)
                 {
                     // 将世界坐标转换到旋转后的坐标系
@@ -141,78 +140,78 @@ namespace VisionNet.Controls
         /// <summary>
         public void FitView(Box3D? viewBox)
         {
-            if (!viewBox.HasValue || ViewMode == ViewMode.None)
-            {
+            if (ViewMode == ViewMode.None)
                 return;
-            }
-
-            // 更新点云中心
-            pointCloudCenter = new CxPoint3D(
-                (float)viewBox.Value.Center.X,
-                (float)viewBox.Value.Center.Y,
-                (float)viewBox.Value.Center.Z
-            );
-
-            // 计算点云的宽度、高度和深度
-            double pointCloudWidth = viewBox.Value.Size.Width;
-            double pointCloudHeight = viewBox.Value.Size.Height;
-            double pointCloudDepth = viewBox.Value.Size.Depth;
-
-            // 计算平移缩放的速度系数
-            var min1 = Math.Min(pointCloudWidth, pointCloudHeight);
-            var min2 = Math.Min(pointCloudHeight, pointCloudDepth);
-            var min3 = Math.Min(pointCloudDepth, pointCloudWidth);
-            if (min1 == min2) // height min
-                translateSpeed = (float)min3 / 400.0f;
-            if (min2 == min3) // depth min
-                translateSpeed = (float)min1 / 400.0f;
-            if (min1 == min3) // width min
-                translateSpeed = (float)min2 / 400.0f;
-
-            // 根据窗体大小和点云的大小自适应设置 zoom
-            double aspectRatio = (double)openGLControl.Width / (double)openGLControl.Height;
-            double zoomFactor = Math.Max(pointCloudWidth / aspectRatio, pointCloudHeight);
-
-            translateX = (float)-viewBox.Value.Center.X;
-            translateY = (float)-viewBox.Value.Center.Y;
-            if (!Enable2DView)
-            {
-                translateZ = (float)-viewBox.Value.Center.Z - (float)zoomFactor * 1.2f; // 适当调整视距
-            }
-            else
-            {
-                var scaleWdith = pointCloudWidth / aspectRatio;
-                if (scaleWdith > pointCloudHeight)
-                    translateZ = (float)(openGLControl.Width / scaleWdith); // 适当调整视距
-                else
-                    translateZ = (float)(openGLControl.Height / pointCloudHeight); // 适当调整视距
-            }
-
-            // 重置旋转矩阵
+            translateX = 0f;
+            translateY = 0f;
+            translateZ = -10;
+            translateSpeed = 0.5f;
+            pointCloudCenter = new CxPoint3D();
+            //重置视图旋转矩阵
             for (int i = 0; i < 16; i++)
                 rotationMatrix[i] = (i % 5 == 0) ? 1.0f : 0.0f;
+            //重置视图中心位置
+            if (viewBox.HasValue)
+            {
+                // 更新点云中心
+                pointCloudCenter = new CxPoint3D(
+                    (float)viewBox.Value.Center.X,
+                    (float)viewBox.Value.Center.Y,
+                    (float)viewBox.Value.Center.Z
+                );
 
-            // 根据视图模式设置初始旋转矩阵
-            //scale = 1;
+                // 计算点云的宽度、高度和深度
+                double pointCloudWidth = viewBox.Value.Size.Width;
+                double pointCloudHeight = viewBox.Value.Size.Height;
+                double pointCloudDepth = viewBox.Value.Size.Depth;
+
+                // 计算平移缩放的速度系数
+                var min1 = Math.Min(pointCloudWidth, pointCloudHeight);
+                var min2 = Math.Min(pointCloudHeight, pointCloudDepth);
+                var min3 = Math.Min(pointCloudDepth, pointCloudWidth);
+                if (min1 == min2) // height min
+                    translateSpeed = (float)min3 / 400.0f;
+                if (min2 == min3) // depth min
+                    translateSpeed = (float)min1 / 400.0f;
+                if (min1 == min3) // width min
+                    translateSpeed = (float)min2 / 400.0f;
+
+                // 根据窗体大小和点云的大小自适应设置 zoom
+                double aspectRatio = (double)openGLControl.Width / (double)openGLControl.Height;
+                double zoomFactor = Math.Max(pointCloudWidth / aspectRatio, pointCloudHeight);
+
+                translateX = (float)-viewBox.Value.Center.X;
+                translateY = (float)-viewBox.Value.Center.Y;
+                if (!Enable2DView)
+                {
+                    translateZ = (float)-viewBox.Value.Center.Z - (float)zoomFactor * 1.2f; // 适当调整视距
+                }
+                else
+                {
+                    var scaleWdith = pointCloudWidth / aspectRatio;
+                    if (scaleWdith > pointCloudHeight)
+                        translateZ = (float)(openGLControl.Width / scaleWdith); // 适当调整视距
+                    else
+                        translateZ = (float)(openGLControl.Height / pointCloudHeight); // 适当调整视距
+                }
+            }
             switch (ViewMode)
             {
                 case ViewMode.Top:
-                    //SetRotationMatrix(0, 1, 0, 0);
                     break;
                 case ViewMode.Front:
-                    //SetRotationMatrix(90, 1, 0, 0);
                     UpdateRotationMatrix(90, 0);
                     break;
                 case ViewMode.Left:
-                    //SetRotationMatrix(90, 0, 1, 0);
                     UpdateRotationMatrix(0, -90);
                     break;
                 case ViewMode.Right:
-                    //SetRotationMatrix(-90, 0, 1, 0);
                     UpdateRotationMatrix(0, 90);
                     break;
+                default: break;
             }
         }
+
         /// <summary>
         /// 视图空间设置
         /// </summary>
@@ -331,7 +330,6 @@ namespace VisionNet.Controls
             rotationMatrix[14] = 0.0f;
             rotationMatrix[15] = 1.0f;
         }
-
         private void MultiplyMatrix(float[] result, float[] matrix)
         {
             float[] temp = new float[16];

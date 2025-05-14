@@ -133,5 +133,65 @@ namespace VisionNet.Controls
             }
             gl.DrawText((int)screenCoord.X, (int)screenCoord.Y, 1, 1, 1, "Arial", size, text);
         }
+
+        public static bool IsOpenGLAvailable()
+        {
+            try
+            {
+                // 尝试创建一个临时的OpenGL上下文
+                OpenGL gl = new OpenGL();
+
+                // 获取OpenGL版本信息
+                string version = gl.GetString(OpenGL.GL_VERSION);
+                string renderer = gl.GetString(OpenGL.GL_RENDERER);
+                string vendor = gl.GetString(OpenGL.GL_VENDOR);
+
+                // 记录日志
+                Console.WriteLine($"OpenGL版本: {version}");
+                Console.WriteLine($"渲染器: {renderer}");
+                Console.WriteLine($"供应商: {vendor}");
+
+                // 检查是否为软件渲染器
+                bool isSoftwareRenderer = renderer.Contains("Software") ||
+                                         renderer.Contains("Microsoft") ||
+                                         renderer.Contains("GDI Generic");
+
+                // 如果是软件渲染，可以选择警告或拒绝
+                if (isSoftwareRenderer)
+                {
+                    Console.WriteLine("警告：检测到软件渲染器，性能可能受限");
+                }
+
+                return true;
+
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"OpenGL初始化失败: {ex.Message}");
+                return false;
+            }
+        }
+
+        public static string GetOpenGLVersion()
+        {
+            try
+            {
+                // 尝试创建一个临时的OpenGL上下文
+                OpenGL gl = new OpenGL();
+                // 获取OpenGL版本信息
+                string version = gl.GetString(OpenGL.GL_VERSION);
+                string renderer = gl.GetString(OpenGL.GL_RENDERER);
+                string vendor = gl.GetString(OpenGL.GL_VENDOR);
+
+                // 记录日志
+                var message = $"OpenGL版本: {version}\r\n渲染器: {renderer}\r\n供应商: {vendor}";
+                return message;
+
+            }
+            catch (Exception ex)
+            {
+                return ex.Message;
+            }
+        }
     }
 }

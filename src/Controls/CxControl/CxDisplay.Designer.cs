@@ -69,13 +69,14 @@ namespace VisionNet.Controls
             this.surfaceModeToolStripMenuItem,
             this.surfaceColorModeToolStripMenuItem});
             this.menu_right.Name = "menu_right";
-            this.menu_right.Size = new System.Drawing.Size(187, 92);
+            this.menu_right.Size = new System.Drawing.Size(187, 114);
             // 
             // d2DToolStripMenuItem
             // 
             this.d2DToolStripMenuItem.Name = "d2DToolStripMenuItem";
             this.d2DToolStripMenuItem.Size = new System.Drawing.Size(186, 22);
             this.d2DToolStripMenuItem.Text = "2D View";
+            this.d2DToolStripMenuItem.Visible = false;
             this.d2DToolStripMenuItem.Click += new System.EventHandler(this.d2DToolStripMenuItem_Click);
             // 
             // viewModeToolStripMenuItem

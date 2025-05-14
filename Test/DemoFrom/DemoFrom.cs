@@ -26,6 +26,14 @@ namespace DemoFrom
             GocatorHandle.GocatorHandle.Instance.Connect("127.0.0.1", false);
             GocatorHandle.GocatorHandle.Instance.SetDataHandler(onData);
             //camera = new CxCamera(openGLControl1);
+            var state = CxExtension.IsOpenGLAvailable();
+            var message = CxExtension.GetOpenGLVersion();
+            MessageBox.Show(message);
+            if (!state)
+            {
+                MessageBox.Show("OpenGL不可用，请检查您的系统配置。");
+                return;
+            }
         }
         CxSurface surface = null;
         private void onData(GoDataSet obj)
@@ -170,6 +178,10 @@ namespace DemoFrom
             //添加TextInfo
             var text = new TextInfo(new CxPoint3D(0, 0, 0), "this is a test!", 10);
             cxDisplay2.SetTextInfo(new TextInfo[] { text }, Color.Yellow);
+
+            //添加Text2D
+            var text2d = new Text2D(new CxPoint2D(10, 50), "2D Labels", 10);
+            cxDisplay2.SetText2D(new Text2D[] { text2d }, Color.Green);
         }
     }
 }
