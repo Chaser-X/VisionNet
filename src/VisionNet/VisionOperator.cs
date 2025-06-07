@@ -44,5 +44,25 @@ namespace VisionNet
             suface = new CxSurface(width, height, heighData, intensityMap, xOffset, yOffset, zOffset, xScale, yScale, zScale);
             return suface;
         }
+        //3D transform point by matrix
+        public static CxPoint3D TransformPoint3D(CxPoint3D point, CxMatrix4X4 matrix)
+        {
+            var m = matrix.Data;
+            float x = point.X, y = point.Y, z = point.Z;
+
+            // 按OpenGL列主序
+            float tx = m[0] * x + m[4] * y + m[8] * z + m[12];
+            float ty = m[1] * x + m[5] * y + m[9] * z + m[13];
+            float tz = m[2] * x + m[6] * y + m[10] * z + m[14];
+            float tw = m[3] * x + m[7] * y + m[11] * z + m[15];
+
+            if (Math.Abs(tw) > 1e-6f)
+            {
+                tx /= tw;
+                ty /= tw;
+                tz /= tw;
+            }
+            return new CxPoint3D(tx, ty, tz);
+        }
     }
 }

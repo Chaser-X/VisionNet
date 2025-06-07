@@ -157,7 +157,12 @@ namespace DemoFrom
             cxDisplay2.SetSegment(new Segment3D[] { new Segment3D(new CxPoint3D(0, 0, 0), new CxPoint3D(0, 1, 1)) }, Color.Yellow);
 
             cxDisplay2.SetPoint(new CxPoint3D[] { new CxPoint3D(2, 3, 1), new CxPoint3D(5, 1, 1) }, Color.Green, 1f, PointShape.Sphere);
-
+            cxDisplay2.SetCoordinate3DSystem(new CxCoordination3D() {
+                Origin = new CxPoint3D(5, 5 ,5),
+                XAxis = new CxVector3D(1, 0, 0),
+                YAxis = new CxVector3D(0, 1, 0),
+                ZAxis = new CxVector3D(0, 0, -1)
+            },50);
             //添加多边形
             List<CxPoint3D> pts = new List<CxPoint3D>();
             pts.Add(new CxPoint3D(0, 0, 0));
@@ -172,7 +177,7 @@ namespace DemoFrom
             cxDisplay2.SetPlane(new Plane3D[] { plane }, Color.FromArgb(100, Color.Red));
 
             //添加Box3D
-            var box = new Box3D(new CxPoint3D(10, 0, 0), new CxSize3D(10, 10, 10));
+            var box = new Box3D(new CxPoint3D(0, 0, 0), new CxSize3D(10, 10, 10));
             cxDisplay2.SetBox(new Box3D[] { box }, Color.FromArgb(100, Color.Yellow));
 
             //添加TextInfo

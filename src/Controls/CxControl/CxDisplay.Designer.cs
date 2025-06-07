@@ -63,18 +63,19 @@ namespace VisionNet.Controls
             // 
             // menu_right
             // 
+            this.menu_right.ImageScalingSize = new System.Drawing.Size(20, 20);
             this.menu_right.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
             this.d2DToolStripMenuItem,
             this.viewModeToolStripMenuItem,
             this.surfaceModeToolStripMenuItem,
             this.surfaceColorModeToolStripMenuItem});
             this.menu_right.Name = "menu_right";
-            this.menu_right.Size = new System.Drawing.Size(187, 114);
+            this.menu_right.Size = new System.Drawing.Size(217, 100);
             // 
             // d2DToolStripMenuItem
             // 
             this.d2DToolStripMenuItem.Name = "d2DToolStripMenuItem";
-            this.d2DToolStripMenuItem.Size = new System.Drawing.Size(186, 22);
+            this.d2DToolStripMenuItem.Size = new System.Drawing.Size(216, 24);
             this.d2DToolStripMenuItem.Text = "2D View";
             this.d2DToolStripMenuItem.Visible = false;
             this.d2DToolStripMenuItem.Click += new System.EventHandler(this.d2DToolStripMenuItem_Click);
@@ -88,20 +89,20 @@ namespace VisionNet.Controls
             this.leftToolStripMenuItem,
             this.rightToolStripMenuItem});
             this.viewModeToolStripMenuItem.Name = "viewModeToolStripMenuItem";
-            this.viewModeToolStripMenuItem.Size = new System.Drawing.Size(186, 22);
+            this.viewModeToolStripMenuItem.Size = new System.Drawing.Size(216, 24);
             this.viewModeToolStripMenuItem.Text = "ViewMode";
             // 
             // orthographicToolStripMenuItem
             // 
             this.orthographicToolStripMenuItem.Name = "orthographicToolStripMenuItem";
-            this.orthographicToolStripMenuItem.Size = new System.Drawing.Size(108, 22);
+            this.orthographicToolStripMenuItem.Size = new System.Drawing.Size(132, 26);
             this.orthographicToolStripMenuItem.Text = "None";
             this.orthographicToolStripMenuItem.Click += new System.EventHandler(this.toolStripMenuItem_ViewModeClick);
             // 
             // topToolStripMenuItem1
             // 
             this.topToolStripMenuItem1.Name = "topToolStripMenuItem1";
-            this.topToolStripMenuItem1.Size = new System.Drawing.Size(108, 22);
+            this.topToolStripMenuItem1.Size = new System.Drawing.Size(132, 26);
             this.topToolStripMenuItem1.Text = "Top";
             this.topToolStripMenuItem1.Click += new System.EventHandler(this.toolStripMenuItem_ViewModeClick);
             // 
@@ -110,21 +111,21 @@ namespace VisionNet.Controls
             this.frontToolStripMenuItem.Checked = true;
             this.frontToolStripMenuItem.CheckState = System.Windows.Forms.CheckState.Checked;
             this.frontToolStripMenuItem.Name = "frontToolStripMenuItem";
-            this.frontToolStripMenuItem.Size = new System.Drawing.Size(108, 22);
+            this.frontToolStripMenuItem.Size = new System.Drawing.Size(132, 26);
             this.frontToolStripMenuItem.Text = "Front";
             this.frontToolStripMenuItem.Click += new System.EventHandler(this.toolStripMenuItem_ViewModeClick);
             // 
             // leftToolStripMenuItem
             // 
             this.leftToolStripMenuItem.Name = "leftToolStripMenuItem";
-            this.leftToolStripMenuItem.Size = new System.Drawing.Size(108, 22);
+            this.leftToolStripMenuItem.Size = new System.Drawing.Size(132, 26);
             this.leftToolStripMenuItem.Text = "Left";
             this.leftToolStripMenuItem.Click += new System.EventHandler(this.toolStripMenuItem_ViewModeClick);
             // 
             // rightToolStripMenuItem
             // 
             this.rightToolStripMenuItem.Name = "rightToolStripMenuItem";
-            this.rightToolStripMenuItem.Size = new System.Drawing.Size(108, 22);
+            this.rightToolStripMenuItem.Size = new System.Drawing.Size(132, 26);
             this.rightToolStripMenuItem.Text = "Right";
             this.rightToolStripMenuItem.Click += new System.EventHandler(this.toolStripMenuItem_ViewModeClick);
             // 
@@ -134,13 +135,13 @@ namespace VisionNet.Controls
             this.pointCloudToolStripMenuItem,
             this.meshToolStripMenuItem});
             this.surfaceModeToolStripMenuItem.Name = "surfaceModeToolStripMenuItem";
-            this.surfaceModeToolStripMenuItem.Size = new System.Drawing.Size(186, 22);
+            this.surfaceModeToolStripMenuItem.Size = new System.Drawing.Size(216, 24);
             this.surfaceModeToolStripMenuItem.Text = "SurfaceMode";
             // 
             // pointCloudToolStripMenuItem
             // 
             this.pointCloudToolStripMenuItem.Name = "pointCloudToolStripMenuItem";
-            this.pointCloudToolStripMenuItem.Size = new System.Drawing.Size(139, 22);
+            this.pointCloudToolStripMenuItem.Size = new System.Drawing.Size(173, 26);
             this.pointCloudToolStripMenuItem.Tag = "1";
             this.pointCloudToolStripMenuItem.Text = "PointCloud";
             this.pointCloudToolStripMenuItem.Click += new System.EventHandler(this.toolStripMenuItem_SurfaceModeClick);
@@ -148,7 +149,7 @@ namespace VisionNet.Controls
             // meshToolStripMenuItem
             // 
             this.meshToolStripMenuItem.Name = "meshToolStripMenuItem";
-            this.meshToolStripMenuItem.Size = new System.Drawing.Size(139, 22);
+            this.meshToolStripMenuItem.Size = new System.Drawing.Size(173, 26);
             this.meshToolStripMenuItem.Tag = "2";
             this.meshToolStripMenuItem.Text = "Mesh";
             this.meshToolStripMenuItem.Click += new System.EventHandler(this.toolStripMenuItem_SurfaceModeClick);
@@ -160,37 +161,40 @@ namespace VisionNet.Controls
             this.itensityToolStripMenuItem,
             this.colorWithIntensityToolStripMenuItem});
             this.surfaceColorModeToolStripMenuItem.Name = "surfaceColorModeToolStripMenuItem";
-            this.surfaceColorModeToolStripMenuItem.Size = new System.Drawing.Size(186, 22);
+            this.surfaceColorModeToolStripMenuItem.Size = new System.Drawing.Size(216, 24);
             this.surfaceColorModeToolStripMenuItem.Text = "SurfaceColorMode";
             // 
             // colorMapToolStripMenuItem
             // 
             this.colorMapToolStripMenuItem.Name = "colorMapToolStripMenuItem";
-            this.colorMapToolStripMenuItem.Size = new System.Drawing.Size(182, 22);
+            this.colorMapToolStripMenuItem.Size = new System.Drawing.Size(228, 26);
             this.colorMapToolStripMenuItem.Text = "Color";
             this.colorMapToolStripMenuItem.Click += new System.EventHandler(this.toolStripMenuItem_SurfaceColorModeClick);
             // 
             // itensityToolStripMenuItem
             // 
             this.itensityToolStripMenuItem.Name = "itensityToolStripMenuItem";
-            this.itensityToolStripMenuItem.Size = new System.Drawing.Size(182, 22);
+            this.itensityToolStripMenuItem.Size = new System.Drawing.Size(228, 26);
             this.itensityToolStripMenuItem.Text = "Intensity";
             this.itensityToolStripMenuItem.Click += new System.EventHandler(this.toolStripMenuItem_SurfaceColorModeClick);
             // 
             // colorWithIntensityToolStripMenuItem
             // 
             this.colorWithIntensityToolStripMenuItem.Name = "colorWithIntensityToolStripMenuItem";
-            this.colorWithIntensityToolStripMenuItem.Size = new System.Drawing.Size(182, 22);
+            this.colorWithIntensityToolStripMenuItem.Size = new System.Drawing.Size(228, 26);
             this.colorWithIntensityToolStripMenuItem.Text = "ColorWithIntensity";
             this.colorWithIntensityToolStripMenuItem.Click += new System.EventHandler(this.toolStripMenuItem_SurfaceColorModeClick);
             // 
             // CxDisplay
             // 
-            this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
+            this.AutoScaleDimensions = new System.Drawing.SizeF(8F, 16F);
             this.BackColor = System.Drawing.SystemColors.ActiveCaptionText;
             this.ContextMenuStrip = this.menu_right;
+            this.FrameRate = 0;
+            this.Margin = new System.Windows.Forms.Padding(5);
             this.Name = "CxDisplay";
             this.RenderContextType = SharpGL.RenderContextType.FBO;
+            this.RenderTrigger = SharpGL.RenderTrigger.Manual;
             this.menu_right.ResumeLayout(false);
             ((System.ComponentModel.ISupportInitialize)(this)).EndInit();
             this.ResumeLayout(false);

@@ -25,6 +25,7 @@ namespace VisionNet.Controls
         #region 属性
         public ViewMode ViewMode { get; set; } = ViewMode.Front;
         public bool Enable2DView { get; set; } = false;
+        public CxPoint3D? RotationPoint { get; set; } = null; //旋转点
         #endregion
         #region 构造函数
         public CxTrackBallCamera(OpenGLControl openGLControl)
@@ -84,8 +85,10 @@ namespace VisionNet.Controls
                 float angleY = -deltaX * 0.5f;
 
                 if (!Enable2DView)
+                {
                     // 更新旋转矩阵
-                    UpdateRotationMatrix(angleX, angleY);
+                    UpdateRotationMatrix(angleX, angleY, RotationPoint);
+                }
 
                 lastMouseX = e.X;
                 lastMouseY = e.Y;
@@ -112,7 +115,7 @@ namespace VisionNet.Controls
             // 计算缩放因子
             float delta = e.Delta > 0 ? 0.9f : 1.1f;
             translateZ *= delta;
-
+            openGLControl.Invalidate();
         }
         private void OpenGLControl_MouseDoubleClick(object sender, MouseEventArgs e)
         {
@@ -255,23 +258,27 @@ namespace VisionNet.Controls
             }
             gl.MultMatrix(rotationMatrix);
         }
-        private void UpdateRotationMatrix(float angleX, float angleY)
+        private void UpdateRotationMatrix(float angleX, float angleY, CxPoint3D? rotationPt = null)
         {
-            // 平移到点云中心
+            if (!rotationPt.HasValue)
+            {
+                rotationPt = pointCloudCenter; // 如果没有指定旋转点，则使用点云中心
+            }
+            // 平移到旋转中心
             float[] translateToCenter = new float[16];
             for (int i = 0; i < 16; i++)
                 translateToCenter[i] = (i % 5 == 0) ? 1.0f : 0.0f;
-            translateToCenter[12] = -pointCloudCenter.X;
-            translateToCenter[13] = -pointCloudCenter.Y;
-            translateToCenter[14] = -pointCloudCenter.Z;
+            translateToCenter[12] = -rotationPt.Value.X;
+            translateToCenter[13] = -rotationPt.Value.Y;
+            translateToCenter[14] = -rotationPt.Value.Z;
 
             // 平移回原点
             float[] translateBack = new float[16];
             for (int i = 0; i < 16; i++)
                 translateBack[i] = (i % 5 == 0) ? 1.0f : 0.0f;
-            translateBack[12] = pointCloudCenter.X;
-            translateBack[13] = pointCloudCenter.Y;
-            translateBack[14] = pointCloudCenter.Z;
+            translateBack[12] = rotationPt.Value.X;
+            translateBack[13] = rotationPt.Value.Y;
+            translateBack[14] = rotationPt.Value.Z;
 
             // 计算旋转矩阵
             float[] rotationX = new float[16];

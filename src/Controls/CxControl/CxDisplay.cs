@@ -68,8 +68,9 @@ namespace VisionNet.Controls
                 camera = new CxTrackBallCamera(this);
                 camera.ViewMode = viewMode;
                 SurfaceMode = surfaceMode;
-                SurfaceColorMode = surfaceColorMode; 
+                SurfaceColorMode = surfaceColorMode;
                 updataMenuItem();
+               // RenderTrigger = RenderTrigger.Manual;
             }
         }
         //刷新menu
@@ -99,7 +100,7 @@ namespace VisionNet.Controls
         {
             var tempSuface = new CxSurface();
             var size = inpointCloud.Width * inpointCloud.Length;
-            if (size > 10000000)
+            if (size > 100000000)
             {
                 var points = inpointCloud.ToPoints();
                 var ratio = points.Length / 10000000F;
@@ -116,12 +117,14 @@ namespace VisionNet.Controls
 
             surfaceItem = new CxSurfaceItem(tempSuface ?? new CxSurface(), SurfaceMode, SurfaceColorMode);
             camera.FitView(surfaceItem.BoundingBox); // 调整视图以适应点云数据
+            Invalidate();
         }
         //添加Mesh
         public void SetMesh(CxMesh mesh)
         {
             surfaceItem = new CxMeshItem(mesh, SurfaceMode, SurfaceColorMode);
             camera.FitView(surfaceItem.BoundingBox);
+            Invalidate();
         }
 
         /// <summary>
@@ -168,6 +171,20 @@ namespace VisionNet.Controls
             var textItem = new CxText2DItem(text2Ds, color, 1);
             renderItem.Add(textItem);
         }
+        //添加自定义3D坐标系
+        public void SetCoordinate3DSystem(CxCoordination3D? coordinationItem = null, float axisLength = 5)
+        {
+            if (!coordinationItem.HasValue)
+                coordinationItem = new CxCoordination3D()
+                {
+                    Origin = new CxPoint3D(0, 0, 0),
+                    XAxis = new CxVector3D(1, 0, 0),
+                    YAxis = new CxVector3D(0, 1, 0),
+                    ZAxis = new CxVector3D(0, 0, 1)
+                };
+            var coorItem = new CxCoordinateSystemItem(axisLength, axisLength / 50, axisLength / 10, axisLength / 25, coordinationItem);
+            renderItem.Add(coorItem);
+        }
         #endregion
         #region 渲染方法
         /// <summary>
@@ -187,7 +204,7 @@ namespace VisionNet.Controls
             var items = renderItem.ToArray();
             foreach (var item in items)
             {
-                item.Draw(gl); 
+                item.Draw(gl);
             }
             if (surfaceItem != null)
                 coorTagItem.Draw(gl);
@@ -287,11 +304,14 @@ namespace VisionNet.Controls
         protected override void OnMouseDown(MouseEventArgs e)
         {
             isMouseDown = true;
+            var pos = GetNearestSurfacePoint(e.X, e.Y);
+            camera.RotationPoint = pos.Location;
             base.OnMouseDown(e);
         }
         protected override void OnMouseUp(MouseEventArgs e)
         {
             isMouseDown = false;
+            camera.RotationPoint = null;
             base.OnMouseUp(e);
         }
         protected override void OnMouseMove(MouseEventArgs e)
@@ -328,7 +348,7 @@ namespace VisionNet.Controls
             }
             // 将屏幕坐标转换为世界坐标
             var obj = gl.UnProject((double)mouseX, (double)adjustedY, (double)depth);
-            return new CxPoint3D((float)obj[0], (float)obj[1], (float)obj[2]); 
+            return new CxPoint3D((float)obj[0], (float)obj[1], (float)obj[2]);
         }
         private (CxPoint3D? Location, byte? Intensity) GetNearestSurfacePoint(int mouseX, int mouseY)
         {

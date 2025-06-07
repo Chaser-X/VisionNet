@@ -183,6 +183,22 @@ namespace VisionNet.DataType
             Size = size;
         }
     }
+
+    //3D坐标系
+    public struct CxCoordination3D
+    {
+        public CxPoint3D Origin;
+        public CxVector3D XAxis;
+        public CxVector3D YAxis;
+        public CxVector3D ZAxis;
+        public CxCoordination3D(CxPoint3D origin, CxVector3D xAxis, CxVector3D yAxis, CxVector3D zAxis)
+        {
+            Origin = origin;
+            XAxis = xAxis;
+            YAxis = yAxis;
+            ZAxis = zAxis;
+        }
+    }
     #endregion
 
     #region 2d datatype
@@ -395,5 +411,19 @@ namespace VisionNet.DataType
         public uint[] Indices { get; set; }
         //亮度纹理
         public byte[] Intensity { get; set; }
+    }
+
+    public class CxMatrix4X4
+    {
+        public CxMatrix4X4() { }
+        public CxMatrix4X4(float[] data)
+        {
+            if (data.Length != 16)
+                throw new ArgumentException("Matrix data must contain 16 elements.");
+            Data = data;
+        }
+        public float[] Data { get; set; }
+        = new float[16];
+
     }
 }
