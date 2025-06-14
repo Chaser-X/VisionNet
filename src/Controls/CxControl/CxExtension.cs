@@ -133,7 +133,6 @@ namespace VisionNet.Controls
             }
             gl.DrawText((int)screenCoord.X, (int)screenCoord.Y, 1, 1, 1, "Arial", size, text);
         }
-
         public static bool IsOpenGLAvailable()
         {
             try
@@ -171,7 +170,6 @@ namespace VisionNet.Controls
                 return false;
             }
         }
-
         public static string GetOpenGLVersion()
         {
             try

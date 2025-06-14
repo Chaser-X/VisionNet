@@ -15,6 +15,7 @@ namespace VisionNet.Controls
         private float translateX = 0f;
         private float translateY = 0f;
         private float translateZ = -10;
+        private float originalZ = -10;
         private bool isDragging = false;
         private bool isRotating = false;
         private int lastMouseX, lastMouseY;
@@ -73,7 +74,6 @@ namespace VisionNet.Controls
 
                 lastMouseX = e.X;
                 lastMouseY = e.Y;
-                openGLControl.Invalidate();
             }
             else if (isRotating)
             {
@@ -81,8 +81,8 @@ namespace VisionNet.Controls
                 int deltaY = e.Y - lastMouseY;
 
                 // 计算旋转角度
-                float angleX = -deltaY * 0.5f;
-                float angleY = -deltaX * 0.5f;
+                float angleX = -deltaY * 0.25f;
+                float angleY = -deltaX * 0.25f;
 
                 if (!Enable2DView)
                 {
@@ -92,8 +92,8 @@ namespace VisionNet.Controls
 
                 lastMouseX = e.X;
                 lastMouseY = e.Y;
-                openGLControl.Invalidate();
             }
+            openGLControl.Invalidate();
         }
         private void OpenGLControl_MouseUp(object sender, MouseEventArgs e)
         {
@@ -108,12 +108,12 @@ namespace VisionNet.Controls
         }
         private void OpenGLControl_MouseWheel(object sender, MouseEventArgs e)
         {
-            /*  // translateZ += e.Delta * (translateZSpeed * (1 - (-translateZ) / 10000.0f));
-              float delta = e.Delta > 0 ? 0.9f : 1.1f;
-              //translateZ *= delta;
-              scale *= delta;*/
             // 计算缩放因子
-            float delta = e.Delta > 0 ? 0.9f : 1.1f;
+            //float delta = e.Delta > 0 ? 0.9f : 1.1f;
+            //translateZ *= delta;
+            // 计算缩放因子，越近缩放速度越慢
+            float factor = 0.5f; // 调整这个因子来控制缩放的敏感度
+            float delta = e.Delta > 0 ? 1.0f - factor / (translateZ + 1.0f) : 1.0f + factor / (translateZ + 1.0f);
             translateZ *= delta;
             openGLControl.Invalidate();
         }

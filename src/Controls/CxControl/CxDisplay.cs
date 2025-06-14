@@ -134,42 +134,49 @@ namespace VisionNet.Controls
         {
             var segmentItem = new CxSegment3DItem(segment, color, size);
             renderItem.Add(segmentItem);
+            Invalidate();
         }
         //添加点
         public void SetPoint(CxPoint3D[] point, Color color, float size = 1.0f, PointShape shape = PointShape.Point)
         {
             var pointItem = new CxPoint3DItem(point, color, size, shape);
             renderItem.Add(pointItem);
+            Invalidate();
         }
         //添加多边形
         public void SetPolygon(Polygon3D[] polygon, Color color, float size = 1.0f)
         {
             var polygonItem = new CxPolygon3DItem(polygon, color, size);
             renderItem.Add(polygonItem);
+            Invalidate();
         }
         //添加平面
         public void SetPlane(Plane3D[] plane, Color color, float size = 100.0f)
         {
             var planeItem = new CxPlane3DItem(plane, color, size);
             renderItem.Add(planeItem);
+            Invalidate();
         }
         //添加Box3D
         public void SetBox(Box3D[] box, Color color, float size = 1.0f)
         {
             var boxItem = new CxBox3DItem(box, color, size);
             renderItem.Add(boxItem);
+            Invalidate();
         }
         //添加Textinfo
         public void SetTextInfo(TextInfo[] textInfo, Color color)
         {
             var textItem = new CxTextInfoItem(textInfo, color, 1);
             renderItem.Add(textItem);
+            Invalidate();
         }
         //添加2D文本
         public void SetText2D(Text2D[] text2Ds, Color color)
         {
             var textItem = new CxText2DItem(text2Ds, color, 1);
             renderItem.Add(textItem);
+            Invalidate();
         }
         //添加自定义3D坐标系
         public void SetCoordinate3DSystem(CxCoordination3D? coordinationItem = null, float axisLength = 5)
@@ -184,6 +191,7 @@ namespace VisionNet.Controls
                 };
             var coorItem = new CxCoordinateSystemItem(axisLength, axisLength / 50, axisLength / 10, axisLength / 25, coordinationItem);
             renderItem.Add(coorItem);
+            Invalidate();
         }
         #endregion
         #region 渲染方法
