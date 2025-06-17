@@ -31,10 +31,10 @@
             this.components = new System.ComponentModel.Container();
             this.splitContainer1 = new System.Windows.Forms.SplitContainer();
             this.splitContainer2 = new System.Windows.Forms.SplitContainer();
-            this.btn_addSeg3D = new System.Windows.Forms.Button();
-            this.btn_test = new System.Windows.Forms.Button();
             this.cxDisplay1 = new VisionNet.Controls.CxDisplay();
             this.cxDisplay2 = new VisionNet.Controls.CxDisplay();
+            this.btn_addSeg3D = new System.Windows.Forms.Button();
+            this.btn_test = new System.Windows.Forms.Button();
             ((System.ComponentModel.ISupportInitialize)(this.splitContainer1)).BeginInit();
             this.splitContainer1.Panel1.SuspendLayout();
             this.splitContainer1.Panel2.SuspendLayout();
@@ -83,6 +83,42 @@
             this.splitContainer2.SplitterDistance = 370;
             this.splitContainer2.TabIndex = 0;
             // 
+            // cxDisplay1
+            // 
+            this.cxDisplay1.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.cxDisplay1.DrawFPS = false;
+            this.cxDisplay1.FrameRate = 1;
+            this.cxDisplay1.Location = new System.Drawing.Point(0, 0);
+            this.cxDisplay1.Margin = new System.Windows.Forms.Padding(4);
+            this.cxDisplay1.Name = "cxDisplay1";
+            this.cxDisplay1.OpenGLVersion = SharpGL.Version.OpenGLVersion.OpenGL2_1;
+            this.cxDisplay1.RenderContextType = SharpGL.RenderContextType.FBO;
+            this.cxDisplay1.RenderTrigger = SharpGL.RenderTrigger.Manual;
+            this.cxDisplay1.ShowCoordinateSystem = false;
+            this.cxDisplay1.Size = new System.Drawing.Size(370, 443);
+            this.cxDisplay1.SurfaceColorMode = VisionNet.Controls.SurfaceColorMode.ColorWithIntensity;
+            this.cxDisplay1.SurfaceMode = VisionNet.Controls.SurfaceMode.PointCloud;
+            this.cxDisplay1.SurfaceViewMode = VisionNet.Controls.ViewMode.Top;
+            this.cxDisplay1.TabIndex = 1;
+            // 
+            // cxDisplay2
+            // 
+            this.cxDisplay2.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.cxDisplay2.DrawFPS = false;
+            this.cxDisplay2.FrameRate = 1;
+            this.cxDisplay2.Location = new System.Drawing.Point(0, 0);
+            this.cxDisplay2.Margin = new System.Windows.Forms.Padding(4);
+            this.cxDisplay2.Name = "cxDisplay2";
+            this.cxDisplay2.OpenGLVersion = SharpGL.Version.OpenGLVersion.OpenGL2_1;
+            this.cxDisplay2.RenderContextType = SharpGL.RenderContextType.FBO;
+            this.cxDisplay2.RenderTrigger = SharpGL.RenderTrigger.Manual;
+            this.cxDisplay2.ShowCoordinateSystem = false;
+            this.cxDisplay2.Size = new System.Drawing.Size(375, 443);
+            this.cxDisplay2.SurfaceColorMode = VisionNet.Controls.SurfaceColorMode.ColorWithIntensity;
+            this.cxDisplay2.SurfaceMode = VisionNet.Controls.SurfaceMode.PointCloud;
+            this.cxDisplay2.SurfaceViewMode = VisionNet.Controls.ViewMode.Top;
+            this.cxDisplay2.TabIndex = 2;
+            // 
             // btn_addSeg3D
             // 
             this.btn_addSeg3D.Location = new System.Drawing.Point(22, 84);
@@ -104,36 +140,6 @@
             this.btn_test.UseVisualStyleBackColor = true;
             this.btn_test.Visible = false;
             this.btn_test.Click += new System.EventHandler(this.btn_test_Click);
-            // 
-            // cxDisplay1
-            // 
-            this.cxDisplay1.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.cxDisplay1.DrawFPS = false;
-            this.cxDisplay1.Location = new System.Drawing.Point(0, 0);
-            this.cxDisplay1.Name = "cxDisplay1";
-            this.cxDisplay1.OpenGLVersion = SharpGL.Version.OpenGLVersion.OpenGL2_1;
-            this.cxDisplay1.RenderContextType = SharpGL.RenderContextType.FBO;
-            this.cxDisplay1.RenderTrigger = SharpGL.RenderTrigger.TimerBased;
-            this.cxDisplay1.ShowCoordinateSystem = false;
-            this.cxDisplay1.Size = new System.Drawing.Size(370, 443);
-            this.cxDisplay1.SurfaceColorMode = VisionNet.Controls.SurfaceColorMode.ColorWithIntensity;
-            this.cxDisplay1.SurfaceMode = VisionNet.Controls.SurfaceMode.PointCloud;
-            this.cxDisplay1.TabIndex = 1;
-            // 
-            // cxDisplay2
-            // 
-            this.cxDisplay2.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.cxDisplay2.DrawFPS = false;
-            this.cxDisplay2.Location = new System.Drawing.Point(0, 0);
-            this.cxDisplay2.Name = "cxDisplay2";
-            this.cxDisplay2.OpenGLVersion = SharpGL.Version.OpenGLVersion.OpenGL2_1;
-            this.cxDisplay2.RenderContextType = SharpGL.RenderContextType.FBO;
-            this.cxDisplay2.RenderTrigger = SharpGL.RenderTrigger.TimerBased;
-            this.cxDisplay2.ShowCoordinateSystem = false;
-            this.cxDisplay2.Size = new System.Drawing.Size(375, 443);
-            this.cxDisplay2.SurfaceColorMode = VisionNet.Controls.SurfaceColorMode.ColorWithIntensity;
-            this.cxDisplay2.SurfaceMode = VisionNet.Controls.SurfaceMode.PointCloud;
-            this.cxDisplay2.TabIndex = 2;
             // 
             // DemoFrom
             // 

@@ -8,20 +8,23 @@ using VisionNet.DataType;
 
 namespace VisionNet.Controls
 {
-    public class CxTrackBallCamera
+    public class CxTrackBallCamera : IDisposable
     {
         #region 私有字段
         private OpenGLControl openGLControl;
         private float translateX = 0f;
         private float translateY = 0f;
         private float translateZ = -10;
-        private float originalZ = -10;
         private bool isDragging = false;
         private bool isRotating = false;
         private int lastMouseX, lastMouseY;
         private float[] rotationMatrix = new float[16];
         private float translateSpeed = 0.5f;
-        private CxPoint3D pointCloudCenter = new CxPoint3D();
+        private CxPoint3D pointCloudCenter = new CxPoint3D(); //点云中心
+
+        private float originalZ = -10;
+        private bool firstFitView = true; // 是否第一次适应视图
+        private bool disposedValue = false;
         #endregion
         #region 属性
         public ViewMode ViewMode { get; set; } = ViewMode.Front;
@@ -81,8 +84,8 @@ namespace VisionNet.Controls
                 int deltaY = e.Y - lastMouseY;
 
                 // 计算旋转角度
-                float angleX = -deltaY * 0.25f;
-                float angleY = -deltaX * 0.25f;
+                float angleX = -deltaY * 0.15f;
+                float angleY = -deltaX * 0.15f;
 
                 if (!Enable2DView)
                 {
@@ -111,10 +114,12 @@ namespace VisionNet.Controls
             // 计算缩放因子
             //float delta = e.Delta > 0 ? 0.9f : 1.1f;
             //translateZ *= delta;
-            // 计算缩放因子，越近缩放速度越慢
-            float factor = 0.5f; // 调整这个因子来控制缩放的敏感度
-            float delta = e.Delta > 0 ? 1.0f - factor / (translateZ + 1.0f) : 1.0f + factor / (translateZ + 1.0f);
-            translateZ *= delta;
+            float baseStep = 0.02f;
+            float speed = Math.Max(Math.Abs(translateZ) * baseStep, 0.005f); // 距离越近，speed 越小，但有下限
+            if (e.Delta > 0)
+                translateZ += speed;
+            else
+                translateZ -= speed;
             openGLControl.Invalidate();
         }
         private void OpenGLControl_MouseDoubleClick(object sender, MouseEventArgs e)
@@ -143,8 +148,12 @@ namespace VisionNet.Controls
         /// <summary>
         public void FitView(Box3D? viewBox)
         {
-            if (ViewMode == ViewMode.None)
+            if (ViewMode == ViewMode.None && !firstFitView)
+            {
                 return;
+            }
+            firstFitView = false;
+
             translateX = 0f;
             translateY = 0f;
             translateZ = -10;
@@ -197,6 +206,7 @@ namespace VisionNet.Controls
                     else
                         translateZ = (float)(openGLControl.Height / pointCloudHeight); // 适当调整视距
                 }
+                originalZ = translateZ; // 保存原始的Z值
             }
             switch (ViewMode)
             {
@@ -416,6 +426,40 @@ namespace VisionNet.Controls
                     matrix[j * 4 + i] = temp;
                 }
             }
+        }
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (!disposedValue)
+            {
+                if (disposing)
+                {
+                    // 注销事件，防止内存泄漏
+                    if (openGLControl != null)
+                    {
+                        openGLControl.MouseDown -= OpenGLControl_MouseDown;
+                        openGLControl.MouseMove -= OpenGLControl_MouseMove;
+                        openGLControl.MouseUp -= OpenGLControl_MouseUp;
+                        openGLControl.MouseWheel -= OpenGLControl_MouseWheel;
+                        openGLControl.MouseDoubleClick -= OpenGLControl_MouseDoubleClick;
+                    }
+                }
+
+                disposedValue = true;
+            }
+        }
+        public void Dispose()
+        {
+            // 不要更改此代码。请将清理代码放入“Dispose(bool disposing)”方法中
+            Dispose(disposing: true);
+            GC.SuppressFinalize(this);
+        }
+
+        // // TODO: 仅当“Dispose(bool disposing)”拥有用于释放未托管资源的代码时才替代终结器
+        ~CxTrackBallCamera()
+        {
+            // 不要更改此代码。请将清理代码放入“Dispose(bool disposing)”方法中
+            Dispose(disposing: false);
         }
         #endregion
     }

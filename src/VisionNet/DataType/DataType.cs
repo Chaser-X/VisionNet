@@ -379,6 +379,21 @@ namespace VisionNet.DataType
                 return points;
             }
         }
+
+        public void Dispose()
+        {
+            Width = 0;
+            Length = 0;
+            Data = null;
+            Intensity = null;
+            XOffset = 0;
+            YOffset = 0;
+            ZOffset = 0;
+            XScale = 1;
+            YScale = 1;
+            ZScale = 1;
+            Type = SurfaceType.Surface; // Reset to default
+        }
     }
 
     //2D图像，数据类型可选byte,short,float
@@ -400,6 +415,12 @@ namespace VisionNet.DataType
         //    Data = new T[size];
         //    Marshal.Copy(dataPtr, Data, 0, size);
         //}
+        public void Dispose()
+        {
+            Width = 0;
+            Height = 0;
+            Data = null;
+        }
     }
     //Mesh网格对象
     public class CxMesh
@@ -411,6 +432,13 @@ namespace VisionNet.DataType
         public uint[] Indices { get; set; }
         //亮度纹理
         public byte[] Intensity { get; set; }
+
+        public void Disopse()
+        {
+            Vertexs = null;
+            Indices = null;
+            Intensity = null;
+        }
     }
 
     public class CxMatrix4X4

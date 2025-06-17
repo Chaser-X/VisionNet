@@ -35,7 +35,6 @@ namespace VisionNet.Controls
         public void Dispose()
         {
             Dispose(true);
-            GC.SuppressFinalize(this);
         }
         protected virtual void Dispose(bool disposing)
         {
@@ -56,14 +55,10 @@ namespace VisionNet.Controls
         public float Size { get; set; } = 1.0f;
         public Color Color { get; set; } = Color.White;
         public abstract void Draw(OpenGL gL);
-        //~AbstractRenderItem()
-        //{
-        //    Dispose(false);
-        //}
     }
 
     //mesh surface pointcloud 等obj公用接口
-    public interface ICxObjRenderItem
+    public interface ICxObjRenderItem : IDisposable
     {
         float ZMin { get; set; }
         float ZMax { get; set; }

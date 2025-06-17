@@ -11,6 +11,7 @@ namespace VisionNet.Controls
         private uint[] vboIds = new uint[2]; // 用于存储顶点和颜色的 VBO
         private bool vboInitialized = false;
         private bool meshUpdated = false;
+        private bool dispose = false; // 标记是否释放资源
         public float ZMin { get; set; }
         public float ZMax { get; set; }
         // 新增：BoundingBox 属性
@@ -55,6 +56,18 @@ namespace VisionNet.Controls
         }
         public void Draw(OpenGL gl)
         {
+            if (dispose)
+            {
+                dispose = false; // 重置释放标记
+                if (vboInitialized)
+                {
+                    gl.DeleteBuffers(2, vboIds);
+                    vboInitialized = false;
+                }
+                if(Mesh != null)
+                    Mesh.Disopse();
+                Mesh = null;
+            }
             if (Mesh == null || Mesh.Vertexs == null || Mesh.Vertexs.Length == 0 || Mesh.Indices == null || Mesh.Indices.Length == 0)
                 return;
 
@@ -182,6 +195,12 @@ namespace VisionNet.Controls
             );
 
             return new Box3D(center, size);
+        }
+
+        public void Dispose()
+        {
+            // 延迟释放OpenGL VBO资源
+            dispose = true;
         }
     }
 }

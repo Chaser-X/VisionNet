@@ -27,6 +27,16 @@ namespace VisionNet.Controls
         //相机属性
         public CxTrackBallCamera Camera => camera;
 
+        public ViewMode SurfaceViewMode
+        {
+            get { return camera.ViewMode; }
+            set
+            {
+                camera.ViewMode = value;
+                updataMenuItem();
+            }
+        }
+
         private SurfaceMode pSufaceMode = VisionNet.Controls.SurfaceMode.PointCloud;
         public SurfaceMode SurfaceMode
         {
@@ -70,7 +80,7 @@ namespace VisionNet.Controls
                 SurfaceMode = surfaceMode;
                 SurfaceColorMode = surfaceColorMode;
                 updataMenuItem();
-               // RenderTrigger = RenderTrigger.Manual;
+                // RenderTrigger = RenderTrigger.Manual;
             }
         }
         //刷新menu
@@ -114,7 +124,11 @@ namespace VisionNet.Controls
             {
                 tempSuface = inpointCloud;
             }
-
+            if (surfaceItem != null)
+            {
+                surfaceItem.Dispose(); // 释放旧的图元资源
+                Invalidate();
+            }
             surfaceItem = new CxSurfaceItem(tempSuface ?? new CxSurface(), SurfaceMode, SurfaceColorMode);
             camera.FitView(surfaceItem.BoundingBox); // 调整视图以适应点云数据
             Invalidate();
@@ -122,6 +136,11 @@ namespace VisionNet.Controls
         //添加Mesh
         public void SetMesh(CxMesh mesh)
         {
+            if (surfaceItem != null)
+            {
+                surfaceItem.Dispose(); // 释放旧的图元资源
+                Invalidate();
+            }
             surfaceItem = new CxMeshItem(mesh, SurfaceMode, SurfaceColorMode);
             camera.FitView(surfaceItem.BoundingBox);
             Invalidate();
@@ -226,6 +245,11 @@ namespace VisionNet.Controls
         {
             renderItem.ForEach(item => item.Dispose());
             renderItem.Clear();
+            coordinationItem?.Dispose();
+            coorTagItem?.Dispose();
+            colorBarItem?.Dispose();
+            surfaceItem?.Dispose(); // 释放旧的图元资源
+            Invalidate();
         }
         protected override void DoOpenGLInitialized()
         {
