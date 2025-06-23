@@ -42,22 +42,6 @@ namespace VisionNet.Controls
             }
             else
             {
-                /*     
-                     //使用sharpgl绘制球体
-                     GLSphere.Sphere sphere = new GLSphere.Sphere();
-                     sphere.Radius = Size / 2; // 球体半径
-                     sphere.Slices = 10 + 10 * (int)Size; // 球体的切片数
-                     sphere.Stacks = 10 + 10 * (int)Size; // 球体的堆叠数
-                     sphere.CreateInContext(gl); // 创建球体
-                     gl.PushMatrix();
-                     foreach (var point in Point3Ds)
-                     {
-                         gl.Translate(point.X, point.Y, point.Z); // 移动到点的位置
-                         sphere.Render(gl, SharpGL.SceneGraph.Core.RenderMode.Render); // 绘制球体
-                         gl.Translate(-point.X, -point.Y, -point.Z); // 移动到点的位置
-                     }
-                     gl.PopMatrix();
-                     sphere.DestroyInContext(gl); // 销毁球体 */
                 uint[] buffers = new uint[3];
                 int indicesCount = 0;
                 var vao = GenSphereVAO(gl,ref buffers, ref indicesCount);
@@ -270,9 +254,9 @@ namespace VisionNet.Controls
         {
             if (disposing)
             {
-                // 释放托管资源
+                // 释放资源
+                Point3Ds = null;
             }
-            // 释放非托管资源
             base.Dispose(disposing);
         }
     }

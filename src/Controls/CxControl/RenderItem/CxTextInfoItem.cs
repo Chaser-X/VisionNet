@@ -37,5 +37,15 @@ namespace VisionNet.Controls
                 gl.DrawText((int)screenCoord.X, (int)screenCoord.Y, (float)(Color.R / 255.0), (float)(Color.G / 255.0), (float)(Color.B / 255.0), "Arial", textInfo.Size, textInfo.Text);
             }
         }
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                // 释放托管资源
+                TextInfos = null;
+            }
+            // 释放非托管资源（如果有）
+            base.Dispose(disposing);
+        }
     }
 }

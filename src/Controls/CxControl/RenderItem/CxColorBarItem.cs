@@ -40,7 +40,7 @@ namespace VisionNet.Controls
 
             // 绘制颜色条
             gl.Begin(OpenGL.GL_QUADS);
-           
+
             for (int i = 0; i < colorBarHeight; i++)
             {
                 // 计算归一化值和当前高度
@@ -75,7 +75,7 @@ namespace VisionNet.Controls
                 // 绘制高度文字
                 gl.DrawText(startX - 45, tickY - 5, 1, 1, 1, "", 10, $"{heightValue:F2}");
             }
-       
+
             // 恢复矩阵设置
             gl.PopMatrix();
             gl.MatrixMode(OpenGL.GL_PROJECTION);
@@ -83,6 +83,16 @@ namespace VisionNet.Controls
             gl.MatrixMode(OpenGL.GL_MODELVIEW);
             // 恢复深度测试
             gl.Enable(OpenGL.GL_DEPTH_TEST);
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                // 释放托管资源
+            }
+            // 释放非托管资源
+            base.Dispose(disposing);
         }
     }
 }

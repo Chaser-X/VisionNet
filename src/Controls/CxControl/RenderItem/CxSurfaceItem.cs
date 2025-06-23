@@ -8,13 +8,14 @@ namespace VisionNet.Controls
 {
     public class CxSurfaceItem : ICxObjRenderItem
     {
+        public event Action OnDisposed;
         public CxSurface Surface { get; private set; }
         private OpenGL openGL = null; // 用于存储OpenGL上下文
         private uint[] vboIds = new uint[2];
         private bool vboInitialized = false;
         private bool pointCloudUpdated = false;
         private List<uint> meshIndexs = new List<uint>();
-        private bool dispose = false; // 标记是否释放资源
+        public bool IsDisposed { get; private set; } = false; // 标记是否释放资源
         public float ZMin { get; set; }
         public float ZMax { get; set; }
         public Box3D? BoundingBox { get; private set; }
@@ -57,19 +58,21 @@ namespace VisionNet.Controls
         }
         public void Draw(OpenGL gl)
         {
-            if (dispose)
+            if (IsDisposed)
             {
-                dispose = false; // 重置释放标记
+                IsDisposed = false; // 重置释放标记
                 if (vboInitialized)
                 {
                     gl.DeleteBuffers(2, vboIds);
                     vboInitialized = false;
                 }
-                if(Surface != null)
+                if (Surface != null)
                     Surface.Dispose();
                 Surface = null;
+                OnDisposed?.Invoke(); // 触发释放事件
             }
-            if (Surface == null || Surface.Data.Length == 0) return;
+            if (Surface == null ) return;
+            if (Surface.Data.Length == 0) return;
 
             if (vboInitialized && pointCloudUpdated)
             {
@@ -250,7 +253,7 @@ namespace VisionNet.Controls
 
         public void Dispose()
         {
-            dispose = true; // 设置释放标记
+            IsDisposed = true; // 设置释放标记
         }
     }
 }

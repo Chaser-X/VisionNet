@@ -25,6 +25,12 @@ namespace VisionNet.Controls
         private bool disposed = false;
         protected override void Dispose(bool disposing)
         {
+            //是否跨线程调用
+            if (InvokeRequired)
+            {
+                Invoke(new Action(() => Dispose(disposing)));
+                return;
+            }
             if (!disposed)
             {
                 if (disposing)
@@ -32,6 +38,8 @@ namespace VisionNet.Controls
                     // 释放托管资源
                     components?.Dispose();
 
+                    //surfaceItem?.Dispose();
+                    //surfaceItem?.Draw(this.OpenGL);
                     // 释放 renderItem 列表中的资源
                     foreach (var item in renderItem)
                     {

@@ -113,7 +113,7 @@ namespace VisionNet.Controls
             // 设置坐标轴大小
             float axisScale = 10.0f;
             gl.Scale(axisScale, axisScale, axisScale);
-            
+
             // 应用旋转（但不应用平移）
             gl.MultMatrix(modelViewMatrix);
 
@@ -257,6 +257,16 @@ namespace VisionNet.Controls
             DrawLabel(gl, label, 0, 0, axisLength, r, g, b);
 
             gl.PopMatrix();
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                // 释放托管资源
+            }
+            // 释放非托管资源
+            base.Dispose(disposing);
         }
     }
 }

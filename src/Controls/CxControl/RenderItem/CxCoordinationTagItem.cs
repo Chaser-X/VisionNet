@@ -104,5 +104,15 @@ namespace VisionNet.Controls
             // 恢复深度测试
             gl.Enable(OpenGL.GL_DEPTH_TEST);
         }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                // 释放托管资源
+            }
+            // 释放非托管资源
+            base.Dispose(disposing);
+        }
     }
 }

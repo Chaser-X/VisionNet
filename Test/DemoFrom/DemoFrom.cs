@@ -109,6 +109,7 @@ namespace DemoFrom
                     }
                 }
             }
+            cxDisplay1.ResetView();
             cxDisplay1.SetPointCloud(surface);
             ////添加平面 Plane3D
             //var plane = new Plane3D(new CxPoint3D(0, 0, 0), new CxVector3D(1, 1, 1));
@@ -181,7 +182,7 @@ namespace DemoFrom
             cxDisplay2.SetBox(new Box3D[] { box }, Color.FromArgb(100, Color.Yellow));
 
             //添加TextInfo
-            var text = new TextInfo(new CxPoint3D(0, 0, 0), "this is a test!", 10);
+            var text = new TextInfo(new CxPoint3D(0, 0, 0), "this is a test中文!", 50);
             cxDisplay2.SetTextInfo(new TextInfo[] { text }, Color.Yellow);
 
             //添加Text2D

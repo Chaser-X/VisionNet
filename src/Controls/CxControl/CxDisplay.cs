@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
+using System.Net.Http.Headers;
 using System.Numerics;
 using System.Reflection;
 using System.Runtime.InteropServices;
@@ -26,7 +27,6 @@ namespace VisionNet.Controls
         private List<IRenderItem> renderItem = new List<IRenderItem>();
         //相机属性
         public CxTrackBallCamera Camera => camera;
-
         public ViewMode SurfaceViewMode
         {
             get { return camera.ViewMode; }
@@ -86,6 +86,12 @@ namespace VisionNet.Controls
         //刷新menu
         private void updataMenuItem()
         {
+            //是否跨线程调用
+            //if (InvokeRequired)
+            //{
+            //    BeginInvoke(new Action(() => updataMenuItem()));
+            //    return;
+            //}
             foreach (var item in viewModeToolStripMenuItem.DropDownItems)
             {
                 var tripItem = (ToolStripMenuItem)item;
@@ -108,6 +114,11 @@ namespace VisionNet.Controls
         /// </summary>
         public void SetPointCloud(CxSurface inpointCloud)
         {
+            //if (InvokeRequired)
+            //{
+            //    BeginInvoke(new Action(() => SetPointCloud(inpointCloud)));
+            //    return;
+            //}
             var tempSuface = new CxSurface();
             var size = inpointCloud.Width * inpointCloud.Length;
             if (size > 100000000)
@@ -126,24 +137,54 @@ namespace VisionNet.Controls
             }
             if (surfaceItem != null)
             {
+                surfaceItem.OnDisposed += () =>
+                {
+                    surfaceItem = new CxSurfaceItem(tempSuface ?? new CxSurface(), SurfaceMode, SurfaceColorMode);
+                    camera.FitView(surfaceItem.BoundingBox); // 调整视图以适应点云数据
+                    Invalidate();
+                };
                 surfaceItem.Dispose(); // 释放旧的图元资源
+                //DoOpenGLDraw(new RenderEventArgs(this.CreateGraphics()));
+                Invalidate();
+                //surfaceItem = new CxSurfaceItem(tempSuface, SurfaceMode, SurfaceColorMode);
+                //camera.FitView(surfaceItem.BoundingBox); // 调整视图以适应点云数据
+                //Invalidate();
+            }
+            else
+            {
+                surfaceItem = new CxSurfaceItem(tempSuface, SurfaceMode, SurfaceColorMode);
+                camera.FitView(surfaceItem.BoundingBox); // 调整视图以适应点云数据
                 Invalidate();
             }
-            surfaceItem = new CxSurfaceItem(tempSuface ?? new CxSurface(), SurfaceMode, SurfaceColorMode);
-            camera.FitView(surfaceItem.BoundingBox); // 调整视图以适应点云数据
-            Invalidate();
         }
+
         //添加Mesh
         public void SetMesh(CxMesh mesh)
         {
-            if (surfaceItem != null)
+            //if (InvokeRequired)
+            //{
+            //    BeginInvoke(new Action(() => SetMesh(mesh)));
+            //    return;
+            //}
+            if (surfaceItem != null && !surfaceItem.IsDisposed)
             {
+                surfaceItem.OnDisposed += () =>
+                {
+                    surfaceItem = new CxMeshItem(mesh, SurfaceMode, SurfaceColorMode);
+                    camera.FitView(surfaceItem.BoundingBox);
+                    Invalidate();
+                };
+
                 surfaceItem.Dispose(); // 释放旧的图元资源
+                //DoOpenGLDraw(new RenderEventArgs(this.CreateGraphics()));
                 Invalidate();
             }
-            surfaceItem = new CxMeshItem(mesh, SurfaceMode, SurfaceColorMode);
-            camera.FitView(surfaceItem.BoundingBox);
-            Invalidate();
+            else
+            {
+                surfaceItem = new CxMeshItem(mesh, SurfaceMode, SurfaceColorMode);
+                camera.FitView(surfaceItem.BoundingBox);
+                Invalidate();
+            }
         }
 
         /// <summary>
@@ -151,6 +192,12 @@ namespace VisionNet.Controls
         /// </summary>
         public void SetSegment(Segment3D[] segment, Color color, float size = 1.0f)
         {
+            //增加BeginInvorke
+            //if (InvokeRequired)
+            //{
+            //    BeginInvoke(new Action(() => SetSegment(segment, color, size)));
+            //    return;
+            //}
             var segmentItem = new CxSegment3DItem(segment, color, size);
             renderItem.Add(segmentItem);
             Invalidate();
@@ -158,6 +205,12 @@ namespace VisionNet.Controls
         //添加点
         public void SetPoint(CxPoint3D[] point, Color color, float size = 1.0f, PointShape shape = PointShape.Point)
         {
+            //增加BeginInvorke
+            //if (InvokeRequired)
+            //{
+            //    BeginInvoke(new Action(() => SetPoint(point, color, size, shape)));
+            //    return;
+            //}
             var pointItem = new CxPoint3DItem(point, color, size, shape);
             renderItem.Add(pointItem);
             Invalidate();
@@ -165,6 +218,12 @@ namespace VisionNet.Controls
         //添加多边形
         public void SetPolygon(Polygon3D[] polygon, Color color, float size = 1.0f)
         {
+            //增加BeginInvorke
+            //if (InvokeRequired)
+            //{
+            //    BeginInvoke(new Action(() => SetPolygon(polygon, color, size)));
+            //    return;
+            //}
             var polygonItem = new CxPolygon3DItem(polygon, color, size);
             renderItem.Add(polygonItem);
             Invalidate();
@@ -172,6 +231,12 @@ namespace VisionNet.Controls
         //添加平面
         public void SetPlane(Plane3D[] plane, Color color, float size = 100.0f)
         {
+            //增加BeginInvorke
+            //if (InvokeRequired)
+            //{
+            //    BeginInvoke(new Action(() => SetPlane(plane, color, size)));
+            //    return;
+            //}
             var planeItem = new CxPlane3DItem(plane, color, size);
             renderItem.Add(planeItem);
             Invalidate();
@@ -179,6 +244,12 @@ namespace VisionNet.Controls
         //添加Box3D
         public void SetBox(Box3D[] box, Color color, float size = 1.0f)
         {
+            //增加BeginInvorke
+            //if (InvokeRequired)
+            //{
+            //    BeginInvoke(new Action(() => SetBox(box, color, size)));
+            //    return;
+            //}
             var boxItem = new CxBox3DItem(box, color, size);
             renderItem.Add(boxItem);
             Invalidate();
@@ -186,6 +257,12 @@ namespace VisionNet.Controls
         //添加Textinfo
         public void SetTextInfo(TextInfo[] textInfo, Color color)
         {
+            //增加BeginInvorke
+            //if (InvokeRequired)
+            //{
+            //    BeginInvoke(new Action(() => SetTextInfo(textInfo, color)));
+            //    return;
+            //}
             var textItem = new CxTextInfoItem(textInfo, color, 1);
             renderItem.Add(textItem);
             Invalidate();
@@ -193,6 +270,12 @@ namespace VisionNet.Controls
         //添加2D文本
         public void SetText2D(Text2D[] text2Ds, Color color)
         {
+            //增加BeginInvorke
+            //if (InvokeRequired)
+            //{
+            //    BeginInvoke(new Action(() => SetText2D(text2Ds, color)));
+            //    return;
+            //}
             var textItem = new CxText2DItem(text2Ds, color, 1);
             renderItem.Add(textItem);
             Invalidate();
@@ -200,6 +283,12 @@ namespace VisionNet.Controls
         //添加自定义3D坐标系
         public void SetCoordinate3DSystem(CxCoordination3D? coordinationItem = null, float axisLength = 5)
         {
+            //增加BeginInvorke
+            //if (InvokeRequired)
+            //{
+            //    BeginInvoke(new Action(() => SetCoordinate3DSystem(coordinationItem, axisLength)));
+            //    return;
+            //}
             if (!coordinationItem.HasValue)
                 coordinationItem = new CxCoordination3D()
                 {
@@ -221,13 +310,16 @@ namespace VisionNet.Controls
         {
             if (!camera.Enable2DView && ShowCoordinateSystem)
                 coordinationItem.Draw(gl);
+
             surfaceItem?.Draw(gl);
+
             if (surfaceItem != null &&
                 surfaceItem.SurfaceColorMode != SurfaceColorMode.Intensity)
             {
                 colorBarItem.SetRange(surfaceItem.ZMin, surfaceItem.ZMax);
                 colorBarItem.Draw(gl);
             }
+
             var items = renderItem.ToArray();
             foreach (var item in items)
             {
@@ -241,14 +333,25 @@ namespace VisionNet.Controls
         /// <summary>
         /// 清空图元
         /// </summary>
-        public void ResetView()
+        public void ResetView(bool resetAll = true)
         {
+            //增加BeginInvorke
+            //if (InvokeRequired)
+            //{
+            //    BeginInvoke(new Action(() => ResetView(resetAll)));
+            //    return;
+            //}
             renderItem.ForEach(item => item.Dispose());
             renderItem.Clear();
             coordinationItem?.Dispose();
             coorTagItem?.Dispose();
             colorBarItem?.Dispose();
-            surfaceItem?.Dispose(); // 释放旧的图元资源
+            if (resetAll)
+            {
+                surfaceItem?.Dispose(); // 释放旧的图元资源
+            }
+            //DoOpenGLDraw(new RenderEventArgs(this.CreateGraphics()));
+
             Invalidate();
         }
         protected override void DoOpenGLInitialized()

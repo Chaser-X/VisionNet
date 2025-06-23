@@ -7,11 +7,12 @@ namespace VisionNet.Controls
 {
     public class CxMeshItem : ICxObjRenderItem
     {
+        public event Action OnDisposed; // 释放事件
         public CxMesh Mesh { get; set; }
         private uint[] vboIds = new uint[2]; // 用于存储顶点和颜色的 VBO
         private bool vboInitialized = false;
         private bool meshUpdated = false;
-        private bool dispose = false; // 标记是否释放资源
+        public bool IsDisposed { get; private set; } = false; // 标记是否释放资源
         public float ZMin { get; set; }
         public float ZMax { get; set; }
         // 新增：BoundingBox 属性
@@ -56,9 +57,9 @@ namespace VisionNet.Controls
         }
         public void Draw(OpenGL gl)
         {
-            if (dispose)
+            if (IsDisposed)
             {
-                dispose = false; // 重置释放标记
+                IsDisposed = false; // 重置释放标记
                 if (vboInitialized)
                 {
                     gl.DeleteBuffers(2, vboIds);
@@ -67,6 +68,7 @@ namespace VisionNet.Controls
                 if(Mesh != null)
                     Mesh.Disopse();
                 Mesh = null;
+                OnDisposed?.Invoke(); // 触发释放事件
             }
             if (Mesh == null || Mesh.Vertexs == null || Mesh.Vertexs.Length == 0 || Mesh.Indices == null || Mesh.Indices.Length == 0)
                 return;
@@ -200,7 +202,7 @@ namespace VisionNet.Controls
         public void Dispose()
         {
             // 延迟释放OpenGL VBO资源
-            dispose = true;
+            IsDisposed = true;
         }
     }
 }

@@ -140,6 +140,17 @@ namespace VisionNet.Controls
                 gl.End();
             }
         }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                // 释放托管资源
+                Box3Ds = null;
+            }
+            // 释放非托管资源
+            base.Dispose(disposing);
+        }
     }
 }
 

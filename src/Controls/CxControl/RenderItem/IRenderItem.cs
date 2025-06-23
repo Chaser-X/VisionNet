@@ -35,6 +35,7 @@ namespace VisionNet.Controls
         public void Dispose()
         {
             Dispose(true);
+            GC.SuppressFinalize(this);
         }
         protected virtual void Dispose(bool disposing)
         {
@@ -60,6 +61,8 @@ namespace VisionNet.Controls
     //mesh surface pointcloud 等obj公用接口
     public interface ICxObjRenderItem : IDisposable
     {
+        event Action OnDisposed;
+        bool IsDisposed { get; }
         float ZMin { get; set; }
         float ZMax { get; set; }
         Box3D? BoundingBox { get;}
