@@ -8,7 +8,7 @@ using VisionNet.DataType;
 
 namespace VisionNet.Controls
 {
-    public class CxTrackBallCamera : IDisposable
+    public class CxTrackBallCamera : ICamera
     {
         #region Ë½ÓÐ×Ö¶Î
         private OpenGLControl openGLControl;

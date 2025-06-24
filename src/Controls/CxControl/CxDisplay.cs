@@ -17,7 +17,7 @@ namespace VisionNet.Controls
 {
     public partial class CxDisplay : OpenGLControl, IDisposable
     {
-        private CxTrackBallCamera camera;
+        private CxAdvancedTrackBallCamera camera;
         bool isMouseDown = false;
         // 渲染数据
         private ICxObjRenderItem surfaceItem = null;
@@ -26,14 +26,17 @@ namespace VisionNet.Controls
         private CxCoordinationTagItem coorTagItem = new CxCoordinationTagItem();
         private List<IRenderItem> renderItem = new List<IRenderItem>();
         //相机属性
-        public CxTrackBallCamera Camera => camera;
+        public CxAdvancedTrackBallCamera Camera => camera;
         public ViewMode SurfaceViewMode
         {
             get { return camera.ViewMode; }
             set
             {
-                camera.ViewMode = value;
-                updataMenuItem();
+                if(camera.ViewMode != value)
+                {
+                    camera.ViewMode = value;
+                    updataMenuItem();
+                }
             }
         }
 
@@ -43,10 +46,13 @@ namespace VisionNet.Controls
             get { return pSufaceMode; }
             set
             {
-                pSufaceMode = value;
+                if (pSufaceMode != value)
+                {
+                    pSufaceMode = value;
+                    updataMenuItem();
+                }
                 if (surfaceItem != null)
                     surfaceItem.SurfaceMode = value;
-                updataMenuItem();
             }
         }
         private SurfaceColorMode pSurfaceColorMode = VisionNet.Controls.SurfaceColorMode.ColorWithIntensity;
@@ -55,10 +61,14 @@ namespace VisionNet.Controls
             get { return pSurfaceColorMode; }
             set
             {
-                pSurfaceColorMode = value;
+               
+               if( pSurfaceColorMode != value)
+                {
+                    pSurfaceColorMode = value;
+                    updataMenuItem();
+                }
                 if (surfaceItem != null)
                     surfaceItem.SurfaceColorMode = value;
-                updataMenuItem();
             }
         }
         //是否显示坐标系
@@ -75,7 +85,7 @@ namespace VisionNet.Controls
             if (!DesignMode)
             {
                 InitializeComponent();
-                camera = new CxTrackBallCamera(this);
+                camera = new CxAdvancedTrackBallCamera(this);
                 camera.ViewMode = viewMode;
                 SurfaceMode = surfaceMode;
                 SurfaceColorMode = surfaceColorMode;
@@ -87,11 +97,11 @@ namespace VisionNet.Controls
         private void updataMenuItem()
         {
             //是否跨线程调用
-            //if (InvokeRequired)
-            //{
-            //    BeginInvoke(new Action(() => updataMenuItem()));
-            //    return;
-            //}
+            if (InvokeRequired)
+            {
+                BeginInvoke(new Action(() => updataMenuItem()));
+                return;
+            }
             foreach (var item in viewModeToolStripMenuItem.DropDownItems)
             {
                 var tripItem = (ToolStripMenuItem)item;
@@ -161,12 +171,12 @@ namespace VisionNet.Controls
         //添加Mesh
         public void SetMesh(CxMesh mesh)
         {
-            //if (InvokeRequired)
-            //{
-            //    BeginInvoke(new Action(() => SetMesh(mesh)));
-            //    return;
-            //}
-            if (surfaceItem != null && !surfaceItem.IsDisposed)
+        //    if (InvokeRequired)
+        //    {
+        //        BeginInvoke(new Action(() => SetMesh(mesh)));
+        //        return;
+        //    }
+            if (surfaceItem != null)
             {
                 surfaceItem.OnDisposed += () =>
                 {
@@ -177,7 +187,7 @@ namespace VisionNet.Controls
 
                 surfaceItem.Dispose(); // 释放旧的图元资源
                 //DoOpenGLDraw(new RenderEventArgs(this.CreateGraphics()));
-                Invalidate();
+                //Invalidate();
             }
             else
             {
@@ -407,6 +417,7 @@ namespace VisionNet.Controls
             selectedItem.Checked = true;
             camera.ViewMode = (ViewMode)Enum.Parse(typeof(ViewMode), selectedItem.Text);
             camera?.FitView(surfaceItem?.BoundingBox);
+            //Invalidate();
         }
         private void toolStripMenuItem_SurfaceModeClick(object sender, EventArgs e)
         {
@@ -415,7 +426,7 @@ namespace VisionNet.Controls
             var selectedItem = (ToolStripMenuItem)sender;
             selectedItem.Checked = true;
             SurfaceMode = (SurfaceMode)Enum.Parse(typeof(SurfaceMode), selectedItem.Text);
-
+            //Invalidate();
         }
         private void toolStripMenuItem_SurfaceColorModeClick(object sender, EventArgs e)
         {
@@ -424,6 +435,7 @@ namespace VisionNet.Controls
             var selectedItem = (ToolStripMenuItem)sender;
             selectedItem.Checked = true;
             SurfaceColorMode = (SurfaceColorMode)Enum.Parse(typeof(SurfaceColorMode), selectedItem.Text);
+            //Invalidate();
         }
         //private void lineWidthToolStripMenuItem_Click(object sender, EventArgs e)
         //{
@@ -446,7 +458,7 @@ namespace VisionNet.Controls
         protected override void OnMouseUp(MouseEventArgs e)
         {
             isMouseDown = false;
-            camera.RotationPoint = null;
+            //camera.RotationPoint = null;
             base.OnMouseUp(e);
         }
         protected override void OnMouseMove(MouseEventArgs e)

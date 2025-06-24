@@ -10,7 +10,6 @@ namespace VisionNet.Controls
     {
         public event Action OnDisposed;
         public CxSurface Surface { get; private set; }
-        private OpenGL openGL = null; // 用于存储OpenGL上下文
         private uint[] vboIds = new uint[2];
         private bool vboInitialized = false;
         private bool pointCloudUpdated = false;
