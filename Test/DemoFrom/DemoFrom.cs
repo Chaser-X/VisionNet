@@ -110,7 +110,8 @@ namespace DemoFrom
                 }
             }
             cxDisplay1.ResetView();
-            cxDisplay1.SetPointCloud(surface);
+            cxDisplay1.SurfaceMode = SurfaceMode.Mesh;
+            cxDisplay1.SetSurfaceAdvancedItem(surface);
             ////添加平面 Plane3D
             //var plane = new Plane3D(new CxPoint3D(0, 0, 0), new CxVector3D(1, 1, 1));
             //cxDisplay1.SetPlane(plane, Color.FromArgb(100, Color.Blue));
@@ -188,6 +189,11 @@ namespace DemoFrom
             //添加Text2D
             var text2d = new Text2D(new CxPoint2D(10, 50), "2D Labels", 10);
             cxDisplay2.SetText2D(new Text2D[] { text2d }, Color.Green);
+        }
+
+        private void button1_Click(object sender, EventArgs e)
+        {
+            cxDisplay1.ResetView();
         }
     }
 }

@@ -35,6 +35,7 @@
             this.cxDisplay2 = new VisionNet.Controls.CxDisplay();
             this.btn_addSeg3D = new System.Windows.Forms.Button();
             this.btn_test = new System.Windows.Forms.Button();
+            this.button1 = new System.Windows.Forms.Button();
             ((System.ComponentModel.ISupportInitialize)(this.splitContainer1)).BeginInit();
             this.splitContainer1.Panel1.SuspendLayout();
             this.splitContainer1.Panel2.SuspendLayout();
@@ -60,6 +61,7 @@
             // 
             // splitContainer1.Panel2
             // 
+            this.splitContainer1.Panel2.Controls.Add(this.button1);
             this.splitContainer1.Panel2.Controls.Add(this.btn_addSeg3D);
             this.splitContainer1.Panel2.Controls.Add(this.btn_test);
             this.splitContainer1.Size = new System.Drawing.Size(918, 443);
@@ -141,6 +143,16 @@
             this.btn_test.Visible = false;
             this.btn_test.Click += new System.EventHandler(this.btn_test_Click);
             // 
+            // button1
+            // 
+            this.button1.Location = new System.Drawing.Point(22, 141);
+            this.button1.Name = "button1";
+            this.button1.Size = new System.Drawing.Size(92, 23);
+            this.button1.TabIndex = 0;
+            this.button1.Text = "Reset";
+            this.button1.UseVisualStyleBackColor = true;
+            this.button1.Click += new System.EventHandler(this.button1_Click);
+            // 
             // DemoFrom
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
@@ -171,6 +183,7 @@
         private VisionNet.Controls.CxDisplay cxDisplay2;
         private VisionNet.Controls.CxDisplay cxDisplay1;
         private System.Windows.Forms.SplitContainer splitContainer2;
+        private System.Windows.Forms.Button button1;
     }
 }
 

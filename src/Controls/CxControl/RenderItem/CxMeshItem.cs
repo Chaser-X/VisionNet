@@ -65,10 +65,11 @@ namespace VisionNet.Controls
                     gl.DeleteBuffers(2, vboIds);
                     vboInitialized = false;
                 }
-                if(Mesh != null)
+                if (Mesh != null)
                     Mesh.Disopse();
                 Mesh = null;
                 OnDisposed?.Invoke(); // 触发释放事件
+                IsDisposed = true; // 重置释放标记
             }
             if (Mesh == null || Mesh.Vertexs == null || Mesh.Vertexs.Length == 0 || Mesh.Indices == null || Mesh.Indices.Length == 0)
                 return;

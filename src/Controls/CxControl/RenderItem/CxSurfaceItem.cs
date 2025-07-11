@@ -1,6 +1,7 @@
 ﻿using SharpGL;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Threading.Tasks;
 using VisionNet.DataType;
 
@@ -69,6 +70,8 @@ namespace VisionNet.Controls
                     Surface.Dispose();
                 Surface = null;
                 OnDisposed?.Invoke(); // 触发释放事件
+                IsDisposed = true; // 重置释放标记
+                Debug.WriteLine("SurfaceItem disposed");
             }
             if (Surface == null ) return;
             if (Surface.Data.Length == 0) return;

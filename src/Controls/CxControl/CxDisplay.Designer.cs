@@ -38,8 +38,8 @@ namespace VisionNet.Controls
                     // 释放托管资源
                     components?.Dispose();
 
-                    //surfaceItem?.Dispose();
-                    //surfaceItem?.Draw(this.OpenGL);
+                    surfaceItem?.Dispose();
+                    surfaceItem?.Draw(this.OpenGL);
                     // 释放 renderItem 列表中的资源
                     foreach (var item in renderItem)
                     {
