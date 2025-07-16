@@ -132,7 +132,6 @@ namespace VisionNet.Controls
 
                 PanCamera(deltaX, deltaY);
             }
-
             _lastMousePosition = e.Location;
             _glControl.Invalidate();
         }

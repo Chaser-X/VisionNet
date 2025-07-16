@@ -206,8 +206,8 @@ namespace VisionNet.Controls
         public void SetSurfaceAdvancedItem(CxSurface surfaceItem)
         {
             var tempsurfaceItem = new CxSurfaceAdvancedItem(surfaceItem, SurfaceMode, SurfaceColorMode,2000000);
-            camera.FitView(tempsurfaceItem.BoundingBox);
             surfaceItemBag.Enqueue(tempsurfaceItem);
+            camera.FitView(tempsurfaceItem.BoundingBox);
             Invalidate();
         }
         /// <summary>
@@ -296,8 +296,8 @@ namespace VisionNet.Controls
                 tempsurfaceItem.Dispose();
                 tempsurfaceItem.Draw(gl);
                 surfaceItemBag.TryPeek(out surfaceItem);
+                camera.FitView(surfaceItem.BoundingBox);
             }
-
             surfaceItem?.Draw(gl);
 
             if (surfaceItem != null &&
@@ -475,10 +475,25 @@ namespace VisionNet.Controls
             if (tempmeshItem != null)
                 return (worldObj, null);
             //surface图元
+            CxSurface surface = null;
             var tempsurfaceItem = surfaceItem as CxSurfaceItem;
-            if (tempsurfaceItem == null || tempsurfaceItem.Surface == null)
-                return (null, null);
-            var surface = tempsurfaceItem.Surface;
+            if (tempsurfaceItem != null)
+            {
+                if (tempsurfaceItem.Surface == null)
+                    return (null, null);
+                surface = tempsurfaceItem.Surface;
+            }
+            else if (surfaceItem is CxSurfaceAdvancedItem advancedItem)
+            {
+                if (advancedItem.Surface == null)
+                    return (null, null);
+                surface = advancedItem.Surface;
+            }
+            else
+            {
+                return (null, null); // 如果没有有效的surface图元，返回null
+            }
+
             // 初始化最近点和最小距离
             CxPoint3D? nearestPoint = null;
             byte? nearestIntensity = null;
@@ -491,13 +506,13 @@ namespace VisionNet.Controls
                 // 检查索引是否在范围内
                 if (xIndex < 0 || xIndex >= surface.Width || yIndex < 0 || yIndex >= surface.Length)
                     return (null, null);
-                var minDis = 3 * (surface.XScale * surface.XScale +
+                var minDis = 5 * (surface.XScale * surface.XScale +
                              surface.YScale * surface.YScale +
                              surface.ZScale * surface.ZScale);
                 // 遍历附近的点（3x3 邻域）
-                for (int dy = -1; dy <= 1; dy++)
+                for (int dy = -2; dy <= 2; dy++)
                 {
-                    for (int dx = -1; dx <= 1; dx++)
+                    for (int dx = -2; dx <= 2; dx++)
                     {
                         int nx = xIndex + dx;
                         int ny = yIndex + dy;

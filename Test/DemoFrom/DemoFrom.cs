@@ -28,10 +28,10 @@ namespace DemoFrom
             //camera = new CxCamera(openGLControl1);
             var state = CxExtension.IsOpenGLAvailable();
             var message = CxExtension.GetOpenGLVersion();
-            MessageBox.Show(message);
+           // MessageBox.Show(message);
             if (!state)
             {
-                MessageBox.Show("OpenGL不可用，请检查您的系统配置。");
+                //MessageBox.Show("OpenGL不可用，请检查您的系统配置。");
                 return;
             }
         }
@@ -110,7 +110,8 @@ namespace DemoFrom
                 }
             }
             cxDisplay1.ResetView();
-            cxDisplay1.SurfaceMode = SurfaceMode.Mesh;
+            //cxDisplay1.SurfaceMode = SurfaceMode.Mesh;
+            //cxDisplay1.SurfaceColorMode = SurfaceColorMode.Intensity;
             cxDisplay1.SetSurfaceAdvancedItem(surface);
             ////添加平面 Plane3D
             //var plane = new Plane3D(new CxPoint3D(0, 0, 0), new CxVector3D(1, 1, 1));
@@ -119,6 +120,8 @@ namespace DemoFrom
             //添加Box3D
             var box = new Box3D(new CxPoint3D(0, 0, 0), new CxSize3D(10, 10, 10));
             //cxDisplay1.SetBox(new Box3D[] { box }, Color.FromArgb(100, Color.Yellow), 1);
+
+            //cxDisplay1.SetPoint(new CxPoint3D[] { new CxPoint3D(2, 3, 1), new CxPoint3D(5, 1, 1) }, Color.Green, 10f, PointShape.Sphere);
 
             //添加Box3D
             cxDisplay2.ResetView();

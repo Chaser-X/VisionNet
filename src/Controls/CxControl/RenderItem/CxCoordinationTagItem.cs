@@ -9,7 +9,7 @@ namespace VisionNet.Controls
     {
         public CxPoint3D Point { get; set; } = new CxPoint3D();
         public byte? Intensity { get; set; } = null; // 点的强度值
-        public bool Visible { get; set; } = true; // 控制标签是否可见
+        public bool Visible { get; set; } = false; // 控制标签是否可见
 
         public Color TextColor { get; set; } = Color.White;
 
