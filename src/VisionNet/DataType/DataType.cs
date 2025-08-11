@@ -432,12 +432,19 @@ namespace VisionNet.DataType
         public uint[] Indices { get; set; }
         //亮度纹理
         public byte[] Intensity { get; set; }
+        //纹理大小
+        public int TextureWidth { get; set; } = 0;
+        public int TextureHeight { get; set; } = 0;
+
+        //UV坐标
+        public CxPoint2D[] UVs { get; set; }
 
         public void Disopse()
         {
             Vertexs = null;
             Indices = null;
             Intensity = null;
+            UVs = null;
         }
     }
 
