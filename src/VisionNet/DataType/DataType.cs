@@ -395,7 +395,6 @@ namespace VisionNet.DataType
             Type = SurfaceType.Surface; // Reset to default
         }
     }
-
     //2D图像，数据类型可选byte,short,float
     public class CxImage<T>
     {
@@ -440,7 +439,6 @@ namespace VisionNet.DataType
             Intensity = null;
         }
     }
-
     public class CxMatrix4X4
     {
         public CxMatrix4X4() { }
@@ -453,5 +451,183 @@ namespace VisionNet.DataType
         public float[] Data { get; set; }
         = new float[16];
 
+        public static CxMatrix4X4 Identity()
+        {
+            return new CxMatrix4X4(new float[]
+            {
+                1, 0, 0, 0,
+                0, 1, 0, 0,
+                0, 0, 1, 0,
+                0, 0, 0, 1
+            });
+        }
+
+        public static CxMatrix4X4 operator *(CxMatrix4X4 m1, CxMatrix4X4 m2)
+        {
+            var result = new float[16];
+            for (int i = 0; i < 4; i++)
+            {
+                for (int j = 0; j < 4; j++)
+                {
+                    result[i * 4 + j] = m1.Data[i * 4 + 0] * m2.Data[0 * 4 + j] +
+                                         m1.Data[i * 4 + 1] * m2.Data[1 * 4 + j] +
+                                         m1.Data[i * 4 + 2] * m2.Data[2 * 4 + j] +
+                                         m1.Data[i * 4 + 3] * m2.Data[3 * 4 + j];
+                }
+            }
+            return new CxMatrix4X4(result);
+        }
+
+        //inverse function
+        public CxMatrix4X4 Inverse()
+        {
+            //高斯消元法计算矩阵的逆
+            float[] inv = new float[16];
+            float[] m = new float[16];
+            Array.Copy(Data, m, 16);
+            for (int i = 0; i < 4; i++)
+            {
+                // 单位矩阵
+                inv[i * 4 + i] = 1;
+            }
+            for (int i = 0; i < 4; i++)
+            {
+                // 寻找主元
+                float maxVal = Math.Abs(m[i * 4 + i]);
+                int maxRow = i;
+                for (int j = i + 1; j < 4; j++)
+                {
+                    if (Math.Abs(m[j * 4 + i]) > maxVal)
+                    {
+                        maxVal = Math.Abs(m[j * 4 + i]);
+                        maxRow = j;
+                    }
+                }
+                if (maxRow != i)
+                {
+                    // 交换行
+                    for (int j = 0; j < 4; j++)
+                    {
+                        float temp = m[i * 4 + j];
+                        m[i * 4 + j] = m[maxRow * 4 + j];
+                        m[maxRow * 4 + j] = temp;
+                        temp = inv[i * 4 + j];
+                        inv[i * 4 + j] = inv[maxRow * 4 + j];
+                        inv[maxRow * 4 + j] = temp;
+                    }
+                }
+                // 消元
+                for (int j = i + 1; j < 4; j++)
+                {
+                    float factor = m[j * 4 + i] / m[i * 4 + i];
+                    for (int k = i; k < 4; k++)
+                    {
+                        m[j * 4 + k] -= factor * m[i * 4 + k];
+                    }
+                    for (int k = 0; k < 4; k++)
+                    {
+                        inv[j * 4 + k] -= factor * inv[i * 4 + k];
+                    }
+                }
+            }
+            // 回代
+            for (int i = 3; i >= 0; i--)
+            {
+                for (int j = 0; j < 4; j++)
+                {
+                    float sum = 0;
+                    for (int k = i + 1; k < 4; k++)
+                    {
+                        sum += m[i * 4 + k] * inv[k * 4 + j];
+                    }
+                    inv[i * 4 + j] = (inv[i * 4 + j] - sum) / m[i * 4 + i];
+                }
+            }
+            return new CxMatrix4X4(inv);
+        }
+        //计算矩阵转置
+        public CxMatrix4X4 Transpose()
+        {
+            var result = new float[16];
+            for (int i = 0; i < 4; i++)
+            {
+                for (int j = 0; j < 4; j++)
+                {
+                    result[j * 4 + i] = this.Data[i * 4 + j];
+                }
+            }
+            return new CxMatrix4X4(result);
+        }
+        public static CxMatrix4X4 Translation(float x, float y, float z)
+        {
+            return new CxMatrix4X4(new float[]
+            {
+                1, 0, 0, x,
+                0, 1, 0, y,
+                0, 0, 1, z,
+                0, 0, 0, 1
+            });
+        }
+        public static CxMatrix4X4 RotationX(float angle)
+        {
+            float c = (float)Math.Cos(angle);
+            float s = (float)Math.Sin(angle);
+            return new CxMatrix4X4(new float[]
+            {
+                1, 0, 0, 0,
+                0, c, -s, 0,
+                0, s, c, 0,
+                0, 0, 0, 1
+            });
+        }
+        public static CxMatrix4X4 RotationY(float angle)
+        {
+            float c = (float)Math.Cos(angle);
+            float s = (float)Math.Sin(angle);
+            return new CxMatrix4X4(new float[]
+            {
+                c, 0, s, 0,
+                0, 1, 0, 0,
+                -s, 0, c, 0,
+                0, 0, 0, 1
+            });
+        }
+        public static CxMatrix4X4 RotationZ(float angle)
+        {
+            float c = (float)Math.Cos(angle);
+            float s = (float)Math.Sin(angle);
+            return new CxMatrix4X4(new float[]
+            {
+                c, -s, 0, 0,
+                s, c, 0, 0,
+                0, 0, 1, 0,
+                0, 0, 0, 1
+            });
+        }
+        public static CxMatrix4X4 Scale(float x, float y, float z)
+        {
+            return new CxMatrix4X4(new float[]
+            {
+                x, 0, 0, 0,
+                0, y, 0, 0,
+                0, 0, z, 0,
+                0, 0, 0, 1
+            });
+        }
+        public static CxMatrix4X4 LookAt(CxPoint3D eye, CxPoint3D center, CxVector3D up)
+        {
+            CxVector3D f = new CxVector3D(center.X - eye.X, center.Y - eye.Y, center.Z - eye.Z).Normalize();
+            CxVector3D s = f.Cross(up).Normalize();
+            CxVector3D u = s.Cross(f);
+            return new CxMatrix4X4(new float[]
+            {
+                s.X, u.X, -f.X, 0,
+                s.Y, u.Y, -f.Y, 0,
+                s.Z, u.Z, -f.Z, 0,
+                -s.Dot(new CxVector3D(eye.X, eye.Y, eye.Z)),
+                -u.Dot(new CxVector3D(eye.X, eye.Y, eye.Z)),
+                f.Dot(new CxVector3D(eye.X, eye.Y, eye.Z)), 1
+            });
+        }
     }
 }

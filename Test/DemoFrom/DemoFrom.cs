@@ -34,6 +34,7 @@ namespace DemoFrom
                 //MessageBox.Show("OpenGL不可用，请检查您的系统配置。");
                 return;
             }
+            VisionOperator.InitialLib();
         }
         CxSurface surface = null;
         private void onData(GoDataSet obj)
@@ -197,6 +198,18 @@ namespace DemoFrom
         private void button1_Click(object sender, EventArgs e)
         {
             cxDisplay1.ResetView();
+        }
+
+        private void button2_Click(object sender, EventArgs e)
+        {
+            var ps = surface.ToPoints();
+            var matrix = new CxMatrix4X4(new float[16] {
+                1, 0, 0, 10,
+                0, 1, 0, 20,
+                0, 0, 1, 30,
+                0, 0, 0, 1
+            });
+            var points = VisionOperator.TransformSurface(surface, matrix);
         }
     }
 }

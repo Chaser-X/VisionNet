@@ -3,12 +3,26 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using VisionNet.Compute;
 using VisionNet.DataType;
 
 namespace VisionNet
 {
     public static partial class VisionOperator
     {
+        public static bool InitialLib()
+        {
+            // Initialize the native library if needed
+            // This can be used to load the library or perform any necessary setup
+            var state = OpenCLEnvironment.Instance.Initialize();
+            if (!state)
+            {
+                Console.WriteLine($"Failed to initialize OpenCL environment: {state}");
+                return false;
+            }
+            return state;
+        }
+
         public static CxPoint3D GetPoint3DArrayCenter(List<CxPoint3D> point3Ds)
         {
             CxPoint3D center = new CxPoint3D();
@@ -51,18 +65,34 @@ namespace VisionNet
             float x = point.X, y = point.Y, z = point.Z;
 
             // 按OpenGL列主序
-            float tx = m[0] * x + m[4] * y + m[8] * z + m[12];
-            float ty = m[1] * x + m[5] * y + m[9] * z + m[13];
-            float tz = m[2] * x + m[6] * y + m[10] * z + m[14];
-            float tw = m[3] * x + m[7] * y + m[11] * z + m[15];
-
-            if (Math.Abs(tw) > 1e-6f)
-            {
-                tx /= tw;
-                ty /= tw;
-                tz /= tw;
-            }
+            float tx = m[0] * x + m[1] * y + m[2] * z + m[3];
+            float ty = m[4] * x + m[5] * y + m[6] * z + m[7];
+            float tz = m[8] * x + m[9] * y + m[10] * z + m[11];
             return new CxPoint3D(tx, ty, tz);
+        }
+
+        //3D transform CxSurface array by matrix
+        public static CxPoint3D[] TransformSurface(CxSurface surface, CxMatrix4X4 matrix)
+        {
+            if (surface == null || matrix == null)
+                return null;
+            //int width = surface.Width;
+            //int length = surface.Length;
+            //int count = width * length;
+            //var data = surface.Data;
+            //CxPoint3D[] points = new CxPoint3D[count];
+            //for (int i = 0; i < count; i++)
+            //{
+            //    float x = (i % width) * surface.XScale + surface.XOffset;
+            //    float y = (i / width) * surface.YScale + surface.YOffset;
+            //    float z = data[i] * surface.ZScale + surface.ZOffset;
+            //    points[i] = TransformPoint3D(new CxPoint3D(x, y, z), matrix);
+            //}
+            //使用CxTransformSurface进行矩阵变换
+            var transform = new CxTransformSurface(matrix);
+            var points = transform.Transform(surface);
+
+            return points;
         }
     }
 }
