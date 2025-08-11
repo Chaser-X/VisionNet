@@ -81,6 +81,7 @@
     <Compile Include="RenderItem\CxPoint3DItem.cs" />
     <Compile Include="RenderItem\CxPolygon3DItem.cs" />
     <Compile Include="RenderItem\CxSegment3DItem.cs" />
+    <Compile Include="RenderItem\CxMeshAdvancedItem.cs" />
     <Compile Include="RenderItem\CxSurfaceAdvancedItem.cs" />
     <Compile Include="RenderItem\CxText2DItem.cs" />
     <Compile Include="RenderItem\CxSurfaceItem.cs" />

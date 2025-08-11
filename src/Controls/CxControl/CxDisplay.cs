@@ -210,6 +210,14 @@ namespace VisionNet.Controls
             camera.FitView(tempsurfaceItem.BoundingBox);
             Invalidate();
         }
+        //添加MeshAdvancedItem
+        public void SetMeshAdvancedItem(CxMesh meshItem)
+        {
+            var tempsurfaceItem = new CxMeshAdvancedItem(meshItem, SurfaceMode, SurfaceColorMode);
+            surfaceItemBag.Enqueue(tempsurfaceItem);
+            camera.FitView(tempsurfaceItem.BoundingBox);
+            Invalidate();
+        }
         /// <summary>
         /// 添加线段
         /// </summary>
@@ -474,6 +482,9 @@ namespace VisionNet.Controls
             var tempmeshItem = surfaceItem as CxMeshItem;
             if (tempmeshItem != null)
                 return (worldObj, null);
+            var tempmeshAdvancedItem = surfaceItem as CxMeshAdvancedItem;
+            if (tempmeshAdvancedItem != null)
+                return (worldObj, null); // 如果是MeshAdvancedItem，直接返回世界坐标和无强度值
             //surface图元
             CxSurface surface = null;
             var tempsurfaceItem = surfaceItem as CxSurfaceItem;
