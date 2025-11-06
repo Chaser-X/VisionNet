@@ -21,10 +21,9 @@ namespace VisionNet.Compute
         protected override string GetKernelSource()
         {
             // OpenCL kernel: 4x4矩阵变换3D点
-            
             return @"__kernel void TransformSurface(
                 __global const short* data,
-                __global float4* dstPoints,
+                __global float* dstPoints,
                 int width,
                 int length,
                 float xOffset, float yOffset, float zOffset,
@@ -46,21 +45,11 @@ namespace VisionNet.Compute
                 r.y = matrix[4]*p.x + matrix[5]*p.y + matrix[6]*p.z + matrix[7]*p.w;
                 r.z = matrix[8]*p.x + matrix[9]*p.y + matrix[10]*p.z + matrix[11]*p.w;
                 r.w = matrix[12]*p.x + matrix[13]*p.y + matrix[14]*p.z + matrix[15]*p.w;
-                dstPoints[gid] = r;
-            }";
-            // (data[idx] == -32768) ? -INFINITY : 
-            //return @"__kernel void TransformSurface(
-            //    __global const short* data,
-            //    __global float4* dstPoints,
-            //    int width,
-            //    int length,
-            //    float xOffset, float yOffset, float zOffset,
-            //    float xScale, float yScale, float zScale,
-            //    __constant float* matrix)
-            //{
-            //    int gid = get_global_id(0);
-            //    dstPoints[gid] = (float4)(zScale,zScale,zScale, 1.0f);
-            //}";
+                dstPoints[gid * 4] = r.x;
+                dstPoints[gid * 4 + 1] = r.y;
+                dstPoints[gid * 4 + 2] = data[idx] == -32768 ? NAN : r.z;
+                dstPoints[gid * 4 + 3] = r.w;
+            }";//= data[idx] == -32768 ? (float4)(NAN, NAN, NAN, 1.0f): r;
         }
 
         protected override string[] GetKernelNames()
@@ -71,20 +60,21 @@ namespace VisionNet.Compute
         /// <summary>
         /// 对CxSurface进行矩阵变换，返回变换后的点云
         /// </summary>
-        public CxPoint3D[] Transform(CxSurface surface)
+        public (CxPoint3D[] TranformedPoints, byte[] Intensitys) Transform(CxSurface surface)
         {
             int width = surface.Width;
             int length = surface.Length;
             int count = width * length;
             var data = surface.Data;
+            var intensity = surface.Intensity;
             float[] dstFloat4 = new float[count * 4];
             float[] matrix = _matrix.Data;
             if (!EnsureInitialized())
                 throw new Exception("OpenCL环境初始化失败");
 
             var dataBuffer = CreateBuffer<short>(OpenCL.Net.MemFlags.ReadOnly | OpenCL.Net.MemFlags.CopyHostPtr, data);
-            var dstBuffer = CreateBufferWithSize<float>(OpenCL.Net.MemFlags.WriteOnly, count * 4);
             var matrixBuffer = CreateBuffer<float>(OpenCL.Net.MemFlags.ReadOnly | OpenCL.Net.MemFlags.CopyHostPtr, matrix);
+            var dstBuffer = CreateBufferWithSize<float>(OpenCL.Net.MemFlags.WriteOnly, count * 4);
             var state = true;
             state &= SetKernelArg(KernelName, 0, dataBuffer);
             state &= SetKernelArg(KernelName, 1, dstBuffer);
@@ -108,16 +98,17 @@ namespace VisionNet.Compute
                 throw new Exception("OpenCL计算失败");
             }
 
-            CxPoint3D[] result = new CxPoint3D[count];
+            int validCount = 0;
+            CxPoint3D[] temp = new CxPoint3D[count];
+            byte[] tempIntensity = new byte[count];
+            var hasIntensity = intensity != null && intensity.Length == count;
             for (int i = 0; i < count; i++)
             {
-                if(float.IsInfinity(dstFloat4[i * 4 + 2]) || float.IsNaN(dstFloat4[i * 4 + 2]))
-                {
+                float z = dstFloat4[i * 4 + 2];
+                if (float.IsInfinity(z) || float.IsNaN(z))
                     continue;
-                }
                 float x = dstFloat4[i * 4 + 0];
                 float y = dstFloat4[i * 4 + 1];
-                float z = dstFloat4[i * 4 + 2];
                 float w = dstFloat4[i * 4 + 3];
                 if (Math.Abs(w) > 1e-6f)
                 {
@@ -125,12 +116,21 @@ namespace VisionNet.Compute
                     y /= w;
                     z /= w;
                 }
-                result[i] = new CxPoint3D(x, y, z);
+                temp[validCount] = new CxPoint3D(x, y, z);
+                if (hasIntensity)
+                    tempIntensity[validCount] = intensity[i];
+                validCount++;
             }
-
+            if (validCount == temp.Length)
+                return (temp, hasIntensity ? tempIntensity : null);
+            CxPoint3D[] result = new CxPoint3D[validCount];
+            Array.Copy(temp, result, validCount);
+            byte[] resultIntensity = new byte[validCount];
+            if (hasIntensity)
+                Array.Copy(tempIntensity, resultIntensity, validCount);
             // 释放资源
             Cleanup();
-            return result;
+            return (result, hasIntensity ? resultIntensity : null);
         }
     }
 }

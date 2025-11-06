@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
 using System.Drawing;
+using System.Drawing.Drawing2D;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -28,7 +29,7 @@ namespace DemoFrom
             //camera = new CxCamera(openGLControl1);
             var state = CxExtension.IsOpenGLAvailable();
             var message = CxExtension.GetOpenGLVersion();
-           // MessageBox.Show(message);
+            // MessageBox.Show(message);
             if (!state)
             {
                 //MessageBox.Show("OpenGL不可用，请检查您的系统配置。");
@@ -92,7 +93,7 @@ namespace DemoFrom
                 {
                     var surfaceMsg = msg as GoSurfacePointCloudMsg;
                     long width = surfaceMsg.Width;
-                    long length = surfaceMsg.Length; 
+                    long length = surfaceMsg.Length;
                     long bufferSize = width * length;
                     float xoffset = surfaceMsg.XOffset / 1000.0f;
                     float yoffset = surfaceMsg.YOffset / 1000.0f;
@@ -134,6 +135,7 @@ namespace DemoFrom
             GocatorHandle.GocatorHandle.Instance.DisConnect();
             cxDisplay1.Dispose();
             cxDisplay2.Dispose();
+            VisionOperator.DestroyLib();
             //  Environment.Exit(0);
         }
 
@@ -163,12 +165,13 @@ namespace DemoFrom
             cxDisplay2.SetSegment(new Segment3D[] { new Segment3D(new CxPoint3D(0, 0, 0), new CxPoint3D(0, 1, 1)) }, Color.Yellow);
 
             cxDisplay2.SetPoint(new CxPoint3D[] { new CxPoint3D(2, 3, 1), new CxPoint3D(5, 1, 1) }, Color.Green, 1f, PointShape.Sphere);
-            cxDisplay2.SetCoordinate3DSystem(new CxCoordination3D() {
-                Origin = new CxPoint3D(5, 5 ,5),
+            cxDisplay2.SetCoordinate3DSystem(new CxCoordination3D()
+            {
+                Origin = new CxPoint3D(5, 5, 5),
                 XAxis = new CxVector3D(1, 0, 0),
                 YAxis = new CxVector3D(0, 1, 0),
                 ZAxis = new CxVector3D(0, 0, -1)
-            },50);
+            }, 50);
             //添加多边形
             List<CxPoint3D> pts = new List<CxPoint3D>();
             pts.Add(new CxPoint3D(0, 0, 0));
@@ -202,14 +205,22 @@ namespace DemoFrom
 
         private void button2_Click(object sender, EventArgs e)
         {
-            var ps = surface.ToPoints();
-            var matrix = new CxMatrix4X4(new float[16] {
-                1, 0, 0, 10,
-                0, 1, 0, 20,
-                0, 0, 1, 30,
-                0, 0, 0, 1
-            });
-            var points = VisionOperator.TransformSurface(surface, matrix);
+            //var ps = surface.ToPoints();
+            //var matrix = new CxMatrix4X4(new float[16] {
+            //    1, 0, 0, 0,
+            //    0, -1, 0, 0,
+            //    0, 0, 1, 0,
+            //    0, 0, 0, 1
+            //});
+            var matrix = CxMatrix4X4.RotationY((float)Math.PI / 4);
+            var points = VisionOperator.TransformSurface(surface, matrix,SampleMode.Max);
+            cxDisplay2.ResetView();
+            cxDisplay2.SetPointCloud(points);
+        }
+
+        private void DemoFrom_Load(object sender, EventArgs e)
+        {
+
         }
     }
 }

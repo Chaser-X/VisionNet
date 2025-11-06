@@ -39,6 +39,7 @@
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
+    <Reference Include="System.Numerics" />
     <Reference Include="System.Xml.Linq" />
     <Reference Include="System.Data.DataSetExtensions" />
     <Reference Include="Microsoft.CSharp" />
@@ -48,7 +49,9 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Compute\CxTransformSurface.cs" />
+    <Compile Include="Compute\CxUniformSurface.cs" />
     <Compile Include="Compute\OpenCLEnvironment.cs" />
+    <Compile Include="DataType\CxEmunType.cs" />
     <Compile Include="DataType\DataType.cs" />
     <Compile Include="Export.cs" />
     <Compile Include="VisionOperator.cs" />

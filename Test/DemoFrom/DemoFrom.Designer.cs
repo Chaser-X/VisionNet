@@ -35,8 +35,8 @@
             this.cxDisplay2 = new VisionNet.Controls.CxDisplay();
             this.button1 = new System.Windows.Forms.Button();
             this.btn_addSeg3D = new System.Windows.Forms.Button();
-            this.btn_test = new System.Windows.Forms.Button();
             this.button2 = new System.Windows.Forms.Button();
+            this.btn_test = new System.Windows.Forms.Button();
             ((System.ComponentModel.ISupportInitialize)(this.splitContainer1)).BeginInit();
             this.splitContainer1.Panel1.SuspendLayout();
             this.splitContainer1.Panel2.SuspendLayout();
@@ -54,6 +54,7 @@
             this.splitContainer1.Dock = System.Windows.Forms.DockStyle.Fill;
             this.splitContainer1.FixedPanel = System.Windows.Forms.FixedPanel.Panel2;
             this.splitContainer1.Location = new System.Drawing.Point(0, 0);
+            this.splitContainer1.Margin = new System.Windows.Forms.Padding(4);
             this.splitContainer1.Name = "splitContainer1";
             // 
             // splitContainer1.Panel1
@@ -66,14 +67,16 @@
             this.splitContainer1.Panel2.Controls.Add(this.btn_addSeg3D);
             this.splitContainer1.Panel2.Controls.Add(this.button2);
             this.splitContainer1.Panel2.Controls.Add(this.btn_test);
-            this.splitContainer1.Size = new System.Drawing.Size(918, 443);
-            this.splitContainer1.SplitterDistance = 749;
+            this.splitContainer1.Size = new System.Drawing.Size(1224, 545);
+            this.splitContainer1.SplitterDistance = 1053;
+            this.splitContainer1.SplitterWidth = 5;
             this.splitContainer1.TabIndex = 1;
             // 
             // splitContainer2
             // 
             this.splitContainer2.Dock = System.Windows.Forms.DockStyle.Fill;
             this.splitContainer2.Location = new System.Drawing.Point(0, 0);
+            this.splitContainer2.Margin = new System.Windows.Forms.Padding(4);
             this.splitContainer2.Name = "splitContainer2";
             // 
             // splitContainer2.Panel1
@@ -83,8 +86,9 @@
             // splitContainer2.Panel2
             // 
             this.splitContainer2.Panel2.Controls.Add(this.cxDisplay2);
-            this.splitContainer2.Size = new System.Drawing.Size(749, 443);
-            this.splitContainer2.SplitterDistance = 370;
+            this.splitContainer2.Size = new System.Drawing.Size(1053, 545);
+            this.splitContainer2.SplitterDistance = 519;
+            this.splitContainer2.SplitterWidth = 5;
             this.splitContainer2.TabIndex = 0;
             // 
             // cxDisplay1
@@ -93,13 +97,13 @@
             this.cxDisplay1.DrawFPS = false;
             this.cxDisplay1.FrameRate = 10;
             this.cxDisplay1.Location = new System.Drawing.Point(0, 0);
-            this.cxDisplay1.Margin = new System.Windows.Forms.Padding(4);
+            this.cxDisplay1.Margin = new System.Windows.Forms.Padding(5);
             this.cxDisplay1.Name = "cxDisplay1";
             this.cxDisplay1.OpenGLVersion = SharpGL.Version.OpenGLVersion.OpenGL2_1;
             this.cxDisplay1.RenderContextType = SharpGL.RenderContextType.FBO;
             this.cxDisplay1.RenderTrigger = SharpGL.RenderTrigger.Manual;
             this.cxDisplay1.ShowCoordinateSystem = false;
-            this.cxDisplay1.Size = new System.Drawing.Size(370, 443);
+            this.cxDisplay1.Size = new System.Drawing.Size(519, 545);
             this.cxDisplay1.SurfaceColorMode = VisionNet.Controls.SurfaceColorMode.ColorWithIntensity;
             this.cxDisplay1.SurfaceMode = VisionNet.Controls.SurfaceMode.PointCloud;
             this.cxDisplay1.SurfaceViewMode = VisionNet.Controls.ViewMode.Top;
@@ -111,13 +115,13 @@
             this.cxDisplay2.DrawFPS = false;
             this.cxDisplay2.FrameRate = 10;
             this.cxDisplay2.Location = new System.Drawing.Point(0, 0);
-            this.cxDisplay2.Margin = new System.Windows.Forms.Padding(4);
+            this.cxDisplay2.Margin = new System.Windows.Forms.Padding(5);
             this.cxDisplay2.Name = "cxDisplay2";
             this.cxDisplay2.OpenGLVersion = SharpGL.Version.OpenGLVersion.OpenGL2_1;
             this.cxDisplay2.RenderContextType = SharpGL.RenderContextType.FBO;
             this.cxDisplay2.RenderTrigger = SharpGL.RenderTrigger.Manual;
             this.cxDisplay2.ShowCoordinateSystem = false;
-            this.cxDisplay2.Size = new System.Drawing.Size(375, 443);
+            this.cxDisplay2.Size = new System.Drawing.Size(529, 545);
             this.cxDisplay2.SurfaceColorMode = VisionNet.Controls.SurfaceColorMode.ColorWithIntensity;
             this.cxDisplay2.SurfaceMode = VisionNet.Controls.SurfaceMode.PointCloud;
             this.cxDisplay2.SurfaceViewMode = VisionNet.Controls.ViewMode.Top;
@@ -125,9 +129,10 @@
             // 
             // button1
             // 
-            this.button1.Location = new System.Drawing.Point(22, 141);
+            this.button1.Location = new System.Drawing.Point(29, 174);
+            this.button1.Margin = new System.Windows.Forms.Padding(4);
             this.button1.Name = "button1";
-            this.button1.Size = new System.Drawing.Size(92, 23);
+            this.button1.Size = new System.Drawing.Size(123, 28);
             this.button1.TabIndex = 0;
             this.button1.Text = "Reset";
             this.button1.UseVisualStyleBackColor = true;
@@ -135,43 +140,48 @@
             // 
             // btn_addSeg3D
             // 
-            this.btn_addSeg3D.Location = new System.Drawing.Point(22, 84);
+            this.btn_addSeg3D.Location = new System.Drawing.Point(29, 103);
+            this.btn_addSeg3D.Margin = new System.Windows.Forms.Padding(4);
             this.btn_addSeg3D.Name = "btn_addSeg3D";
-            this.btn_addSeg3D.Size = new System.Drawing.Size(92, 23);
+            this.btn_addSeg3D.Size = new System.Drawing.Size(123, 28);
             this.btn_addSeg3D.TabIndex = 0;
             this.btn_addSeg3D.Text = "AddSegment3D";
             this.btn_addSeg3D.UseVisualStyleBackColor = true;
             this.btn_addSeg3D.Click += new System.EventHandler(this.btn_addSeg3D_Click);
             // 
-            // btn_test
-            // 
-            this.btn_test.Location = new System.Drawing.Point(22, 37);
-            this.btn_test.Name = "btn_test";
-            this.btn_test.Size = new System.Drawing.Size(92, 23);
-            this.btn_test.TabIndex = 0;
-            this.btn_test.Text = "Test";
-            this.btn_test.UseVisualStyleBackColor = true;
-            this.btn_test.Click += new System.EventHandler(this.btn_test_Click);
-            // 
             // button2
             // 
-            this.button2.Location = new System.Drawing.Point(22, 187);
+            this.button2.Location = new System.Drawing.Point(29, 230);
+            this.button2.Margin = new System.Windows.Forms.Padding(4);
             this.button2.Name = "button2";
-            this.button2.Size = new System.Drawing.Size(92, 23);
+            this.button2.Size = new System.Drawing.Size(123, 28);
             this.button2.TabIndex = 0;
             this.button2.Text = "Tranform";
             this.button2.UseVisualStyleBackColor = true;
             this.button2.Click += new System.EventHandler(this.button2_Click);
             // 
+            // btn_test
+            // 
+            this.btn_test.Location = new System.Drawing.Point(29, 46);
+            this.btn_test.Margin = new System.Windows.Forms.Padding(4);
+            this.btn_test.Name = "btn_test";
+            this.btn_test.Size = new System.Drawing.Size(123, 28);
+            this.btn_test.TabIndex = 0;
+            this.btn_test.Text = "Test";
+            this.btn_test.UseVisualStyleBackColor = true;
+            this.btn_test.Click += new System.EventHandler(this.btn_test_Click);
+            // 
             // DemoFrom
             // 
-            this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
+            this.AutoScaleDimensions = new System.Drawing.SizeF(8F, 16F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(918, 443);
+            this.ClientSize = new System.Drawing.Size(1224, 545);
             this.Controls.Add(this.splitContainer1);
+            this.Margin = new System.Windows.Forms.Padding(4);
             this.Name = "DemoFrom";
             this.Text = "Form1";
             this.FormClosing += new System.Windows.Forms.FormClosingEventHandler(this.DemoFrom_FormClosing);
+            this.Load += new System.EventHandler(this.DemoFrom_Load);
             this.splitContainer1.Panel1.ResumeLayout(false);
             this.splitContainer1.Panel2.ResumeLayout(false);
             ((System.ComponentModel.ISupportInitialize)(this.splitContainer1)).EndInit();

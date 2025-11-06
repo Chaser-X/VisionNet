@@ -293,7 +293,7 @@ namespace VisionNet.Controls
         {
             if (!camera.Enable2DView && ShowCoordinateSystem)
                 coordinationItem.Draw(gl);
-
+            
             if (surfaceItemBag.Count == 0)
                 surfaceItem = null;
             else if (surfaceItemBag.Count == 1)
