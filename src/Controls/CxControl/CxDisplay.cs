@@ -205,7 +205,7 @@ namespace VisionNet.Controls
         //添加SurfaceAdvancedItem
         public void SetSurfaceAdvancedItem(CxSurface surfaceItem)
         {
-            var tempsurfaceItem = new CxSurfaceAdvancedItem(surfaceItem, SurfaceMode, SurfaceColorMode,2000000);
+            var tempsurfaceItem = new CxSurfaceAdvancedItem(surfaceItem, SurfaceMode, SurfaceColorMode, 2000000);
             surfaceItemBag.Enqueue(tempsurfaceItem);
             camera.FitView(tempsurfaceItem.BoundingBox);
             Invalidate();
@@ -347,6 +347,12 @@ namespace VisionNet.Controls
             }
             //DoOpenGLDraw(new RenderEventArgs(this.CreateGraphics()));
 
+            Invalidate();
+        }
+        //设置渲染的焦点位置
+        public void SetViewCenter(CxPoint3D center)
+        {
+            camera.FocusOnPoint(new Vector3(center.X, center.Y, center.Z));
             Invalidate();
         }
         protected override void DoOpenGLInitialized()
