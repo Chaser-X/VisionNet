@@ -182,7 +182,7 @@ namespace VisionNet.Controls
         /// <summary>
         /// 旋转相机
         /// </summary>
-        private void RotateCamera(int deltaX, int deltaY)
+        internal void RotateCamera(int deltaX, int deltaY)
         {
             // 获取旋转中心
             Vector3 rotationCenter;
@@ -234,7 +234,7 @@ namespace VisionNet.Controls
         /// <summary>
         /// 平移相机
         /// </summary>
-        private void PanCamera(int deltaX, int deltaY)
+        internal void PanCamera(int deltaX, int deltaY)
         {
             // 计算相机坐标系
             Vector3 viewDir = Vector3.Normalize(_target - _position);
@@ -258,7 +258,7 @@ namespace VisionNet.Controls
         /// <summary>
         /// 缩放相机
         /// </summary>
-        private void ZoomCamera(float zoomFactor)
+        internal void ZoomCamera(float zoomFactor)
         {
             // 计算相机到目标的向量
             Vector3 viewDir = _position - _target;
@@ -281,7 +281,7 @@ namespace VisionNet.Controls
         /// </summary>
         /// <param name="zoomPoint">缩放中心点</param>
         /// <param name="zoomFactor">缩放因子（小于1为放大，大于1为缩小）</param>
-        private void ZoomTowardPoint(Vector3 zoomPoint, float zoomFactor)
+        internal void ZoomTowardPoint(Vector3 zoomPoint, float zoomFactor)
         {
             // 计算相机到缩放点的向量
             Vector3 cameraToPoint = _position - zoomPoint;
@@ -302,7 +302,7 @@ namespace VisionNet.Controls
         /// <summary>
         /// 聚焦到指定点
         /// </summary>
-        private void FocusOnPoint(Vector3 point)
+        internal void FocusOnPoint(Vector3 point)
         {
             // 保持相机到目标的方向和距离
             Vector3 viewDir = _position - _target;
