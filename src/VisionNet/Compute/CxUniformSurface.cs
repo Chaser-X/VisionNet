@@ -86,7 +86,7 @@ namespace VisionNet.Compute
                     case 0:
                         {
                             int oldZ = atomic_max(&heightMap[idx], scaledZ);
-                            if (scaledZ > oldZ) intensityMap[idx] = inten;
+                            if (scaledZ >= oldZ) intensityMap[idx] = inten;
                         }
                         break;
                     case 1:
@@ -117,6 +117,16 @@ namespace VisionNet.Compute
         {
             int count = points.Length;
             int[] heightMap = new int[width * height];
+            switch (inMode)
+            {
+                case SampleMode.Max:
+                    Parallel.For(0, heightMap.Length, i => heightMap[i] = int.MinValue);
+                    break;
+                case SampleMode.Min:
+                    Parallel.For(0, heightMap.Length, i => heightMap[i] = int.MaxValue);
+                    break;
+                    // 平均模式无需处理
+            }
             int[] intensityMap = new int[width * height];
             int[] pointCountMap = new int[width * height];
             // 点云数据转换为float[]，每点3分量
@@ -134,7 +144,8 @@ namespace VisionNet.Compute
             // 创建OpenCL缓冲区
             var pointsBuffer = CreateBuffer<float>(OpenCL.Net.MemFlags.ReadOnly | OpenCL.Net.MemFlags.CopyHostPtr, pointData);
             var intensityBuffer = CreateBuffer<byte>(OpenCL.Net.MemFlags.ReadOnly | OpenCL.Net.MemFlags.CopyHostPtr, intensity ?? new byte[count]);
-            var heightMapBuffer = CreateBufferWithSize<int>(OpenCL.Net.MemFlags.WriteOnly, width * height);
+            //var heightMapBuffer = CreateBufferWithSize<int>(OpenCL.Net.MemFlags.WriteOnly, width * height);
+            var heightMapBuffer = CreateBuffer<int>(OpenCL.Net.MemFlags.ReadWrite | OpenCL.Net.MemFlags.CopyHostPtr, heightMap);
             var intensityMapBuffer = CreateBufferWithSize<int>(OpenCL.Net.MemFlags.WriteOnly, width * height);
             var pointCountMapBuffer = CreateBufferWithSize<int>(OpenCL.Net.MemFlags.WriteOnly, width * height);
 
@@ -198,7 +209,6 @@ namespace VisionNet.Compute
                         intensitydata[i] = 0;
                 }
             }
-
             Cleanup();
             return new CxSurface(width, height, data, intensity == null ? new byte[0] : intensitydata, xOffset, yOffset, zOffset, xScale, yScale, zScale);
         }

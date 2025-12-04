@@ -181,8 +181,8 @@ namespace VisionNet
             var box = CalculateBoundingBoxSIMD(points.TranformedPoints);
             if (box == null)
                 return null;
-            var xcale = surface.XScale * 2;
-            var yScale = surface.YScale * 2;
+            var xcale = 0.01f;//surface.XScale; 
+            var yScale = 0.01f; //surface.YScale;
             var width = (int)Math.Ceiling((box.Value.Size.Width / xcale));
             var height = (int)Math.Ceiling((box.Value.Size.Height / yScale));
             var xOffset = box.Value.Center.X - (width * xcale) / 2;

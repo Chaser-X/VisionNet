@@ -213,7 +213,7 @@ namespace DemoFrom
             //    0, 0, 0, 1
             //});
             var matrix = CxMatrix4X4.RotationY((float)Math.PI / 4);
-            var points = VisionOperator.TransformSurface(surface, matrix,SampleMode.Max);
+            var points = VisionOperator.TransformSurface(surface, matrix,SampleMode.Average);
             cxDisplay2.ResetView();
             cxDisplay2.SetPointCloud(points);
         }
