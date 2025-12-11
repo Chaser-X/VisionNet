@@ -355,6 +355,12 @@ namespace VisionNet.Controls
             camera.FocusOnPoint(new Vector3(center.X, center.Y, center.Z));
             Invalidate();
         }
+        //设置向上方向
+        public void SetViewUpDirection(CxVector3D upDirection)
+        {
+            camera.SetDefaultUpView(new Vector3(upDirection.X, upDirection.Y, upDirection.Z));
+            //Invalidate();
+        }
         protected override void DoOpenGLInitialized()
         {
             base.DoOpenGLInitialized();

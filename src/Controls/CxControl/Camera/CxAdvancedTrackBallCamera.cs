@@ -367,9 +367,9 @@ namespace VisionNet.Controls
             _firstFitView = false;
 
             // 重置相机
-            _position = new Vector3(0, 0, -10);
-            _target = Vector3.Zero;
-            _up = Vector3.UnitY;
+            //_position = new Vector3(0, 0, -10);
+            //_target = Vector3.Zero;
+            //_up = Vector3.UnitY;
 
             if (viewBox.HasValue)
             {
@@ -426,7 +426,7 @@ namespace VisionNet.Controls
 
                     default:
                         _position = _target + new Vector3(0, 0, distance * 1.1f);
-                        _up = Vector3.UnitY;
+                        //_up = Vector3.UnitY;
                         break;
                 }
             }
@@ -469,6 +469,17 @@ namespace VisionNet.Controls
                 _position.X, _position.Y, _position.Z,
                 _target.X, _target.Y, _target.Z,
                 _up.X, _up.Y, _up.Z);
+        }
+        /// <summary>
+        /// 设置默认上向量
+        /// </summary>
+        /// <param name="up"></param>
+        public void SetDefaultUpView(Vector3? up)
+        {
+            if (up.HasValue)
+                _up = up.Value;
+            else
+                _up = Vector3.UnitY;
         }
         #endregion
 

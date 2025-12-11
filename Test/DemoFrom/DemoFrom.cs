@@ -7,6 +7,8 @@ using System.ComponentModel;
 using System.Data;
 using System.Drawing;
 using System.Linq;
+using System.Runtime.InteropServices.ComTypes;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
@@ -28,12 +30,13 @@ namespace DemoFrom
             //camera = new CxCamera(openGLControl1);
             var state = CxExtension.IsOpenGLAvailable();
             var message = CxExtension.GetOpenGLVersion();
-           // MessageBox.Show(message);
+            // MessageBox.Show(message);
             if (!state)
             {
                 //MessageBox.Show("OpenGL不可用，请检查您的系统配置。");
                 return;
             }
+            cxDisplay1.SetViewUpDirection(new CxVector3D(-1, 0, 0));
         }
         CxSurface surface = null;
         private void onData(GoDataSet obj)
@@ -91,7 +94,7 @@ namespace DemoFrom
                 {
                     var surfaceMsg = msg as GoSurfacePointCloudMsg;
                     long width = surfaceMsg.Width;
-                    long length = surfaceMsg.Length; 
+                    long length = surfaceMsg.Length;
                     long bufferSize = width * length;
                     float xoffset = surfaceMsg.XOffset / 1000.0f;
                     float yoffset = surfaceMsg.YOffset / 1000.0f;
@@ -100,8 +103,26 @@ namespace DemoFrom
                     float yscale = surfaceMsg.YResolution / 1000000.0f;
                     float zscale = surfaceMsg.ZResolution / 1000000.0f;
                     IntPtr surfacePtr = surfaceMsg.Data;
-                    surface = new CxSurface((int)width, (int)length, new short[bufferSize * 3], new byte[0], xoffset, yoffset, zoffset, xscale, yscale, zscale, SurfaceType.PointCloud);
+
+                    //int size = (int)(width * length * 3);
+                    //var Data = new short[size];
+                    //Marshal.Copy(surfacePtr, Data, 0, size);
+
+                    //var points = new short[width / 2 * length * 3];
+                    //for (int i = 0; i < length; i++)
+                    //{
+                    //    for (int j = 0; j < width / 2; j++)
+                    //    {
+                    //        var index = i * width + j + width / 2;
+
+                    //        points[(i * width / 2 + j) * 3] = Data[index * 3];
+                    //        points[(i * width / 2 + j) * 3 + 1] = Data[index * 3 + 1];
+                    //        points[(i * width / 2 + j) * 3 + 2] = Data[index * 3 + 2];
+                    //    }
+                    //}
                     surface.SetData(surfacePtr);
+                    surface = new CxSurface((int)width / 2, (int)length, new short[bufferSize * 3], new byte[0], xoffset, yoffset, zoffset, xscale, yscale, zscale, SurfaceType.PointCloud);
+                   
                     if (surfaceIntensityMsg != null)
                     {
                         IntPtr intensityPtr = surfaceIntensityMsg.Data;
@@ -162,12 +183,13 @@ namespace DemoFrom
             cxDisplay2.SetSegment(new Segment3D[] { new Segment3D(new CxPoint3D(0, 0, 0), new CxPoint3D(0, 1, 1)) }, Color.Yellow);
 
             cxDisplay2.SetPoint(new CxPoint3D[] { new CxPoint3D(2, 3, 1), new CxPoint3D(5, 1, 1) }, Color.Green, 1f, PointShape.Sphere);
-            cxDisplay2.SetCoordinate3DSystem(new CxCoordination3D() {
-                Origin = new CxPoint3D(5, 5 ,5),
+            cxDisplay2.SetCoordinate3DSystem(new CxCoordination3D()
+            {
+                Origin = new CxPoint3D(5, 5, 5),
                 XAxis = new CxVector3D(1, 0, 0),
                 YAxis = new CxVector3D(0, 1, 0),
                 ZAxis = new CxVector3D(0, 0, -1)
-            },50);
+            }, 50);
             //添加多边形
             List<CxPoint3D> pts = new List<CxPoint3D>();
             pts.Add(new CxPoint3D(0, 0, 0));
