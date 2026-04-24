@@ -1,7 +1,6 @@
-﻿using SharpGL;
+using SharpGL;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Threading.Tasks;
 using VisionNet.DataType;
 
@@ -10,252 +9,181 @@ namespace VisionNet.Controls
     public class CxSurfaceItem : ICxObjRenderItem
     {
         public event Action OnDisposed;
+        public event Action OnRenderDataChanged;
+
         public CxSurface Surface { get; private set; }
-        private uint[] vboIds = new uint[2];
-        private bool vboInitialized = false;
-        private bool pointCloudUpdated = false;
-        private List<uint> meshIndexs = new List<uint>();
-        public bool IsDisposed { get; private set; } = false; // 标记是否释放资源
+        public bool IsDisposed { get; private set; } = false;
         public float ZMin { get; set; }
         public float ZMax { get; set; }
         public Box3D? BoundingBox { get; private set; }
-        private SurfaceMode surfaceMode;
+
+        private SurfaceMode _surfaceMode;
         public SurfaceMode SurfaceMode
         {
-            get
-            {
-                return surfaceMode;
-            }
+            get => _surfaceMode;
             set
             {
-                pointCloudUpdated = value != surfaceMode;
-                surfaceMode = value;
+                // SurfaceMode 只影响 Draw() 选择 DrawArrays 还是 DrawElements
+                // 索引始终预计算，无需重建 GL 资源
+                _surfaceMode = value;
             }
         }
-        private SurfaceColorMode surfaceColorMode;
+
+        private SurfaceColorMode _surfaceColorMode;
         public SurfaceColorMode SurfaceColorMode
         {
-            get
-            {
-                return surfaceColorMode;
-            }
+            get => _surfaceColorMode;
             set
             {
-                pointCloudUpdated = value != surfaceColorMode;
-                surfaceColorMode = value;
+                if (_surfaceColorMode != value)
+                {
+                    _surfaceColorMode = value;
+                    // 颜色数组已缓存到 VBO，Mode 变化需重建
+                    _cachedRenderData = null;
+                    OnRenderDataChanged?.Invoke();
+                }
             }
         }
-        public CxSurfaceItem(CxSurface surface, SurfaceMode surfaceMode = SurfaceMode.PointCloud,
+
+        private RenderData _cachedRenderData;
+
+        public CxSurfaceItem(CxSurface surface,
+            SurfaceMode surfaceMode = SurfaceMode.PointCloud,
             SurfaceColorMode surfaceColorMode = SurfaceColorMode.Color)
         {
-            this.Surface = surface;
-            this.SurfaceMode = surfaceMode;
-            this.SurfaceColorMode = surfaceColorMode;
-            BoundingBox = GetBoundingBox();
+            Surface = surface;
+            _surfaceMode = surfaceMode;
+            _surfaceColorMode = surfaceColorMode;
+
+            BoundingBox = surface?.Data != null && surface.Data.Length > 0
+                ? CxExtension.CalculateBoundingBox(surface.ToPoints())
+                : null;
             ZMax = (float)(BoundingBox?.Center.Z + BoundingBox?.Size.Depth / 2);
             ZMin = (float)(BoundingBox?.Center.Z - BoundingBox?.Size.Depth / 2);
-            pointCloudUpdated = false;
         }
-        public void Draw(OpenGL gl)
+
+        public RenderData PrepareRenderData()
         {
-            if (IsDisposed)
+            if (_cachedRenderData != null) return _cachedRenderData;
+
+            if (IsDisposed || Surface == null || Surface.Data == null || Surface.Data.Length == 0)
+                return null;
+
+            var points = Surface.ToPoints();
+            var vertices = new float[points.Length * 3];
+            var colors = new float[points.Length * 3];
+
+            for (int i = 0; i < points.Length; i++)
             {
-                IsDisposed = false; // 重置释放标记
-                if (vboInitialized)
+                vertices[i * 3]     = points[i].X;
+                vertices[i * 3 + 1] = points[i].Y;
+                vertices[i * 3 + 2] = points[i].Z;
+
+                float intensity = 1f;
+                if (Surface.Intensity != null && Surface.Intensity.Length > i)
+                    intensity = Surface.Intensity[i] / 255f;
+
+                if (_surfaceColorMode == SurfaceColorMode.Intensity)
                 {
-                    gl.DeleteBuffers(2, vboIds);
-                    vboInitialized = false;
+                    colors[i * 3]     = Math.Min(intensity, 1f);
+                    colors[i * 3 + 1] = Math.Min(intensity, 1f);
+                    colors[i * 3 + 2] = Math.Min(intensity, 1f);
                 }
-                if (Surface != null)
-                    Surface.Dispose();
-                Surface = null;
-                OnDisposed?.Invoke(); // 触发释放事件
-                IsDisposed = true; // 重置释放标记
-                Debug.WriteLine("SurfaceItem disposed");
-            }
-            if (Surface == null ) return;
-            if (Surface.Data.Length == 0) return;
-
-            if (vboInitialized && pointCloudUpdated)
-            {
-                gl.DeleteBuffers(2, vboIds);
-                vboInitialized = false;
-            }
-
-            if (!vboInitialized)
-            {
-                gl.GenBuffers(2, vboIds);
-                vboInitialized = true;
-                pointCloudUpdated = true; // 初次初始化时标记为已更新
-            }
-
-            if (pointCloudUpdated)
-            {
-                float[] vertices = null;
-                float[] colors = null;
-                CxPoint3D[] vertexs = Surface.ToPoints();
-                if (SurfaceMode == SurfaceMode.Mesh)
+                else
                 {
-                    meshIndexs = GenerateMeshIndexFromPointCloud(Surface);
+                    var c = CxExtension.GetColorByHeight(points[i].Z, ZMin, ZMax);
+                    float factor = (_surfaceColorMode == SurfaceColorMode.Color) ? 1f : intensity;
+                    colors[i * 3]     = Math.Min(c.r * factor, 1f);
+                    colors[i * 3 + 1] = Math.Min(c.g * factor, 1f);
+                    colors[i * 3 + 2] = Math.Min(c.b * factor, 1f);
                 }
-                vertices = new float[vertexs.Length * 3];
-                colors = new float[vertexs.Length * 3];
-
-                for (int i = 0; i < vertexs.Length; i++)
-                {
-                    vertices[i * 3] = (float)vertexs[i].X;
-                    vertices[i * 3 + 1] = (float)vertexs[i].Y;
-                    vertices[i * 3 + 2] = (float)vertexs[i].Z;
-
-                    float intensity = 1;
-                    if (Surface.Intensity.Length == 0)
-                    {
-                        intensity = 1;
-                    }
-                    else
-                    {
-                        intensity = (float)Surface.Intensity[i] / 255.0f; // 亮度因子
-                    }
-
-                    if (SurfaceColorMode == SurfaceColorMode.Intensity)
-                    {
-                        colors[i * 3] = Math.Min(intensity, 1.0f);
-                        colors[i * 3 + 1] = Math.Min(intensity, 1.0f);
-                        colors[i * 3 + 2] = Math.Min(intensity, 1.0f);
-                    }
-                    else
-                    {
-                        var color = CxExtension.GetColorByHeight(vertexs[i].Z, ZMin, ZMax);
-                        if (surfaceColorMode == SurfaceColorMode.Color)
-                        {
-                            intensity = 1;
-                        }
-                        colors[i * 3] = Math.Min(color.r * intensity, 1.0f);
-                        colors[i * 3 + 1] = Math.Min(color.g * intensity, 1.0f);
-                        colors[i * 3 + 2] = Math.Min(color.b * intensity, 1.0f);
-                    }
-                }
-
-                gl.BindBuffer(OpenGL.GL_ARRAY_BUFFER, vboIds[0]);
-                gl.BufferData(OpenGL.GL_ARRAY_BUFFER, vertices, OpenGL.GL_STATIC_DRAW);
-
-                gl.BindBuffer(OpenGL.GL_ARRAY_BUFFER, vboIds[1]);
-                gl.BufferData(OpenGL.GL_ARRAY_BUFFER, colors, OpenGL.GL_STATIC_DRAW);
-                pointCloudUpdated = false; // 重置标记
             }
+
+            // 始终生成 Mesh 索引，Draw() 按 SurfaceMode 决定是否使用
+            uint[] indices = GenerateMeshIndices(Surface.Width, Surface.Length);
+
+            _cachedRenderData = new RenderData
+            {
+                Vertices    = vertices,
+                Colors      = colors,
+                Indices     = indices,
+                VertexCount = points.Length,
+                IndexCount  = indices.Length,
+                UseVAO      = false,
+            };
+
+            return _cachedRenderData;
+        }
+
+        public void Draw(OpenGL gl, GLResourceHandle handle)
+        {
+            if (!handle.IsValid || IsDisposed) return;
+            var data = _cachedRenderData;
+            if (data == null) return;
 
             gl.EnableClientState(OpenGL.GL_VERTEX_ARRAY);
             gl.EnableClientState(OpenGL.GL_COLOR_ARRAY);
 
-            gl.BindBuffer(OpenGL.GL_ARRAY_BUFFER, vboIds[0]);
+            gl.BindBuffer(OpenGL.GL_ARRAY_BUFFER, handle.VboIds[0]);
             gl.VertexPointer(3, OpenGL.GL_FLOAT, 0, IntPtr.Zero);
 
-            gl.BindBuffer(OpenGL.GL_ARRAY_BUFFER, vboIds[1]);
+            gl.BindBuffer(OpenGL.GL_ARRAY_BUFFER, handle.VboIds[1]);
             gl.ColorPointer(3, OpenGL.GL_FLOAT, 0, IntPtr.Zero);
 
-            if (SurfaceMode == SurfaceMode.PointCloud)
-                gl.DrawArrays(OpenGL.GL_POINTS, 0, Surface.Data.Length);
-            else if (SurfaceMode == SurfaceMode.Mesh)
+            if (_surfaceMode == SurfaceMode.PointCloud)
             {
-                gl.DrawElements(OpenGL.GL_TRIANGLES, meshIndexs.Count, meshIndexs.ToArray());
+                gl.DrawArrays(OpenGL.GL_POINTS, 0, data.VertexCount);
+            }
+            else if (_surfaceMode == SurfaceMode.Mesh && handle.HasEBO)
+            {
+                gl.BindBuffer(OpenGL.GL_ELEMENT_ARRAY_BUFFER, handle.ElementBufferId);
+                gl.DrawElements(OpenGL.GL_TRIANGLES, data.IndexCount, OpenGL.GL_UNSIGNED_INT, IntPtr.Zero);
+                gl.BindBuffer(OpenGL.GL_ELEMENT_ARRAY_BUFFER, 0);
             }
 
             gl.DisableClientState(OpenGL.GL_VERTEX_ARRAY);
             gl.DisableClientState(OpenGL.GL_COLOR_ARRAY);
         }
-        /// <summary>
-        /// 生成点云网格索引
-        /// </summary>
-        private List<uint> GenerateMeshIndexFromPointCloud(CxSurface pointCloud)
-        {
-            if (pointCloud == null || pointCloud.Data.Length == 0)
-                return new List<uint>();
-
-            int totalTriangles = (pointCloud.Width - 1) * (pointCloud.Length - 1) * 2;
-            int totalIndices = totalTriangles * 3;
-
-            List<uint> meshIndices = new List<uint>(totalIndices);
-            object lockObj = new object();
-
-            // 使用并行循环
-            Parallel.For(0, pointCloud.Length - 1, y =>
-            {
-                uint rowStart = (uint)y * (uint)pointCloud.Width;
-                uint nextRowStart = (uint)(y + 1) * (uint)pointCloud.Width;
-
-                List<uint> localIndices = new List<uint>();
-
-                for (uint x = 0; x < pointCloud.Width - 1; x++)
-                {
-                    uint topLeft = rowStart + x;
-                    uint topRight = topLeft + 1;
-                    uint bottomLeft = nextRowStart + x;
-                    uint bottomRight = bottomLeft + 1;
-
-                    // 添加第一个三角形
-                    localIndices.Add(topLeft);
-                    localIndices.Add(bottomLeft);
-                    localIndices.Add(topRight);
-
-                    // 添加第二个三角形
-                    localIndices.Add(topRight);
-                    localIndices.Add(bottomLeft);
-                    localIndices.Add(bottomRight);
-                }
-
-                // 合并结果
-                lock (lockObj)
-                {
-                    meshIndices.AddRange(localIndices);
-                }
-            });
-
-            return meshIndices;
-        }
-
-        /// <summary>
-        /// 获取点云的边界
-        /// </summary>
-        private Box3D? GetBoundingBox()
-        {
-            if (Surface == null || Surface.Data.Length == 0) return null;
-            // 计算点云的边界
-            var data = Surface.ToPoints();
-
-            float minX = float.MaxValue, minY = float.MaxValue, minZ = float.MaxValue;
-            float maxX = float.MinValue, maxY = float.MinValue, maxZ = float.MinValue;
-
-            foreach (var point in data)
-            {
-
-                if (float.IsInfinity(point.X) || float.IsInfinity(point.Y) || float.IsInfinity(point.Z))
-                    continue;
-                if (point.X < minX) minX = point.X;
-                if (point.Y < minY) minY = point.Y;
-                if (point.Z < minZ) minZ = point.Z;
-                if (point.X > maxX) maxX = point.X;
-                if (point.Y > maxY) maxY = point.Y;
-                if (point.Z > maxZ) maxZ = point.Z;
-                
-            }
-            // 计算中心点和尺寸
-            var center = new CxPoint3D(
-                (minX + maxX) / 2,
-                (minY + maxY) / 2,
-                (minZ + maxZ) / 2
-            );
-
-            var size = new CxSize3D(
-                maxX - minX,
-                maxY - minY,
-                maxZ - minZ
-            );
-            return new Box3D(center, size);
-        }
 
         public void Dispose()
         {
-            IsDisposed = true; // 设置释放标记
+            if (IsDisposed) return;
+            Surface?.Dispose();
+            Surface = null;
+            _cachedRenderData = null;
+            IsDisposed = true;
+            OnDisposed?.Invoke();
+        }
+
+        private uint[] GenerateMeshIndices(int width, int height)
+        {
+            if (width <= 1 || height <= 1) return new uint[0];
+
+            int total = (width - 1) * (height - 1) * 6;
+            var indices = new uint[total];
+            int idx = 0;
+
+            // 顺序生成（非并行），保证索引顺序确定性
+            for (int y = 0; y < height - 1; y++)
+            {
+                uint rowStart  = (uint)(y * width);
+                uint nextStart = (uint)((y + 1) * width);
+                for (uint x = 0; x < width - 1; x++)
+                {
+                    uint tl = rowStart  + x;
+                    uint tr = tl + 1;
+                    uint bl = nextStart + x;
+                    uint br = bl + 1;
+                    indices[idx++] = tl;
+                    indices[idx++] = bl;
+                    indices[idx++] = tr;
+                    indices[idx++] = tr;
+                    indices[idx++] = bl;
+                    indices[idx++] = br;
+                }
+            }
+
+            return indices;
         }
     }
 }

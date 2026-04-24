@@ -1,16 +1,14 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Drawing;
-using System.Drawing.Drawing2D;
-using System.Net.Http.Headers;
 using System.Numerics;
-using System.Reflection;
 using System.Runtime.InteropServices;
+using System.Text;
 using System.Windows.Forms;
 using SharpGL;
 using SharpGL.SceneGraph;
-using SharpGL.SceneGraph.Cameras;
 using VisionNet.DataType;
 
 namespace VisionNet.Controls
@@ -18,19 +16,28 @@ namespace VisionNet.Controls
     public partial class CxDisplay : OpenGLControl, IDisposable
     {
         private CxAdvancedTrackBallCamera camera;
-        bool isMouseDown = false;
-        // äÖÈ¾Êı¾İ
-        private ConcurrentQueue<ICxObjRenderItem> surfaceItemBag = new ConcurrentQueue<ICxObjRenderItem>();
+        private bool isMouseDown = false;
+
+        // GL èµ„æºæ± ï¼šCxDisplay æŒæœ‰æ‰€æœ‰ GL èµ„æºï¼ŒItem åªæŒæœ‰ CPU æ•°æ®
+        private readonly Dictionary<ICxObjRenderItem, GLResourceHandle> _resourcePool
+            = new Dictionary<ICxObjRenderItem, GLResourceHandle>();
+        private readonly object _resourceLock = new object();
+
+        // å¾…é‡Šæ”¾çš„ GL èµ„æºé˜Ÿåˆ—ï¼ˆçº¿ç¨‹å®‰å…¨ï¼Œåœ¨ä¸‹ä¸€å¸§ GL ä¸Šä¸‹æ–‡ä¸­é‡Šæ”¾ï¼‰
+        private readonly ConcurrentQueue<GLResourceHandle> _pendingRelease
+            = new ConcurrentQueue<GLResourceHandle>();
+
         private ICxObjRenderItem surfaceItem = null;
         private CxCoordinateSystemItem coordinationItem = new CxCoordinateSystemItem();
         private CxColorBarItem colorBarItem = new CxColorBarItem();
         private CxCoordinationTagItem coorTagItem = new CxCoordinationTagItem();
-        private List<IRenderItem> renderItem = new List<IRenderItem>();
-        //Ïà»úÊôĞÔ
+        private readonly List<IRenderItem> renderItem = new List<IRenderItem>();
+
         public CxAdvancedTrackBallCamera Camera => camera;
+
         public ViewMode SurfaceViewMode
         {
-            get { return camera.ViewMode; }
+            get => camera.ViewMode;
             set
             {
                 if (camera.ViewMode != value)
@@ -41,10 +48,10 @@ namespace VisionNet.Controls
             }
         }
 
-        private SurfaceMode pSufaceMode = VisionNet.Controls.SurfaceMode.PointCloud;
+        private SurfaceMode pSufaceMode = SurfaceMode.PointCloud;
         public SurfaceMode SurfaceMode
         {
-            get { return pSufaceMode; }
+            get => pSufaceMode;
             set
             {
                 if (pSufaceMode != value)
@@ -52,33 +59,33 @@ namespace VisionNet.Controls
                     pSufaceMode = value;
                     updataMenuItem();
                 }
-                if (surfaceItem != null)
-                    surfaceItem.SurfaceMode = value;
+                var cur = surfaceItem;
+                if (cur != null && !cur.IsDisposed)
+                    cur.SurfaceMode = value;
             }
         }
-        private SurfaceColorMode pSurfaceColorMode = VisionNet.Controls.SurfaceColorMode.ColorWithIntensity;
+
+        private SurfaceColorMode pSurfaceColorMode = SurfaceColorMode.ColorWithIntensity;
         public SurfaceColorMode SurfaceColorMode
         {
-            get { return pSurfaceColorMode; }
+            get => pSurfaceColorMode;
             set
             {
-
                 if (pSurfaceColorMode != value)
                 {
                     pSurfaceColorMode = value;
                     updataMenuItem();
                 }
-                if (surfaceItem != null)
-                    surfaceItem.SurfaceColorMode = value;
+                var cur = surfaceItem;
+                if (cur != null && !cur.IsDisposed)
+                    cur.SurfaceColorMode = value;
             }
         }
-        //ÊÇ·ñÏÔÊ¾×ø±êÏµ
+
         public bool ShowCoordinateSystem { get; set; } = false;
 
-        public CxDisplay() : this(ViewMode.Top, SurfaceMode.PointCloud, SurfaceColorMode.ColorWithIntensity)
-        {
+        public CxDisplay() : this(ViewMode.Top, SurfaceMode.PointCloud, SurfaceColorMode.ColorWithIntensity) { }
 
-        }
         public CxDisplay(ViewMode viewMode = ViewMode.Top,
             SurfaceMode surfaceMode = SurfaceMode.PointCloud,
             SurfaceColorMode surfaceColorMode = SurfaceColorMode.ColorWithIntensity)
@@ -91,356 +98,577 @@ namespace VisionNet.Controls
                 SurfaceMode = surfaceMode;
                 SurfaceColorMode = surfaceColorMode;
                 updataMenuItem();
-                // RenderTrigger = RenderTrigger.Manual;
             }
         }
-        //Ë¢ĞÂmenu
+
         private void updataMenuItem()
         {
-            //ÊÇ·ñ¿çÏß³Ìµ÷ÓÃ
-            if (InvokeRequired)
-            {
-                BeginInvoke(new Action(() => updataMenuItem()));
-                return;
-            }
+            if (InvokeRequired) { BeginInvoke(new Action(() => updataMenuItem())); return; }
+
             foreach (var item in viewModeToolStripMenuItem.DropDownItems)
-            {
-                var tripItem = (ToolStripMenuItem)item;
-                tripItem.Checked = tripItem.Text == camera.ViewMode.ToString();
-            }
+                ((ToolStripMenuItem)item).Checked = ((ToolStripMenuItem)item).Text == camera.ViewMode.ToString();
             foreach (var item in surfaceModeToolStripMenuItem.DropDownItems)
-            {
-                var tripItem = (ToolStripMenuItem)item;
-                tripItem.Checked = tripItem.Text == pSufaceMode.ToString();
-            }
+                ((ToolStripMenuItem)item).Checked = ((ToolStripMenuItem)item).Text == pSufaceMode.ToString();
             foreach (var item in surfaceColorModeToolStripMenuItem.DropDownItems)
-            {
-                var tripItem = (ToolStripMenuItem)item;
-                tripItem.Checked = tripItem.Text == pSurfaceColorMode.ToString();
-            }
+                ((ToolStripMenuItem)item).Checked = ((ToolStripMenuItem)item).Text == pSurfaceColorMode.ToString();
         }
-        #region ²Ù×÷·½·¨
+
+        #region è®¾ç½®ä¸»æ¸²æŸ“å¯¹è±¡
+
         /// <summary>
-        /// ÉèÖÃµãÔÆÊı¾İ²¢×ÔÊÊÓ¦ZÏÔÊ¾·¶Î§
+        /// ç»Ÿä¸€æ›¿æ¢ä¸»æ¸²æŸ“å¯¹è±¡ã€‚çº¿ç¨‹å®‰å…¨ï¼Œå¯ä»ä»»æ„çº¿ç¨‹è°ƒç”¨ã€‚
+        /// æ—§å¯¹è±¡çš„ GL èµ„æºåŠ å…¥å¾…é‡Šæ”¾é˜Ÿåˆ—ï¼Œä¸‹ä¸€å¸§åœ¨ GL ä¸Šä¸‹æ–‡ä¸­é‡Šæ”¾ã€‚
         /// </summary>
+        private void ReplaceSurfaceItem(ICxObjRenderItem newItem)
+        {
+            lock (_resourceLock)
+            {
+                if (surfaceItem != null)
+                {
+                    if (_resourcePool.TryGetValue(surfaceItem, out var oldHandle))
+                    {
+                        _pendingRelease.Enqueue(oldHandle);
+                        _resourcePool.Remove(surfaceItem);
+                    }
+                    surfaceItem.OnRenderDataChanged -= OnItemRenderDataChanged;
+                    surfaceItem.Dispose();
+                }
+
+                surfaceItem = newItem;
+                _resourcePool[newItem] = new GLResourceHandle { IsValid = false, NeedsUpdate = true };
+                newItem.OnRenderDataChanged += OnItemRenderDataChanged;
+            }
+
+            camera.FitView(newItem.BoundingBox);
+            Invalidate();
+        }
+
+        private void OnItemRenderDataChanged()
+        {
+            lock (_resourceLock)
+            {
+                var cur = surfaceItem;
+                if (cur != null && _resourcePool.TryGetValue(cur, out var handle))
+                    handle.NeedsUpdate = true;
+            }
+            Invalidate();
+        }
+
         public void SetPointCloud(CxSurface inpointCloud)
         {
-            var tempSuface = new CxSurface();
-            var size = inpointCloud.Width * inpointCloud.Length;
-            if (size > 100000000)
+            var surface = inpointCloud;
+            if (inpointCloud.Width * inpointCloud.Length > 100_000_000)
             {
                 var points = inpointCloud.ToPoints();
-                var ratio = points.Length / 10000000F;
-                var width = inpointCloud.Width / ratio;
-                var height = inpointCloud.Length / ratio;
-                var xScale = inpointCloud.XScale * ratio;
-                var yScale = inpointCloud.YScale * ratio;
-                tempSuface = VisionOperator.UniformSuface(points, inpointCloud.Intensity, (int)width, (int)height, xScale, yScale, inpointCloud.ZScale, inpointCloud.XOffset, inpointCloud.YOffset, inpointCloud.ZOffset);
+                float ratio  = points.Length / 10_000_000f;
+                surface = VisionOperator.UniformSuface(points, inpointCloud.Intensity,
+                    (int)(inpointCloud.Width / ratio), (int)(inpointCloud.Length / ratio),
+                    inpointCloud.XScale * ratio, inpointCloud.YScale * ratio,
+                    inpointCloud.ZScale, inpointCloud.XOffset, inpointCloud.YOffset, inpointCloud.ZOffset);
             }
-            else
-            {
-                tempSuface = inpointCloud;
-            }
-            /*
-            if (surfaceItem != null)
-            {
-                surfaceItem.OnDisposed += () =>
-                {
-                    surfaceItem = new CxSurfaceItem(tempSuface ?? new CxSurface(), SurfaceMode, SurfaceColorMode);
-                    camera.FitView(surfaceItem.BoundingBox); // µ÷ÕûÊÓÍ¼ÒÔÊÊÓ¦µãÔÆÊı¾İ
-                    Invalidate();
-                };
-                surfaceItem.Dispose(); // ÊÍ·Å¾ÉµÄÍ¼Ôª×ÊÔ´
-                //DoOpenGLDraw(new RenderEventArgs(this.CreateGraphics()));
-                Invalidate();
-                //surfaceItem = new CxSurfaceItem(tempSuface, SurfaceMode, SurfaceColorMode);
-                //camera.FitView(surfaceItem.BoundingBox); // µ÷ÕûÊÓÍ¼ÒÔÊÊÓ¦µãÔÆÊı¾İ
-                //Invalidate();
-            }
-            else
-            {
-                surfaceItem = new CxSurfaceItem(tempSuface, SurfaceMode, SurfaceColorMode);
-                camera.FitView(surfaceItem.BoundingBox); // µ÷ÕûÊÓÍ¼ÒÔÊÊÓ¦µãÔÆÊı¾İ
-                Invalidate();
-            }
-            */
-
-            var tempsurfaceItem = new CxSurfaceItem(tempSuface, SurfaceMode, SurfaceColorMode);
-            camera.FitView(tempsurfaceItem.BoundingBox); // µ÷ÕûÊÓÍ¼ÒÔÊÊÓ¦µãÔÆÊı¾İ
-            surfaceItemBag.Enqueue(tempsurfaceItem);
-            Invalidate();
+            ReplaceSurfaceItem(new CxSurfaceItem(surface, SurfaceMode, SurfaceColorMode));
         }
-        //Ìí¼ÓMesh
+
         public void SetMesh(CxMesh mesh)
         {
-            //    if (InvokeRequired)
-            //    {
-            //        BeginInvoke(new Action(() => SetMesh(mesh)));
-            //        return;
-            //    }
-            /*   if (surfaceItem != null)
-               {
-                   surfaceItem.OnDisposed += () =>
-                   {
-                       surfaceItem = new CxMeshItem(mesh, SurfaceMode, SurfaceColorMode);
-                       camera.FitView(surfaceItem.BoundingBox);
-                       Invalidate();
-                   };
+            ReplaceSurfaceItem(new CxMeshItem(mesh, SurfaceMode, SurfaceColorMode));
+        }
 
-                   surfaceItem.Dispose(); // ÊÍ·Å¾ÉµÄÍ¼Ôª×ÊÔ´
-                   //DoOpenGLDraw(new RenderEventArgs(this.CreateGraphics()));
-                   //Invalidate();
-               }
-               else
-               {
-                   surfaceItem = new CxMeshItem(mesh, SurfaceMode, SurfaceColorMode);
-                   camera.FitView(surfaceItem.BoundingBox);
-                   Invalidate();
-               }*/
-            var tempsurfaceItem = new CxMeshItem(mesh, SurfaceMode, SurfaceColorMode);
-            camera.FitView(tempsurfaceItem.BoundingBox);
-            surfaceItemBag.Enqueue(tempsurfaceItem);
-            Invalidate();
-        }
-        //Ìí¼ÓSurfaceAdvancedItem
-        public void SetSurfaceAdvancedItem(CxSurface surfaceItem)
+        public void SetSurfaceAdvancedItem(CxSurface surface)
         {
-            var tempsurfaceItem = new CxSurfaceAdvancedItem(surfaceItem, SurfaceMode, SurfaceColorMode, 2000000);
-            surfaceItemBag.Enqueue(tempsurfaceItem);
-            camera.FitView(tempsurfaceItem.BoundingBox);
-            Invalidate();
+            ReplaceSurfaceItem(new CxSurfaceAdvancedItem(surface, SurfaceMode, SurfaceColorMode, 2_000_0000));
         }
-        //Ìí¼ÓMeshAdvancedItem
-        public void SetMeshAdvancedItem(CxMesh meshItem)
+
+        public void SetMeshAdvancedItem(CxMesh mesh)
         {
-            var tempsurfaceItem = new CxMeshAdvancedItem(meshItem, SurfaceMode, SurfaceColorMode);
-            surfaceItemBag.Enqueue(tempsurfaceItem);
-            camera.FitView(tempsurfaceItem.BoundingBox);
-            Invalidate();
+            ReplaceSurfaceItem(new CxMeshAdvancedItem(mesh, SurfaceMode, SurfaceColorMode));
         }
-        /// <summary>
-        /// Ìí¼ÓÏß¶Î
-        /// </summary>
+
         public void SetSegment(Segment3D[] segment, Color color, float size = 1.0f)
         {
-            var segmentItem = new CxSegment3DItem(segment, color, size);
-            renderItem.Add(segmentItem);
+            renderItem.Add(new CxSegment3DItem(segment, color, size));
             Invalidate();
         }
-        //Ìí¼Óµã
+
         public void SetPoint(CxPoint3D[] point, Color color, float size = 1.0f, PointShape shape = PointShape.Point)
         {
-            var pointItem = new CxPoint3DItem(point, color, size, shape);
-            renderItem.Add(pointItem);
+            renderItem.Add(new CxPoint3DItem(point, color, size, shape));
             Invalidate();
         }
-        //Ìí¼Ó¶à±ßĞÎ
+
         public void SetPolygon(Polygon3D[] polygon, Color color, float size = 1.0f)
         {
-            var polygonItem = new CxPolygon3DItem(polygon, color, size);
-            renderItem.Add(polygonItem);
+            renderItem.Add(new CxPolygon3DItem(polygon, color, size));
             Invalidate();
         }
-        //Ìí¼ÓÆ½Ãæ
+
         public void SetPlane(Plane3D[] plane, Color color, float size = 100.0f)
         {
-            var planeItem = new CxPlane3DItem(plane, color, size);
-            renderItem.Add(planeItem);
+            renderItem.Add(new CxPlane3DItem(plane, color, size));
             Invalidate();
         }
-        //Ìí¼ÓBox3D
+
         public void SetBox(Box3D[] box, Color color, float size = 1.0f)
         {
-            var boxItem = new CxBox3DItem(box, color, size);
-            renderItem.Add(boxItem);
+            renderItem.Add(new CxBox3DItem(box, color, size));
             Invalidate();
         }
-        //Ìí¼ÓTextinfo
+
         public void SetTextInfo(TextInfo[] textInfo, Color color)
         {
-            var textItem = new CxTextInfoItem(textInfo, color, 1);
-            renderItem.Add(textItem);
+            renderItem.Add(new CxTextInfoItem(textInfo, color, 1));
             Invalidate();
         }
-        //Ìí¼Ó2DÎÄ±¾
+
         public void SetText2D(Text2D[] text2Ds, Color color)
         {
-            var textItem = new CxText2DItem(text2Ds, color, 1);
-            renderItem.Add(textItem);
+            renderItem.Add(new CxText2DItem(text2Ds, color, 1));
             Invalidate();
         }
-        //Ìí¼Ó×Ô¶¨Òå3D×ø±êÏµ
-        public void SetCoordinate3DSystem(CxCoordination3D? coordinationItem = null, float axisLength = 5)
+
+        public void SetCoordinate3DSystem(CxCoordination3D? coordination = null, float axisLength = 5)
         {
-            if (!coordinationItem.HasValue)
-                coordinationItem = new CxCoordination3D()
+            if (!coordination.HasValue)
+                coordination = new CxCoordination3D
                 {
                     Origin = new CxPoint3D(0, 0, 0),
                     XAxis = new CxVector3D(1, 0, 0),
                     YAxis = new CxVector3D(0, 1, 0),
-                    ZAxis = new CxVector3D(0, 0, 1)
+                    ZAxis = new CxVector3D(0, 0, 1),
                 };
-            var coorItem = new CxCoordinateSystemItem(axisLength, axisLength / 50, axisLength / 10, axisLength / 25, coordinationItem);
-            renderItem.Add(coorItem);
+            renderItem.Add(new CxCoordinateSystemItem(
+                axisLength, axisLength / 50, axisLength / 10, axisLength / 25, coordination));
             Invalidate();
         }
-        #endregion
-        #region äÖÈ¾·½·¨
-        /// <summary>
-        /// äÖÈ¾Í¼Ôª
-        /// </summary>
-        private void Render(OpenGL gl)
-        {
-            if (!camera.Enable2DView && ShowCoordinateSystem)
-                coordinationItem.Draw(gl);
-            
-            if (surfaceItemBag.Count == 0)
-                surfaceItem = null;
-            else if (surfaceItemBag.Count == 1)
-                surfaceItemBag.TryPeek(out surfaceItem);
-            else if (surfaceItemBag.Count > 1)
-            {
-                surfaceItemBag.TryDequeue(out ICxObjRenderItem tempsurfaceItem);
-                tempsurfaceItem.Dispose();
-                tempsurfaceItem.Draw(gl);
-                surfaceItemBag.TryPeek(out surfaceItem);
-                camera.FitView(surfaceItem.BoundingBox);
-            }
-            surfaceItem?.Draw(gl);
 
-            if (surfaceItem != null &&
-                surfaceItem.SurfaceColorMode != SurfaceColorMode.Intensity)
-            {
-                colorBarItem.SetRange(surfaceItem.ZMin, surfaceItem.ZMax);
-                colorBarItem.Draw(gl);
-            }
+#endregion
 
-            var items = renderItem.ToArray();
-            foreach (var item in items)
-            {
-                item.Draw(gl);
-            }
-            if (surfaceItem != null)
-                coorTagItem.Draw(gl);
-            if (!camera.Enable2DView)
-                coordinationItem.DrawScreenPositionedAxes(gl);
-        }
-        /// <summary>
-        /// Çå¿ÕÍ¼Ôª
-        /// </summary>
-        public void ResetView(bool resetAll = true)
-        {
-            //Ôö¼ÓBeginInvorke
-            //if (InvokeRequired)
-            //{
-            //    BeginInvoke(new Action(() => ResetView(resetAll)));
-            //    return;
-            //}
-            renderItem.ForEach(item => item.Dispose());
-            renderItem.Clear();
-            coordinationItem?.Dispose();
-            coorTagItem?.Dispose();
-            colorBarItem?.Dispose();
-            if (resetAll)
-            {
-                surfaceItem?.Dispose(); // ÊÍ·Å¾ÉµÄÍ¼Ôª×ÊÔ´
-            }
-            //DoOpenGLDraw(new RenderEventArgs(this.CreateGraphics()));
+        #region æ¸²æŸ“
 
-            Invalidate();
-        }
-        //ÉèÖÃäÖÈ¾µÄ½¹µãÎ»ÖÃ
-        public void SetViewCenter(CxPoint3D center)
-        {
-            camera.FocusOnPoint(new Vector3(center.X, center.Y, center.Z));
-            Invalidate();
-        }
         protected override void DoOpenGLInitialized()
         {
             base.DoOpenGLInitialized();
             OpenGL.ClearColor(0, 0, 0, 0);
             OpenGL.PointSize(2.0f);
         }
+
         protected override void DoOpenGLDraw(RenderEventArgs e)
         {
             if (DesignMode) return;
             base.DoOpenGLDraw(e);
-            OpenGL gl = OpenGL;
+
+            var gl = OpenGL;
             gl.Clear(OpenGL.GL_COLOR_BUFFER_BIT | OpenGL.GL_DEPTH_BUFFER_BIT);
-            // ÆôÓÃÉî¶È²âÊÔ
+
+            // 1. åœ¨ GL ä¸Šä¸‹æ–‡ä¸­é‡Šæ”¾æ—§èµ„æº
+            ProcessPendingRelease(gl);
+
+            // 2. ä¸ºæ–°/å˜æ›´çš„ Item åˆ›å»º GL èµ„æºï¼ˆå…¨ç¨‹æŒé”ï¼Œé˜²æ­¢ Dispose å¹¶å‘ï¼‰
+            ProcessResourcePool(gl);
+
             gl.Enable(OpenGL.GL_DEPTH_TEST);
             gl.DepthFunc(OpenGL.GL_LESS);
-            // ÆôÓÃ»ìºÏ
             gl.Enable(OpenGL.GL_BLEND);
             gl.BlendFunc(OpenGL.GL_SRC_ALPHA, OpenGL.GL_ONE_MINUS_SRC_ALPHA);
             gl.LoadIdentity();
-            // ÉèÖÃÍ¶Ó°¾ØÕó
+
             camera.LookAtMatrix(gl);
-            // Ó¦ÓÃÊÓÍ¼±ä»»²¢»æÖÆËùÓĞÔªËØ
             Render(gl);
-            // ½ûÓÃÉî¶È²âÊÔ
+
             gl.Disable(OpenGL.GL_DEPTH_TEST);
-            // ½ûÓÃ»ìºÏ
             gl.Disable(OpenGL.GL_BLEND);
         }
-        protected override void DoGDIDraw(RenderEventArgs e)
+
+        private void ProcessPendingRelease(OpenGL gl)
         {
-            base.DoGDIDraw(e);
+            while (_pendingRelease.TryDequeue(out var handle))
+                ReleaseGLResources(gl, handle);
         }
+
+        /// <summary>
+        /// å…¨ç¨‹æŒé”ï¼šé˜²æ­¢éå†æœŸé—´ ReplaceSurfaceItem åœ¨å¦ä¸€çº¿ç¨‹ Dispose æ‰æ­£åœ¨åˆ›å»ºèµ„æºçš„ Itemã€‚
+        /// </summary>
+        private void ProcessResourcePool(OpenGL gl)
+        {
+            lock (_resourceLock)
+            {
+                foreach (var kv in _resourcePool)
+                {
+                    var item   = kv.Key;
+                    var handle = kv.Value;
+
+                    if (item.IsDisposed) continue;
+
+                    if (!handle.IsValid || handle.NeedsUpdate)
+                    {
+                        if (handle.IsValid)
+                            ReleaseGLResources(gl, handle);
+
+                        CreateGLResources(gl, item, handle);
+                    }
+                }
+            }
+        }
+
+        private void Render(OpenGL gl)
+        {
+            if (!camera.Enable2DView && ShowCoordinateSystem)
+                coordinationItem.Draw(gl);
+
+            // æœ¬åœ°å¿«ç…§ï¼šé˜²æ­¢å…¶ä»–çº¿ç¨‹åœ¨ä½¿ç”¨æœŸé—´ä¿®æ”¹ surfaceItem å­—æ®µ
+            var cur = surfaceItem;
+            GLResourceHandle handle = null;
+
+            if (cur != null && !cur.IsDisposed)
+            {
+                lock (_resourceLock)
+                    _resourcePool.TryGetValue(cur, out handle);
+
+                if (handle != null && handle.IsValid)
+                {
+                    cur.Draw(gl, handle);
+
+                    if (cur.SurfaceColorMode != SurfaceColorMode.Intensity)
+                    {
+                        colorBarItem.SetRange(cur.ZMin, cur.ZMax);
+                        colorBarItem.Draw(gl);
+                    }
+
+                    coorTagItem.Draw(gl);
+                }
+            }
+
+            var items = renderItem.ToArray();
+            foreach (var item in items)
+                item.Draw(gl);
+
+            if (!camera.Enable2DView)
+                coordinationItem.DrawScreenPositionedAxes(gl);
+        }
+
+        #endregion
+
+        #region GL èµ„æºç®¡ç†
+
+        private void CreateGLResources(OpenGL gl, ICxObjRenderItem item, GLResourceHandle handle)
+        {
+            var data = item.PrepareRenderData();
+            if (data == null) return;
+
+            var tempId = new uint[1];
+
+            if (data.UseVAO)
+            {
+                gl.GenVertexArrays(1, tempId);
+                handle.VaoId = tempId[0];
+                handle.HasVAO = true;
+                gl.BindVertexArray(handle.VaoId);
+            }
+
+            int vboIndex = 0;
+
+            if (data.Vertices != null)
+            {
+                gl.GenBuffers(1, tempId);
+                handle.VboIds[vboIndex] = tempId[0];
+                gl.BindBuffer(OpenGL.GL_ARRAY_BUFFER, handle.VboIds[vboIndex]);
+                gl.BufferData(OpenGL.GL_ARRAY_BUFFER, data.Vertices, OpenGL.GL_STATIC_DRAW);
+                if (data.UseVAO)
+                {
+                    gl.VertexAttribPointer(0, 3, OpenGL.GL_FLOAT, false, 3 * sizeof(float), IntPtr.Zero);
+                    gl.EnableVertexAttribArray(0);
+                }
+                vboIndex++;
+            }
+
+            if (data.Colors != null)
+            {
+                gl.GenBuffers(1, tempId);
+                handle.VboIds[vboIndex] = tempId[0];
+                gl.BindBuffer(OpenGL.GL_ARRAY_BUFFER, handle.VboIds[vboIndex]);
+                gl.BufferData(OpenGL.GL_ARRAY_BUFFER, data.Colors, OpenGL.GL_STATIC_DRAW);
+                if (data.UseVAO)
+                {
+                    gl.VertexAttribPointer(1, 3, OpenGL.GL_FLOAT, false, 3 * sizeof(float), IntPtr.Zero);
+                    gl.EnableVertexAttribArray(1);
+                }
+                vboIndex++;
+            }
+            else if (data.UVCoords != null)
+            {
+                gl.GenBuffers(1, tempId);
+                handle.VboIds[vboIndex] = tempId[0];
+                gl.BindBuffer(OpenGL.GL_ARRAY_BUFFER, handle.VboIds[vboIndex]);
+                gl.BufferData(OpenGL.GL_ARRAY_BUFFER, data.UVCoords, OpenGL.GL_STATIC_DRAW);
+                if (data.UseVAO)
+                {
+                    gl.VertexAttribPointer(1, 2, OpenGL.GL_FLOAT, false, 2 * sizeof(float), IntPtr.Zero);
+                    gl.EnableVertexAttribArray(1);
+                }
+                vboIndex++;
+            }
+
+            handle.VboCount = vboIndex;
+
+            if (data.Indices != null && data.Indices.Length > 0)
+            {
+                gl.GenBuffers(1, tempId);
+                handle.ElementBufferId = tempId[0];
+                handle.HasEBO = true;
+
+                gl.BindBuffer(OpenGL.GL_ELEMENT_ARRAY_BUFFER, handle.ElementBufferId);
+                int bytes = data.Indices.Length * sizeof(uint);
+                IntPtr ptr = Marshal.AllocHGlobal(bytes);
+                try
+                {
+                    var indexBytes = new byte[bytes];
+                    Buffer.BlockCopy(data.Indices, 0, indexBytes, 0, bytes);
+                    Marshal.Copy(indexBytes, 0, ptr, bytes);
+                    gl.BufferData(OpenGL.GL_ELEMENT_ARRAY_BUFFER, bytes, ptr, OpenGL.GL_STATIC_DRAW);
+                }
+                finally
+                {
+                    Marshal.FreeHGlobal(ptr);
+                }
+            }
+
+            if (data.ShaderSource != null)
+            {
+                handle.ShaderProgram = CompileShader(gl, data.ShaderSource);
+                handle.HasShader = true;
+            }
+
+            if (data.TextureData?.Data != null)
+            {
+                handle.TextureId = CreateTexture(gl, data.TextureData);
+                handle.HasTexture = true;
+            }
+
+            if (handle.HasVAO)
+                gl.BindVertexArray(0);
+
+            handle.IsValid = true;
+            handle.NeedsUpdate = false;
+        }
+
+        private void ReleaseGLResources(OpenGL gl, GLResourceHandle handle)
+        {
+            if (handle.VboCount > 0)
+            {
+                gl.DeleteBuffers(handle.VboCount, handle.VboIds);
+                for (int i = 0; i < handle.VboIds.Length; i++) handle.VboIds[i] = 0;
+                handle.VboCount = 0;
+            }
+
+            if (handle.HasVAO && handle.VaoId != 0)
+            {
+                gl.DeleteVertexArrays(1, new[] { handle.VaoId });
+                handle.VaoId = 0;
+                handle.HasVAO = false;
+            }
+
+            if (handle.HasEBO && handle.ElementBufferId != 0)
+            {
+                gl.DeleteBuffers(1, new[] { handle.ElementBufferId });
+                handle.ElementBufferId = 0;
+                handle.HasEBO = false;
+            }
+
+            if (handle.HasShader && handle.ShaderProgram != 0)
+            {
+                gl.DeleteProgram(handle.ShaderProgram);
+                handle.ShaderProgram = 0;
+                handle.HasShader = false;
+            }
+
+            if (handle.HasTexture && handle.TextureId != 0)
+            {
+                gl.DeleteTextures(1, new[] { handle.TextureId });
+                handle.TextureId = 0;
+                handle.HasTexture = false;
+            }
+
+            handle.IsValid = false;
+        }
+
+        private uint CompileShader(OpenGL gl, ShaderSource source)
+        {
+            uint vs = gl.CreateShader(OpenGL.GL_VERTEX_SHADER);
+            gl.ShaderSource(vs, source.VertexSource);
+            gl.CompileShader(vs);
+            LogShaderError(gl, vs, "vertex");
+
+            uint fs = gl.CreateShader(OpenGL.GL_FRAGMENT_SHADER);
+            gl.ShaderSource(fs, source.FragmentSource);
+            gl.CompileShader(fs);
+            LogShaderError(gl, fs, "fragment");
+
+            uint prog = gl.CreateProgram();
+            gl.AttachShader(prog, vs);
+            gl.AttachShader(prog, fs);
+            gl.LinkProgram(prog);
+
+            int[] status = new int[1];
+            gl.GetProgram(prog, OpenGL.GL_LINK_STATUS, status);
+            if (status[0] == OpenGL.GL_FALSE)
+            {
+                int[] len = new int[1];
+                gl.GetProgram(prog, OpenGL.GL_INFO_LOG_LENGTH, len);
+                var log = new StringBuilder(len[0]);
+                gl.GetProgramInfoLog(prog, len[0], IntPtr.Zero, log);
+                Debug.WriteLine("Shader link error: " + log);
+            }
+
+            gl.DeleteShader(vs);
+            gl.DeleteShader(fs);
+            return prog;
+        }
+
+        private void LogShaderError(OpenGL gl, uint shader, string stage)
+        {
+            int[] status = new int[1];
+            gl.GetShader(shader, OpenGL.GL_COMPILE_STATUS, status);
+            if (status[0] != OpenGL.GL_FALSE) return;
+            int[] len = new int[1];
+            gl.GetShader(shader, OpenGL.GL_INFO_LOG_LENGTH, len);
+            var log = new StringBuilder(len[0]);
+            gl.GetShaderInfoLog(shader, len[0], IntPtr.Zero, log);
+            Debug.WriteLine($"{stage} shader error: {log}");
+        }
+
+        private uint CreateTexture(OpenGL gl, TextureData tex)
+        {
+            // æŸ¥è¯¢ GPU æœ€å¤§çº¹ç†å°ºå¯¸ï¼Œè¶…å‡ºæ—¶é™é‡‡æ ·ï¼Œå¦åˆ™ç›´æ¥ä½¿ç”¨åŸå§‹æ•°æ®
+            int[] maxSizeArr = new int[1];
+            gl.GetInteger(OpenGL.GL_MAX_TEXTURE_SIZE, maxSizeArr);
+            int maxSize = maxSizeArr[0];
+
+            int uploadW = Math.Min(tex.Width,  maxSize);
+            int uploadH = Math.Min(tex.Height, maxSize);
+            byte[] uploadData = (uploadW != tex.Width || uploadH != tex.Height)
+                ? DownsampleTextureRGBA(tex.Data, tex.Width, tex.Height, uploadW, uploadH)
+                : tex.Data;
+
+            var ids = new uint[1];
+            gl.GenTextures(1, ids);
+            gl.BindTexture(OpenGL.GL_TEXTURE_2D, ids[0]);
+            gl.TexParameter(OpenGL.GL_TEXTURE_2D, OpenGL.GL_TEXTURE_MIN_FILTER, OpenGL.GL_LINEAR);
+            gl.TexParameter(OpenGL.GL_TEXTURE_2D, OpenGL.GL_TEXTURE_MAG_FILTER, OpenGL.GL_LINEAR);
+            gl.TexParameter(OpenGL.GL_TEXTURE_2D, OpenGL.GL_TEXTURE_WRAP_S, OpenGL.GL_CLAMP_TO_EDGE);
+            gl.TexParameter(OpenGL.GL_TEXTURE_2D, OpenGL.GL_TEXTURE_WRAP_T, OpenGL.GL_CLAMP_TO_EDGE);
+
+            IntPtr ptr = Marshal.AllocHGlobal(uploadData.Length);
+            try
+            {
+                Marshal.Copy(uploadData, 0, ptr, uploadData.Length);
+                gl.TexImage2D(OpenGL.GL_TEXTURE_2D, 0, OpenGL.GL_RGBA,
+                    uploadW, uploadH, 0, OpenGL.GL_RGBA, OpenGL.GL_UNSIGNED_BYTE, ptr);
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(ptr);
+                gl.BindTexture(OpenGL.GL_TEXTURE_2D, 0);
+            }
+
+            return ids[0];
+        }
+
+        /// <summary>
+        /// å¯¹ RGBAï¼ˆ4å­—èŠ‚/åƒç´ ï¼‰çº¹ç†æ•°æ®åšæœ€è¿‘é‚»é™é‡‡æ ·ã€‚
+        /// UV åæ ‡ä¸ºå½’ä¸€åŒ– [0,1]ï¼Œçº¹ç†å°ºå¯¸ç¼©å°ä¸å½±å“æ˜ å°„æ­£ç¡®æ€§ã€‚
+        /// </summary>
+        private static byte[] DownsampleTextureRGBA(
+            byte[] src, int srcW, int srcH, int dstW, int dstH)
+        {
+            float scaleX = (float)srcW / dstW;
+            float scaleY = (float)srcH / dstH;
+            var dst = new byte[dstW * dstH * 4];
+
+            for (int y = 0; y < dstH; y++)
+            {
+                int srcY = Math.Min((int)(y * scaleY), srcH - 1);
+                for (int x = 0; x < dstW; x++)
+                {
+                    int srcX = Math.Min((int)(x * scaleX), srcW - 1);
+                    int si = (srcY * srcW + srcX) * 4;
+                    int di = (y    * dstW + x)    * 4;
+                    dst[di]     = src[si];
+                    dst[di + 1] = src[si + 1];
+                    dst[di + 2] = src[si + 2];
+                    dst[di + 3] = src[si + 3];
+                }
+            }
+
+            return dst;
+        }
+
+        #endregion
+
+        #region è§†å›¾æ“ä½œ
+
+        public void ResetView(bool resetAll = true)
+        {
+            renderItem.ForEach(item => item.Dispose());
+            renderItem.Clear();
+
+            coordinationItem = new CxCoordinateSystemItem();
+            coorTagItem = new CxCoordinationTagItem();
+            colorBarItem = new CxColorBarItem();
+
+            if (resetAll && surfaceItem != null)
+            {
+                lock (_resourceLock)
+                {
+                    if (_resourcePool.TryGetValue(surfaceItem, out var handle))
+                    {
+                        _pendingRelease.Enqueue(handle);
+                        _resourcePool.Remove(surfaceItem);
+                    }
+                    surfaceItem.OnRenderDataChanged -= OnItemRenderDataChanged;
+                    surfaceItem.Dispose();
+                    surfaceItem = null;
+                }
+            }
+
+            Invalidate();
+        }
+
+        public void SetViewCenter(CxPoint3D center)
+        {
+            camera.FocusOnPoint(new Vector3(center.X, center.Y, center.Z));
+            Invalidate();
+        }
+
+        public void SetViewUpDirection(CxVector3D upDirection)
+        {
+            camera.SetDefaultUpView(new Vector3(upDirection.X, upDirection.Y, upDirection.Z));
+        }
+
+        protected override void DoGDIDraw(RenderEventArgs e) => base.DoGDIDraw(e);
+
         protected override void OnResize(EventArgs e)
         {
             base.OnResize(e);
             camera?.LookAtMatrix(OpenGL);
         }
-        #endregion äÖÈ¾·½·¨
-        private void d2DToolStripMenuItem_Click(object sender, EventArgs e)
-        {
-            var selectedItem = (ToolStripMenuItem)sender;
-            selectedItem.Checked = !selectedItem.Checked;
-            camera.Enable2DView = selectedItem.Checked;
-            camera?.FitView(surfaceItem?.BoundingBox);
-        }
-        private void toolStripMenuItem_ViewModeClick(object sender, EventArgs e)
-        {
-            foreach (var item in viewModeToolStripMenuItem.DropDownItems)
-                ((ToolStripMenuItem)item).Checked = false;
-            var selectedItem = (ToolStripMenuItem)sender;
-            selectedItem.Checked = true;
-            camera.ViewMode = (ViewMode)Enum.Parse(typeof(ViewMode), selectedItem.Text);
-            camera?.FitView(surfaceItem?.BoundingBox);
-            //Invalidate();
-        }
-        private void toolStripMenuItem_SurfaceModeClick(object sender, EventArgs e)
-        {
-            foreach (var item in surfaceModeToolStripMenuItem.DropDownItems)
-                ((ToolStripMenuItem)item).Checked = false;
-            var selectedItem = (ToolStripMenuItem)sender;
-            selectedItem.Checked = true;
-            SurfaceMode = (SurfaceMode)Enum.Parse(typeof(SurfaceMode), selectedItem.Text);
-            //Invalidate();
-        }
-        private void toolStripMenuItem_SurfaceColorModeClick(object sender, EventArgs e)
-        {
-            foreach (var item in surfaceColorModeToolStripMenuItem.DropDownItems)
-                ((ToolStripMenuItem)item).Checked = false;
-            var selectedItem = (ToolStripMenuItem)sender;
-            selectedItem.Checked = true;
-            SurfaceColorMode = (SurfaceColorMode)Enum.Parse(typeof(SurfaceColorMode), selectedItem.Text);
-            //Invalidate();
-        }
+
+        #endregion
+
+        #region é¼ æ ‡äº¤äº’
+
         protected override void OnMouseDown(MouseEventArgs e)
         {
             isMouseDown = true;
-            var pos = GetNearestSurfacePoint(e.X, e.Y);
-            camera.RotationPoint = pos.Location;
+            camera.RotationPoint = GetNearestSurfacePoint(e.X, e.Y).Location;
             base.OnMouseDown(e);
         }
+
         protected override void OnMouseUp(MouseEventArgs e)
         {
             isMouseDown = false;
-            //camera.RotationPoint = null;
             base.OnMouseUp(e);
         }
+
         protected override void OnMouseMove(MouseEventArgs e)
         {
             var pos = GetNearestSurfacePoint(e.X, e.Y);
@@ -450,131 +678,150 @@ namespace VisionNet.Controls
                 coorTagItem.SetCoordinates(pos.Location.Value, pos.Intensity);
             }
             else
+            {
                 coorTagItem.Visible = false;
+            }
             base.OnMouseMove(e);
         }
+
         private CxPoint3D? ScreenToWorldCoordinate(int mouseX, int mouseY)
         {
-            OpenGL gl = OpenGL;
-            // »ñÈ¡µ±Ç°ÊÓ¿Ú
+            var gl = OpenGL;
             int[] viewport = new int[4];
             gl.GetInteger(OpenGL.GL_VIEWPORT, viewport);
-            // µ÷ÕûY×ø±ê£¨OpenGL×ø±êÏµÔ­µãÔÚ×óÏÂ½Ç£©
             int adjustedY = viewport[3] - mouseY;
-            // ÎªÉî¶ÈÖµ´´½¨byteÊı×é
-            byte[] depthBuffer = new byte[4]; // µ¥¸öfloatÖµĞèÒª4¸ö×Ö½Ú
-            // ¶ÁÈ¡Éî¶ÈÖµµ½byteÊı×é
+
+            byte[] depthBuffer = new byte[4];
             gl.ReadPixels(mouseX, adjustedY, 1, 1, OpenGL.GL_DEPTH_COMPONENT, OpenGL.GL_FLOAT, depthBuffer);
-            // ½«byteÊı×é×ª»»Îªfloat
             float depth = BitConverter.ToSingle(depthBuffer, 0);
-            // ÔÚ×ª»»×ø±êÖ®Ç°¼ì²éÉî¶ÈÖµ
-            if (Math.Abs(depth - 1.0f) < 0.00001f)
-            {
-                // Éî¶ÈÖµÎª1.0£¬±íÊ¾µã»÷ÁË±³¾°
-                return null; // »òÕß·µ»ØÒ»¸öÌØÊâÖµ±íÊ¾ÎŞĞ§µã»÷
-            }
-            // ½«ÆÁÄ»×ø±ê×ª»»ÎªÊÀ½ç×ø±ê
-            var obj = gl.UnProject((double)mouseX, (double)adjustedY, (double)depth);
+
+            if (Math.Abs(depth - 1.0f) < 0.00001f) return null;
+
+            var obj = gl.UnProject(mouseX, adjustedY, depth);
             return new CxPoint3D((float)obj[0], (float)obj[1], (float)obj[2]);
         }
+
         private (CxPoint3D? Location, byte? Intensity) GetNearestSurfacePoint(int mouseX, int mouseY)
         {
+            var pos = ScreenToWorldCoordinate(mouseX, mouseY);
+            if (!pos.HasValue) return (null, null);
+            var world = pos.Value;
 
-            var obj = ScreenToWorldCoordinate(mouseX, mouseY);
-            if (!obj.HasValue)
-                return (null, null);
-            var worldObj = obj.Value;
-            //meshÍ¼Ôª
-            var tempmeshItem = surfaceItem as CxMeshItem;
-            if (tempmeshItem != null)
-                return (worldObj, null);
-            var tempmeshAdvancedItem = surfaceItem as CxMeshAdvancedItem;
-            if (tempmeshAdvancedItem != null)
-                return (worldObj, null); // Èç¹ûÊÇMeshAdvancedItem£¬Ö±½Ó·µ»ØÊÀ½ç×ø±êºÍÎŞÇ¿¶ÈÖµ
-            //surfaceÍ¼Ôª
+            // æœ¬åœ°å¿«ç…§é˜²ç«æ€
+            var cur = surfaceItem;
+            if (cur == null || cur.IsDisposed) return (null, null);
+
+            if (cur is CxMeshItem || cur is CxMeshAdvancedItem)
+                return (world, null);
+
             CxSurface surface = null;
-            var tempsurfaceItem = surfaceItem as CxSurfaceItem;
-            if (tempsurfaceItem != null)
+            if (cur is CxSurfaceItem si)
             {
-                if (tempsurfaceItem.Surface == null)
-                    return (null, null);
-                surface = tempsurfaceItem.Surface;
+                if (si.Surface == null) return (null, null);
+                surface = si.Surface;
             }
-            else if (surfaceItem is CxSurfaceAdvancedItem advancedItem)
+            else if (cur is CxSurfaceAdvancedItem ai)
             {
-                if (advancedItem.Surface == null)
-                    return (null, null);
-                surface = advancedItem.Surface;
+                if (ai.Surface == null) return (null, null);
+                surface = ai.Surface;
             }
             else
             {
-                return (null, null); // Èç¹ûÃ»ÓĞÓĞĞ§µÄsurfaceÍ¼Ôª£¬·µ»Ønull
+                return (null, null);
             }
 
-            // ³õÊ¼»¯×î½üµãºÍ×îĞ¡¾àÀë
-            CxPoint3D? nearestPoint = null;
+            CxPoint3D? nearest = null;
             byte? nearestIntensity = null;
-            float minDistanceSquared = float.MaxValue;
+            float minDist = float.MaxValue;
+
             if (surface.Type == SurfaceType.Surface)
             {
-                // ¼ÆËã worldObj ÔÚÍø¸ñÖĞµÄË÷Òı
-                int xIndex = (int)((worldObj.X - surface.XOffset) / surface.XScale);
-                int yIndex = (int)((worldObj.Y - surface.YOffset) / surface.YScale);
-                // ¼ì²éË÷ÒıÊÇ·ñÔÚ·¶Î§ÄÚ
-                if (xIndex < 0 || xIndex >= surface.Width || yIndex < 0 || yIndex >= surface.Length)
+                int xi = (int)((world.X - surface.XOffset) / surface.XScale);
+                int yi = (int)((world.Y - surface.YOffset) / surface.YScale);
+                if (xi < 0 || xi >= surface.Width || yi < 0 || yi >= surface.Length)
                     return (null, null);
-                var minDis = 5 * (surface.XScale * surface.XScale +
-                             surface.YScale * surface.YScale +
-                             surface.ZScale * surface.ZScale);
-                // ±éÀú¸½½üµÄµã£¨3x3 ÁÚÓò£©
+
+                float threshold = 5 * (surface.XScale * surface.XScale
+                                     + surface.YScale * surface.YScale
+                                     + surface.ZScale * surface.ZScale);
+
                 for (int dy = -2; dy <= 2; dy++)
                 {
                     for (int dx = -2; dx <= 2; dx++)
                     {
-                        int nx = xIndex + dx;
-                        int ny = yIndex + dy;
+                        int nx = xi + dx, ny = yi + dy;
+                        if (nx < 0 || nx >= surface.Width || ny < 0 || ny >= surface.Length) continue;
 
-                        // ¼ì²éÁÚÓòµãÊÇ·ñÔÚ·¶Î§ÄÚ
-                        if (nx < 0 || nx >= surface.Width || ny < 0 || ny >= surface.Length)
-                            continue;
+                        int idx = ny * surface.Width + nx;
+                        float z = surface.Data[idx] == -32768
+                            ? float.NegativeInfinity
+                            : surface.ZOffset + surface.Data[idx] * surface.ZScale;
+                        if (float.IsInfinity(z)) continue;
 
-                        // »ñÈ¡µãµÄË÷Òı
-                        int index = ny * surface.Width + nx;
-                        // ¼ÆËãµãµÄÊµ¼Ê×ø±ê
                         float x = surface.XOffset + nx * surface.XScale;
                         float y = surface.YOffset + ny * surface.YScale;
-                        float z = surface.Data[index] == -32768
-                           ? float.NegativeInfinity
-                           : surface.ZOffset + surface.Data[index] * surface.ZScale;
+                        float d = (x - world.X) * (x - world.X)
+                                + (y - world.Y) * (y - world.Y)
+                                + (z - world.Z) * (z - world.Z);
 
-                        if (float.IsInfinity(z)) // Ìø¹ıÎŞĞ§µã
-                            continue;
-
-                        // ¼ÆËãÅ·¼¸ÀïµÃ¾àÀëµÄÆ½·½
-                        float distanceSquared = (x - worldObj.X) * (x - worldObj.X) +
-                                                (y - worldObj.Y) * (y - worldObj.Y) +
-                                                (z - worldObj.Z) * (z - worldObj.Z);
-
-                        // ¸üĞÂ×î½üµã
-                        if (distanceSquared < minDistanceSquared && distanceSquared < minDis)
+                        if (d < minDist && d < threshold)
                         {
-                            minDistanceSquared = distanceSquared;
-                            nearestPoint = new CxPoint3D(x, y, z);
-                            if (surface.Intensity != null && surface.Intensity.Length != 0)
-                                nearestIntensity = surface.Intensity[index];
+                            minDist = d;
+                            nearest = new CxPoint3D(x, y, z);
+                            if (surface.Intensity != null && surface.Intensity.Length > idx)
+                                nearestIntensity = surface.Intensity[idx];
                         }
                     }
                 }
             }
             else
             {
-                //PointCloudÀàĞÍ
-                nearestPoint = worldObj;
-                nearestIntensity = null;
+                nearest = world;
             }
-            return (nearestPoint, nearestIntensity);
+
+            return (nearest, nearestIntensity);
         }
+
+        #endregion
+
+        #region èœå•äº‹ä»¶
+
+        private void d2DToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            var mi = (ToolStripMenuItem)sender;
+            mi.Checked = !mi.Checked;
+            camera.Enable2DView = mi.Checked;
+            camera?.FitView(surfaceItem?.BoundingBox);
+        }
+
+        private void toolStripMenuItem_ViewModeClick(object sender, EventArgs e)
+        {
+            foreach (var item in viewModeToolStripMenuItem.DropDownItems)
+                ((ToolStripMenuItem)item).Checked = false;
+            var mi = (ToolStripMenuItem)sender;
+            mi.Checked = true;
+            camera.ViewMode = (ViewMode)Enum.Parse(typeof(ViewMode), mi.Text);
+            camera?.FitView(surfaceItem?.BoundingBox);
+        }
+
+        private void toolStripMenuItem_SurfaceModeClick(object sender, EventArgs e)
+        {
+            foreach (var item in surfaceModeToolStripMenuItem.DropDownItems)
+                ((ToolStripMenuItem)item).Checked = false;
+            var mi = (ToolStripMenuItem)sender;
+            mi.Checked = true;
+            SurfaceMode = (SurfaceMode)Enum.Parse(typeof(SurfaceMode), mi.Text);
+        }
+
+        private void toolStripMenuItem_SurfaceColorModeClick(object sender, EventArgs e)
+        {
+            foreach (var item in surfaceColorModeToolStripMenuItem.DropDownItems)
+                ((ToolStripMenuItem)item).Checked = false;
+            var mi = (ToolStripMenuItem)sender;
+            mi.Checked = true;
+            SurfaceColorMode = (SurfaceColorMode)Enum.Parse(typeof(SurfaceColorMode), mi.Text);
+        }
+
+        #endregion
     }
 }
-
-

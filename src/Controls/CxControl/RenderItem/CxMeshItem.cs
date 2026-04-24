@@ -1,209 +1,144 @@
 using SharpGL;
 using System;
-using System.Collections.Generic;
 using VisionNet.DataType;
 
 namespace VisionNet.Controls
 {
     public class CxMeshItem : ICxObjRenderItem
     {
-        public event Action OnDisposed; // ÊÍ·ÅÊÂ¼þ
-        public CxMesh Mesh { get; set; }
-        private uint[] vboIds = new uint[2]; // ÓÃÓÚ´æ´¢¶¥µãºÍÑÕÉ«µÄ VBO
-        private bool vboInitialized = false;
-        private bool meshUpdated = false;
-        public bool IsDisposed { get; private set; } = false; // ±ê¼ÇÊÇ·ñÊÍ·Å×ÊÔ´
+        public event Action OnDisposed;
+        public event Action OnRenderDataChanged;
+
+        public CxMesh Mesh { get; private set; }
+        public bool IsDisposed { get; private set; } = false;
         public float ZMin { get; set; }
         public float ZMax { get; set; }
-        // ÐÂÔö£ºBoundingBox ÊôÐÔ
         public Box3D? BoundingBox { get; private set; }
-        private SurfaceMode surfaceMode;
+
+        private SurfaceMode _surfaceMode;
         public SurfaceMode SurfaceMode
         {
-            get
-            {
-                return surfaceMode;
-            }
-            set
-            {
-                meshUpdated = value != surfaceMode;
-                surfaceMode = value;
-            }
+            get => _surfaceMode;
+            set => _surfaceMode = value; // åªå½±å“ Draw() çš„ç»˜åˆ¶è°ƒç”¨ï¼Œæ— éœ€é‡å»ºèµ„æº
         }
-        private SurfaceColorMode surfaceColorMode;
+
+        private SurfaceColorMode _surfaceColorMode;
         public SurfaceColorMode SurfaceColorMode
         {
-            get
-            {
-                return surfaceColorMode;
-            }
+            get => _surfaceColorMode;
             set
             {
-                meshUpdated = value != surfaceColorMode;
-                surfaceColorMode = value;
+                if (_surfaceColorMode != value)
+                {
+                    _surfaceColorMode = value;
+                    _cachedRenderData = null;
+                    OnRenderDataChanged?.Invoke();
+                }
             }
         }
-        public CxMeshItem(CxMesh mesh, SurfaceMode surfaceMode = SurfaceMode.PointCloud,
+
+        private RenderData _cachedRenderData;
+
+        public CxMeshItem(CxMesh mesh,
+            SurfaceMode surfaceMode = SurfaceMode.PointCloud,
             SurfaceColorMode surfaceColorMode = SurfaceColorMode.Color)
         {
-            this.Mesh = mesh;
-            this.SurfaceMode = surfaceMode;
-            this.SurfaceColorMode = surfaceColorMode;
-            meshUpdated = true; // ³õ´Î³õÊ¼»¯Ê±±ê¼ÇÎªÒÑ¸üÐÂ
-            BoundingBox = CalculateBoundingBox(); // ³õÊ¼»¯Ê±¼ÆËã°üÎ§ºÐ
+            Mesh = mesh;
+            _surfaceMode = surfaceMode;
+            _surfaceColorMode = surfaceColorMode;
+
+            BoundingBox = CxExtension.CalculateBoundingBox(mesh?.Vertexs);
             ZMax = (float)(BoundingBox?.Center.Z + BoundingBox?.Size.Depth / 2);
             ZMin = (float)(BoundingBox?.Center.Z - BoundingBox?.Size.Depth / 2);
-            meshUpdated = false;
         }
-        public void Draw(OpenGL gl)
+
+        public RenderData PrepareRenderData()
         {
-            if (IsDisposed)
+            if (_cachedRenderData != null) return _cachedRenderData;
+
+            if (IsDisposed || Mesh == null || Mesh.Vertexs == null || Mesh.Vertexs.Length == 0
+                || Mesh.Indices == null || Mesh.Indices.Length == 0)
+                return null;
+
+            var vertices = new float[Mesh.Vertexs.Length * 3];
+            var colors   = new float[Mesh.Vertexs.Length * 3];
+
+            for (int i = 0; i < Mesh.Vertexs.Length; i++)
             {
-                IsDisposed = false; // ÖØÖÃÊÍ·Å±ê¼Ç
-                if (vboInitialized)
+                vertices[i * 3]     = Mesh.Vertexs[i].X;
+                vertices[i * 3 + 1] = Mesh.Vertexs[i].Y;
+                vertices[i * 3 + 2] = Mesh.Vertexs[i].Z;
+
+                float intensity = 1f;
+                if (Mesh.Intensity != null && Mesh.Intensity.Length > i)
+                    intensity = Mesh.Intensity[i] / 255f;
+
+                if (_surfaceColorMode == SurfaceColorMode.Intensity)
                 {
-                    gl.DeleteBuffers(2, vboIds);
-                    vboInitialized = false;
+                    colors[i * 3]     = Math.Min(intensity, 1f);
+                    colors[i * 3 + 1] = Math.Min(intensity, 1f);
+                    colors[i * 3 + 2] = Math.Min(intensity, 1f);
                 }
-                if (Mesh != null)
-                    Mesh.Disopse();
-                Mesh = null;
-                OnDisposed?.Invoke(); // ´¥·¢ÊÍ·ÅÊÂ¼þ
-                IsDisposed = true; // ÖØÖÃÊÍ·Å±ê¼Ç
-            }
-            if (Mesh == null || Mesh.Vertexs == null || Mesh.Vertexs.Length == 0 || Mesh.Indices == null || Mesh.Indices.Length == 0)
-                return;
-
-            if (vboInitialized && meshUpdated)
-            {
-                gl.DeleteBuffers(2, vboIds);
-                vboInitialized = false;
-            }
-
-            if (!vboInitialized)
-            {
-                gl.GenBuffers(2, vboIds);
-                vboInitialized = true;
-                meshUpdated = true; // ³õ´Î³õÊ¼»¯Ê±±ê¼ÇÎªÒÑ¸üÐÂ
-            }
-
-            if (meshUpdated)
-            {
-                // ×¼±¸¶¥µãÊý¾Ý
-                float[] vertices = new float[Mesh.Vertexs.Length * 3];
-                float[] colors = new float[Mesh.Vertexs.Length * 3];
-                for (int i = 0; i < Mesh.Vertexs.Length; i++)
+                else
                 {
-                    vertices[i * 3] = Mesh.Vertexs[i].X;
-                    vertices[i * 3 + 1] = Mesh.Vertexs[i].Y;
-                    vertices[i * 3 + 2] = Mesh.Vertexs[i].Z;
-
-                    float intensity = 1;
-                    if (Mesh.Intensity.Length == 0)
-                    {
-                        intensity = 1;
-                    }
-                    else
-                    {
-                        intensity = (float)Mesh.Intensity[i] / 255.0f; // ÁÁ¶ÈÒò×Ó
-                    }
-
-                    if (SurfaceColorMode == SurfaceColorMode.Intensity)
-                    {
-                        colors[i * 3] = Math.Min(intensity, 1.0f);
-                        colors[i * 3 + 1] = Math.Min(intensity, 1.0f);
-                        colors[i * 3 + 2] = Math.Min(intensity, 1.0f);
-                    }
-                    else
-                    {
-                        var color = CxExtension.GetColorByHeight(Mesh.Vertexs[i].Z, ZMin, ZMax);
-                        if (surfaceColorMode == SurfaceColorMode.Color)
-                        {
-                            intensity = 1;
-                        }
-                        colors[i * 3] = Math.Min(color.r * intensity, 1.0f);
-                        colors[i * 3 + 1] = Math.Min(color.g * intensity, 1.0f);
-                        colors[i * 3 + 2] = Math.Min(color.b * intensity, 1.0f);
-                    }
+                    var c = CxExtension.GetColorByHeight(Mesh.Vertexs[i].Z, ZMin, ZMax);
+                    float factor = (_surfaceColorMode == SurfaceColorMode.Color) ? 1f : intensity;
+                    colors[i * 3]     = Math.Min(c.r * factor, 1f);
+                    colors[i * 3 + 1] = Math.Min(c.g * factor, 1f);
+                    colors[i * 3 + 2] = Math.Min(c.b * factor, 1f);
                 }
-
-                // ÉÏ´«¶¥µãÊý¾Ýµ½ VBO
-                gl.BindBuffer(OpenGL.GL_ARRAY_BUFFER, vboIds[0]);
-                gl.BufferData(OpenGL.GL_ARRAY_BUFFER, vertices, OpenGL.GL_STATIC_DRAW);
-
-                // ÉÏ´«ÑÕÉ«Êý¾Ýµ½ VBO
-                gl.BindBuffer(OpenGL.GL_ARRAY_BUFFER, vboIds[1]);
-                gl.BufferData(OpenGL.GL_ARRAY_BUFFER, colors, OpenGL.GL_STATIC_DRAW);
-
-                meshUpdated = false; // ÖØÖÃ¸üÐÂ±ê¼Ç
             }
 
-            // ÆôÓÃ¶¥µãºÍÑÕÉ«Êý×é
+            _cachedRenderData = new RenderData
+            {
+                Vertices    = vertices,
+                Colors      = colors,
+                Indices     = Mesh.Indices,
+                VertexCount = Mesh.Vertexs.Length,
+                IndexCount  = Mesh.Indices.Length,
+                UseVAO      = false,
+            };
+
+            return _cachedRenderData;
+        }
+
+        public void Draw(OpenGL gl, GLResourceHandle handle)
+        {
+            if (!handle.IsValid || IsDisposed) return;
+            var data = _cachedRenderData;
+            if (data == null) return;
+
             gl.EnableClientState(OpenGL.GL_VERTEX_ARRAY);
             gl.EnableClientState(OpenGL.GL_COLOR_ARRAY);
 
-            // °ó¶¨¶¥µãÊý¾Ý
-            gl.BindBuffer(OpenGL.GL_ARRAY_BUFFER, vboIds[0]);
+            gl.BindBuffer(OpenGL.GL_ARRAY_BUFFER, handle.VboIds[0]);
             gl.VertexPointer(3, OpenGL.GL_FLOAT, 0, IntPtr.Zero);
 
-            // °ó¶¨ÑÕÉ«Êý¾Ý
-            gl.BindBuffer(OpenGL.GL_ARRAY_BUFFER, vboIds[1]);
+            gl.BindBuffer(OpenGL.GL_ARRAY_BUFFER, handle.VboIds[1]);
             gl.ColorPointer(3, OpenGL.GL_FLOAT, 0, IntPtr.Zero);
 
-
-            if (SurfaceMode == SurfaceMode.PointCloud)
-                gl.DrawArrays(OpenGL.GL_POINTS, 0, Mesh.Vertexs.Length);
-            else if (SurfaceMode == SurfaceMode.Mesh)
+            if (_surfaceMode == SurfaceMode.PointCloud)
             {
-                gl.DrawElements(OpenGL.GL_TRIANGLES, Mesh.Indices.Length, Mesh.Indices);
+                gl.DrawArrays(OpenGL.GL_POINTS, 0, data.VertexCount);
+            }
+            else if (_surfaceMode == SurfaceMode.Mesh && handle.HasEBO)
+            {
+                gl.BindBuffer(OpenGL.GL_ELEMENT_ARRAY_BUFFER, handle.ElementBufferId);
+                gl.DrawElements(OpenGL.GL_TRIANGLES, data.IndexCount, OpenGL.GL_UNSIGNED_INT, IntPtr.Zero);
+                gl.BindBuffer(OpenGL.GL_ELEMENT_ARRAY_BUFFER, 0);
             }
 
-            // ½ûÓÃ¶¥µãºÍÑÕÉ«Êý×é
             gl.DisableClientState(OpenGL.GL_VERTEX_ARRAY);
             gl.DisableClientState(OpenGL.GL_COLOR_ARRAY);
-        }
-        // ÐÂÔö£º¼ÆËã°üÎ§ºÐ
-        private Box3D? CalculateBoundingBox()
-        {
-            if (Mesh == null || Mesh.Vertexs == null || Mesh.Vertexs.Length == 0)
-                return null;
-
-            float minX = float.MaxValue, minY = float.MaxValue, minZ = float.MaxValue;
-            float maxX = float.MinValue, maxY = float.MinValue, maxZ = float.MinValue;
-
-            foreach (var point in Mesh.Vertexs)
-            {
-                if (float.IsInfinity(point.X) || float.IsInfinity(point.Y) || float.IsInfinity(point.Z))
-                    continue;
-                if (point.X < minX) minX = point.X;
-                if (point.Y < minY) minY = point.Y;
-                if (point.Z < minZ) minZ = point.Z;
-
-                if (point.X > maxX) maxX = point.X;
-                if (point.Y > maxY) maxY = point.Y;
-                if (point.Z > maxZ) maxZ = point.Z;
-            }
-
-            // ¼ÆËãÖÐÐÄµãºÍ³ß´ç
-            var center = new CxPoint3D(
-                (minX + maxX) / 2,
-                (minY + maxY) / 2,
-                (minZ + maxZ) / 2
-            );
-
-            var size = new CxSize3D(
-                maxX - minX,
-                maxY - minY,
-                maxZ - minZ
-            );
-
-            return new Box3D(center, size);
         }
 
         public void Dispose()
         {
-            // ÑÓ³ÙÊÍ·ÅOpenGL VBO×ÊÔ´
+            if (IsDisposed) return;
+            Mesh = null;
+            _cachedRenderData = null;
             IsDisposed = true;
+            OnDisposed?.Invoke();
         }
     }
 }

@@ -5,11 +5,38 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using VisionNet.DataType;
 
 namespace VisionNet.Controls
 {
     public class CxExtension
     {
+        public static Box3D? CalculateBoundingBox(IEnumerable<CxPoint3D> points)
+        {
+            if (points == null) return null;
+
+            float minX = float.MaxValue, minY = float.MaxValue, minZ = float.MaxValue;
+            float maxX = float.MinValue, maxY = float.MinValue, maxZ = float.MinValue;
+            bool hasValidPoint = false;
+
+            foreach (var p in points)
+            {
+                if (float.IsInfinity(p.X) || float.IsInfinity(p.Y) || float.IsInfinity(p.Z))
+                    continue;
+                hasValidPoint = true;
+                if (p.X < minX) minX = p.X;
+                if (p.Y < minY) minY = p.Y;
+                if (p.Z < minZ) minZ = p.Z;
+                if (p.X > maxX) maxX = p.X;
+                if (p.Y > maxY) maxY = p.Y;
+                if (p.Z > maxZ) maxZ = p.Z;
+            }
+
+            if (!hasValidPoint) return null;
+            return new Box3D(
+                new CxPoint3D((minX + maxX) / 2, (minY + maxY) / 2, (minZ + maxZ) / 2),
+                new CxSize3D(maxX - minX, maxY - minY, maxZ - minZ));
+        }
         /// <summary>
         /// 根据给定范围的Zmin,zmax,对每个点Z返回和Z相关的颜色
         /// </summary>

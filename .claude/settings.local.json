@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__filesystem__directory_tree",
+      "Bash(find D:\\\\GitRepos\\\\soft\\\\VisionNet\\\\src\\\\Controls\\\\CxControl\\\\RenderItem:*)",
+      "Bash(grep -E \"\\\\.cs$\")",
+      "Bash(wc -l /d/GitRepos/soft/VisionNet/src/Controls/CxControl/**/*.cs)"
+    ]
+  }
+}
