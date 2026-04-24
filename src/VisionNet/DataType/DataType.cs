@@ -439,7 +439,7 @@ namespace VisionNet.DataType
         //UV坐标
         public CxPoint2D[] UVs { get; set; }
 
-        public void Disopse()
+        public void Dispose()
         {
             Vertexs = null;
             Indices = null;

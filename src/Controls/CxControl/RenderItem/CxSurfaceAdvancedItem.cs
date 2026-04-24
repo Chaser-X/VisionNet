@@ -112,7 +112,9 @@ namespace VisionNet.Controls
 
             CalculateSamplingFactors();
 
-            BoundingBox = CalculateBoundingBox();
+            BoundingBox = surface?.Data != null && surface.Data.Length > 0
+                ? CxExtension.CalculateBoundingBox(surface.ToPoints())
+                : null;
             ZMax = (float)(BoundingBox?.Center.Z + BoundingBox?.Size.Depth / 2);
             ZMin = (float)(BoundingBox?.Center.Z - BoundingBox?.Size.Depth / 2);
         }
@@ -326,33 +328,6 @@ namespace VisionNet.Controls
                 _samplingFactorX = Math.Max(1, (int)(_samplingFactorX * ratio));
                 _samplingFactorY = Math.Max(1, (int)(_samplingFactorY * ratio));
             }
-        }
-
-        private Box3D? CalculateBoundingBox()
-        {
-            if (Surface == null || Surface.Data == null || Surface.Data.Length == 0)
-                return null;
-
-            var points = Surface.ToPoints();
-            float minX = float.MaxValue, minY = float.MaxValue, minZ = float.MaxValue;
-            float maxX = float.MinValue, maxY = float.MinValue, maxZ = float.MinValue;
-
-            foreach (var p in points)
-            {
-                if (float.IsInfinity(p.X) || float.IsInfinity(p.Y) || float.IsInfinity(p.Z))
-                    continue;
-                if (p.X < minX) minX = p.X;
-                if (p.Y < minY) minY = p.Y;
-                if (p.Z < minZ) minZ = p.Z;
-                if (p.X > maxX) maxX = p.X;
-                if (p.Y > maxY) maxY = p.Y;
-                if (p.Z > maxZ) maxZ = p.Z;
-            }
-
-            if (minX == float.MaxValue) return null;
-            return new Box3D(
-                new CxPoint3D((minX + maxX) / 2, (minY + maxY) / 2, (minZ + maxZ) / 2),
-                new CxSize3D(maxX - minX, maxY - minY, maxZ - minZ));
         }
     }
 }

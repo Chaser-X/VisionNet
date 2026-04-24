@@ -47,7 +47,7 @@ namespace VisionNet.Controls
             _surfaceMode = surfaceMode;
             _surfaceColorMode = surfaceColorMode;
 
-            BoundingBox = CalculateBoundingBox();
+            BoundingBox = CxExtension.CalculateBoundingBox(mesh?.Vertexs);
             ZMax = (float)(BoundingBox?.Center.Z + BoundingBox?.Size.Depth / 2);
             ZMin = (float)(BoundingBox?.Center.Z - BoundingBox?.Size.Depth / 2);
         }
@@ -139,32 +139,6 @@ namespace VisionNet.Controls
             _cachedRenderData = null;
             IsDisposed = true;
             OnDisposed?.Invoke();
-        }
-
-        private Box3D? CalculateBoundingBox()
-        {
-            if (Mesh == null || Mesh.Vertexs == null || Mesh.Vertexs.Length == 0)
-                return null;
-
-            float minX = float.MaxValue, minY = float.MaxValue, minZ = float.MaxValue;
-            float maxX = float.MinValue, maxY = float.MinValue, maxZ = float.MinValue;
-
-            foreach (var p in Mesh.Vertexs)
-            {
-                if (float.IsInfinity(p.X) || float.IsInfinity(p.Y) || float.IsInfinity(p.Z))
-                    continue;
-                if (p.X < minX) minX = p.X;
-                if (p.Y < minY) minY = p.Y;
-                if (p.Z < minZ) minZ = p.Z;
-                if (p.X > maxX) maxX = p.X;
-                if (p.Y > maxY) maxY = p.Y;
-                if (p.Z > maxZ) maxZ = p.Z;
-            }
-
-            if (minX == float.MaxValue) return null;
-            return new Box3D(
-                new CxPoint3D((minX + maxX) / 2, (minY + maxY) / 2, (minZ + maxZ) / 2),
-                new CxSize3D(maxX - minX, maxY - minY, maxZ - minZ));
         }
     }
 }
