@@ -176,7 +176,7 @@ namespace VisionNet.Controls
 
         public void SetSurfaceAdvancedItem(CxSurface surface)
         {
-            ReplaceSurfaceItem(new CxSurfaceAdvancedItem(surface, SurfaceMode, SurfaceColorMode, 2_000_000));
+            ReplaceSurfaceItem(new CxSurfaceAdvancedItem(surface, SurfaceMode, SurfaceColorMode, 2_000_0000));
         }
 
         public void SetMeshAdvancedItem(CxMesh mesh)
@@ -538,6 +538,17 @@ namespace VisionNet.Controls
 
         private uint CreateTexture(OpenGL gl, TextureData tex)
         {
+            // 查询 GPU 最大纹理尺寸，超出时降采样，否则直接使用原始数据
+            int[] maxSizeArr = new int[1];
+            gl.GetInteger(OpenGL.GL_MAX_TEXTURE_SIZE, maxSizeArr);
+            int maxSize = maxSizeArr[0];
+
+            int uploadW = Math.Min(tex.Width,  maxSize);
+            int uploadH = Math.Min(tex.Height, maxSize);
+            byte[] uploadData = (uploadW != tex.Width || uploadH != tex.Height)
+                ? DownsampleTextureRGBA(tex.Data, tex.Width, tex.Height, uploadW, uploadH)
+                : tex.Data;
+
             var ids = new uint[1];
             gl.GenTextures(1, ids);
             gl.BindTexture(OpenGL.GL_TEXTURE_2D, ids[0]);
@@ -546,12 +557,12 @@ namespace VisionNet.Controls
             gl.TexParameter(OpenGL.GL_TEXTURE_2D, OpenGL.GL_TEXTURE_WRAP_S, OpenGL.GL_CLAMP_TO_EDGE);
             gl.TexParameter(OpenGL.GL_TEXTURE_2D, OpenGL.GL_TEXTURE_WRAP_T, OpenGL.GL_CLAMP_TO_EDGE);
 
-            IntPtr ptr = Marshal.AllocHGlobal(tex.Data.Length);
+            IntPtr ptr = Marshal.AllocHGlobal(uploadData.Length);
             try
             {
-                Marshal.Copy(tex.Data, 0, ptr, tex.Data.Length);
+                Marshal.Copy(uploadData, 0, ptr, uploadData.Length);
                 gl.TexImage2D(OpenGL.GL_TEXTURE_2D, 0, OpenGL.GL_RGBA,
-                    tex.Width, tex.Height, 0, OpenGL.GL_RGBA, OpenGL.GL_UNSIGNED_BYTE, ptr);
+                    uploadW, uploadH, 0, OpenGL.GL_RGBA, OpenGL.GL_UNSIGNED_BYTE, ptr);
             }
             finally
             {
@@ -560,6 +571,35 @@ namespace VisionNet.Controls
             }
 
             return ids[0];
+        }
+
+        /// <summary>
+        /// 对 RGBA（4字节/像素）纹理数据做最近邻降采样。
+        /// UV 坐标为归一化 [0,1]，纹理尺寸缩小不影响映射正确性。
+        /// </summary>
+        private static byte[] DownsampleTextureRGBA(
+            byte[] src, int srcW, int srcH, int dstW, int dstH)
+        {
+            float scaleX = (float)srcW / dstW;
+            float scaleY = (float)srcH / dstH;
+            var dst = new byte[dstW * dstH * 4];
+
+            for (int y = 0; y < dstH; y++)
+            {
+                int srcY = Math.Min((int)(y * scaleY), srcH - 1);
+                for (int x = 0; x < dstW; x++)
+                {
+                    int srcX = Math.Min((int)(x * scaleX), srcW - 1);
+                    int si = (srcY * srcW + srcX) * 4;
+                    int di = (y    * dstW + x)    * 4;
+                    dst[di]     = src[si];
+                    dst[di + 1] = src[si + 1];
+                    dst[di + 2] = src[si + 2];
+                    dst[di + 3] = src[si + 3];
+                }
+            }
+
+            return dst;
         }
 
         #endregion
