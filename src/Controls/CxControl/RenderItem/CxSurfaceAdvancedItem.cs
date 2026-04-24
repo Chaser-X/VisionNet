@@ -1,11 +1,6 @@
 using SharpGL;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
-using System.Drawing;
-using System.Runtime.InteropServices;
-using System.Text;
-using System.Threading.Tasks;
 using VisionNet.DataType;
 
 namespace VisionNet.Controls
@@ -13,724 +8,351 @@ namespace VisionNet.Controls
     public class CxSurfaceAdvancedItem : ICxObjRenderItem
     {
         public event Action OnDisposed;
+        // colorMode ÈÄöËøá Uniform ‰º†ÂÖ• ShaderÔºå‰∏çÈúÄË¶ÅÈáçÂª∫ GL ËµÑÊ∫êÔºå‰∏çËß¶ÂèëÊ≠§‰∫ã‰ª∂
+        public event Action OnRenderDataChanged;
+
         public CxSurface Surface { get; private set; }
-
-        // OpenGL◊ ‘¥
-        private uint vaoId = 0;
-        private uint[] vboIds = new uint[2]; // ∂•µ„°¢UV◊¯±Í
-        private uint intensityTextureId = 0; // ¡¡∂»Œ∆¿Ì
-        private int textureWidth = 1; // Œ∆¿ÌøÌ
-        private int textureHeight = 1; // Œ∆¿Ì∏ﬂ
-        private uint elementBufferId = 0; // À˜“˝ª∫≥Â«¯
-        private uint shaderProgram = 0;
-
-        private bool resourcesInitialized = false;
-        private bool pointCloudUpdated = false;
-        private List<uint> meshIndexs = new List<uint>();
         public bool IsDisposed { get; private set; } = false;
         public float ZMin { get; set; }
         public float ZMax { get; set; }
         public Box3D? BoundingBox { get; private set; }
-
-        // ◊Ó¥Û∂•µ„ ˝¡øœﬁ÷∆
         public int MaxPointCount { get; set; } = int.MaxValue;
 
-        // ≤…—˘“Ú◊” - ∏˘æ›MaxPointCount∂ØÃ¨º∆À„
-        private int samplingFactorX = 1;
-        private int samplingFactorY = 1;
+        private int _samplingFactorX = 1;
+        private int _samplingFactorY = 1;
 
-        // ‰÷»æƒ£ Ω
-        private SurfaceMode surfaceMode;
+        private SurfaceMode _surfaceMode;
         public SurfaceMode SurfaceMode
         {
-            get { return surfaceMode; }
-            set
-            {
-                //pointCloudUpdated = value != surfaceMode;
-                surfaceMode = value;
-            }
+            get => _surfaceMode;
+            set => _surfaceMode = value; // Âè™ÂΩ±Âìç Draw() ÈÄâÊã© DrawArrays/DrawElements
         }
 
-        // —’…´ƒ£ Ω
-        private SurfaceColorMode surfaceColorMode;
+        private SurfaceColorMode _surfaceColorMode;
         public SurfaceColorMode SurfaceColorMode
         {
-            get { return surfaceColorMode; }
+            get => _surfaceColorMode;
             set
             {
-                //pointCloudUpdated = value != surfaceColorMode;
-                surfaceColorMode = value;
+                if (_surfaceColorMode != value)
+                {
+                    _surfaceColorMode = value;
+                    // colorMode ‰ª• Uniform ‰º†ÂÖ• ShaderÔºåÂè™ÈúÄÊõ¥Êñ∞ÁºìÂ≠ò‰∏≠ÁöÑ Uniform ÂÄº
+                    if (_cachedRenderData?.Uniforms != null)
+                        _cachedRenderData.Uniforms["colorMode"] = (int)value;
+                }
             }
         }
 
-        // ∂•µ„ ˝¡ø
-        private int vertexCount = 0;
-        private int indexCount = 0;
+        private RenderData _cachedRenderData;
 
-        public CxSurfaceAdvancedItem(CxSurface surface, SurfaceMode surfaceMode = SurfaceMode.PointCloud,
-            SurfaceColorMode surfaceColorMode = SurfaceColorMode.Color, int maxPointCount = int.MaxValue)
+        #region Shader Ê∫êÁ†ÅÔºàÈùôÊÄÅÔºå‰∏é MeshAdvancedItem ÂÖ±Áî®Ôºâ
+        internal static readonly string VertexShaderSource =
+            @"#version 330 core
+            layout (location = 0) in vec3 aPos;
+            layout (location = 1) in vec2 aTexCoord;
+
+            uniform mat4 view;
+            uniform mat4 projection;
+
+            out float height;
+            out vec2 TexCoord;
+
+            void main()
+            {
+                gl_Position = projection * view * vec4(aPos, 1.0);
+                height = aPos.z;
+                TexCoord = aTexCoord;
+            }";
+
+        internal static readonly string FragmentShaderSource =
+            @"#version 330 core
+            in float height;
+            in vec2 TexCoord;
+            out vec4 FragColor;
+
+            uniform float zMin;
+            uniform float zMax;
+            uniform int colorMode;
+            uniform sampler2D intensityTexture;
+
+            vec3 getColorByHeight(float h)
+            {
+                float n = clamp((h - zMin) / (zMax - zMin), 0.0, 1.0);
+                if (n < 0.2) return mix(vec3(0,0,1), vec3(0,1,1), n * 5.0);
+                if (n < 0.4) return mix(vec3(0,1,1), vec3(0,1,0), (n-0.2)*5.0);
+                if (n < 0.6) return mix(vec3(0,1,0), vec3(1,1,0), (n-0.4)*5.0);
+                if (n < 0.8) return mix(vec3(1,1,0), vec3(1,0,0), (n-0.6)*5.0);
+                return mix(vec3(1,0,0), vec3(1,0,1), (n-0.8)*5.0);
+            }
+
+            void main()
+            {
+                if (isinf(height)) discard;
+                float intensity = texture(intensityTexture, TexCoord).r;
+                if (colorMode == 0) {
+                    FragColor = vec4(getColorByHeight(height), 1.0);
+                } else if (colorMode == 1) {
+                    FragColor = vec4(vec3(intensity), 1.0);
+                } else {
+                    FragColor = vec4(mix(vec3(intensity), getColorByHeight(height), 0.5), 1.0);
+                }
+            }";
+        #endregion
+
+        public CxSurfaceAdvancedItem(CxSurface surface,
+            SurfaceMode surfaceMode = SurfaceMode.PointCloud,
+            SurfaceColorMode surfaceColorMode = SurfaceColorMode.Color,
+            int maxPointCount = int.MaxValue)
         {
-            this.Surface = surface;
-            this.SurfaceMode = surfaceMode;
-            this.SurfaceColorMode = surfaceColorMode;
-            this.MaxPointCount = maxPointCount;
+            Surface = surface;
+            _surfaceMode = surfaceMode;
+            _surfaceColorMode = surfaceColorMode;
+            MaxPointCount = maxPointCount;
 
-            // º∆À„≤…—˘“Ú◊”
             CalculateSamplingFactors();
 
-            BoundingBox = GetBoundingBox();
+            BoundingBox = CalculateBoundingBox();
             ZMax = (float)(BoundingBox?.Center.Z + BoundingBox?.Size.Depth / 2);
             ZMin = (float)(BoundingBox?.Center.Z - BoundingBox?.Size.Depth / 2);
-            pointCloudUpdated = true;
         }
 
-        /// <summary>
-        /// º∆À„≤…—˘“Ú◊”
-        /// </summary>
-        private void CalculateSamplingFactors()
+        public RenderData PrepareRenderData()
         {
-            if (Surface == null || Surface.Width <= 0 || Surface.Length <= 0)
-                return;
+            if (_cachedRenderData != null) return _cachedRenderData;
 
-            int totalPoints = Surface.Width * Surface.Length;
+            if (IsDisposed || Surface == null || Surface.Data == null || Surface.Data.Length == 0)
+                return null;
 
-            // »Áπ˚◊‹µ„ ˝–°”⁄◊Ó¥Ûµ„ ˝œﬁ÷∆£¨≤ª–Ë“™≤…—˘
-            if (totalPoints <= MaxPointCount)
-            {
-                samplingFactorX = 1;
-                samplingFactorY = 1;
-                return;
-            }
-
-            // º∆À„–Ë“™µƒ≤…—˘¬ 
-            double samplingRate = Math.Sqrt((double)MaxPointCount / totalPoints);
-
-            // º∆À„X∫ÕY∑ΩœÚµƒ≤…—˘“Ú◊”
-            samplingFactorX = Math.Max(1, (int)(1.0 / samplingRate));
-            samplingFactorY = Math.Max(1, (int)(1.0 / samplingRate));
-
-            // »∑±£≤…—˘∫Ûµƒµ„ ˝≤ªª·≥¨π˝◊Ó¥Ûœﬁ÷∆
-            while ((Surface.Width / samplingFactorX) * (Surface.Length / samplingFactorY) > MaxPointCount)
-            {
-                if (samplingFactorX <= samplingFactorY)
-                    samplingFactorX++;
-                else
-                    samplingFactorY++;
-            }
-
-            // »∑±£º∆À„µƒ≤…—˘≥ﬂ¥Á «’˝»∑µƒ
-            int sampledWidth = (Surface.Width + samplingFactorX - 1) / samplingFactorX;  // œÚ…œ»°’˚
-            int sampledLength = (Surface.Length + samplingFactorY - 1) / samplingFactorY;  // œÚ…œ»°’˚
-
-            // ‘Ÿ¥Œ—È÷§◊‹µ„ ˝
-            if (sampledWidth * sampledLength > MaxPointCount)
-            {
-                // »Áπ˚»‘»ª≥¨≥ˆ£¨‘ˆº”≤…—˘“Ú◊”
-                double ratio = Math.Sqrt((double)(sampledWidth * sampledLength) / MaxPointCount);
-                samplingFactorX = Math.Max(1, (int)(samplingFactorX * ratio));
-                samplingFactorY = Math.Max(1, (int)(samplingFactorY * ratio));
-            }
-        }
-        public void Draw(OpenGL gl)
-        {
-            if (IsDisposed)
-            {
-                CleanupResources(gl);
-                return;
-            }
-
-            if (Surface == null || Surface.Data.Length == 0) return;
-
-            // »Áπ˚–Ë“™∏¸–¬ªÚ≥ı ºªØ◊ ‘¥
-            if (!resourcesInitialized || pointCloudUpdated)
-            {
-                // »Áπ˚“—æ≠≥ı ºªØπ˝£¨œ»«Â¿Ìæ…◊ ‘¥
-                if (resourcesInitialized)
-                {
-                    // «Â¿ÌVAO∫ÕVBO◊ ‘¥
-                    CleanupVAOVBO(gl);
-
-                    //  Õ∑≈¡¡∂»Œ∆¿Ì
-                    if (intensityTextureId != 0)
-                    {
-                        gl.DeleteTextures(1, new uint[] { intensityTextureId });
-                        intensityTextureId = 0;
-                    }
-
-                    if (shaderProgram != 0)
-                    {
-                        gl.DeleteProgram(shaderProgram);
-                        shaderProgram = 0;
-                    }
-                }
-
-                // ≥ı ºªØ◊≈…´∆˜
-                InitializeShaders(gl);
-
-                // ≥ı ºªØVAO∫ÕVBO
-                InitializeBuffers(gl);
-
-                // ¥¥Ω®¡¡∂»Œ∆¿Ì
-                CreateIntensityTexture(gl);
-
-                resourcesInitialized = true;
-                pointCloudUpdated = false;
-            }
-
-            //  π”√◊≈…´∆˜≥Ã–Ú
-            gl.UseProgram(shaderProgram);
-            // ∞Û∂®VAO
-            gl.BindVertexArray(vaoId);
-            var stat = gl.GetError(); // «Â≥˝¥ÌŒÛ◊¥Ã¨
-            Debug.WriteLine($"OpenGL Error:0 {stat}-{gl.GetErrorDescription(stat)}");
-            if (stat != 0)
-            {
-                // »Áπ˚∑¢…˙¥ÌŒÛ£¨«Â¿Ì◊ ‘¥≤¢÷ÿ–¬≥ı ºªØ
-                CleanupVAOVBO(gl);
-                // ≥ı ºªØVAO∫ÕVBO
-                InitializeBuffers(gl);
-                gl.BindVertexArray(vaoId);
-                stat = gl.GetError(); // «Â≥˝¥ÌŒÛ◊¥Ã¨
-                Debug.WriteLine($"OpenGL Error:1 {stat}-{gl.GetErrorDescription(stat)}");
-            }
-            // …Ë÷√Õ∂”∞∫Õ ”Õºæÿ’Û
-            float[] projectionMatrix = new float[16]; // ºŸ…Ëƒ˙“—æ≠º∆À„¡ÀÕ∂”∞æÿ’Û
-            gl.GetFloat(OpenGL.GL_PROJECTION_MATRIX, projectionMatrix); // ªÒ»°µ±«∞µƒÕ∂”∞æÿ’Û
-            float[] viewMatrix = new float[16];       // ºŸ…Ëƒ˙“—æ≠º∆À„¡À ”Õºæÿ’Û
-            gl.GetFloat(OpenGL.GL_MODELVIEW_MATRIX, viewMatrix); // ªÒ»°µ±«∞µƒƒ£–Õ ”Õºæÿ’Û
-                                                                 // ªÒ»°uniformŒª÷√
-            int viewLoc = gl.GetUniformLocation(shaderProgram, "view");
-            int projectionLoc = gl.GetUniformLocation(shaderProgram, "projection");
-            // …Ë÷√uniform÷µ
-            gl.UniformMatrix4(viewLoc, 1, false, viewMatrix);
-            gl.UniformMatrix4(projectionLoc, 1, false, projectionMatrix);
-
-            // …Ë÷√◊≈…´∆˜Õ≥“ª±‰¡ø
-            int zMinLocation = gl.GetUniformLocation(shaderProgram, "zMin");
-            gl.Uniform1(zMinLocation, ZMin);
-            int zMaxLocation = gl.GetUniformLocation(shaderProgram, "zMax");
-            gl.Uniform1(zMaxLocation, ZMax);
-            int colorModeLocation = gl.GetUniformLocation(shaderProgram, "colorMode");
-            gl.Uniform1(colorModeLocation, (int)SurfaceColorMode);
-
-            int intensityTextureLocation = gl.GetUniformLocation(shaderProgram, "intensityTexture");
-            gl.ActiveTexture(OpenGL.GL_TEXTURE0);
-            gl.BindTexture(OpenGL.GL_TEXTURE_2D, intensityTextureId);
-            gl.Uniform1(intensityTextureLocation, 0); // ∞Û∂®Œ∆¿Ìµ•‘™0
-
-            // ∏˘æ›‰÷»æƒ£ ΩªÊ÷∆
-            if (SurfaceMode == SurfaceMode.PointCloud)
-            {
-                gl.DrawArrays(OpenGL.GL_POINTS, 0, vertexCount);
-            }
-            else if (SurfaceMode == SurfaceMode.Mesh)
-            {
-                gl.DrawElements(OpenGL.GL_TRIANGLES, indexCount, OpenGL.GL_UNSIGNED_INT, IntPtr.Zero);
-            }
-
-            // Ω‚∞ÛŒ∆¿Ì
-            gl.BindTexture(OpenGL.GL_TEXTURE_2D, 0);
-            // Ω‚∞ÛVAO
-            gl.BindVertexArray(0);
-            // Õ£”√◊≈…´∆˜≥Ã–Ú
-            gl.UseProgram(0);
-        }
-        /// <summary>
-        /// ≥ı ºªØ◊≈…´∆˜
-        /// </summary>
-        private void InitializeShaders(OpenGL gl)
-        {
-            // ∂•µ„◊≈…´∆˜‘¥¬Î -  π”√∆’Õ®◊÷∑˚¥Æ¡¨Ω”∂¯∑«÷◊÷◊÷∑˚¥Æ
-            string vertexShaderSource =
-                @"#version 330 core
-                layout (location = 0) in vec3 aPos;
-                layout (location = 1) in vec2 aTexCoord;
-
-                uniform mat4 view;
-                uniform mat4 projection;
-
-                out float height;
-                out vec2 TexCoord;
-
-                void main()
-                { 
-                    gl_Position = projection * view * vec4(aPos, 1.0);
-                    height = aPos.z;
-                    TexCoord = aTexCoord;
-                }";
-
-            // ∆¨∂Œ◊≈…´∆˜‘¥¬Î
-            string fragmentShaderSource =
-                @"#version 330 core
-                in float height;
-                in vec2 TexCoord;
-                out vec4 FragColor;
-
-                uniform float zMin;
-                uniform float zMax;
-                uniform int colorMode; 
-                uniform sampler2D intensityTexture;
-
-                vec3 getColorByHeight(float height)
-                {
-                    float normalized = (height - zMin) / (zMax - zMin);
-                    normalized = clamp(normalized, 0.0, 1.0);
-                    if (normalized < 0.2) {
-                        return mix(vec3(0, 0, 1), vec3(0, 1, 1), normalized * 5.0);
-                    } else if (normalized < 0.4) {
-                        return mix(vec3(0, 1, 1), vec3(0, 1, 0), (normalized - 0.2) * 5.0);
-                    } else if (normalized < 0.6) {
-                        return mix(vec3(0, 1, 0), vec3(1, 1, 0), (normalized - 0.4) * 5.0);
-                    } else if (normalized < 0.8) {
-                        return mix(vec3(1, 1, 0), vec3(1, 0, 0), (normalized - 0.6) * 5.0);
-                    } else {
-                        return mix(vec3(1, 0, 0), vec3(1, 0, 1), (normalized - 0.8) * 5.0);
-                    }
-                }
-                
-                void main()
-                {
-                    if (isinf(height)) {
-                        discard;
-                    }
-                    float intensity = texture(intensityTexture, TexCoord).r;
-                    if (colorMode == 0) { 
-                        vec3 color = getColorByHeight(height);
-                        FragColor = vec4(color, 1.0);
-                    } else if(colorMode == 1){
-                        FragColor = vec4(vec3(intensity), 1.0);
-                    } else {
-                        vec3 color = getColorByHeight(height);
-                        FragColor = vec4(mix(vec3(intensity),color,0.5),1.0);
-                    }
-                }";
-
-            // ±‡“Î∂•µ„◊≈…´∆˜
-            uint vertexShader = gl.CreateShader(OpenGL.GL_VERTEX_SHADER);
-            gl.ShaderSource(vertexShader, vertexShaderSource);
-            gl.CompileShader(vertexShader);
-
-            // ºÏ≤È±‡“Î¥ÌŒÛ
-            int[] status = new int[1];
-            gl.GetShader(vertexShader, OpenGL.GL_COMPILE_STATUS, status);
-            if (status[0] == OpenGL.GL_FALSE)
-            {
-                int[] logLength = new int[1];
-                gl.GetShader(vertexShader, OpenGL.GL_INFO_LOG_LENGTH, logLength);
-                StringBuilder log = new StringBuilder(logLength[0]);
-                gl.GetShaderInfoLog(vertexShader, logLength[0], IntPtr.Zero, log);
-                Debug.WriteLine("Vertex shader compilation error: " + log.ToString());
-            }
-
-            // ±‡“Î∆¨∂Œ◊≈…´∆˜
-            uint fragmentShader = gl.CreateShader(OpenGL.GL_FRAGMENT_SHADER);
-            gl.ShaderSource(fragmentShader, fragmentShaderSource);
-            gl.CompileShader(fragmentShader);
-
-            // ºÏ≤È±‡“Î¥ÌŒÛ
-            gl.GetShader(fragmentShader, OpenGL.GL_COMPILE_STATUS, status);
-            if (status[0] == OpenGL.GL_FALSE)
-            {
-                int[] logLength = new int[1];
-                gl.GetShader(fragmentShader, OpenGL.GL_INFO_LOG_LENGTH, logLength);
-                StringBuilder log = new StringBuilder(logLength[0]);
-                gl.GetShaderInfoLog(fragmentShader, logLength[0], IntPtr.Zero, log);
-                Debug.WriteLine("Fragment shader compilation error: " + log.ToString());
-            }
-
-            // ¥¥Ω®◊≈…´∆˜≥Ã–Ú
-            shaderProgram = gl.CreateProgram();
-            gl.AttachShader(shaderProgram, vertexShader);
-            gl.AttachShader(shaderProgram, fragmentShader);
-            gl.LinkProgram(shaderProgram);
-
-            // ºÏ≤È¡¥Ω”¥ÌŒÛ
-            gl.GetProgram(shaderProgram, OpenGL.GL_LINK_STATUS, status);
-            if (status[0] == OpenGL.GL_FALSE)
-            {
-                int[] logLength = new int[1];
-                gl.GetProgram(shaderProgram, OpenGL.GL_INFO_LOG_LENGTH, logLength);
-                StringBuilder log = new StringBuilder(logLength[0]);
-                gl.GetProgramInfoLog(shaderProgram, logLength[0], IntPtr.Zero, log);
-                Debug.WriteLine("Shader program linking error: " + log.ToString());
-            }
-
-            // …æ≥˝◊≈…´∆˜∂‘œÛ£®“—æ≠¡¥Ω”µΩ≥Ã–Ú÷–£©
-            gl.DeleteShader(vertexShader);
-            gl.DeleteShader(fragmentShader);
-        }
-        /// <summary>
-        /// ≥ı ºªØVAO∫ÕVBO
-        /// </summary>
-        private void InitializeBuffers(OpenGL gl)
-        {
-            // ÷ÿ–¬º∆À„≤…—˘“Ú◊”
             CalculateSamplingFactors();
 
-            // º∆À„≤…—˘∫ÛµƒÕ¯∏Ò≥ﬂ¥Á
-            int sampledWidth = (Surface.Width + samplingFactorX - 1) / samplingFactorX;  // œÚ…œ»°’˚
-            int sampledLength = (Surface.Length + samplingFactorY - 1) / samplingFactorY;  // œÚ…œ»°’˚
+            int sampledWidth  = (Surface.Width  + _samplingFactorX - 1) / _samplingFactorX;
+            int sampledLength = (Surface.Length + _samplingFactorY - 1) / _samplingFactorY;
             int totalVertices = sampledWidth * sampledLength;
-            vertexCount = totalVertices;
 
-            // …˙≥…∂•µ„°¢UV◊¯±Í∫Õ¡¡∂» ˝æ›
-            float[] vertices = new float[totalVertices * 3];
-            float[] uvCoords = new float[totalVertices * 2];
-            //float[] intensities = new float[totalVertices];
+            var vertices = new float[totalVertices * 3];
+            var uvCoords = new float[totalVertices * 2];
 
-            int vertexIndex = 0;
-
-            for (int y = 0; y < Surface.Length && vertexIndex < totalVertices; y += samplingFactorY)
+            int vi = 0;
+            for (int y = 0; y < Surface.Length && vi < totalVertices; y += _samplingFactorY)
             {
-                for (int x = 0; x < Surface.Width && vertexIndex < totalVertices; x += samplingFactorX)
+                for (int x = 0; x < Surface.Width && vi < totalVertices; x += _samplingFactorX)
                 {
-                    int surfaceIndex = y * Surface.Width + x;
-
-                    // ªÒ»°∂•µ„◊¯±Í
+                    int si = y * Surface.Width + x;
                     float xPos, yPos, zPos;
 
                     if (Surface.Type == SurfaceType.Surface)
                     {
                         xPos = Surface.XOffset + x * Surface.XScale;
                         yPos = Surface.YOffset + y * Surface.YScale;
-                        zPos = Surface.Data[surfaceIndex] == -32768 ?
-                            float.NegativeInfinity :
-                            Surface.ZOffset + Surface.Data[surfaceIndex] * Surface.ZScale;
+                        zPos = Surface.Data[si] == -32768
+                            ? float.NegativeInfinity
+                            : Surface.ZOffset + Surface.Data[si] * Surface.ZScale;
                     }
-                    else // PointCloud
+                    else
                     {
-                        xPos = Surface.Data[surfaceIndex * 3] == -32768 ?
-                            float.NegativeInfinity :
-                            Surface.XOffset + Surface.Data[surfaceIndex * 3] * Surface.XScale;
-
-                        yPos = Surface.Data[surfaceIndex * 3 + 1] == -32768 ?
-                            float.NegativeInfinity :
-                            Surface.YOffset + Surface.Data[surfaceIndex * 3 + 1] * Surface.YScale;
-
-                        zPos = Surface.Data[surfaceIndex * 3 + 2] == -32768 ?
-                            float.NegativeInfinity :
-                            Surface.ZOffset + Surface.Data[surfaceIndex * 3 + 2] * Surface.ZScale;
+                        xPos = Surface.Data[si * 3]     == -32768 ? float.NegativeInfinity : Surface.XOffset + Surface.Data[si * 3]     * Surface.XScale;
+                        yPos = Surface.Data[si * 3 + 1] == -32768 ? float.NegativeInfinity : Surface.YOffset + Surface.Data[si * 3 + 1] * Surface.YScale;
+                        zPos = Surface.Data[si * 3 + 2] == -32768 ? float.NegativeInfinity : Surface.ZOffset + Surface.Data[si * 3 + 2] * Surface.ZScale;
                     }
 
-                    // …Ë÷√∂•µ„◊¯±Í
-                    vertices[vertexIndex * 3] = xPos;
-                    vertices[vertexIndex * 3 + 1] = yPos;
-                    vertices[vertexIndex * 3 + 2] = zPos;
-
-                    // …Ë÷√UV◊¯±Í -  π”√‘≠ º◊¯±Íœµµƒ±»¿˝
-                    uvCoords[vertexIndex * 2] = (float)x / (Surface.Width - 1);
-                    uvCoords[vertexIndex * 2 + 1] = (float)y / (Surface.Length - 1);
-
-                    // …Ë÷√¡¡∂»÷µ
-                    //float intensity = 1.0f;
-                    //if (Surface.Intensity != null && Surface.Intensity.Length > surfaceIndex)
-                    //{
-                    //    intensity = (float)Surface.Intensity[surfaceIndex] / 255.0f;
-                    //}
-                    //intensities[vertexIndex] = intensity;
-
-                    vertexIndex++;
+                    vertices[vi * 3]     = xPos;
+                    vertices[vi * 3 + 1] = yPos;
+                    vertices[vi * 3 + 2] = zPos;
+                    uvCoords[vi * 2]     = (float)x / Math.Max(Surface.Width  - 1, 1);
+                    uvCoords[vi * 2 + 1] = (float)y / Math.Max(Surface.Length - 1, 1);
+                    vi++;
                 }
             }
 
-            // »Áπ˚ «Õ¯∏Òƒ£ Ω£¨…˙≥…À˜“˝
-            uint[] indices = null;
-            //if (SurfaceMode == SurfaceMode.Mesh)
-            //{
-            meshIndexs = GenerateMeshIndexFromSampledPointCloud(sampledWidth, sampledLength);
-            indices = meshIndexs.ToArray();
-            indexCount = indices.Length;
-            //}
+            uint[] indices = GenerateMeshIndices(sampledWidth, sampledLength);
+            byte[] textureBytes = GenerateIntensityTextureData();
 
-            // ¥¥Ω®VAO
-            uint[] vaoIds = new uint[1];
-            gl.GenVertexArrays(1, vaoIds);
-            vaoId = vaoIds[0];
-            gl.BindVertexArray(vaoId);
-
-            // ¥¥Ω®VBO
-            gl.GenBuffers(2, vboIds);
-
-            // ∞Û∂®∂•µ„ ˝æ›
-            gl.BindBuffer(OpenGL.GL_ARRAY_BUFFER, vboIds[0]);
-            gl.BufferData(OpenGL.GL_ARRAY_BUFFER, vertices, OpenGL.GL_STATIC_DRAW);
-            gl.VertexAttribPointer(0, 3, OpenGL.GL_FLOAT, false, 3 * sizeof(float), IntPtr.Zero);
-            gl.EnableVertexAttribArray(0);
-
-            // ∞Û∂®UV◊¯±Í
-            gl.BindBuffer(OpenGL.GL_ARRAY_BUFFER, vboIds[1]);
-            gl.BufferData(OpenGL.GL_ARRAY_BUFFER, uvCoords, OpenGL.GL_STATIC_DRAW);
-            gl.VertexAttribPointer(1, 2, OpenGL.GL_FLOAT, false, 2 * sizeof(float), IntPtr.Zero);
-            gl.EnableVertexAttribArray(1);
-
-            // ∞Û∂®¡¡∂» ˝æ›
-            //gl.BindBuffer(OpenGL.GL_ARRAY_BUFFER, vboIds[2]);
-            //gl.BufferData(OpenGL.GL_ARRAY_BUFFER, intensities, OpenGL.GL_STATIC_DRAW);
-            //gl.VertexAttribPointer(2, 1, OpenGL.GL_FLOAT, false, sizeof(float), IntPtr.Zero);
-            //gl.EnableVertexAttribArray(2);
-
-            // »Áπ˚ «Õ¯∏Òƒ£ Ω£¨∞Û∂®À˜“˝
-            //if (SurfaceMode == SurfaceMode.Mesh && indices != null)
-            //{
-            uint[] elementBufferIds = new uint[1];
-            gl.GenBuffers(1, elementBufferIds);
-            elementBufferId = elementBufferIds[0];
-
-            gl.BindBuffer(OpenGL.GL_ELEMENT_ARRAY_BUFFER, elementBufferId);
-            int sizeInBytes = indices.Length * sizeof(uint);
-            IntPtr ptr = Marshal.AllocHGlobal(sizeInBytes);
-            try
+            _cachedRenderData = new RenderData
             {
-                // ”√Buffer.BlockCopyøΩ±¥uint[]µΩbyte[]
-                byte[] indexBytes = new byte[sizeInBytes];
-                Buffer.BlockCopy(indices, 0, indexBytes, 0, sizeInBytes);
-                Marshal.Copy(indexBytes, 0, ptr, sizeInBytes);
-                gl.BufferData(OpenGL.GL_ELEMENT_ARRAY_BUFFER, sizeInBytes, ptr, OpenGL.GL_STATIC_DRAW);
-            }
-            finally
-            {
-                Marshal.FreeHGlobal(ptr);
-            }
-            //}
+                Vertices    = vertices,
+                UVCoords    = uvCoords,
+                Indices     = indices,
+                VertexCount = totalVertices,
+                IndexCount  = indices.Length,
+                UseVAO      = true,
+                ShaderSource = new ShaderSource
+                {
+                    VertexSource   = VertexShaderSource,
+                    FragmentSource = FragmentShaderSource,
+                },
+                TextureData = new TextureData
+                {
+                    Width  = Surface.Width,
+                    Height = Surface.Length,
+                    Data   = textureBytes,
+                },
+                Uniforms = new Dictionary<string, object>
+                {
+                    ["zMin"]      = ZMin,
+                    ["zMax"]      = ZMax,
+                    ["colorMode"] = (int)_surfaceColorMode,
+                },
+            };
 
-            // Ω‚∞ÛVAO
+            return _cachedRenderData;
+        }
+
+        public void Draw(OpenGL gl, GLResourceHandle handle)
+        {
+            if (!handle.IsValid || IsDisposed) return;
+            var data = _cachedRenderData;
+            if (data == null) return;
+
+            gl.UseProgram(handle.ShaderProgram);
+            gl.BindVertexArray(handle.VaoId);
+
+            float[] proj = new float[16];
+            float[] view = new float[16];
+            gl.GetFloat(OpenGL.GL_PROJECTION_MATRIX, proj);
+            gl.GetFloat(OpenGL.GL_MODELVIEW_MATRIX, view);
+            gl.UniformMatrix4(gl.GetUniformLocation(handle.ShaderProgram, "view"),       1, false, view);
+            gl.UniformMatrix4(gl.GetUniformLocation(handle.ShaderProgram, "projection"), 1, false, proj);
+
+            foreach (var kv in data.Uniforms)
+            {
+                int loc = gl.GetUniformLocation(handle.ShaderProgram, kv.Key);
+                if (kv.Value is float f) gl.Uniform1(loc, f);
+                else if (kv.Value is int i) gl.Uniform1(loc, i);
+            }
+
+            gl.ActiveTexture(OpenGL.GL_TEXTURE0);
+            gl.BindTexture(OpenGL.GL_TEXTURE_2D, handle.TextureId);
+            gl.Uniform1(gl.GetUniformLocation(handle.ShaderProgram, "intensityTexture"), 0);
+
+            if (_surfaceMode == SurfaceMode.PointCloud)
+                gl.DrawArrays(OpenGL.GL_POINTS, 0, data.VertexCount);
+            else
+                gl.DrawElements(OpenGL.GL_TRIANGLES, data.IndexCount, OpenGL.GL_UNSIGNED_INT, IntPtr.Zero);
+
+            gl.BindTexture(OpenGL.GL_TEXTURE_2D, 0);
             gl.BindVertexArray(0);
+            gl.UseProgram(0);
         }
 
-        /// <summary>
-        /// ≥ı ºªØŒ∆¿Ì
-        /// </summary>
-        /// <param name="gl"></param>
-        private void CreateIntensityTexture(OpenGL gl)
+        public void Dispose()
         {
-            // ≤È—Ø◊Ó¥ÛŒ∆¿Ì≥ﬂ¥Á
-            int[] maxSize = new int[1];
-            gl.GetInteger(OpenGL.GL_MAX_TEXTURE_SIZE, maxSize);
-            var maxTextureSize = maxSize[0];
-
-            // »∑∂®Œ∆¿Ì≥ﬂ¥Á£¨øº¬«”≤º˛œﬁ÷∆
-            textureWidth = Math.Min(Surface.Width, maxTextureSize);
-            textureHeight = Math.Min(Surface.Length, maxTextureSize);
-
-            // º∆À„Àı∑≈“Ú◊”
-            var textureScaleX = (float)textureWidth / Surface.Width;
-            var textureScaleY = (float)textureHeight / Surface.Length;
-
-            // ¥¥Ω®¡¡∂» ˝æ›
-            byte[] intensityData = new byte[textureWidth * textureHeight * 4];
-
-            for (int y = 0; y < textureHeight; y++)
-            {
-                for (int x = 0; x < textureWidth; x++)
-                {
-                    // º∆À„∂‘”¶µƒ‘≠ ºµ„‘∆◊¯±Í
-                    int srcX = (int)(x / textureScaleX);
-                    int srcY = (int)(y / textureScaleY);
-
-                    // »∑±£◊¯±Í‘⁄”––ß∑∂Œßƒ⁄
-                    srcX = Math.Min(srcX, Surface.Width - 1);
-                    srcY = Math.Min(srcY, Surface.Length - 1);
-
-                    int srcIndex = srcY * Surface.Width + srcX;
-                    int destIndex = y * textureWidth + x;
-
-                    // ªÒ»°¡¡∂»÷µ
-                    byte intensity = 255; // ƒ¨»œ÷µ
-                    if (Surface.Intensity != null && Surface.Intensity.Length > srcIndex)
-                    {
-                        intensity = Surface.Intensity[srcIndex];
-                    }
-
-                    intensityData[destIndex * 4] = intensity;
-                    intensityData[destIndex * 4 + 1] = intensity;
-                    intensityData[destIndex * 4 + 2] = intensity;
-                    intensityData[destIndex * 4 + 3] = intensity;
-                }
-            }
-
-            // ¥¥Ω®Œ∆¿Ì
-            uint[] ids = new uint[1];
-            gl.GenTextures(1, ids);
-            intensityTextureId = ids[0];
-
-            // ∞Û∂®Œ∆¿Ì
-            gl.BindTexture(OpenGL.GL_TEXTURE_2D, intensityTextureId);
-
-            // …Ë÷√Œ∆¿Ì≤Œ ˝
-            gl.TexParameter(OpenGL.GL_TEXTURE_2D, OpenGL.GL_TEXTURE_MIN_FILTER, OpenGL.GL_LINEAR);
-            gl.TexParameter(OpenGL.GL_TEXTURE_2D, OpenGL.GL_TEXTURE_MAG_FILTER, OpenGL.GL_LINEAR);
-            gl.TexParameter(OpenGL.GL_TEXTURE_2D, OpenGL.GL_TEXTURE_WRAP_S, OpenGL.GL_CLAMP_TO_EDGE);
-            gl.TexParameter(OpenGL.GL_TEXTURE_2D, OpenGL.GL_TEXTURE_WRAP_T, OpenGL.GL_CLAMP_TO_EDGE);
-
-            // …œ¥´Œ∆¿Ì ˝æ›
-            IntPtr ptr = Marshal.AllocHGlobal(intensityData.Length);
-            try
-            {
-                Marshal.Copy(intensityData, 0, ptr, intensityData.Length);
-                gl.TexImage2D(OpenGL.GL_TEXTURE_2D, 0, OpenGL.GL_RGBA, textureWidth, textureHeight,
-                        0, OpenGL.GL_RGBA, OpenGL.GL_UNSIGNED_BYTE, ptr);
-            }
-            finally
-            {
-                Marshal.FreeHGlobal(ptr);
-                // Ω‚∞ÛŒ∆¿Ì
-                gl.BindTexture(OpenGL.GL_TEXTURE_2D, 0);
-            }
-        }
-
-        /// <summary>
-        /// «Â¿ÌOpenGL◊ ‘¥
-        /// </summary>
-        private void CleanupResources(OpenGL gl)
-        {
-            IsDisposed = false; // ¡Ÿ ±÷ÿ÷√±Íº«“‘÷¥––«Â¿Ì
-
-            // «Â¿ÌVAO∫ÕVBO◊ ‘¥
-            CleanupVAOVBO(gl);
-
-            //  Õ∑≈¡¡∂»Œ∆¿Ì
-            if (intensityTextureId != 0)
-            {
-                gl.DeleteTextures(1, new uint[] { intensityTextureId });
-                intensityTextureId = 0;
-            }
-
-            if (shaderProgram != 0)
-            {
-                gl.DeleteProgram(shaderProgram);
-                shaderProgram = 0;
-            }
-
-            resourcesInitialized = false;
-
-            //  Õ∑≈Surface◊ ‘¥
-            if (Surface != null)
-                Surface.Dispose();
+            if (IsDisposed) return;
+            Surface?.Dispose();
             Surface = null;
-
+            _cachedRenderData = null;
+            IsDisposed = true;
             OnDisposed?.Invoke();
-            IsDisposed = false;
-            Debug.WriteLine("SurfaceAdvancedItem disposed");
-        }
-        /// <summary>
-        /// «Â¿ÌVAO∫ÕVBO◊ ‘¥
-        /// </summary>
-        /// <param name="gl"></param>
-        private void CleanupVAOVBO(OpenGL gl)
-        {
-            if (vaoId != 0)
-            {
-                gl.DeleteVertexArrays(1, new uint[] { vaoId });
-                vaoId = 0;
-            }
-            if (vboIds[0] != 0)
-            {
-                gl.DeleteBuffers(2, vboIds);
-                vboIds[0] = 0;
-                vboIds[1] = 0;
-            }
-            //  Õ∑≈À˜“˝ª∫≥Â«¯
-            if (elementBufferId != 0)
-            {
-                gl.DeleteBuffers(1, new uint[] { elementBufferId });
-                elementBufferId = 0;
-            }
         }
 
-        /// <summary>
-        /// Œ™≤…—˘∫Ûµƒµ„‘∆…˙≥…Õ¯∏ÒÀ˜“˝
-        /// </summary>
-        private List<uint> GenerateMeshIndexFromSampledPointCloud(int sampledWidth, int sampledLength)
+        private byte[] GenerateIntensityTextureData()
         {
-            if (sampledWidth <= 1 || sampledLength <= 1)
-                return new List<uint>();
+            int w = Surface.Width;
+            int h = Surface.Length;
+            var data = new byte[w * h * 4];
 
-            int totalTriangles = (sampledWidth - 1) * (sampledLength - 1) * 2;
-            int totalIndices = totalTriangles * 3;
-
-            List<uint> meshIndices = new List<uint>(totalIndices);
-            object lockObj = new object();
-
-            //  π”√≤¢––—≠ª∑
-            Parallel.For(0, sampledLength - 1, y =>
+            for (int y = 0; y < h; y++)
             {
-                uint rowStart = (uint)y * (uint)sampledWidth;
-                uint nextRowStart = (uint)(y + 1) * (uint)sampledWidth;
-
-                List<uint> localIndices = new List<uint>();
-
-                for (uint x = 0; x < sampledWidth - 1; x++)
+                for (int x = 0; x < w; x++)
                 {
-                    uint topLeft = rowStart + x;
-                    uint topRight = topLeft + 1;
-                    uint bottomLeft = nextRowStart + x;
-                    uint bottomRight = bottomLeft + 1;
-
-                    // ÃÌº”µ⁄“ª∏ˆ»˝Ω«–Œ
-                    localIndices.Add(topLeft);
-                    localIndices.Add(bottomLeft);
-                    localIndices.Add(topRight);
-
-                    // ÃÌº”µ⁄∂˛∏ˆ»˝Ω«–Œ
-                    localIndices.Add(topRight);
-                    localIndices.Add(bottomLeft);
-                    localIndices.Add(bottomRight);
+                    int si = y * w + x;
+                    byte v = 255;
+                    if (Surface.Intensity != null && Surface.Intensity.Length > si)
+                        v = Surface.Intensity[si];
+                    int di = si * 4;
+                    data[di] = data[di + 1] = data[di + 2] = data[di + 3] = v;
                 }
+            }
 
-                // ∫œ≤¢Ω·π˚
-                lock (lockObj)
-                {
-                    meshIndices.AddRange(localIndices);
-                }
-            });
-
-            return meshIndices;
+            return data;
         }
 
-        /// <summary>
-        /// ªÒ»°µ„‘∆µƒ±ﬂΩÁ
-        /// </summary>
-        private Box3D? GetBoundingBox()
+        private uint[] GenerateMeshIndices(int width, int height)
         {
-            if (Surface == null || Surface.Data.Length == 0) return null;
+            if (width <= 1 || height <= 1) return new uint[0];
 
-            // º∆À„µ„‘∆µƒ±ﬂΩÁ
-            var data = Surface.ToPoints();
+            int total = (width - 1) * (height - 1) * 6;
+            var indices = new uint[total];
+            int idx = 0;
 
+            for (int y = 0; y < height - 1; y++)
+            {
+                uint rowStart  = (uint)(y * width);
+                uint nextStart = (uint)((y + 1) * width);
+                for (uint x = 0; x < width - 1; x++)
+                {
+                    uint tl = rowStart  + x;
+                    uint tr = tl + 1;
+                    uint bl = nextStart + x;
+                    uint br = bl + 1;
+                    indices[idx++] = tl;
+                    indices[idx++] = bl;
+                    indices[idx++] = tr;
+                    indices[idx++] = tr;
+                    indices[idx++] = bl;
+                    indices[idx++] = br;
+                }
+            }
+
+            return indices;
+        }
+
+        private void CalculateSamplingFactors()
+        {
+            if (Surface == null || Surface.Width <= 0 || Surface.Length <= 0) return;
+
+            int total = Surface.Width * Surface.Length;
+            if (total <= MaxPointCount)
+            {
+                _samplingFactorX = _samplingFactorY = 1;
+                return;
+            }
+
+            double rate = Math.Sqrt((double)MaxPointCount / total);
+            _samplingFactorX = Math.Max(1, (int)(1.0 / rate));
+            _samplingFactorY = Math.Max(1, (int)(1.0 / rate));
+
+            while ((Surface.Width / _samplingFactorX) * (Surface.Length / _samplingFactorY) > MaxPointCount)
+            {
+                if (_samplingFactorX <= _samplingFactorY) _samplingFactorX++;
+                else _samplingFactorY++;
+            }
+
+            int sw = (Surface.Width  + _samplingFactorX - 1) / _samplingFactorX;
+            int sl = (Surface.Length + _samplingFactorY - 1) / _samplingFactorY;
+            if (sw * sl > MaxPointCount)
+            {
+                double ratio = Math.Sqrt((double)(sw * sl) / MaxPointCount);
+                _samplingFactorX = Math.Max(1, (int)(_samplingFactorX * ratio));
+                _samplingFactorY = Math.Max(1, (int)(_samplingFactorY * ratio));
+            }
+        }
+
+        private Box3D? CalculateBoundingBox()
+        {
+            if (Surface == null || Surface.Data == null || Surface.Data.Length == 0)
+                return null;
+
+            var points = Surface.ToPoints();
             float minX = float.MaxValue, minY = float.MaxValue, minZ = float.MaxValue;
             float maxX = float.MinValue, maxY = float.MinValue, maxZ = float.MinValue;
 
-            foreach (var point in data)
+            foreach (var p in points)
             {
-                if (float.IsInfinity(point.X) || float.IsInfinity(point.Y) || float.IsInfinity(point.Z))
+                if (float.IsInfinity(p.X) || float.IsInfinity(p.Y) || float.IsInfinity(p.Z))
                     continue;
-
-                if (point.X < minX) minX = point.X;
-                if (point.Y < minY) minY = point.Y;
-                if (point.Z < minZ) minZ = point.Z;
-                if (point.X > maxX) maxX = point.X;
-                if (point.Y > maxY) maxY = point.Y;
-                if (point.Z > maxZ) maxZ = point.Z;
+                if (p.X < minX) minX = p.X;
+                if (p.Y < minY) minY = p.Y;
+                if (p.Z < minZ) minZ = p.Z;
+                if (p.X > maxX) maxX = p.X;
+                if (p.Y > maxY) maxY = p.Y;
+                if (p.Z > maxZ) maxZ = p.Z;
             }
 
-            // º∆À„÷––ƒµ„∫Õ≥ﬂ¥Á
-            var center = new CxPoint3D(
-                (minX + maxX) / 2,
-                (minY + maxY) / 2,
-                (minZ + maxZ) / 2
-            );
-
-            var size = new CxSize3D(
-                maxX - minX,
-                maxY - minY,
-                maxZ - minZ
-            );
-
-            return new Box3D(center, size);
-        }
-        public void Dispose()
-        {
-            IsDisposed = true; // …Ë÷√ Õ∑≈±Íº«
+            if (minX == float.MaxValue) return null;
+            return new Box3D(
+                new CxPoint3D((minX + maxX) / 2, (minY + maxY) / 2, (minZ + maxZ) / 2),
+                new CxSize3D(maxX - minX, maxY - minY, maxZ - minZ));
         }
     }
 }
