@@ -31,13 +31,13 @@ namespace VisionNet.Compute
         /// <inheritdoc/>
         protected override string GetKernelSource() => @"
             __kernel void TransformSurface(
-                __global const short* data,     // height map (Width × Length), -32768 = invalid
+                __global const short* data,     // height map (Width X Length), -32768 = invalid
                 __global float*       dstPoints,// output float4 per cell (x, y, z, w)
                 int   width,
                 int   length,
                 float xOffset, float yOffset, float zOffset,
                 float xScale,  float yScale,  float zScale,
-                __global const float* matrix)   // 16-element column-major 4×4 matrix
+                __global const float* matrix)   // 16-element column-major 4x4 matrix
             {
                 int gid = get_global_id(0);
                 int x   = gid % width;
