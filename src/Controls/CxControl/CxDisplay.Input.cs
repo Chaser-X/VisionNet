@@ -10,14 +10,19 @@ namespace VisionNet.Controls
 {
     public partial class CxDisplay
     {
+        /// <summary>
+        /// Resets the display. Clears all overlay geometry and reinitializes HUD items.
+        /// If <paramref name="resetAll"/> is <c>true</c>, also clears surface items (point clouds / meshes).
+        /// </summary>
+        /// <param name="resetAll">When <c>true</c>, removes all surface items in addition to overlays.</param>
         public void ResetView(bool resetAll = true)
         {
-            renderItem.ForEach(item => item.Dispose());
-            renderItem.Clear();
+            _renderItems.ForEach(item => item.Dispose());
+            _renderItems.Clear();
 
-            coordinationItem = new CxCoordinateSystemItem();
-            coorTagItem = new CxCoordinationTagItem();
-            colorBarItem = new CxColorBarItem();
+            _coordinationItem = new CxCoordinateSystemItem();
+            _coordTagItem     = new CxCoordinationTagItem();
+            _colorBarItem     = new CxColorBarItem();
 
             if (resetAll)
                 ClearSurfaceItems();
@@ -25,70 +30,89 @@ namespace VisionNet.Controls
             Invalidate();
         }
 
+        /// <summary>Sets the camera focus (rotation pivot) to the given world-space position.</summary>
+        /// <param name="center">Target point in world space.</param>
         public void SetViewCenter(CxPoint3D center)
         {
-            camera.FocusOnPoint(new Vector3(center.X, center.Y, center.Z));
+            _camera.FocusOnPoint(new Vector3(center.X, center.Y, center.Z));
             Invalidate();
         }
 
+        /// <summary>Sets the camera up-direction vector.</summary>
+        /// <param name="upDirection">Desired up vector in world space.</param>
         public void SetViewUpDirection(CxVector3D upDirection)
         {
-            camera.SetDefaultUpView(new Vector3(upDirection.X, upDirection.Y, upDirection.Z));
+            _camera.SetDefaultUpView(new Vector3(upDirection.X, upDirection.Y, upDirection.Z));
         }
 
+        /// <inheritdoc/>
         protected override void DoGDIDraw(RenderEventArgs e) => base.DoGDIDraw(e);
 
+        /// <inheritdoc/>
         protected override void OnResize(EventArgs e)
         {
             base.OnResize(e);
-            camera?.LookAtMatrix(OpenGL);
+            _camera?.LookAtMatrix(OpenGL);
         }
 
+        /// <inheritdoc/>
         protected override void OnMouseDown(MouseEventArgs e)
         {
-            isMouseDown = true;
-            camera.RotationPoint = GetNearestSurfacePoint(e.X, e.Y).Location;
+            _isMouseDown = true;
+            _camera.RotationPoint = GetNearestSurfacePoint(e.X, e.Y).Location;
             base.OnMouseDown(e);
         }
 
+        /// <inheritdoc/>
         protected override void OnMouseUp(MouseEventArgs e)
         {
-            isMouseDown = false;
+            _isMouseDown = false;
             base.OnMouseUp(e);
         }
 
+        /// <inheritdoc/>
         protected override void OnMouseMove(MouseEventArgs e)
         {
             var pos = GetNearestSurfacePoint(e.X, e.Y);
-            if (pos.Location.HasValue && !isMouseDown)
+            if (pos.Location.HasValue && !_isMouseDown)
             {
-                coorTagItem.Visible = true;
-                coorTagItem.SetCoordinates(pos.Location.Value, pos.Intensity);
+                _coordTagItem.Visible = true;
+                _coordTagItem.SetCoordinates(pos.Location.Value, pos.Intensity);
             }
             else
             {
-                coorTagItem.Visible = false;
+                _coordTagItem.Visible = false;
             }
             base.OnMouseMove(e);
         }
 
+        /// <summary>
+        /// Reads the depth buffer at the given screen pixel and un-projects it to a world-space point.
+        /// Returns <c>null</c> if the pixel hits the far plane (no geometry).
+        /// </summary>
         private CxPoint3D? ScreenToWorldCoordinate(int mouseX, int mouseY)
         {
             var gl = OpenGL;
             int[] viewport = new int[4];
             gl.GetInteger(OpenGL.GL_VIEWPORT, viewport);
-            int adjustedY = viewport[3] - mouseY;
+            int adjustedY = viewport[3] - mouseY;   // OpenGL Y is bottom-up.
 
-            byte[] depthBuffer = new byte[4];
-            gl.ReadPixels(mouseX, adjustedY, 1, 1, OpenGL.GL_DEPTH_COMPONENT, OpenGL.GL_FLOAT, depthBuffer);
-            float depth = BitConverter.ToSingle(depthBuffer, 0);
+            byte[] depthBytes = new byte[4];
+            gl.ReadPixels(mouseX, adjustedY, 1, 1, OpenGL.GL_DEPTH_COMPONENT, OpenGL.GL_FLOAT, depthBytes);
+            float depth = BitConverter.ToSingle(depthBytes, 0);
 
-            if (Math.Abs(depth - 1.0f) < 0.00001f) return null;
+            if (Math.Abs(depth - 1.0f) < 0.00001f) return null;   // Far plane → no hit.
 
             var obj = gl.UnProject(mouseX, adjustedY, depth);
             return new CxPoint3D((float)obj[0], (float)obj[1], (float)obj[2]);
         }
 
+        /// <summary>
+        /// Finds the surface point nearest to the given screen pixel across all active surface items.
+        /// For structured surfaces a 5×5 neighbourhood search is performed; mesh-type items contribute
+        /// the un-projected world coordinate directly.
+        /// </summary>
+        /// <returns>The nearest location and its intensity value, or <c>(null, null)</c> if none found.</returns>
         private (CxPoint3D? Location, byte? Intensity) GetNearestSurfacePoint(int mouseX, int mouseY)
         {
             var pos = ScreenToWorldCoordinate(mouseX, mouseY);
@@ -101,31 +125,35 @@ namespace VisionNet.Controls
 
             if (snapshot.Count == 0) return (null, null);
 
-            CxPoint3D? bestPoint = null;
-            byte? bestIntensity = null;
-            float bestDist = float.MaxValue;
+            CxPoint3D? bestPoint    = null;
+            byte?      bestIntensity = null;
+            float      bestDist     = float.MaxValue;
 
             foreach (var cur in snapshot)
             {
                 if (cur == null || cur.IsDisposed) continue;
 
+                // Mesh items: no per-point grid to refine; use the world coordinate directly.
                 if (cur is CxMeshItem || cur is CxMeshAdvancedItem)
                 {
                     if (0f < bestDist) { bestDist = 0f; bestPoint = world; bestIntensity = null; }
                     continue;
                 }
 
+                // Resolve the underlying CxSurface from supported item types.
                 CxSurface surface = null;
                 if      (cur is CxSurfaceItem        si) surface = si.Surface;
                 else if (cur is CxSurfaceAdvancedItem ai) surface = ai.Surface;
                 if (surface == null) continue;
 
+                // Unordered point cloud: no grid structure to search; use world coordinate.
                 if (surface.Type != SurfaceType.Surface)
                 {
                     if (0f < bestDist) { bestDist = 0f; bestPoint = world; bestIntensity = null; }
                     continue;
                 }
 
+                // Structured surface: 5×5 neighbourhood search.
                 int xi = (int)((world.X - surface.XOffset) / surface.XScale);
                 int yi = (int)((world.Y - surface.YOffset) / surface.YScale);
                 if (xi < 0 || xi >= surface.Width || yi < 0 || yi >= surface.Length) continue;
@@ -147,16 +175,16 @@ namespace VisionNet.Controls
                             : surface.ZOffset + surface.Data[idx] * surface.ZScale;
                         if (float.IsInfinity(z)) continue;
 
-                        float x = surface.XOffset + nx * surface.XScale;
-                        float y = surface.YOffset + ny * surface.YScale;
-                        float d = (x - world.X) * (x - world.X)
-                                + (y - world.Y) * (y - world.Y)
-                                + (z - world.Z) * (z - world.Z);
+                        float px = surface.XOffset + nx * surface.XScale;
+                        float py = surface.YOffset + ny * surface.YScale;
+                        float d  = (px - world.X) * (px - world.X)
+                                 + (py - world.Y) * (py - world.Y)
+                                 + (z  - world.Z) * (z  - world.Z);
 
                         if (d < bestDist && d < threshold)
                         {
-                            bestDist = d;
-                            bestPoint = new CxPoint3D(x, y, z);
+                            bestDist      = d;
+                            bestPoint     = new CxPoint3D(px, py, z);
                             bestIntensity = (surface.Intensity != null && surface.Intensity.Length > idx)
                                 ? surface.Intensity[idx] : (byte?)null;
                         }
@@ -167,14 +195,16 @@ namespace VisionNet.Controls
             return (bestPoint, bestIntensity);
         }
 
+        // ── Context-menu event handlers ──────────────────────────────────────────
+
         private void d2DToolStripMenuItem_Click(object sender, EventArgs e)
         {
             var mi = (ToolStripMenuItem)sender;
             mi.Checked = !mi.Checked;
-            camera.Enable2DView = mi.Checked;
+            _camera.Enable2DView = mi.Checked;
             Box3D? combined;
             lock (_resourceLock) combined = GetCombinedBoundingBox();
-            camera?.FitView(combined);
+            _camera?.FitView(combined);
         }
 
         private void toolStripMenuItem_ViewModeClick(object sender, EventArgs e)
@@ -183,10 +213,10 @@ namespace VisionNet.Controls
                 ((ToolStripMenuItem)item).Checked = false;
             var mi = (ToolStripMenuItem)sender;
             mi.Checked = true;
-            camera.ViewMode = (ViewMode)Enum.Parse(typeof(ViewMode), mi.Text);
+            _camera.ViewMode = (ViewMode)Enum.Parse(typeof(ViewMode), mi.Text);
             Box3D? combined;
             lock (_resourceLock) combined = GetCombinedBoundingBox();
-            camera?.FitView(combined);
+            _camera?.FitView(combined);
         }
 
         private void toolStripMenuItem_SurfaceModeClick(object sender, EventArgs e)

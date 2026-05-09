@@ -5,6 +5,11 @@ using VisionNet.DataType;
 
 namespace VisionNet.Controls
 {
+    /// <summary>
+    /// High-performance surface renderer using a VAO + GLSL shader pipeline with intensity texture.
+    /// Supports automatic down-sampling when the point count exceeds <c>maxPointCount</c>.
+    /// Colour mode changes update shader uniforms only — no VBO rebuild needed.
+    /// </summary>
     public class CxSurfaceAdvancedItem : ICxObjRenderItem
     {
         public event Action OnDisposed;

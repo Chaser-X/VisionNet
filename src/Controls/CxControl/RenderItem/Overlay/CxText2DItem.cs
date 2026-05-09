@@ -1,73 +1,73 @@
 using SharpGL;
 using System;
-using System.Collections.Generic;
 using System.Drawing;
 using VisionNet.DataType;
-using static System.Net.Mime.MediaTypeNames;
 
 namespace VisionNet.Controls
 {
+    /// <summary>
+    /// Renders an array of <see cref="Text2D"/> values as screen-space text overlays
+    /// using an orthographic 2D projection. Y coordinates are measured from the top of the window
+    /// (matching conventional UI coordinates).
+    /// </summary>
     public class CxText2DItem : AbstractRenderItem
     {
+        /// <summary>Gets the text items to be rendered.</summary>
         public Text2D[] TextItems { get; private set; }
 
+        /// <summary>Initializes the item with the given text items, colour, and font size scale.</summary>
+        /// <param name="textItems">Text items to render. Must not be <c>null</c> or empty.</param>
+        /// <param name="color">Text colour.</param>
+        /// <param name="size">Font size scale factor (passed directly to <c>gl.DrawText</c>).</param>
+        /// <exception cref="ArgumentNullException">Thrown when <paramref name="textItems"/> is null or empty.</exception>
         public CxText2DItem(Text2D[] textItems, Color color, float size = 1f) : base(color, size)
         {
             if (textItems == null || textItems.Length == 0)
-            {
                 throw new ArgumentNullException(nameof(textItems));
-            }
             TextItems = textItems;
         }
 
+        /// <inheritdoc/>
         public override void Draw(OpenGL gl)
         {
-            if (TextItems == null || TextItems.Length == 0)
-            {
-                return; // 没有文本需要绘制
-            }
+            if (TextItems == null || TextItems.Length == 0) return;
 
-            // 关闭深度测试
+            int vpHeight = gl.RenderContextProvider.Height;
+
+            // Switch to 2D orthographic projection.
             gl.Disable(OpenGL.GL_DEPTH_TEST);
-
-            // 设置 2D 正交投影模式
             gl.MatrixMode(OpenGL.GL_PROJECTION);
             gl.PushMatrix();
             gl.LoadIdentity();
-            gl.Ortho(0, gl.RenderContextProvider.Width, 0, gl.RenderContextProvider.Height, -1, 1); // 2D 投影
+            gl.Ortho(0, gl.RenderContextProvider.Width, 0, vpHeight, -1, 1);
             gl.MatrixMode(OpenGL.GL_MODELVIEW);
             gl.PushMatrix();
             gl.LoadIdentity();
 
-            foreach (var textItem in TextItems)
-            {
-                // 设置文本颜色
-                gl.Color(Color.R / 255.0f, Color.G / 255.0f, Color.B / 255.0f);
+            float r = Color.R / 255.0f;
+            float g = Color.G / 255.0f;
+            float b = Color.B / 255.0f;
 
-                // 绘制文本
-                gl.DrawText((int)textItem.Location.X, (int)(gl.RenderContextProvider.Height - textItem.Location.Y), 
-                            Color.R / 255.0f, Color.G / 255.0f, Color.B / 255.0f,
-                            "Arial", textItem.FontSize, textItem.Text);
+            foreach (var item in TextItems)
+            {
+                // Convert Y from top-origin to bottom-origin (OpenGL convention).
+                int screenY = vpHeight - (int)item.Location.Y;
+                gl.DrawText((int)item.Location.X, screenY, r, g, b, "Arial", item.FontSize, item.Text);
             }
 
-            // 恢复矩阵设置
+            // Restore matrices and depth test.
             gl.PopMatrix();
             gl.MatrixMode(OpenGL.GL_PROJECTION);
             gl.PopMatrix();
             gl.MatrixMode(OpenGL.GL_MODELVIEW);
-
-            // 恢复深度测试
             gl.Enable(OpenGL.GL_DEPTH_TEST);
         }
 
+        /// <inheritdoc/>
         protected override void Dispose(bool disposing)
         {
             if (disposing)
-            {
-                // 释放托管资源
                 TextItems = null;
-            }
-            // 释放非托管资源（如果有）
             base.Dispose(disposing);
         }
     }

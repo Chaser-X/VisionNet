@@ -5,6 +5,11 @@ using VisionNet.DataType;
 
 namespace VisionNet.Controls
 {
+    /// <summary>
+    /// High-performance mesh renderer using a VAO + GLSL shader pipeline.
+    /// Colour is computed per-fragment in the GPU using the <c>zMin</c>/<c>zMax</c> uniforms,
+    /// so switching colour mode costs only a uniform update — no VBO rebuild required.
+    /// </summary>
     public class CxMeshAdvancedItem : ICxObjRenderItem
     {
         public event Action OnDisposed;
@@ -102,7 +107,7 @@ namespace VisionNet.Controls
             _surfaceMode = surfaceMode;
             _surfaceColorMode = surfaceColorMode;
 
-            BoundingBox = CxExtension.CalculateBoundingBox(mesh?.Vertexs);
+            BoundingBox = CxExtension.CalculateBoundingBox(mesh?.Vertices);
             ZMax = (float)(BoundingBox?.Center.Z + BoundingBox?.Size.Depth / 2);
             ZMin = (float)(BoundingBox?.Center.Z - BoundingBox?.Size.Depth / 2);
         }
@@ -111,15 +116,15 @@ namespace VisionNet.Controls
         {
             if (_cachedRenderData != null) return _cachedRenderData;
 
-            if (IsDisposed || Mesh == null || Mesh.Vertexs == null || Mesh.Vertexs.Length == 0)
+            if (IsDisposed || Mesh == null || Mesh.Vertices == null || Mesh.Vertices.Length == 0)
                 return null;
 
-            var vertices = new float[Mesh.Vertexs.Length * 3];
-            for (int i = 0; i < Mesh.Vertexs.Length; i++)
+            var vertices = new float[Mesh.Vertices.Length * 3];
+            for (int i = 0; i < Mesh.Vertices.Length; i++)
             {
-                vertices[i * 3]     = Mesh.Vertexs[i].X;
-                vertices[i * 3 + 1] = Mesh.Vertexs[i].Y;
-                vertices[i * 3 + 2] = Mesh.Vertexs[i].Z;
+                vertices[i * 3]     = Mesh.Vertices[i].X;
+                vertices[i * 3 + 1] = Mesh.Vertices[i].Y;
+                vertices[i * 3 + 2] = Mesh.Vertices[i].Z;
             }
 
             var uvCoords = new float[Mesh.UVs.Length * 2];
@@ -136,7 +141,7 @@ namespace VisionNet.Controls
                 Vertices    = vertices,
                 UVCoords    = uvCoords,
                 Indices     = Mesh.Indices,
-                VertexCount = Mesh.Vertexs.Length,
+                VertexCount = Mesh.Vertices.Length,
                 IndexCount  = Mesh.Indices?.Length ?? 0,
                 UseVAO      = true,
                 ShaderSource = new ShaderSource

@@ -4,6 +4,11 @@ using VisionNet.DataType;
 
 namespace VisionNet.Controls
 {
+    /// <summary>
+    /// Renders a <see cref="CxMesh"/> using the fixed-function OpenGL pipeline (VBO + colour array).
+    /// Colours are baked into the VBO at prepare time using either the height colour map or
+    /// the per-vertex intensity channel.
+    /// </summary>
     public class CxMeshItem : ICxObjRenderItem
     {
         public event Action OnDisposed;
@@ -47,7 +52,7 @@ namespace VisionNet.Controls
             _surfaceMode = surfaceMode;
             _surfaceColorMode = surfaceColorMode;
 
-            BoundingBox = CxExtension.CalculateBoundingBox(mesh?.Vertexs);
+            BoundingBox = CxExtension.CalculateBoundingBox(mesh?.Vertices);
             ZMax = (float)(BoundingBox?.Center.Z + BoundingBox?.Size.Depth / 2);
             ZMin = (float)(BoundingBox?.Center.Z - BoundingBox?.Size.Depth / 2);
         }
@@ -56,18 +61,18 @@ namespace VisionNet.Controls
         {
             if (_cachedRenderData != null) return _cachedRenderData;
 
-            if (IsDisposed || Mesh == null || Mesh.Vertexs == null || Mesh.Vertexs.Length == 0
+            if (IsDisposed || Mesh == null || Mesh.Vertices == null || Mesh.Vertices.Length == 0
                 || Mesh.Indices == null || Mesh.Indices.Length == 0)
                 return null;
 
-            var vertices = new float[Mesh.Vertexs.Length * 3];
-            var colors   = new float[Mesh.Vertexs.Length * 3];
+            var vertices = new float[Mesh.Vertices.Length * 3];
+            var colors   = new float[Mesh.Vertices.Length * 3];
 
-            for (int i = 0; i < Mesh.Vertexs.Length; i++)
+            for (int i = 0; i < Mesh.Vertices.Length; i++)
             {
-                vertices[i * 3]     = Mesh.Vertexs[i].X;
-                vertices[i * 3 + 1] = Mesh.Vertexs[i].Y;
-                vertices[i * 3 + 2] = Mesh.Vertexs[i].Z;
+                vertices[i * 3]     = Mesh.Vertices[i].X;
+                vertices[i * 3 + 1] = Mesh.Vertices[i].Y;
+                vertices[i * 3 + 2] = Mesh.Vertices[i].Z;
 
                 float intensity = 1f;
                 if (Mesh.Intensity != null && Mesh.Intensity.Length > i)
@@ -81,7 +86,7 @@ namespace VisionNet.Controls
                 }
                 else
                 {
-                    var c = CxExtension.GetColorByHeight(Mesh.Vertexs[i].Z, ZMin, ZMax);
+                    var c = CxExtension.GetColorByHeight(Mesh.Vertices[i].Z, ZMin, ZMax);
                     float factor = (_surfaceColorMode == SurfaceColorMode.Color) ? 1f : intensity;
                     colors[i * 3]     = Math.Min(c.r * factor, 1f);
                     colors[i * 3 + 1] = Math.Min(c.g * factor, 1f);
@@ -94,7 +99,7 @@ namespace VisionNet.Controls
                 Vertices    = vertices,
                 Colors      = colors,
                 Indices     = Mesh.Indices,
-                VertexCount = Mesh.Vertexs.Length,
+                VertexCount = Mesh.Vertices.Length,
                 IndexCount  = Mesh.Indices.Length,
                 UseVAO      = false,
             };

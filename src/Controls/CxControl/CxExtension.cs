@@ -1,16 +1,27 @@
-﻿using SharpGL.SceneGraph;
+using SharpGL.SceneGraph;
 using SharpGL;
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using VisionNet.DataType;
 
 namespace VisionNet.Controls
 {
-    public class CxExtension
+    /// <summary>
+    /// Static utility methods shared across the CxControl rendering pipeline:
+    /// bounding-box calculation, height-to-colour mapping, 3D/2D text rendering,
+    /// and OpenGL capability detection.
+    /// </summary>
+    public static class CxExtension
     {
+        /// <summary>
+        /// Computes the axis-aligned bounding box of a set of 3D points.
+        /// Points with any <see cref="float.IsInfinity"/> coordinate are ignored.
+        /// </summary>
+        /// <param name="points">Input points. May be <c>null</c> or empty.</param>
+        /// <returns>
+        /// A <see cref="Box3D"/> whose centre and size enclose all valid points,
+        /// or <c>null</c> if no valid point exists.
+        /// </returns>
         public static Box3D? CalculateBoundingBox(IEnumerable<CxPoint3D> points)
         {
             if (points == null) return null;
@@ -37,180 +48,163 @@ namespace VisionNet.Controls
                 new CxPoint3D((minX + maxX) / 2, (minY + maxY) / 2, (minZ + maxZ) / 2),
                 new CxSize3D(maxX - minX, maxY - minY, maxZ - minZ));
         }
+
         /// <summary>
-        /// 根据给定范围的Zmin,zmax,对每个点Z返回和Z相关的颜色
+        /// Maps a Z height value to an RGB colour using a 7-band rainbow gradient
+        /// (dark-blue → sky-blue → green → yellow → red → pink → white).
         /// </summary>
+        /// <param name="z">Height value to map. Clamped to [<paramref name="zMin"/>, <paramref name="zMax"/>].</param>
+        /// <param name="zMin">Minimum height (maps to dark blue).</param>
+        /// <param name="zMax">Maximum height (maps to white).</param>
+        /// <returns>RGB colour components in the range [0, 1].</returns>
         public static (float r, float g, float b) GetColorByHeight(double z, double zMin, double zMax)
         {
             float range = (float)(zMax - zMin);
             if (z > zMax) z = zMax;
             if (z < zMin) z = zMin;
-            float normalizedZ = (float)(z - zMin) / range;
+            float n = (float)(z - zMin) / range;   // Normalised height in [0, 1].
 
             float r, g, b;
-            if (normalizedZ < 1.0f / 7.0f)
+            if (n < 1f / 7)
             {
-                // 深蓝
-                r = 0.0f;
-                g = 0.0f;
-                b = 0.5f + normalizedZ * 3.5f;
+                r = 0f; g = 0f; b = 0.5f + n * 3.5f;                         // Dark blue
             }
-            else if (normalizedZ < 2.0f / 7.0f)
+            else if (n < 2f / 7)
             {
-                // 天空蓝
-                r = 0.0f;
-                g = (normalizedZ - 1.0f / 7.0f) * 7.0f;
-                b = 1.0f;
+                r = 0f; g = (n - 1f / 7) * 7f; b = 1f;                        // Sky blue
             }
-            else if (normalizedZ < 3.0f / 7.0f)
+            else if (n < 3f / 7)
             {
-                // 绿
-                r = 0.0f;
-                g = 1.0f;
-                b = 1.0f - (normalizedZ - 2.0f / 7.0f) * 7.0f;
+                r = 0f; g = 1f; b = 1f - (n - 2f / 7) * 7f;                   // Green
             }
-            else if (normalizedZ < 4.0f / 7.0f)
+            else if (n < 4f / 7)
             {
-                // 黄
-                r = (normalizedZ - 3.0f / 7.0f) * 7.0f;
-                g = 1.0f;
-                b = 0.0f;
+                r = (n - 3f / 7) * 7f; g = 1f; b = 0f;                        // Yellow
             }
-            else if (normalizedZ < 5.0f / 7.0f)
+            else if (n < 5f / 7)
             {
-                // 红
-                r = 1.0f;
-                g = 1.0f - (normalizedZ - 4.0f / 7.0f) * 7.0f;
-                b = 0.0f;
+                r = 1f; g = 1f - (n - 4f / 7) * 7f; b = 0f;                   // Red
             }
-            else if (normalizedZ < 6.0f / 7.0f)
+            else if (n < 6f / 7)
             {
-                // 粉
-                r = 1.0f;
-                g = 0.0f;
-                b = (normalizedZ - 5.0f / 7.0f) * 7.0f;
+                r = 1f; g = 0f; b = (n - 5f / 7) * 7f;                        // Pink
             }
             else
             {
-                // 白
-                r = 1.0f;
-                g = (normalizedZ - 6.0f / 7.0f) * 7.0f;
-                b = 1.0f;
+                r = 1f; g = (n - 6f / 7) * 7f; b = 1f;                        // White
             }
             return (r, g, b);
         }
+
+        /// <summary>
+        /// Renders a text label at the given world-space position, scaled so it appears
+        /// at a roughly constant pixel size regardless of depth.
+        /// The label is skipped if it projects outside the viewport or behind the camera.
+        /// </summary>
+        /// <param name="gl">Active OpenGL context.</param>
+        /// <param name="x">World X coordinate.</param>
+        /// <param name="y">World Y coordinate.</param>
+        /// <param name="z">World Z coordinate.</param>
+        /// <param name="size">Base font size before depth scaling.</param>
+        /// <param name="text">Text string to draw.</param>
         public static void DrawTextLabel3D(OpenGL gl, float x, float y, float z, float size, string text)
         {
-            // 将3D坐标转换为屏幕坐标（包括深度信息）
-            var objCoord = new Vertex(x, y, z);
+            var objCoord    = new Vertex(x, y, z);
             var screenCoord = gl.Project(objCoord);
-            // 判断是否在屏幕范围内
+
             if (screenCoord.X < 0 || screenCoord.X > gl.RenderContextProvider.Width ||
                 screenCoord.Y < 0 || screenCoord.Y > gl.RenderContextProvider.Height)
-            {
                 return;
-            }
 
-            // 如果需要考虑透视范围，可以检查 screenCoord.Z（假设其为归一化深度：0～1）
             if (screenCoord.Z < 0 || screenCoord.Z > 1)
-            {
                 return;
-            }
 
-            float newScale = size * (1 + screenCoord.Z);//1 / (size / (screenCoord.Z + epsilon))* 100;
+            float scaledSize = size * (1 + screenCoord.Z);
 
-            // 保存当前矩阵
             gl.PushMatrix();
-
-            // 移动到文字位置
             gl.Translate(x, y, z);
-
-            // 使文字始终面向相机
-            //gl.Rotate(-rotateY, 0.0f, 1.0f, 0.0f);
-            //gl.Rotate(-rotateX, 1.0f, 0.0f, 0.0f);
-
-            // 应用缩放，使文字在屏幕上保持固定像素大小
-            gl.Scale(newScale, newScale, newScale);
-
-            // 绘制文字
+            gl.Scale(scaledSize, scaledSize, scaledSize);
             gl.Color(1.0f, 1.0f, 1.0f);
             foreach (char c in text)
-            {
                 gl.DrawText3D("Arial", 0.1f, 0.0f, c.ToString());
-            }
-
             gl.PopMatrix();
         }
+
+        /// <summary>
+        /// Renders a text label at the screen position corresponding to the given world-space point.
+        /// The label is skipped if it projects outside the viewport or behind the camera.
+        /// </summary>
+        /// <param name="gl">Active OpenGL context.</param>
+        /// <param name="x">World X coordinate.</param>
+        /// <param name="y">World Y coordinate.</param>
+        /// <param name="z">World Z coordinate.</param>
+        /// <param name="size">Font size in points.</param>
+        /// <param name="text">Text string to draw.</param>
         public static void DrawTextLabel2D(OpenGL gl, float x, float y, float z, float size, string text)
         {
-            // 将3D坐标转换为屏幕坐标（包括深度信息）
-            var objCoord = new Vertex(x, y, z);
+            var objCoord    = new Vertex(x, y, z);
             var screenCoord = gl.Project(objCoord);
-            // 判断是否在屏幕范围内
+
             if (screenCoord.X < 0 || screenCoord.X > gl.RenderContextProvider.Width ||
                 screenCoord.Y < 0 || screenCoord.Y > gl.RenderContextProvider.Height)
-            {
                 return;
-            }
-            // 如果需要考虑透视范围，可以检查 screenCoord.Z（假设其为归一化深度：0～1）
+
             if (screenCoord.Z < 0 || screenCoord.Z > 1)
-            {
                 return;
-            }
+
             gl.DrawText((int)screenCoord.X, (int)screenCoord.Y, 1, 1, 1, "Arial", size, text);
         }
+
+        /// <summary>
+        /// Checks whether a hardware OpenGL context can be created on this machine.
+        /// Logs version, renderer, and vendor information to the console.
+        /// </summary>
+        /// <returns>
+        /// <c>true</c> if OpenGL initialised successfully (even on a software renderer);
+        /// <c>false</c> if initialisation threw an exception.
+        /// </returns>
         public static bool IsOpenGLAvailable()
         {
             try
             {
-                // 尝试创建一个临时的OpenGL上下文
-                OpenGL gl = new OpenGL();
+                var gl       = new OpenGL();
+                string ver   = gl.GetString(OpenGL.GL_VERSION);
+                string rend  = gl.GetString(OpenGL.GL_RENDERER);
+                string vend  = gl.GetString(OpenGL.GL_VENDOR);
 
-                // 获取OpenGL版本信息
-                string version = gl.GetString(OpenGL.GL_VERSION);
-                string renderer = gl.GetString(OpenGL.GL_RENDERER);
-                string vendor = gl.GetString(OpenGL.GL_VENDOR);
+                Console.WriteLine($"OpenGL version: {ver}");
+                Console.WriteLine($"Renderer: {rend}");
+                Console.WriteLine($"Vendor: {vend}");
 
-                // 记录日志
-                Console.WriteLine($"OpenGL版本: {version}");
-                Console.WriteLine($"渲染器: {renderer}");
-                Console.WriteLine($"供应商: {vendor}");
-
-                // 检查是否为软件渲染器
-                bool isSoftwareRenderer = renderer.Contains("Software") ||
-                                         renderer.Contains("Microsoft") ||
-                                         renderer.Contains("GDI Generic");
-
-                // 如果是软件渲染，可以选择警告或拒绝
-                if (isSoftwareRenderer)
-                {
-                    Console.WriteLine("警告：检测到软件渲染器，性能可能受限");
-                }
+                bool isSoftware = rend.Contains("Software") ||
+                                  rend.Contains("Microsoft") ||
+                                  rend.Contains("GDI Generic");
+                if (isSoftware)
+                    Console.WriteLine("Warning: software renderer detected — performance may be limited.");
 
                 return true;
-
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"OpenGL初始化失败: {ex.Message}");
+                Console.WriteLine($"OpenGL initialisation failed: {ex.Message}");
                 return false;
             }
         }
+
+        /// <summary>
+        /// Returns a multi-line string with the OpenGL version, renderer, and vendor strings
+        /// reported by the current driver.
+        /// </summary>
+        /// <returns>Formatted version information, or the exception message on failure.</returns>
         public static string GetOpenGLVersion()
         {
             try
             {
-                // 尝试创建一个临时的OpenGL上下文
-                OpenGL gl = new OpenGL();
-                // 获取OpenGL版本信息
-                string version = gl.GetString(OpenGL.GL_VERSION);
-                string renderer = gl.GetString(OpenGL.GL_RENDERER);
-                string vendor = gl.GetString(OpenGL.GL_VENDOR);
-
-                // 记录日志
-                var message = $"OpenGL版本: {version}\r\n渲染器: {renderer}\r\n供应商: {vendor}";
-                return message;
-
+                var gl      = new OpenGL();
+                string ver  = gl.GetString(OpenGL.GL_VERSION);
+                string rend = gl.GetString(OpenGL.GL_RENDERER);
+                string vend = gl.GetString(OpenGL.GL_VENDOR);
+                return $"OpenGL version: {ver}\r\nRenderer: {rend}\r\nVendor: {vend}";
             }
             catch (Exception ex)
             {

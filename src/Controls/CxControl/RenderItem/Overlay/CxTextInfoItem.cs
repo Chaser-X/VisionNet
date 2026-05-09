@@ -1,50 +1,59 @@
 using SharpGL;
 using SharpGL.SceneGraph;
-using System.Collections.Generic;
 using System.Drawing;
 using VisionNet.DataType;
-using static System.Net.Mime.MediaTypeNames;
 
 namespace VisionNet.Controls
 {
+    /// <summary>
+    /// Renders an array of <see cref="TextInfo"/> values as world-anchored 2D text labels.
+    /// Each label is projected from 3D world coordinates to screen space and skipped if
+    /// it falls outside the viewport or behind the camera.
+    /// </summary>
     public class CxTextInfoItem : AbstractRenderItem
     {
+        /// <summary>Gets the text labels to be rendered.</summary>
         public TextInfo[] TextInfos { get; private set; }
+
+        /// <summary>Initializes the item with the given text labels, colour, and size.</summary>
+        /// <param name="textInfos">World-anchored text labels.</param>
+        /// <param name="color">Text colour.</param>
+        /// <param name="size">Font size scale (passed to <c>gl.DrawText</c>).</param>
         public CxTextInfoItem(TextInfo[] textInfos, Color color, float size = 1.0f) : base(color, size)
         {
-            this.TextInfos = textInfos;
+            TextInfos = textInfos;
         }
+
+        /// <inheritdoc/>
         public override void Draw(OpenGL gl)
         {
             if (TextInfos == null || TextInfos.Length == 0) return;
 
-            foreach (var textInfo in TextInfos)
+            float r = Color.R / 255.0f;
+            float g = Color.G / 255.0f;
+            float b = Color.B / 255.0f;
+
+            foreach (var info in TextInfos)
             {
-                // 将3D坐标转换为屏幕坐标（包括深度信息）
-                var objCoord = new Vertex(textInfo.Location.X, textInfo.Location.Y, textInfo.Location.Z);
+                var objCoord    = new Vertex(info.Location.X, info.Location.Y, info.Location.Z);
                 var screenCoord = gl.Project(objCoord);
-                // 判断是否在屏幕范围内
+
+                // Skip labels that project outside the viewport or behind the camera.
                 if (screenCoord.X < 0 || screenCoord.X > gl.RenderContextProvider.Width ||
                     screenCoord.Y < 0 || screenCoord.Y > gl.RenderContextProvider.Height)
-                {
                     continue;
-                }
-                //// 如果需要考虑透视范围，可以检查 screenCoord.Z（假设其为归一化深度：0～1）
                 if (screenCoord.Z < 0 || screenCoord.Z > 1)
-                {
                     continue;
-                }
-                gl.DrawText((int)screenCoord.X, (int)screenCoord.Y, (float)(Color.R / 255.0), (float)(Color.G / 255.0), (float)(Color.B / 255.0), "Arial", textInfo.Size, textInfo.Text);
+
+                gl.DrawText((int)screenCoord.X, (int)screenCoord.Y, r, g, b, "Arial", info.Size, info.Text);
             }
         }
+
+        /// <inheritdoc/>
         protected override void Dispose(bool disposing)
         {
             if (disposing)
-            {
-                // 释放托管资源
                 TextInfos = null;
-            }
-            // 释放非托管资源（如果有）
             base.Dispose(disposing);
         }
     }

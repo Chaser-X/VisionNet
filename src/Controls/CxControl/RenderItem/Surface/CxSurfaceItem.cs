@@ -6,6 +6,12 @@ using VisionNet.DataType;
 
 namespace VisionNet.Controls
 {
+    /// <summary>
+    /// Renders a <see cref="CxSurface"/> as a point cloud or triangle mesh using the
+    /// fixed-function OpenGL pipeline (VBO + colour array).
+    /// Colours are baked into the VBO at prepare time; changing colour mode or the
+    /// global Z range triggers a VBO rebuild via <see cref="ICxObjRenderItem.OnRenderDataChanged"/>.
+    /// </summary>
     public class CxSurfaceItem : ICxObjRenderItem
     {
         public event Action OnDisposed;

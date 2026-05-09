@@ -65,15 +65,19 @@
     </Compile>
     <Compile Include="CxDisplay.Api.cs">
       <DependentUpon>CxDisplay.cs</DependentUpon>
+      <SubType>UserControl</SubType>
     </Compile>
     <Compile Include="CxDisplay.Render.cs">
       <DependentUpon>CxDisplay.cs</DependentUpon>
+      <SubType>UserControl</SubType>
     </Compile>
     <Compile Include="CxDisplay.GLResources.cs">
       <DependentUpon>CxDisplay.cs</DependentUpon>
+      <SubType>UserControl</SubType>
     </Compile>
     <Compile Include="CxDisplay.Input.cs">
       <DependentUpon>CxDisplay.cs</DependentUpon>
+      <SubType>UserControl</SubType>
     </Compile>
     <Compile Include="CxDisplay.Designer.cs">
       <DependentUpon>CxDisplay.cs</DependentUpon>

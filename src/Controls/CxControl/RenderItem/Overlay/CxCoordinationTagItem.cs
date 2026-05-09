@@ -5,114 +5,102 @@ using VisionNet.DataType;
 
 namespace VisionNet.Controls
 {
+    /// <summary>
+    /// Renders a semi-transparent 2D tooltip that displays the world-space X, Y, Z coordinates
+    /// (and optionally intensity) of the surface point nearest to the mouse cursor.
+    /// The tooltip is only drawn when <see cref="Visible"/> is <c>true</c>.
+    /// </summary>
     public class CxCoordinationTagItem : AbstractRenderItem
     {
+        /// <summary>Gets or sets the world-space position shown in the tooltip.</summary>
         public CxPoint3D Point { get; set; } = new CxPoint3D();
-        public byte? Intensity { get; set; } = null; // µãµÄÇ¿¶ÈÖµ
-        public bool Visible { get; set; } = false; // ¿ØÖÆ±êÇ©ÊÇ·ñ¿É¼û
 
+        /// <summary>Gets or sets the intensity value shown in the tooltip, or <c>null</c> if unavailable.</summary>
+        public byte? Intensity { get; set; } = null;
+
+        /// <summary>Gets or sets whether the tooltip is rendered.</summary>
+        public bool Visible { get; set; } = false;
+
+        /// <summary>Gets or sets the text colour used for coordinate labels.</summary>
         public Color TextColor { get; set; } = Color.White;
 
-        public void SetCoordinates(CxPoint3D point, byte? intesity = null)
+        /// <summary>
+        /// Updates the coordinates and intensity value shown by the tooltip.
+        /// </summary>
+        /// <param name="point">World-space surface point.</param>
+        /// <param name="intensity">Per-point intensity (0â€“255), or <c>null</c> if unavailable.</param>
+        public void SetCoordinates(CxPoint3D point, byte? intensity = null)
         {
-            Point = point;
-            Intensity = intesity;
+            Point     = point;
+            Intensity = intensity;
         }
 
+        /// <inheritdoc/>
         public override void Draw(OpenGL gl)
         {
-            if (!Visible) return; // Èç¹û±êÇ©²»¿É¼û£¬Ôò²»»æÖÆ
+            if (!Visible) return;
 
-            // ½«3D×ø±ê×ª»»ÎªÆÁÄ»×ø±ê£¨°üÀ¨Éî¶ÈĞÅÏ¢£©
-            var objCoord = new Vertex(Point.X, Point.Y, Point.Z);
+            var objCoord    = new Vertex(Point.X, Point.Y, Point.Z);
             var screenCoord = gl.Project(objCoord);
-            // ÅĞ¶ÏÊÇ·ñÔÚÆÁÄ»·¶Î§ÄÚ
+
+            // Skip if the point projects outside the viewport or behind the camera.
             if (screenCoord.X < 0 || screenCoord.X > gl.RenderContextProvider.Width ||
                 screenCoord.Y < 0 || screenCoord.Y > gl.RenderContextProvider.Height)
-            {
                 return;
-            }
-            // Èç¹ûĞèÒª¿¼ÂÇÍ¸ÊÓ·¶Î§£¬¿ÉÒÔ¼ì²é screenCoord.Z£¨¼ÙÉèÆäÎª¹éÒ»»¯Éî¶È£º0¡«1£©
             if (screenCoord.Z < 0 || screenCoord.Z > 1)
-            {
                 return;
-            }
 
-            int rectWidth = 80; // ¾ØĞÎ¿í¶È
-            int rectHeight = Intensity.HasValue ? 90 : 80; // ¾ØĞÎ¸ß¶È
-            int startX = (int)screenCoord.X; // ¾ØĞÎ×óÉÏ½ÇX×ø±ê
-            int startY = (int)screenCoord.Y - 10; // ¾ØĞÎ×óÉÏ½ÇY×ø±ê
+            int rectWidth  = 80;
+            int rectHeight = Intensity.HasValue ? 90 : 80;
+            int startX     = (int)screenCoord.X;
+            int startY     = (int)screenCoord.Y - 10;
 
-            //¹Ø±ÕÉî¶È²âÊÔ
+            // Switch to 2D orthographic projection.
             gl.Disable(OpenGL.GL_DEPTH_TEST);
-
-            // ±£´æµ±Ç°¾ØÕóÄ£Ê½ºÍ¾ØÕó
             gl.MatrixMode(OpenGL.GL_PROJECTION);
             gl.PushMatrix();
             gl.LoadIdentity();
-
-            // ÉèÖÃÕı½»Í¶Ó°
-            int width = gl.RenderContextProvider.Width;
-            int height = gl.RenderContextProvider.Height;
-            gl.Ortho(0, width, 0, height, -1, 1);
-
-            // ÇĞ»»µ½Ä£ĞÍÊÓÍ¼¾ØÕó
+            gl.Ortho(0, gl.RenderContextProvider.Width, 0, gl.RenderContextProvider.Height, -1, 1);
             gl.MatrixMode(OpenGL.GL_MODELVIEW);
             gl.PushMatrix();
             gl.LoadIdentity();
 
-            //»æÖÆ°×É«±ß¿òµÄ°ëÍ¸Ã÷ºÚÉ«¾ØĞÎ¿´°å
-            // ÉèÖÃ°ëÍ¸Ã÷ºÚÉ«Ìî³ä
-            gl.Color(0.0f, 0.0f, 0.0f, 0.5f); // RGBA£¬ºÚÉ«£¬50%Í¸Ã÷
-            // »æÖÆÌî³ä¾ØĞÎ
+            // Semi-transparent dark background.
+            gl.Color(0.0f, 0.0f, 0.0f, 0.5f);
             gl.Begin(OpenGL.GL_QUADS);
-            gl.Vertex(startX, startY); // ×óÉÏ½Ç
-            gl.Vertex(startX + rectWidth, startY); // ÓÒÉÏ½Ç
-            gl.Vertex(startX + rectWidth, startY - rectHeight); // ÓÒÏÂ½Ç
-            gl.Vertex(startX, startY - rectHeight); // ×óÏÂ½Ç
+            gl.Vertex(startX,             startY);
+            gl.Vertex(startX + rectWidth, startY);
+            gl.Vertex(startX + rectWidth, startY - rectHeight);
+            gl.Vertex(startX,             startY - rectHeight);
             gl.End();
-            // ÉèÖÃ°×É«±ß¿ò
-            gl.LineWidth(1.0f); // ÉèÖÃÏß¿í
-            gl.Color(1.0f, 1.0f, 1.0f, 1.0f); // RGBA£¬°×É«£¬²»Í¸Ã÷
-            // »æÖÆ¾ØĞÎ±ß¿ò
+
+            // White border outline.
+            gl.Color(1.0f, 1.0f, 1.0f, 1.0f);
+            gl.LineWidth(1.0f);
             gl.Begin(OpenGL.GL_LINE_LOOP);
-            gl.Vertex(startX - 1, startY + 1); // ×óÉÏ½Ç
-            gl.Vertex(startX + rectWidth + 1, startY + 1); // ÓÒÉÏ½Ç
-            gl.Vertex(startX + rectWidth + 1, startY - rectHeight - 1); // ÓÒÏÂ½Ç
-            gl.Vertex(startX - 1, startY - rectHeight - 1); // ×óÏÂ½Ç
+            gl.Vertex(startX - 1,             startY + 1);
+            gl.Vertex(startX + rectWidth + 1, startY + 1);
+            gl.Vertex(startX + rectWidth + 1, startY - rectHeight - 1);
+            gl.Vertex(startX - 1,             startY - rectHeight - 1);
             gl.End();
 
-            int textOffsetX = 10; // ÎÄ±¾µÄXÆ«ÒÆ
-            int textOffsetY = 20; // ÎÄ±¾µÄYÆ«ÒÆ
-            var (R, G, B) = (TextColor.R / 255.0f, TextColor.G / 255.0f, TextColor.B / 255.0f);
-            gl.DrawText(startX + textOffsetX, startY - textOffsetY, R, G, B, "Helvetica", 12, $"X: {Point.X:F3}");
-            gl.DrawText(startX + textOffsetX, startY - textOffsetY * 2, R, B, B, "Helvetica", 12, $"Y: {Point.Y:F3}");
-            gl.DrawText(startX + textOffsetX, startY - textOffsetY * 3, R, G, B, "Helvetica", 12, $"Z: {Point.Z:F3}");
+            // Coordinate text labels.
+            float r = TextColor.R / 255.0f;
+            float g = TextColor.G / 255.0f;
+            float b = TextColor.B / 255.0f;
+            int   tx = startX + 10;
+            gl.DrawText(tx, startY - 20, r, g, b, "Helvetica", 12, $"X: {Point.X:F3}");
+            gl.DrawText(tx, startY - 40, r, g, b, "Helvetica", 12, $"Y: {Point.Y:F3}");
+            gl.DrawText(tx, startY - 60, r, g, b, "Helvetica", 12, $"Z: {Point.Z:F3}");
             if (Intensity.HasValue)
-                gl.DrawText(startX + textOffsetX, startY - textOffsetY * 4, R, G, B, "Helvetica", 12, $"I: {Intensity.Value}");
+                gl.DrawText(tx, startY - 80, r, g, b, "Helvetica", 12, $"I: {Intensity.Value}");
 
-            // »Ö¸´Ä£ĞÍÊÓÍ¼¾ØÕó
+            // Restore matrices and depth test.
             gl.PopMatrix();
-
-            // »Ö¸´Í¶Ó°¾ØÕó
             gl.MatrixMode(OpenGL.GL_PROJECTION);
             gl.PopMatrix();
-
-            // ÇĞ»»»ØÄ¬ÈÏ¾ØÕóÄ£Ê½
             gl.MatrixMode(OpenGL.GL_MODELVIEW);
-
-            // »Ö¸´Éî¶È²âÊÔ
             gl.Enable(OpenGL.GL_DEPTH_TEST);
-        }
-
-        protected override void Dispose(bool disposing)
-        {
-            if (disposing)
-            {
-                // ÊÍ·ÅÍĞ¹Ü×ÊÔ´
-            }
-            // ÊÍ·Å·ÇÍĞ¹Ü×ÊÔ´
-            base.Dispose(disposing);
         }
     }
 }

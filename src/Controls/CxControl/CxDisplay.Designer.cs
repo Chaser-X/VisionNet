@@ -54,17 +54,17 @@ namespace VisionNet.Controls
                         _surfaceItems.Clear();
                     }
 
-                    while (renderItem.Count > 0)
+                    while (_renderItems.Count > 0)
                     {
-                        renderItem[0].Dispose();
-                        renderItem.RemoveAt(0);
+                        _renderItems[0].Dispose();
+                        _renderItems.RemoveAt(0);
                     }
 
                     components?.Dispose();
-                    camera?.Dispose();
-                    coordinationItem?.Dispose();
-                    colorBarItem?.Dispose();
-                    coorTagItem?.Dispose();
+                    _camera?.Dispose();
+                    _coordinationItem?.Dispose();
+                    _colorBarItem?.Dispose();
+                    _coordTagItem?.Dispose();
                 }
 
                 disposed = true;
