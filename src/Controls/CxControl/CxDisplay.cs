@@ -27,7 +27,9 @@ namespace VisionNet.Controls
         private readonly ConcurrentQueue<GLResourceHandle> _pendingRelease
             = new ConcurrentQueue<GLResourceHandle>();
 
-        private ICxObjRenderItem surfaceItem = null;
+        private readonly List<ICxObjRenderItem> _surfaceItems = new List<ICxObjRenderItem>();
+        private ICxObjRenderItem PrimaryItem =>
+            _surfaceItems.Count > 0 ? _surfaceItems[0] : null;
         private CxCoordinateSystemItem coordinationItem = new CxCoordinateSystemItem();
         private CxColorBarItem colorBarItem = new CxColorBarItem();
         private CxCoordinationTagItem coorTagItem = new CxCoordinationTagItem();
@@ -54,14 +56,11 @@ namespace VisionNet.Controls
             get => pSufaceMode;
             set
             {
-                if (pSufaceMode != value)
-                {
-                    pSufaceMode = value;
-                    updataMenuItem();
-                }
-                var cur = surfaceItem;
-                if (cur != null && !cur.IsDisposed)
-                    cur.SurfaceMode = value;
+                if (pSufaceMode != value) { pSufaceMode = value; updataMenuItem(); }
+                List<ICxObjRenderItem> snapshot;
+                lock (_resourceLock) snapshot = new List<ICxObjRenderItem>(_surfaceItems);
+                foreach (var item in snapshot)
+                    if (!item.IsDisposed) item.SurfaceMode = value;
             }
         }
 
@@ -71,14 +70,11 @@ namespace VisionNet.Controls
             get => pSurfaceColorMode;
             set
             {
-                if (pSurfaceColorMode != value)
-                {
-                    pSurfaceColorMode = value;
-                    updataMenuItem();
-                }
-                var cur = surfaceItem;
-                if (cur != null && !cur.IsDisposed)
-                    cur.SurfaceColorMode = value;
+                if (pSurfaceColorMode != value) { pSurfaceColorMode = value; updataMenuItem(); }
+                List<ICxObjRenderItem> snapshot;
+                lock (_resourceLock) snapshot = new List<ICxObjRenderItem>(_surfaceItems);
+                foreach (var item in snapshot)
+                    if (!item.IsDisposed) item.SurfaceColorMode = value;
             }
         }
 
@@ -115,26 +111,49 @@ namespace VisionNet.Controls
 
         #region 设置主渲染对象
 
-        /// <summary>
-        /// 统一替换主渲染对象。线程安全，可从任意线程调用。
-        /// 旧对象的 GL 资源加入待释放队列，下一帧在 GL 上下文中释放。
-        /// </summary>
+        private Box3D? GetCombinedBoundingBox()
+        {
+            float minX = float.MaxValue, minY = float.MaxValue, minZ = float.MaxValue;
+            float maxX = float.MinValue, maxY = float.MinValue, maxZ = float.MinValue;
+
+            foreach (var item in _surfaceItems)
+            {
+                var bb = item.BoundingBox;
+                if (bb == null) continue;
+                float x0 = bb.Value.Center.X - bb.Value.Size.Width  / 2f;
+                float x1 = bb.Value.Center.X + bb.Value.Size.Width  / 2f;
+                float y0 = bb.Value.Center.Y - bb.Value.Size.Height / 2f;
+                float y1 = bb.Value.Center.Y + bb.Value.Size.Height / 2f;
+                float z0 = bb.Value.Center.Z - bb.Value.Size.Depth  / 2f;
+                float z1 = bb.Value.Center.Z + bb.Value.Size.Depth  / 2f;
+                if (x0 < minX) minX = x0; if (x1 > maxX) maxX = x1;
+                if (y0 < minY) minY = y0; if (y1 > maxY) maxY = y1;
+                if (z0 < minZ) minZ = z0; if (z1 > maxZ) maxZ = z1;
+            }
+
+            if (minX == float.MaxValue) return null;
+            return new Box3D(
+                new CxPoint3D((minX + maxX) / 2, (minY + maxY) / 2, (minZ + maxZ) / 2),
+                new CxSize3D(maxX - minX, maxY - minY, maxZ - minZ));
+        }
+
         private void ReplaceSurfaceItem(ICxObjRenderItem newItem)
         {
             lock (_resourceLock)
             {
-                if (surfaceItem != null)
+                foreach (var old in _surfaceItems)
                 {
-                    if (_resourcePool.TryGetValue(surfaceItem, out var oldHandle))
+                    if (_resourcePool.TryGetValue(old, out var h))
                     {
-                        _pendingRelease.Enqueue(oldHandle);
-                        _resourcePool.Remove(surfaceItem);
+                        _pendingRelease.Enqueue(h);
+                        _resourcePool.Remove(old);
                     }
-                    surfaceItem.OnRenderDataChanged -= OnItemRenderDataChanged;
-                    surfaceItem.Dispose();
+                    old.OnRenderDataChanged -= OnItemRenderDataChanged;
+                    old.Dispose();
                 }
+                _surfaceItems.Clear();
 
-                surfaceItem = newItem;
+                _surfaceItems.Add(newItem);
                 _resourcePool[newItem] = new GLResourceHandle { IsValid = false, NeedsUpdate = true };
                 newItem.OnRenderDataChanged += OnItemRenderDataChanged;
             }
@@ -143,13 +162,30 @@ namespace VisionNet.Controls
             Invalidate();
         }
 
+        private void AppendSurfaceItem(ICxObjRenderItem newItem)
+        {
+            Box3D? combined;
+            lock (_resourceLock)
+            {
+                _surfaceItems.Add(newItem);
+                _resourcePool[newItem] = new GLResourceHandle { IsValid = false, NeedsUpdate = true };
+                newItem.OnRenderDataChanged += OnItemRenderDataChanged;
+                combined = GetCombinedBoundingBox();
+            }
+
+            camera.FitView(combined);
+            Invalidate();
+        }
+
         private void OnItemRenderDataChanged()
         {
             lock (_resourceLock)
             {
-                var cur = surfaceItem;
-                if (cur != null && _resourcePool.TryGetValue(cur, out var handle))
-                    handle.NeedsUpdate = true;
+                foreach (var item in _surfaceItems)
+                {
+                    if (_resourcePool.TryGetValue(item, out var handle))
+                        handle.NeedsUpdate = true;
+                }
             }
             Invalidate();
         }
@@ -241,6 +277,52 @@ namespace VisionNet.Controls
             Invalidate();
         }
 
+        public void AddPointCloud(CxSurface inpointCloud)
+        {
+            var surface = inpointCloud;
+            if (inpointCloud.Width * inpointCloud.Length > 100_000_000)
+            {
+                var points = inpointCloud.ToPoints();
+                float ratio = points.Length / 10_000_000f;
+                surface = VisionOperator.UniformSuface(points, inpointCloud.Intensity,
+                    (int)(inpointCloud.Width / ratio), (int)(inpointCloud.Length / ratio),
+                    inpointCloud.XScale * ratio, inpointCloud.YScale * ratio,
+                    inpointCloud.ZScale, inpointCloud.XOffset, inpointCloud.YOffset, inpointCloud.ZOffset);
+            }
+            AppendSurfaceItem(new CxSurfaceItem(surface, SurfaceMode, SurfaceColorMode));
+        }
+
+        public void AddMesh(CxMesh mesh)
+            => AppendSurfaceItem(new CxMeshItem(mesh, SurfaceMode, SurfaceColorMode));
+
+        public void AddSurfaceAdvancedItem(CxSurface surface)
+            => AppendSurfaceItem(new CxSurfaceAdvancedItem(surface, SurfaceMode, SurfaceColorMode, 2_000_000));
+
+        public void AddMeshAdvancedItem(CxMesh mesh)
+            => AppendSurfaceItem(new CxMeshAdvancedItem(mesh, SurfaceMode, SurfaceColorMode));
+
+        public void AddSurfaceItem(ICxObjRenderItem item)
+            => AppendSurfaceItem(item);
+
+        public void ClearSurfaceItems()
+        {
+            lock (_resourceLock)
+            {
+                foreach (var old in _surfaceItems)
+                {
+                    if (_resourcePool.TryGetValue(old, out var h))
+                    {
+                        _pendingRelease.Enqueue(h);
+                        _resourcePool.Remove(old);
+                    }
+                    old.OnRenderDataChanged -= OnItemRenderDataChanged;
+                    old.Dispose();
+                }
+                _surfaceItems.Clear();
+            }
+            Invalidate();
+        }
+
         #endregion
 
         #region 渲染
@@ -315,28 +397,41 @@ namespace VisionNet.Controls
             if (!camera.Enable2DView && ShowCoordinateSystem)
                 coordinationItem.Draw(gl);
 
-            // 本地快照：防止其他线程在使用期间修改 surfaceItem 字段
-            var cur = surfaceItem;
-            GLResourceHandle handle = null;
+            List<ICxObjRenderItem> snapshot;
+            lock (_resourceLock)
+                snapshot = new List<ICxObjRenderItem>(_surfaceItems);
 
-            if (cur != null && !cur.IsDisposed)
+            float zMin = float.MaxValue, zMax = float.MinValue;
+            bool anyDrawn = false;
+
+            foreach (var cur in snapshot)
             {
+                if (cur == null || cur.IsDisposed) continue;
+
+                GLResourceHandle handle;
                 lock (_resourceLock)
                     _resourcePool.TryGetValue(cur, out handle);
 
-                if (handle != null && handle.IsValid)
+                if (handle?.IsValid != true) continue;
+
+                cur.Draw(gl, handle);
+                anyDrawn = true;
+
+                if (cur.SurfaceColorMode != SurfaceColorMode.Intensity)
                 {
-                    cur.Draw(gl, handle);
-
-                    if (cur.SurfaceColorMode != SurfaceColorMode.Intensity)
-                    {
-                        colorBarItem.SetRange(cur.ZMin, cur.ZMax);
-                        colorBarItem.Draw(gl);
-                    }
-
-                    coorTagItem.Draw(gl);
+                    if (cur.ZMin < zMin) zMin = cur.ZMin;
+                    if (cur.ZMax > zMax) zMax = cur.ZMax;
                 }
             }
+
+            if (anyDrawn && zMin < zMax)
+            {
+                colorBarItem.SetRange(zMin, zMax);
+                colorBarItem.Draw(gl);
+            }
+
+            if (anyDrawn)
+                coorTagItem.Draw(gl);
 
             var items = renderItem.ToArray();
             foreach (var item in items)
@@ -615,20 +710,8 @@ namespace VisionNet.Controls
             coorTagItem = new CxCoordinationTagItem();
             colorBarItem = new CxColorBarItem();
 
-            if (resetAll && surfaceItem != null)
-            {
-                lock (_resourceLock)
-                {
-                    if (_resourcePool.TryGetValue(surfaceItem, out var handle))
-                    {
-                        _pendingRelease.Enqueue(handle);
-                        _resourcePool.Remove(surfaceItem);
-                    }
-                    surfaceItem.OnRenderDataChanged -= OnItemRenderDataChanged;
-                    surfaceItem.Dispose();
-                    surfaceItem = null;
-                }
-            }
+            if (resetAll)
+                ClearSurfaceItems();
 
             Invalidate();
         }
@@ -707,8 +790,7 @@ namespace VisionNet.Controls
             if (!pos.HasValue) return (null, null);
             var world = pos.Value;
 
-            // 本地快照防竞态
-            var cur = surfaceItem;
+            var cur = PrimaryItem;
             if (cur == null || cur.IsDisposed) return (null, null);
 
             if (cur is CxMeshItem || cur is CxMeshAdvancedItem)
@@ -791,7 +873,9 @@ namespace VisionNet.Controls
             var mi = (ToolStripMenuItem)sender;
             mi.Checked = !mi.Checked;
             camera.Enable2DView = mi.Checked;
-            camera?.FitView(surfaceItem?.BoundingBox);
+            Box3D? combined;
+            lock (_resourceLock) combined = GetCombinedBoundingBox();
+            camera?.FitView(combined);
         }
 
         private void toolStripMenuItem_ViewModeClick(object sender, EventArgs e)
@@ -801,7 +885,9 @@ namespace VisionNet.Controls
             var mi = (ToolStripMenuItem)sender;
             mi.Checked = true;
             camera.ViewMode = (ViewMode)Enum.Parse(typeof(ViewMode), mi.Text);
-            camera?.FitView(surfaceItem?.BoundingBox);
+            Box3D? combined;
+            lock (_resourceLock) combined = GetCombinedBoundingBox();
+            camera?.FitView(combined);
         }
 
         private void toolStripMenuItem_SurfaceModeClick(object sender, EventArgs e)

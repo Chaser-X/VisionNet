@@ -28,12 +28,7 @@ namespace VisionNet.Controls
 
         protected override void Dispose(bool disposing)
         {
-            // 确保在 UI/GL 线程执行（OpenGL 资源必须在 GL 上下文中释放）
-            if (InvokeRequired)
-            {
-                Invoke(new Action(() => Dispose(disposing)));
-                return;
-            }
+            if (InvokeRequired) { Invoke(new Action(() => Dispose(disposing))); return; }
 
             if (!disposed)
             {
@@ -41,36 +36,29 @@ namespace VisionNet.Controls
                 {
                     var gl = this.OpenGL;
 
-                    // 释放待释放队列中的 GL 资源
                     if (gl != null)
-                    {
-                        while (_pendingRelease.TryDequeue(out var pending))
-                            ReleaseGLResources(gl, pending);
-                    }
+                        while (_pendingRelease.TryDequeue(out var p)) ReleaseGLResources(gl, p);
 
-                    // 释放资源池中的所有 GL 资源
                     lock (_resourceLock)
                     {
-                        if (gl != null)
+                        foreach (var item in _surfaceItems)
                         {
-                            foreach (var handle in _resourcePool.Values)
-                                ReleaseGLResources(gl, handle);
-                        }
-
-                        // 取消事件订阅并释放 Item CPU 数据
-                        foreach (var item in _resourcePool.Keys)
-                        {
+                            if (_resourcePool.TryGetValue(item, out var h))
+                            {
+                                if (gl != null) ReleaseGLResources(gl, h);
+                                _resourcePool.Remove(item);
+                            }
                             item.OnRenderDataChanged -= OnItemRenderDataChanged;
                             item.Dispose();
                         }
-                        _resourcePool.Clear();
+                        _surfaceItems.Clear();
                     }
 
-                    surfaceItem = null;
-
-                    // 释放简单图元
-                    renderItem.ForEach(item => (item as IDisposable)?.Dispose());
-                    renderItem.Clear();
+                    while (renderItem.Count > 0)
+                    {
+                        renderItem[0].Dispose();
+                        renderItem.RemoveAt(0);
+                    }
 
                     components?.Dispose();
                     camera?.Dispose();
