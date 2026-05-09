@@ -63,6 +63,18 @@
     <Compile Include="CxDisplay.cs">
       <SubType>UserControl</SubType>
     </Compile>
+    <Compile Include="CxDisplay.Api.cs">
+      <DependentUpon>CxDisplay.cs</DependentUpon>
+    </Compile>
+    <Compile Include="CxDisplay.Render.cs">
+      <DependentUpon>CxDisplay.cs</DependentUpon>
+    </Compile>
+    <Compile Include="CxDisplay.GLResources.cs">
+      <DependentUpon>CxDisplay.cs</DependentUpon>
+    </Compile>
+    <Compile Include="CxDisplay.Input.cs">
+      <DependentUpon>CxDisplay.cs</DependentUpon>
+    </Compile>
     <Compile Include="CxDisplay.Designer.cs">
       <DependentUpon>CxDisplay.cs</DependentUpon>
     </Compile>
@@ -72,22 +84,26 @@
     <Compile Include="ICamera.cs" />
     <Compile Include="Camera\CxAdvancedTrackBallCamera.cs" />
     <Compile Include="Camera\CxTrackBallCamera.cs" />
-    <Compile Include="RenderItem\CxBox3DItem.cs" />
-    <Compile Include="RenderItem\CxColorBarItem.cs" />
-    <Compile Include="RenderItem\CxCoordinateSystemItem.cs" />
-    <Compile Include="RenderItem\CxCoordinationTagItem.cs" />
-    <Compile Include="RenderItem\CxMeshItem.cs" />
-    <Compile Include="RenderItem\CxPlane3DItem.cs" />
-    <Compile Include="RenderItem\CxPoint3DItem.cs" />
-    <Compile Include="RenderItem\CxPolygon3DItem.cs" />
-    <Compile Include="RenderItem\CxSegment3DItem.cs" />
-    <Compile Include="RenderItem\CxMeshAdvancedItem.cs" />
-    <Compile Include="RenderItem\CxSurfaceAdvancedItem.cs" />
-    <Compile Include="RenderItem\CxText2DItem.cs" />
-    <Compile Include="RenderItem\CxSurfaceItem.cs" />
-    <Compile Include="CxExtension.cs" />
-    <Compile Include="RenderItem\CxTextInfoItem.cs" />
+    <Compile Include="RenderItem\Enums.cs" />
     <Compile Include="RenderItem\IRenderItem.cs" />
+    <Compile Include="RenderItem\ICxObjRenderItem.cs" />
+    <Compile Include="RenderItem\RenderData.cs" />
+    <Compile Include="RenderItem\GLResourceHandle.cs" />
+    <Compile Include="RenderItem\Surface\CxSurfaceItem.cs" />
+    <Compile Include="RenderItem\Surface\CxSurfaceAdvancedItem.cs" />
+    <Compile Include="RenderItem\Mesh\CxMeshItem.cs" />
+    <Compile Include="RenderItem\Mesh\CxMeshAdvancedItem.cs" />
+    <Compile Include="RenderItem\Geometry\CxPoint3DItem.cs" />
+    <Compile Include="RenderItem\Geometry\CxSegment3DItem.cs" />
+    <Compile Include="RenderItem\Geometry\CxPolygon3DItem.cs" />
+    <Compile Include="RenderItem\Geometry\CxPlane3DItem.cs" />
+    <Compile Include="RenderItem\Geometry\CxBox3DItem.cs" />
+    <Compile Include="RenderItem\Overlay\CxColorBarItem.cs" />
+    <Compile Include="RenderItem\Overlay\CxCoordinateSystemItem.cs" />
+    <Compile Include="RenderItem\Overlay\CxCoordinationTagItem.cs" />
+    <Compile Include="RenderItem\Overlay\CxText2DItem.cs" />
+    <Compile Include="RenderItem\Overlay\CxTextInfoItem.cs" />
+    <Compile Include="CxExtension.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Service Include="{94E38DFF-614B-4cbd-B67C-F211BB35CE8B}" />
   </ItemGroup>

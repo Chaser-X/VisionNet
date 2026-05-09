@@ -44,7 +44,26 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="DataType\DataType.cs" />
+    <Compile Include="DataType\Geometry3D\CxPoint3D.cs" />
+    <Compile Include="DataType\Geometry3D\CxVector3D.cs" />
+    <Compile Include="DataType\Geometry3D\CxSize3D.cs" />
+    <Compile Include="DataType\Geometry3D\Box3D.cs" />
+    <Compile Include="DataType\Geometry3D\Plane3D.cs" />
+    <Compile Include="DataType\Geometry3D\Sphere.cs" />
+    <Compile Include="DataType\Geometry3D\Circle3D.cs" />
+    <Compile Include="DataType\Geometry3D\Segment3D.cs" />
+    <Compile Include="DataType\Geometry3D\Polygon3D.cs" />
+    <Compile Include="DataType\Geometry3D\CxCoordination3D.cs" />
+    <Compile Include="DataType\Geometry3D\TextInfo.cs" />
+    <Compile Include="DataType\Geometry2D\CxPoint2D.cs" />
+    <Compile Include="DataType\Geometry2D\Segment2D.cs" />
+    <Compile Include="DataType\Geometry2D\Polygon2D.cs" />
+    <Compile Include="DataType\Geometry2D\Circle2D.cs" />
+    <Compile Include="DataType\Geometry2D\Text2D.cs" />
+    <Compile Include="DataType\Models\CxSurface.cs" />
+    <Compile Include="DataType\Models\CxMesh.cs" />
+    <Compile Include="DataType\Models\CxImage.cs" />
+    <Compile Include="DataType\Models\CxMatrix4X4.cs" />
     <Compile Include="Export.cs" />
     <Compile Include="VisionOperator.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
