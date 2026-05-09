@@ -7,6 +7,7 @@
 [![.NET Framework](https://img.shields.io/badge/.NET%20Framework-4.8-blue?logo=dotnet)](https://dotnet.microsoft.com/)
 [![Platform](https://img.shields.io/badge/Platform-Windows%20x64-lightgrey?logo=windows)](https://www.microsoft.com/windows)
 [![OpenGL](https://img.shields.io/badge/OpenGL-3.3+-green?logo=opengl)](https://www.opengl.org/)
+[![OpenCL](https://img.shields.io/badge/OpenCL-GPU%20Compute-orange)](https://www.khronos.org/opencl/)
 [![License](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
 
 [快速上手](#快速上手) · [API 文档](#api-参考) · [架构说明](#架构)
@@ -31,6 +32,7 @@ VisionNet 由两个互相独立的库组成：
 - 🎨 多 Item 叠加：点云、网格、几何图元可同时显示，颜色条自动同步全局 Z 范围
 - 🖱️ 完整鼠标交互：追踪球旋转、平移、缩放、双击对焦、悬停坐标标签
 - 🔒 线程安全：GL 资源延迟释放机制，数据更新可在后台线程执行
+- 🚀 **OpenCL GPU 计算**：并行包围盒计算、GPU 点云重采样（`CxUniformSurface`）、GPU 表面变换（`CxTransformSurface`）
 
 ---
 
@@ -56,7 +58,9 @@ VisionNet 由两个互相独立的库组成：
 | .NET Framework | 4.8 | 目标框架 |
 | Visual Studio | 2019+ | 推荐开发环境 |
 | OpenGL | 3.3+ | 需要独立显卡或支持 OpenGL 3.3 的集成显卡 |
+| OpenCL | 1.2+ | GPU 计算（可选，无 OpenCL 设备时自动降级到 CPU 路径） |
 | VisionLib.dll | — | 本地 C++ 算法库，仅 x64 |
+| OpenCL.Net.dll | — | OpenCL .NET 绑定，位于 `3rd/` 目录 |
 
 ---
 
@@ -271,16 +275,53 @@ var img = new CxImage<byte>(640, 480);
 ### 算子 API
 
 ```csharp
-// 计算点云重心
+// 计算点云重心（调用本地 C++ 库）
 CxPoint3D center = VisionOperator.GetPoint3DArrayCenter(points);
 
-// 无序点云 → 均匀结构化表面（网格化重采样）
+// 无序点云 → 均匀结构化表面（CPU，本地库）
 CxSurface result = VisionOperator.UniformSurface(
     points, intensity, width, height,
     xScale, yScale, zScale, xOffset, yOffset, zOffset);
 
 // 4×4 矩阵变换（OpenGL 列主序）
 CxPoint3D transformed = VisionOperator.TransformPoint3D(point, matrix);
+
+// 并行包围盒（Parallel.ForEach）
+Box3D? box = VisionOperator.CalculateBoundingBox(points);
+
+// SIMD 包围盒（Vector3.Min / Max）
+Box3D? boxFast = VisionOperator.CalculateBoundingBoxSIMD(points);
+
+// GPU 表面变换（OpenCL，需先调用 InitialLib）
+VisionOperator.InitialLib();
+CxSurface transformed = VisionOperator.TransformSurface(surface, matrix, SampleMode.Max);
+VisionOperator.DestroyLib();
+```
+
+#### OpenCL GPU 计算模块（`VisionNet.Compute`）
+
+| 类 | 说明 |
+|----|------|
+| `OpenCLEnvironment` | 单例，管理 OpenCL 上下文、命令队列、已编译程序和 Kernel |
+| `OpenCLComputation` | 抽象基类，封装 Buffer 分配、Kernel 参数绑定和 NDRange 执行 |
+| `CxUniformSurface` | GPU 点云均匀重采样，支持 Max / Min / Average 聚合模式 |
+| `CxTransformSurface` | GPU 结构化表面矩阵变换，返回变换后的点云 |
+
+```csharp
+// 直接使用底层 GPU 采样（绕过 VisionOperator 包装）
+VisionOperator.InitialLib();
+
+var sampler = new CxUniformSurface();
+CxSurface gridded = sampler.Sample(points, intensity,
+    width: 500, height: 500,
+    xScale: 0.1f, yScale: 0.1f, zScale: 0.001f,
+    xOffset: 0f, yOffset: 0f, zOffset: 0f,
+    SampleMode.Average);
+
+var transformer = new CxTransformSurface(matrix);
+var (pts, intensities) = transformer.Transform(surface);
+
+VisionOperator.DestroyLib();
 ```
 
 ### CxDisplay 控件

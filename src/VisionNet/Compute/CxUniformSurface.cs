@@ -1,216 +1,195 @@
 using System;
-using System.Diagnostics;
-using System.Linq;
 using System.Threading.Tasks;
-using System.Xml.Linq;
 using VisionNet.DataType;
 
 namespace VisionNet.Compute
 {
     /// <summary>
-    /// »ùÓÚOpenCLµÄ¸ßÐ§µãÔÆ²ÉÑù£¨UniformGridSample¹¦ÄÜ£©
+    /// GPU-accelerated uniform-grid re-sampling of an unordered point cloud.
+    /// Replaces the CPU-bound native <c>UniformGridSample</c> P/Invoke for large inputs.
+    /// <para>
+    /// The OpenCL kernel processes each point in parallel and uses atomic operations
+    /// to aggregate multiple points that fall into the same grid cell.
+    /// </para>
     /// </summary>
     public class CxUniformSurface : OpenCLComputation
     {
         private const string KernelName = "UniformSurfaceSample";
 
+        /// <summary>Initialises the computation with its fixed program identifier.</summary>
         public CxUniformSurface() : base("CxUniformSurfaceProgram") { }
 
-        //protected override string GetKernelSource()
-        //{
-        //    return @"__kernel void UniformSurfaceSample(
-        //        __global const float3* points, // X,Y,Z
-        //        __global const uchar* intensity,
-        //        int pointCount,
-        //        int width,
-        //        int height,
-        //        float xScale, float yScale, float zScale,
-        //        float xOffset, float yOffset, float zOffset,
-        //        __global int* heightMap,
-        //        __global int* intensityMap,   
-        //        __global int* pointCountMap)
-        //    {
-        //        int gid = get_global_id(0);
-        //        float3 p = points[gid];
-        //        //p.zÎªÎÞÐ§ÖµÊ±£¬Ìø¹ý´¦Àí
-        //        if (isnan(p.z) || isinf(p.z)) return;
-        //        int xIdx = (int)((p.x - xOffset) / xScale);
-        //        int yIdx = (int)((p.y - yOffset) / yScale);
-        //        // ´¦ÀíZÖáËõ·Å
-        //        p.z = (p.z - zOffset) / zScale;
-        //        if (xIdx >= 0 && xIdx < width && yIdx >= 0 && yIdx < height)
-        //        {
-        //            int idx = yIdx * width + xIdx;
-        //            int z = (int)p.z;
-        //            int inten = intensity ? intensity[gid] : 0; // ÓÃintÀàÐÍ
-        //            atomic_add(&heightMap[idx], z);
-        //            atomic_add(&intensityMap[idx], inten);      
-        //            atomic_inc(&pointCountMap[idx]);
-        //        }
-        //    }";
-        //}
-        protected override string GetKernelSource()
-        {
-            return @"
+        /// <inheritdoc/>
+        protected override string[] GetKernelNames() => new[] { KernelName };
+
+        /// <inheritdoc/>
+        protected override string GetKernelSource() => @"
             __kernel void UniformSurfaceSample(
-                __global const float* points,
+                __global const float* points,       // interleaved X,Y,Z (3 floats per point)
                 __global const uchar* intensity,
-                int pointCount,
-                int width,
-                int height,
-                float xScale, 
-                float yScale, 
+                int   pointCount,
+                int   width,
+                int   height,
+                float xScale,
+                float yScale,
                 float zScale,
-                float xOffset, 
-                float yOffset, 
+                float xOffset,
+                float yOffset,
                 float zOffset,
-                __global int* heightMap,
-                __global int* intensityMap,   
-                __global int* pointCountMap,
-                int inMode)
+                __global int* heightMap,            // aggregated Z (int, atomic)
+                __global int* intensityMap,         // aggregated intensity (int, atomic)
+                __global int* pointCountMap,        // number of points per cell
+                int   inMode)                       // 0=Max, 1=Min, 2=Average
             {
                 int gid = get_global_id(0);
                 float px = points[gid * 3 + 0];
                 float py = points[gid * 3 + 1];
                 float pz = points[gid * 3 + 2];
-                float3 p = (float3)(px,py,pz);
-                if (isnan(p.z) || isinf(p.z)) return;
-                int xIdx = (int)((p.x - xOffset) / xScale);
-                int yIdx = (int)((p.y - yOffset) / yScale);
+                if (isnan(pz) || isinf(pz)) return;
+                int xIdx = (int)((px - xOffset) / xScale);
+                int yIdx = (int)((py - yOffset) / yScale);
                 if (xIdx < 0 || xIdx >= width || yIdx < 0 || yIdx >= height) return;
-                int scaledZ = (int)((p.z - zOffset)/ zScale);
-                int idx = yIdx * width + xIdx;
-                int inten = intensity ? intensity[gid] : 0;
-                switch (inMode) 
+                int scaledZ = (int)((pz - zOffset) / zScale);
+                int idx     = yIdx * width + xIdx;
+                int inten   = intensity ? (int)intensity[gid] : 0;
+                switch (inMode)
                 {
-                    case 0:
-                        {
-                            int oldZ = atomic_max(&heightMap[idx], scaledZ);
-                            if (scaledZ >= oldZ) intensityMap[idx] = inten;
-                        }
+                    case 0:  // Max
+                    {
+                        int old = atomic_max(&heightMap[idx], scaledZ);
+                        if (scaledZ >= old) intensityMap[idx] = inten;
                         break;
-                    case 1:
-                        {
-                            int oldZ = atomic_min(&heightMap[idx], scaledZ);
-                            if (scaledZ < oldZ) intensityMap[idx] = inten;
-                        }
+                    }
+                    case 1:  // Min
+                    {
+                        int old = atomic_min(&heightMap[idx], scaledZ);
+                        if (scaledZ < old) intensityMap[idx] = inten;
                         break;
-                    default:
+                    }
+                    default: // Average
                         atomic_add(&heightMap[idx], scaledZ);
                         atomic_add(&intensityMap[idx], inten);
                         break;
                 }
                 atomic_inc(&pointCountMap[idx]);
             }";
-        }
-
-        protected override string[] GetKernelNames()
-        {
-            return new[] { KernelName };
-        }
 
         /// <summary>
-        /// µãÔÆ²ÉÑùÎª¸ß¶ÈÍ¼ºÍÁÁ¶ÈÍ¼
+        /// Re-samples <paramref name="points"/> onto a <paramref name="width"/> Ã— <paramref name="height"/>
+        /// uniform grid and returns the result as a <see cref="CxSurface"/>.
         /// </summary>
-        public CxSurface Sample(CxPoint3D[] points, byte[] intensity, int width, int height,
-    float xScale, float yScale, float zScale, float xOffset, float yOffset, float zOffset, SampleMode inMode = SampleMode.Average)
+        /// <param name="points">Unordered world-space point positions.</param>
+        /// <param name="intensity">Per-point intensity values, or <c>null</c>.</param>
+        /// <param name="width">Output grid column count.</param>
+        /// <param name="height">Output grid row count.</param>
+        /// <param name="xScale">Cell width along X.</param>
+        /// <param name="yScale">Cell height along Y.</param>
+        /// <param name="zScale">Z encoding scale factor.</param>
+        /// <param name="xOffset">World-space X origin of the output grid.</param>
+        /// <param name="yOffset">World-space Y origin of the output grid.</param>
+        /// <param name="zOffset">World-space Z origin of the output grid.</param>
+        /// <param name="sampleMode">Cell aggregation strategy (Max / Min / Average).</param>
+        /// <exception cref="Exception">Thrown if the OpenCL environment could not be initialised.</exception>
+        public CxSurface Sample(CxPoint3D[] points, byte[] intensity,
+            int width, int height,
+            float xScale, float yScale, float zScale,
+            float xOffset, float yOffset, float zOffset,
+            SampleMode sampleMode = SampleMode.Average)
         {
-            int count = points.Length;
-            int[] heightMap = new int[width * height];
-            switch (inMode)
-            {
-                case SampleMode.Max:
-                    Parallel.For(0, heightMap.Length, i => heightMap[i] = int.MinValue);
-                    break;
-                case SampleMode.Min:
-                    Parallel.For(0, heightMap.Length, i => heightMap[i] = int.MaxValue);
-                    break;
-                    // Æ½¾ùÄ£Ê½ÎÞÐè´¦Àí
-            }
-            int[] intensityMap = new int[width * height];
-            int[] pointCountMap = new int[width * height];
-            // µãÔÆÊý¾Ý×ª»»Îªfloat[]£¬Ã¿µã3·ÖÁ¿
+            int count      = points.Length;
+            int cellCount  = width * height;
+
+            // Initialise height-map sentinel values for max/min modes.
+            int[] heightMap      = new int[cellCount];
+            int[] intensityMap   = new int[cellCount];
+            int[] pointCountMap  = new int[cellCount];
+
+            if (sampleMode == SampleMode.Max)
+                Parallel.For(0, cellCount, i => heightMap[i] = int.MinValue);
+            else if (sampleMode == SampleMode.Min)
+                Parallel.For(0, cellCount, i => heightMap[i] = int.MaxValue);
+
+            // Flatten CxPoint3D[] â†’ float[] (X,Y,Z interleaved) in parallel.
             float[] pointData = new float[count * 3];
             Parallel.For(0, count, i =>
             {
-                pointData[i * 3] = points[i].X;
+                pointData[i * 3]     = points[i].X;
                 pointData[i * 3 + 1] = points[i].Y;
                 pointData[i * 3 + 2] = points[i].Z;
             });
 
             if (!EnsureInitialized())
-                throw new Exception("OpenCL»·¾³³õÊ¼»¯Ê§°Ü");
+                throw new InvalidOperationException("OpenCL environment could not be initialised.");
 
-            // ´´½¨OpenCL»º³åÇø
-            var pointsBuffer = CreateBuffer<float>(OpenCL.Net.MemFlags.ReadOnly | OpenCL.Net.MemFlags.CopyHostPtr, pointData);
-            var intensityBuffer = CreateBuffer<byte>(OpenCL.Net.MemFlags.ReadOnly | OpenCL.Net.MemFlags.CopyHostPtr, intensity ?? new byte[count]);
-            //var heightMapBuffer = CreateBufferWithSize<int>(OpenCL.Net.MemFlags.WriteOnly, width * height);
-            var heightMapBuffer = CreateBuffer<int>(OpenCL.Net.MemFlags.ReadWrite | OpenCL.Net.MemFlags.CopyHostPtr, heightMap);
-            var intensityMapBuffer = CreateBufferWithSize<int>(OpenCL.Net.MemFlags.WriteOnly, width * height);
-            var pointCountMapBuffer = CreateBufferWithSize<int>(OpenCL.Net.MemFlags.WriteOnly, width * height);
+            // Allocate GPU buffers.
+            var pointsBuf    = CreateBuffer<float>(MemFlags.ReadOnly  | MemFlags.CopyHostPtr, pointData);
+            var intensityBuf = CreateBuffer<byte> (MemFlags.ReadOnly  | MemFlags.CopyHostPtr,
+                intensity ?? new byte[count]);
+            var heightBuf    = CreateBuffer<int>  (MemFlags.ReadWrite | MemFlags.CopyHostPtr, heightMap);
+            var intensMapBuf = CreateBufferWithSize<int>(MemFlags.WriteOnly, cellCount);
+            var countBuf     = CreateBufferWithSize<int>(MemFlags.WriteOnly, cellCount);
 
-            bool state = true;
-            state &= SetKernelArg(KernelName, 0, pointsBuffer);
-            state &= SetKernelArg(KernelName, 1, intensityBuffer);
-            state &= SetKernelArg(KernelName, 2, count);
-            state &= SetKernelArg(KernelName, 3, width);
-            state &= SetKernelArg(KernelName, 4, height);
-            state &= SetKernelArg(KernelName, 5, xScale);
-            state &= SetKernelArg(KernelName, 6, yScale);
-            state &= SetKernelArg(KernelName, 7, zScale);
-            state &= SetKernelArg(KernelName, 8, xOffset);
-            state &= SetKernelArg(KernelName, 9, yOffset);
-            state &= SetKernelArg(KernelName, 10, zOffset);
-            state &= SetKernelArg(KernelName, 11, heightMapBuffer);
-            state &= SetKernelArg(KernelName, 12, intensityMapBuffer);
-            state &= SetKernelArg(KernelName, 13, pointCountMapBuffer);
-            state &= SetKernelArg(KernelName, 14, (int)inMode);
+            // Bind kernel arguments.
+            bool ok = true;
+            ok &= SetKernelArg(KernelName,  0, pointsBuf);
+            ok &= SetKernelArg(KernelName,  1, intensityBuf);
+            ok &= SetKernelArg(KernelName,  2, count);
+            ok &= SetKernelArg(KernelName,  3, width);
+            ok &= SetKernelArg(KernelName,  4, height);
+            ok &= SetKernelArg(KernelName,  5, xScale);
+            ok &= SetKernelArg(KernelName,  6, yScale);
+            ok &= SetKernelArg(KernelName,  7, zScale);
+            ok &= SetKernelArg(KernelName,  8, xOffset);
+            ok &= SetKernelArg(KernelName,  9, yOffset);
+            ok &= SetKernelArg(KernelName, 10, zOffset);
+            ok &= SetKernelArg(KernelName, 11, heightBuf);
+            ok &= SetKernelArg(KernelName, 12, intensMapBuf);
+            ok &= SetKernelArg(KernelName, 13, countBuf);
+            ok &= SetKernelArg(KernelName, 14, (int)sampleMode);
 
-            state &= ExecuteKernel(KernelName, new IntPtr[] { new IntPtr(count) });
+            ok &= ExecuteKernel(KernelName, new[] { new IntPtr(count) });
+            ok &= ReadBuffer(heightBuf,    heightMap);
+            ok &= ReadBuffer(intensMapBuf, intensityMap);
+            ok &= ReadBuffer(countBuf,     pointCountMap);
 
-            // ¶ÁÈ¡½á¹û
-            state &= ReadBuffer(heightMapBuffer, heightMap);
-            state &= ReadBuffer(intensityMapBuffer, intensityMap);
-            state &= ReadBuffer(pointCountMapBuffer, pointCountMap);
+            Cleanup();
 
-            if (!state)
+            if (!ok)
+                throw new InvalidOperationException("OpenCL kernel execution failed.");
+
+            // Build the output CxSurface from the aggregated maps.
+            short[] data            = new short[cellCount];
+            byte[]  intensityOutput = new byte[cellCount];
+
+            for (int i = 0; i < cellCount; i++)
             {
-                Cleanup();
-                throw new Exception("OpenCL¼ÆËãÊ§°Ü");
-            }
-            // ¹éÒ»»¯
-            short[] data = new short[width * height];
-            byte[] intensitydata = new byte[width * height];
-            for (int i = 0; i < width * height; i++)
-            {
-                if (pointCountMap[i] > 0)
+                if (pointCountMap[i] == 0)
                 {
-                    if (inMode == SampleMode.Average)
+                    data[i] = short.MinValue;
+                    continue;
+                }
+
+                if (sampleMode == SampleMode.Average)
+                {
+                    float avgZ = heightMap[i] / (float)pointCountMap[i];
+                    data[i] = avgZ < short.MinValue ? short.MinValue : (short)avgZ;
+                    if (intensity != null)
                     {
-                        float avgZ = heightMap[i] / (float)pointCountMap[i];
-                        data[i] = avgZ < -32768 ? short.MinValue : (short)avgZ;
-                        if (intensity != null)
-                        {
-                            float avgInten = intensityMap[i] / (float)pointCountMap[i];
-                            intensitydata[i] = (byte)(avgInten < 0 ? 0 : (avgInten > 255 ? 255 : (byte)avgInten));
-                        }
-                    }
-                    else
-                    {
-                        data[i] = heightMap[i] < -32768 ? short.MinValue : (short)heightMap[i];
-                        if (intensity != null)
-                            intensitydata[i] = (byte)(intensityMap[i] < 0 ? 0 : (intensityMap[i] > 255 ? 255 : intensityMap[i]));
+                        float avgI = intensityMap[i] / (float)pointCountMap[i];
+                        intensityOutput[i] = (byte)Math.Max(0, Math.Min(255, (int)avgI));
                     }
                 }
                 else
                 {
-                    data[i] = short.MinValue;
+                    data[i] = heightMap[i] < short.MinValue ? short.MinValue : (short)heightMap[i];
                     if (intensity != null)
-                        intensitydata[i] = 0;
+                        intensityOutput[i] = (byte)Math.Max(0, Math.Min(255, intensityMap[i]));
                 }
             }
-            Cleanup();
-            return new CxSurface(width, height, data, intensity == null ? new byte[0] : intensitydata, xOffset, yOffset, zOffset, xScale, yScale, zScale);
+
+            return new CxSurface(width, height, data,
+                intensity != null ? intensityOutput : new byte[0],
+                xOffset, yOffset, zOffset, xScale, yScale, zScale);
         }
     }
 }

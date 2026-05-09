@@ -68,6 +68,10 @@
     <Compile Include="DataType\Models\CxMesh.cs" />
     <Compile Include="DataType\Models\CxImage.cs" />
     <Compile Include="DataType\Models\CxMatrix4X4.cs" />
+    <Compile Include="DataType\CxEmunType.cs" />
+    <Compile Include="Compute\OpenCLEnvironment.cs" />
+    <Compile Include="Compute\CxUniformSurface.cs" />
+    <Compile Include="Compute\CxTransformSurface.cs" />
     <Compile Include="Export.cs" />
     <Compile Include="VisionOperator.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
