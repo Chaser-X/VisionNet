@@ -40,6 +40,60 @@ namespace VisionNet.Controls
 
         private RenderData _cachedRenderData;
 
+        #region Shader 源码（与 CxSurfaceAdvancedItem 内容一致，为解耦独立维护）
+        internal static readonly string VertexShaderSource =
+            @"#version 330 core
+            layout (location = 0) in vec3 aPos;
+            layout (location = 1) in vec2 aTexCoord;
+
+            uniform mat4 view;
+            uniform mat4 projection;
+
+            out float height;
+            out vec2 TexCoord;
+
+            void main()
+            {
+                gl_Position = projection * view * vec4(aPos, 1.0);
+                height = aPos.z;
+                TexCoord = aTexCoord;
+            }";
+
+        internal static readonly string FragmentShaderSource =
+            @"#version 330 core
+            in float height;
+            in vec2 TexCoord;
+            out vec4 FragColor;
+
+            uniform float zMin;
+            uniform float zMax;
+            uniform int colorMode;
+            uniform sampler2D intensityTexture;
+
+            vec3 getColorByHeight(float h)
+            {
+                float n = clamp((h - zMin) / (zMax - zMin), 0.0, 1.0);
+                if (n < 0.2) return mix(vec3(0,0,1), vec3(0,1,1), n * 5.0);
+                if (n < 0.4) return mix(vec3(0,1,1), vec3(0,1,0), (n-0.2)*5.0);
+                if (n < 0.6) return mix(vec3(0,1,0), vec3(1,1,0), (n-0.4)*5.0);
+                if (n < 0.8) return mix(vec3(1,1,0), vec3(1,0,0), (n-0.6)*5.0);
+                return mix(vec3(1,0,0), vec3(1,0,1), (n-0.8)*5.0);
+            }
+
+            void main()
+            {
+                if (isinf(height)) discard;
+                float intensity = texture(intensityTexture, TexCoord).r;
+                if (colorMode == 0) {
+                    FragColor = vec4(getColorByHeight(height), 1.0);
+                } else if (colorMode == 1) {
+                    FragColor = vec4(vec3(intensity), 1.0);
+                } else {
+                    FragColor = vec4(mix(vec3(intensity), getColorByHeight(height), 0.5), 1.0);
+                }
+            }";
+        #endregion
+
         public CxMeshAdvancedItem(CxMesh mesh,
             SurfaceMode surfaceMode = SurfaceMode.PointCloud,
             SurfaceColorMode surfaceColorMode = SurfaceColorMode.Color)
@@ -87,8 +141,8 @@ namespace VisionNet.Controls
                 UseVAO      = true,
                 ShaderSource = new ShaderSource
                 {
-                    VertexSource   = CxSurfaceAdvancedItem.VertexShaderSource,
-                    FragmentSource = CxSurfaceAdvancedItem.FragmentShaderSource,
+                    VertexSource   = VertexShaderSource,
+                    FragmentSource = FragmentShaderSource,
                 },
                 TextureData = new TextureData
                 {
