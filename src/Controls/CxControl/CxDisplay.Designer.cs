@@ -5,7 +5,8 @@ namespace VisionNet.Controls
 {
     public partial class CxDisplay
     {
-        private ContextMenuStrip menu_right;
+        // ── Designer-generated UI component fields ───────────────────────────────
+        private ContextMenuStrip       menu_right;
         private System.ComponentModel.IContainer components;
         private ToolStripMenuItem viewModeToolStripMenuItem;
         private ToolStripMenuItem surfaceModeToolStripMenuItem;
@@ -22,7 +23,7 @@ namespace VisionNet.Controls
         private ToolStripMenuItem colorWithIntensityToolStripMenuItem;
         private ToolStripMenuItem d2DToolStripMenuItem;
 
-        #region 资源释放
+        // ── Dispose ──────────────────────────────────────────────────────────────
 
         private bool disposed = false;
 
@@ -34,31 +35,8 @@ namespace VisionNet.Controls
             {
                 if (disposing)
                 {
-                    var gl = this.OpenGL;
-
-                    if (gl != null)
-                        while (_pendingRelease.TryDequeue(out var p)) ReleaseGLResources(gl, p);
-
-                    lock (_resourceLock)
-                    {
-                        foreach (var item in _surfaceItems)
-                        {
-                            if (_resourcePool.TryGetValue(item, out var h))
-                            {
-                                if (gl != null) ReleaseGLResources(gl, h);
-                                _resourcePool.Remove(item);
-                            }
-                            item.OnRenderDataChanged -= OnItemRenderDataChanged;
-                            item.Dispose();
-                        }
-                        _surfaceItems.Clear();
-                    }
-
-                    while (_renderItems.Count > 0)
-                    {
-                        _renderItems[0].Dispose();
-                        _renderItems.RemoveAt(0);
-                    }
+                    // GL resource release is encapsulated in DisposeResources() (CxDisplay.cs).
+                    DisposeResources(this.OpenGL);
 
                     components?.Dispose();
                     _camera?.Dispose();
@@ -66,14 +44,13 @@ namespace VisionNet.Controls
                     _colorBarItem?.Dispose();
                     _coordTagItem?.Dispose();
                 }
-
                 disposed = true;
             }
 
             base.Dispose(disposing);
         }
 
-        #endregion
+        // ── InitializeComponent (designer-generated) ─────────────────────────────
 
         private void InitializeComponent()
         {

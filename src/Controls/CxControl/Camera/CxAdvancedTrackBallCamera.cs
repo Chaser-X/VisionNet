@@ -1,104 +1,112 @@
-﻿using System;
+using SharpGL;
+using System;
 using System.Drawing;
 using System.Numerics;
 using System.Windows.Forms;
-using System.Windows.Input;
-using SharpGL;
-using SharpGL.SceneGraph.Cameras;
 using VisionNet.DataType;
 
 namespace VisionNet.Controls
 {
     /// <summary>
-    /// 现代化3D相机类，实现ICamera接口
+    /// A trackball-style 3D camera that supports perspective and orthographic projection,
+    /// mouse-driven rotation / panning / zoom, and scene-fit.
+    /// <para>
+    /// Mouse bindings:
+    /// <list type="bullet">
+    ///   <item><description>Left drag — rotate around <see cref="RotationPoint"/> (disabled in 2D mode).</description></item>
+    ///   <item><description>Middle drag — pan.</description></item>
+    ///   <item><description>Scroll wheel — zoom in / out.</description></item>
+    ///   <item><description>Left double-click — focus (re-centre) on the clicked surface point.</description></item>
+    /// </list>
+    /// </para>
     /// </summary>
     public class CxAdvancedTrackBallCamera : ICamera
     {
-        #region 私有字段
+        #region Private fields
+
         private readonly OpenGLControl _glControl;
-        private Matrix4x4 _viewMatrix = Matrix4x4.Identity;
-        private Matrix4x4 _projectionMatrix = Matrix4x4.Identity;
 
-        private Vector3 _position = new Vector3(0, 0, -10);
-        private Vector3 _target = Vector3.Zero;
-        private Vector3 _up = Vector3.UnitY;
-
+        // View state.
+        private Vector3 _position    = new Vector3(0, 0, -10);
+        private Vector3 _target      = Vector3.Zero;
+        private Vector3 _up          = Vector3.UnitY;
         private Vector3 _sceneCenter = Vector3.Zero;
-        private float _sceneRadius = 10.0f;
+        private float   _sceneRadius = 10.0f;
 
+        // Mouse state.
         private Point _lastMousePosition;
-        private bool _isRotating = false;
-        private bool _isPanning = false;
+        private bool  _isRotating = false;
+        private bool  _isPanning  = false;
 
-        private float _fieldOfView = 60.0f;
-        private float _nearPlane = 0.01f;
-        private float _farPlane = 1000.0f;
+        // Projection parameters.
+        private readonly float _fieldOfView = 60.0f;
+        private readonly float _nearPlane   = 0.01f;
+        private readonly float _farPlane    = 1000.0f;
 
-        private float _panSpeed = 0.01f;
+        // Speed settings.
+        private float _panSpeed    = 0.01f;
         private float _rotateSpeed = 0.5f;
-        private float _zoomSpeed = 0.2f;
 
         private bool _firstFitView = true;
-        private bool _disposedValue = false;
+        private bool _disposed     = false;
+
         #endregion
 
-        #region 公共属性
-        /// <summary>
-        /// 获取或设置视图模式
-        /// </summary>
+        #region Public properties
+
+        /// <inheritdoc/>
         public ViewMode ViewMode { get; set; } = ViewMode.Front;
 
-        /// <summary>
-        /// 获取或设置是否启用2D视图
-        /// </summary>
+        /// <inheritdoc/>
         public bool Enable2DView { get; set; } = false;
 
-        /// <summary>
-        /// 获取或设置旋转点
-        /// </summary>
+        /// <inheritdoc/>
         public CxPoint3D? RotationPoint { get; set; } = null;
+
         #endregion
 
-        #region 构造函数
+        #region Constructor
+
         /// <summary>
-        /// 创建一个新的Modern3DCamera实例
+        /// Initializes the camera and subscribes to the mouse / resize events of
+        /// <paramref name="glControl"/>.
         /// </summary>
-        /// <param name="glControl">OpenGL控件</param>
+        /// <param name="glControl">The OpenGL host control. Must not be <c>null</c>.</param>
+        /// <exception cref="ArgumentNullException">Thrown when <paramref name="glControl"/> is <c>null</c>.</exception>
         public CxAdvancedTrackBallCamera(OpenGLControl glControl)
         {
             _glControl = glControl ?? throw new ArgumentNullException(nameof(glControl));
-            // 注册事件
             RegisterEvents();
         }
 
-        /// <summary>
-        /// 注册控件事件
-        /// </summary>
-        private void RegisterEvents()
-        {
-            _glControl.MouseDown += GlControl_MouseDown;
-            _glControl.MouseMove += GlControl_MouseMove;
-            _glControl.MouseUp += GlControl_MouseUp;
-            _glControl.MouseWheel += GlControl_MouseWheel;
-            _glControl.MouseDoubleClick += GlControl_MouseDoubleClick;
-            _glControl.Resize += GlControl_Resize;
-        }
-
-        /// <summary>
-        /// 注销控件事件
-        /// </summary>
-        private void UnregisterEvents()
-        {
-            _glControl.MouseDown -= GlControl_MouseDown;
-            _glControl.MouseMove -= GlControl_MouseMove;
-            _glControl.MouseUp -= GlControl_MouseUp;
-            _glControl.MouseWheel -= GlControl_MouseWheel;
-            _glControl.MouseDoubleClick -= GlControl_MouseDoubleClick;
-            _glControl.Resize -= GlControl_Resize;
-        }
         #endregion
 
-        #region 事件处理
+        #region Event subscription
+
+        private void RegisterEvents()
+        {
+            _glControl.MouseDown        += GlControl_MouseDown;
+            _glControl.MouseMove        += GlControl_MouseMove;
+            _glControl.MouseUp          += GlControl_MouseUp;
+            _glControl.MouseWheel       += GlControl_MouseWheel;
+            _glControl.MouseDoubleClick += GlControl_MouseDoubleClick;
+            _glControl.Resize           += GlControl_Resize;
+        }
+
+        private void UnregisterEvents()
+        {
+            _glControl.MouseDown        -= GlControl_MouseDown;
+            _glControl.MouseMove        -= GlControl_MouseMove;
+            _glControl.MouseUp          -= GlControl_MouseUp;
+            _glControl.MouseWheel       -= GlControl_MouseWheel;
+            _glControl.MouseDoubleClick -= GlControl_MouseDoubleClick;
+            _glControl.Resize           -= GlControl_Resize;
+        }
+
+        #endregion
+
+        #region Mouse event handlers
+
         private void GlControl_MouseDown(object sender, MouseEventArgs e)
         {
             _lastMousePosition = e.Location;
@@ -109,7 +117,7 @@ namespace VisionNet.Controls
                 _glControl.Cursor = Cursors.Hand;
             }
             else if (e.Button == MouseButtons.Middle ||
-                    (e.Button == MouseButtons.Left && Control.ModifierKeys.HasFlag(Keys.Shift)))
+                     (e.Button == MouseButtons.Left && Control.ModifierKeys.HasFlag(Keys.Shift)))
             {
                 _isPanning = true;
                 _glControl.Cursor = Cursors.SizeAll;
@@ -118,20 +126,14 @@ namespace VisionNet.Controls
 
         private void GlControl_MouseMove(object sender, MouseEventArgs e)
         {
+            int deltaX = e.X - _lastMousePosition.X;
+            int deltaY = e.Y - _lastMousePosition.Y;
+
             if (_isRotating && !Enable2DView)
-            {
-                int deltaX = e.X - _lastMousePosition.X;
-                int deltaY = e.Y - _lastMousePosition.Y;
-
                 RotateCamera(deltaX, deltaY);
-            }
             else if (_isPanning)
-            {
-                int deltaX = e.X - _lastMousePosition.X;
-                int deltaY = e.Y - _lastMousePosition.Y;
-
                 PanCamera(deltaX, deltaY);
-            }
+
             _lastMousePosition = e.Location;
             _glControl.Invalidate();
         }
@@ -139,22 +141,14 @@ namespace VisionNet.Controls
         private void GlControl_MouseUp(object sender, MouseEventArgs e)
         {
             _isRotating = false;
-            _isPanning = false;
+            _isPanning  = false;
             _glControl.Cursor = Cursors.Default;
         }
 
         private void GlControl_MouseWheel(object sender, MouseEventArgs e)
         {
-            // 计算缩放因子，根据距离自适应速度
-            //float distance = Vector3.Distance(_position, _target);
-            float zoomFactor = e.Delta > 0 ? 1.05f : 0.95f;
-
-            ////自适应缩放速度
-            //float adaptiveSpeed = Math.Max(distance * 0.001f, 0.01f);
-            //zoomFactor = e.Delta > 0 ? 1.0f + adaptiveSpeed : 1.0f - adaptiveSpeed;
-
-            ZoomCamera(zoomFactor);
-            // 触发重绘
+            // 5 % zoom step per wheel notch.
+            ZoomCamera(e.Delta > 0 ? 1.05f : 0.95f);
             _glControl.Invalidate();
         }
 
@@ -162,398 +156,287 @@ namespace VisionNet.Controls
         {
             if (e.Button == MouseButtons.Left)
             {
-                // 获取鼠标点击位置的世界坐标
                 Vector3? worldPos = ScreenToWorld(e.X, e.Y);
                 if (worldPos.HasValue)
                 {
-                    // 聚焦到点击位置
                     FocusOnPoint(worldPos.Value);
                     _glControl.Invalidate();
                 }
             }
         }
 
-        private void GlControl_Resize(object sender, EventArgs e)
-        {
-        }
+        private void GlControl_Resize(object sender, EventArgs e) { }
+
         #endregion
 
-        #region 相机操作方法
+        #region Camera manipulation
+
         /// <summary>
-        /// 旋转相机
+        /// Rotates the camera around <see cref="RotationPoint"/> (or the scene centre if not set)
+        /// by the given screen-space mouse deltas.
         /// </summary>
+        /// <param name="deltaX">Horizontal mouse movement in pixels.</param>
+        /// <param name="deltaY">Vertical mouse movement in pixels.</param>
         internal void RotateCamera(int deltaX, int deltaY)
         {
-            // 获取旋转中心
-            Vector3 rotationCenter;
-            if (RotationPoint.HasValue)
-            {
-                rotationCenter = new Vector3(
-                    RotationPoint.Value.X,
-                    RotationPoint.Value.Y,
-                    RotationPoint.Value.Z);
-            }
-            else
-            {
-                rotationCenter = _sceneCenter;
-            }
+            Vector3 pivot = RotationPoint.HasValue
+                ? new Vector3(RotationPoint.Value.X, RotationPoint.Value.Y, RotationPoint.Value.Z)
+                : _sceneCenter;
 
-            // 保存原始距离
-            float originalDistance = Vector3.Distance(_position, rotationCenter);
-
-            // 计算相机到旋转中心的向量
-            Vector3 viewDir = _position - rotationCenter;
-
-            // 计算屏幕空间的旋转轴
-            // 屏幕空间的水平轴（对应于世界空间中垂直于视线和上向量的轴）
+            Vector3 viewDir     = _position - pivot;
             Vector3 screenRight = Vector3.Normalize(Vector3.Cross(_up, viewDir));
+            Vector3 screenUp    = Vector3.Normalize(Vector3.Cross(viewDir, screenRight));
 
-            // 屏幕空间的垂直轴（对应于世界空间中垂直于视线和右向量的轴）
-            Vector3 screenUp = Vector3.Normalize(Vector3.Cross(viewDir, screenRight));
+            float angleX = -deltaY * _rotateSpeed * (float)Math.PI / 180f;
+            float angleY = -deltaX * _rotateSpeed * (float)Math.PI / 180f;
 
-            // 计算旋转角度
-            float angleX = -deltaY * _rotateSpeed; // 垂直移动 -> 绕屏幕水平轴旋转
-            float angleY = -deltaX * _rotateSpeed; // 水平移动 -> 绕屏幕垂直轴旋转
+            Matrix4x4 rot = Matrix4x4.CreateFromAxisAngle(screenRight, angleX)
+                          * Matrix4x4.CreateFromAxisAngle(screenUp,    angleY);
 
-            // 创建旋转矩阵
-            Matrix4x4 rotationX = Matrix4x4.CreateFromAxisAngle(screenRight, angleX * (float)Math.PI / 180.0f);
-            Matrix4x4 rotationY = Matrix4x4.CreateFromAxisAngle(screenUp, angleY * (float)Math.PI / 180.0f);
-            Matrix4x4 combinedRotation = rotationX * rotationY;
-
-            // 应用旋转到相机位置
-            viewDir = Vector3.TransformNormal(viewDir, combinedRotation);
-            _position = rotationCenter + viewDir;
-
-            // 更新上向量
-            _up = Vector3.TransformNormal(_up, combinedRotation);
-            _up = Vector3.Normalize(_up);
-
-            // 更新目标点
-            //_target = rotationCenter;
+            _position = pivot + Vector3.TransformNormal(viewDir, rot);
+            _up       = Vector3.Normalize(Vector3.TransformNormal(_up, rot));
         }
+
         /// <summary>
-        /// 平移相机
+        /// Pans the camera (moves both position and target) by the given screen-space mouse deltas.
+        /// Pan speed scales with the distance to the target.
         /// </summary>
+        /// <param name="deltaX">Horizontal mouse movement in pixels.</param>
+        /// <param name="deltaY">Vertical mouse movement in pixels.</param>
         internal void PanCamera(int deltaX, int deltaY)
         {
-            // 计算相机坐标系
             Vector3 viewDir = Vector3.Normalize(_target - _position);
-            Vector3 right = Vector3.Normalize(Vector3.Cross(viewDir, _up));
-            Vector3 up = Vector3.Cross(right, viewDir);
+            Vector3 right   = Vector3.Normalize(Vector3.Cross(viewDir, _up));
+            Vector3 up      = Vector3.Cross(right, viewDir);
 
-            // 自适应平移速度
-            float distance = Vector3.Distance(_position, _target);
+            float distance         = Vector3.Distance(_position, _target);
             float adaptivePanSpeed = _panSpeed * Math.Max(distance * 0.05f, 0.5f);
 
-            // 计算平移距离
-            float panX = -deltaX * adaptivePanSpeed;
-            float panY = deltaY * adaptivePanSpeed;
-
-            // 应用平移
-            Vector3 offset = right * panX + up * panY;
+            Vector3 offset = right * (-deltaX * adaptivePanSpeed)
+                           + up    * ( deltaY * adaptivePanSpeed);
             _position += offset;
-            _target += offset;
+            _target   += offset;
         }
 
         /// <summary>
-        /// 缩放相机
+        /// Zooms the camera by moving it along the view vector.
+        /// <paramref name="zoomFactor"/> greater than 1 zooms out; less than 1 zooms in.
+        /// The resulting distance is clamped to [<c>nearPlane</c>, <c>farPlane</c>].
         /// </summary>
+        /// <param name="zoomFactor">Multiplicative zoom factor.</param>
         internal void ZoomCamera(float zoomFactor)
         {
-            // 计算相机到目标的向量
-            Vector3 viewDir = _position - _target;
-            float currentDistance = viewDir.Length();
-
-            // 计算新距离
-            float newDistance = currentDistance * zoomFactor;
-
-            // 应用距离限制
-            newDistance = Math.Max(_nearPlane, Math.Min(newDistance, _farPlane));
-
-            // 重新计算缩放因子
-            float adjustedZoomFactor = newDistance / currentDistance;
-
-            // 应用缩放
+            Vector3 viewDir     = _position - _target;
+            float   newDistance = Math.Max(_nearPlane,
+                                  Math.Min(viewDir.Length() * zoomFactor, _farPlane));
             _position = _target + Vector3.Normalize(viewDir) * newDistance;
         }
-        // <summary>
-        /// 向指定点缩放
+
+        /// <summary>
+        /// Zooms the camera toward a specific world-space point rather than the current target.
         /// </summary>
-        /// <param name="zoomPoint">缩放中心点</param>
-        /// <param name="zoomFactor">缩放因子（小于1为放大，大于1为缩小）</param>
+        /// <param name="zoomPoint">World-space zoom origin.</param>
+        /// <param name="zoomFactor">Multiplicative zoom factor (&lt;1 = zoom in, &gt;1 = zoom out).</param>
         internal void ZoomTowardPoint(Vector3 zoomPoint, float zoomFactor)
         {
-            // 计算相机到缩放点的向量
-            Vector3 cameraToPoint = _position - zoomPoint;
-
-            // 计算当前距离
-            float currentDistance = cameraToPoint.Length();
-
-            // 计算新距离，应用限制
-            float newDistance = currentDistance * zoomFactor;
-            newDistance = Math.Max(_nearPlane, Math.Min(newDistance, _farPlane));
-
-            // 计算实际缩放因子
-            float actualZoomFactor = newDistance / currentDistance;
-
-            // 应用缩放
-            _position = zoomPoint + cameraToPoint * actualZoomFactor;
+            Vector3 toCamera    = _position - zoomPoint;
+            float   newDistance = Math.Max(_nearPlane,
+                                  Math.Min(toCamera.Length() * zoomFactor, _farPlane));
+            _position = zoomPoint + Vector3.Normalize(toCamera) * newDistance;
         }
+
         /// <summary>
-        /// 聚焦到指定点
+        /// Moves the camera target to <paramref name="point"/>, preserving the direction
+        /// and distance from the previous target.
         /// </summary>
+        /// <param name="point">New target / focus point in world space.</param>
         internal void FocusOnPoint(Vector3 point)
         {
-            // 保持相机到目标的方向和距离
-            Vector3 viewDir = _position - _target;
-
-            // 更新目标为新的焦点
-            _target = point;
-
-            // 更新相机位置
-            _position = _target + viewDir;
+            Vector3 offset = _position - _target;
+            _target   = point;
+            _position = _target + offset;
         }
 
         /// <summary>
-        /// 设置视图模式
+        /// Sets the camera up-direction vector.
+        /// Passing <c>null</c> resets to <see cref="Vector3.UnitY"/>.
         /// </summary>
+        /// <param name="up">Desired up direction, or <c>null</c> to use the default.</param>
+        public void SetDefaultUpView(Vector3? up)
+        {
+            _up = up ?? Vector3.UnitY;
+        }
+
+        /// <summary>Repositions the camera for the given preset view direction.</summary>
         private void SetViewMode(ViewMode viewMode)
         {
             ViewMode = viewMode;
-
-            // 保存当前距离
             float distance = Vector3.Distance(_position, _target);
 
-            // 根据视图模式设置相机位置
             switch (viewMode)
             {
                 case ViewMode.Front:
                     _position = _target + new Vector3(0, 0, distance);
                     _up = Vector3.UnitY;
                     break;
-
                 case ViewMode.Top:
                     _position = _target + new Vector3(0, distance, 0);
                     _up = new Vector3(0, 0, -1);
                     break;
-
                 case ViewMode.Left:
                     _position = _target + new Vector3(-distance, 0, 0);
                     _up = Vector3.UnitY;
                     break;
-
                 case ViewMode.Right:
                     _position = _target + new Vector3(distance, 0, 0);
                     _up = Vector3.UnitY;
                     break;
+            }
+        }
 
+        #endregion
+
+        #region ICamera implementation
+
+        /// <summary>
+        /// Repositions the camera so the given bounding box fills the viewport,
+        /// then applies the current <see cref="ViewMode"/> preset orientation.
+        /// The first call is always honoured; subsequent calls with <see cref="ViewMode.None"/>
+        /// are ignored to avoid resetting a user-adjusted view.
+        /// </summary>
+        /// <param name="viewBox">Bounding box to fit, or <c>null</c> to leave the view unchanged.</param>
+        public void FitView(Box3D? viewBox)
+        {
+            if (ViewMode == ViewMode.None && !_firstFitView) return;
+            _firstFitView = false;
+
+            if (!viewBox.HasValue) return;
+
+            _sceneCenter = new Vector3(
+                (float)viewBox.Value.Center.X,
+                (float)viewBox.Value.Center.Y,
+                (float)viewBox.Value.Center.Z);
+
+            double w = viewBox.Value.Size.Width;
+            double h = viewBox.Value.Size.Height;
+            double d = viewBox.Value.Size.Depth;
+
+            _sceneRadius = (float)Math.Sqrt(w * w + h * h + d * d) * 0.5f;
+            _panSpeed    = _sceneRadius / 500f;
+            _target      = _sceneCenter;
+            RotationPoint = new CxPoint3D(_sceneCenter.X, _sceneCenter.Y, _sceneCenter.Z);
+
+            // Distance required so the scene fits inside the FOV.
+            float dist = _sceneRadius / (float)Math.Tan(_fieldOfView * 0.5f * Math.PI / 180f);
+
+            switch (ViewMode)
+            {
+                case ViewMode.Front:
+                    _position = _target + new Vector3(0, -dist * 1.1f, 0);
+                    _up = new Vector3(0, 0, 1);
+                    break;
+                case ViewMode.Top:
+                    _position = _target + new Vector3(0, 0, dist * 1.1f);
+                    _up = Vector3.UnitY;
+                    break;
+                case ViewMode.Left:
+                    _position = _target + new Vector3(-dist * 1.1f, 0, 0);
+                    _up = new Vector3(0, 0, 1);
+                    break;
+                case ViewMode.Right:
+                    _position = _target + new Vector3(dist * 1.1f, 0, 0);
+                    _up = new Vector3(0, 0, 1);
+                    break;
                 default:
+                    _position = _target + new Vector3(0, 0, dist * 1.1f);
                     break;
             }
         }
-        #endregion
-
-        #region ICamera接口实现
-        /// <summary>
-        /// 适应视图大小
-        /// </summary>
-        /// <param name="viewBox">视图边界框</param>
-        public void FitView(Box3D? viewBox)
-        {
-            if (ViewMode == ViewMode.None && !_firstFitView)
-            {
-                return;
-            }
-            _firstFitView = false;
-
-            // 重置相机
-            //_position = new Vector3(0, 0, -10);
-            //_target = Vector3.Zero;
-            //_up = Vector3.UnitY;
-
-            if (viewBox.HasValue)
-            {
-                // 计算场景中心和半径
-                _sceneCenter = new Vector3(
-                    (float)viewBox.Value.Center.X,
-                    (float)viewBox.Value.Center.Y,
-                    (float)viewBox.Value.Center.Z
-                );
-
-                // 计算场景尺寸
-                double sceneWidth = viewBox.Value.Size.Width;
-                double sceneHeight = viewBox.Value.Size.Height;
-                double sceneDepth = viewBox.Value.Size.Depth;
-
-                // 计算场景半径
-                _sceneRadius = (float)Math.Sqrt(
-                    sceneWidth * sceneWidth +
-                    sceneHeight * sceneHeight +
-                    sceneDepth * sceneDepth) * 0.5f;
-
-                // 自适应平移速度
-                _panSpeed = _sceneRadius / 500.0f;
-
-                // 设置目标为场景中心
-                _target = _sceneCenter;
-                RotationPoint = new CxPoint3D(_sceneCenter.X, _sceneCenter.Y, _sceneCenter.Z);
-
-                // 计算合适的相机距离
-                float distance = _sceneRadius / (float)Math.Tan(_fieldOfView * 0.5f * Math.PI / 180.0f);
-
-                // 根据当前视图模式设置相机位置
-                switch (ViewMode)
-                {
-                    case ViewMode.Front:
-                        _position = _target + new Vector3(0, -distance * 1.1f, 0);
-                        _up = new Vector3(0, 0, 1);
-                        break;
-
-                    case ViewMode.Top:
-                        _position = _target + new Vector3(0, 0, distance * 1.1f);
-                        _up = Vector3.UnitY;
-                        break;
-
-                    case ViewMode.Left:
-                        _position = _target + new Vector3(-distance * 1.1f, 0, 0);
-                        _up = new Vector3(0, 0, 1);
-                        break;
-
-                    case ViewMode.Right:
-                        _position = _target + new Vector3(distance * 1.1f, 0, 0);
-                        _up = new Vector3(0, 0, 1);
-                        break;
-
-                    default:
-                        _position = _target + new Vector3(0, 0, distance * 1.1f);
-                        //_up = Vector3.UnitY;
-                        break;
-                }
-            }
-        }
 
         /// <summary>
-        /// 设置视图矩阵
+        /// Applies the viewport, projection matrix (perspective or orthographic),
+        /// and modelview matrix (via <c>gl.LookAt</c>) for the current frame.
         /// </summary>
-        /// <param name="gl">OpenGL上下文</param>
+        /// <param name="gl">Active OpenGL context.</param>
         public void LookAtMatrix(OpenGL gl)
         {
-            // 设置视口
             gl.Viewport(0, 0, _glControl.Width, _glControl.Height);
 
-            // 设置投影矩阵
             gl.MatrixMode(OpenGL.GL_PROJECTION);
             gl.LoadIdentity();
 
+            double aspect = (double)_glControl.Width / _glControl.Height;
             if (!Enable2DView)
             {
-                // 透视投影
-                double aspectRatio = (double)_glControl.Width / _glControl.Height;
-                gl.Perspective(_fieldOfView, aspectRatio, _nearPlane, _farPlane);
+                gl.Perspective(_fieldOfView, aspect, _nearPlane, _farPlane);
             }
             else
             {
-                // 正交投影
-                double aspectRatio = (double)_glControl.Width / _glControl.Height;
                 double height = 2.0 * Math.Abs(_position.Z - _target.Z);
-                double width = height * aspectRatio;
+                double width  = height * aspect;
                 gl.Ortho(-width / 2, width / 2, -height / 2, height / 2, _nearPlane, _farPlane);
             }
 
-            // 设置模型视图矩阵
             gl.MatrixMode(OpenGL.GL_MODELVIEW);
             gl.LoadIdentity();
-
-            // 直接使用LookAt函数应用视图变换，避免额外的变换
             gl.LookAt(
                 _position.X, _position.Y, _position.Z,
-                _target.X, _target.Y, _target.Z,
-                _up.X, _up.Y, _up.Z);
+                _target.X,   _target.Y,   _target.Z,
+                _up.X,       _up.Y,       _up.Z);
         }
-        /// <summary>
-        /// 设置默认上向量
-        /// </summary>
-        /// <param name="up"></param>
-        public void SetDefaultUpView(Vector3? up)
-        {
-            if (up.HasValue)
-                _up = up.Value;
-            else
-                _up = Vector3.UnitY;
-        }
+
         #endregion
 
-        #region 辅助方法
+        #region Helpers
+
         /// <summary>
-        /// 屏幕坐标转换为世界坐标
+        /// Reads the depth buffer at the given screen pixel and un-projects it to world space.
+        /// Returns <c>null</c> if the pixel hits the far plane (background).
         /// </summary>
         private Vector3? ScreenToWorld(int screenX, int screenY)
         {
-            OpenGL gl = _glControl.OpenGL;
+            var gl = _glControl.OpenGL;
 
-            // 获取视口
             int[] viewport = new int[4];
             gl.GetInteger(OpenGL.GL_VIEWPORT, viewport);
+            int adjustedY = viewport[3] - screenY;   // Flip Y to OpenGL convention.
 
-            // 调整Y坐标（OpenGL坐标系原点在左下角）
-            int adjustedY = viewport[3] - screenY;
+            byte[] depthBytes = new byte[4];
+            gl.ReadPixels(screenX, adjustedY, 1, 1,
+                OpenGL.GL_DEPTH_COMPONENT, OpenGL.GL_FLOAT, depthBytes);
+            float depth = BitConverter.ToSingle(depthBytes, 0);
 
-            // 读取深度值
-            byte[] depthBuffer = new byte[4];
-            gl.ReadPixels(screenX, adjustedY, 1, 1, OpenGL.GL_DEPTH_COMPONENT, OpenGL.GL_FLOAT, depthBuffer);
-            float depth = BitConverter.ToSingle(depthBuffer, 0);
+            if (Math.Abs(depth - 1.0f) < 0.00001f) return null;
 
-            // 检查深度值是否有效
-            if (Math.Abs(depth - 1.0f) < 0.00001f)
-                return null;
-
-            // 将屏幕坐标转换为世界坐标
             var obj = gl.UnProject((double)screenX, (double)adjustedY, (double)depth);
             return new Vector3((float)obj[0], (float)obj[1], (float)obj[2]);
         }
 
-        /// <summary>
-        /// 将Vector3转换为CxPoint3D
-        /// </summary>
-        private CxPoint3D ToCxPoint3D(Vector3 vector)
-        {
-            return new CxPoint3D(vector.X, vector.Y, vector.Z);
-        }
-
-        /// <summary>
-        /// 将CxPoint3D转换为Vector3
-        /// </summary>
-        private Vector3 ToVector3(CxPoint3D point)
-        {
-            return new Vector3(point.X, point.Y, point.Z);
-        }
         #endregion
 
-        #region IDisposable实现
+        #region IDisposable
+
+        /// <summary>Releases managed resources (event subscriptions).</summary>
         protected virtual void Dispose(bool disposing)
         {
-            if (!_disposedValue)
+            if (!_disposed)
             {
                 if (disposing)
-                {
-                    // 释放托管资源
                     UnregisterEvents();
-                }
-
-                _disposedValue = true;
+                _disposed = true;
             }
         }
 
-        ~CxAdvancedTrackBallCamera()
-        {
-            Dispose(false);
-        }
-
+        /// <inheritdoc/>
         public void Dispose()
         {
             Dispose(true);
             GC.SuppressFinalize(this);
         }
+
+        /// <summary>Finalizer — releases event subscriptions if <see cref="Dispose()"/> was not called.</summary>
+        ~CxAdvancedTrackBallCamera() => Dispose(false);
+
         #endregion
     }
 }

@@ -8,459 +8,417 @@ using VisionNet.DataType;
 
 namespace VisionNet.Controls
 {
+    /// <summary>
+    /// Legacy trackball camera implemented with a raw rotation matrix.
+    /// <para>
+    /// This implementation is superseded by <see cref="CxAdvancedTrackBallCamera"/> and is kept
+    /// for reference only. Prefer <see cref="CxAdvancedTrackBallCamera"/> for new code.
+    /// </para>
+    /// </summary>
     public class CxTrackBallCamera : ICamera
     {
-        #region Ë½ÓÐ×Ö¶Î
-        private OpenGLControl openGLControl;
-        private float translateX = 0f;
-        private float translateY = 0f;
-        private float translateZ = -10;
-        private bool isDragging = false;
-        private bool isRotating = false;
-        private int lastMouseX, lastMouseY;
-        private float[] rotationMatrix = new float[16];
-        private float translateSpeed = 0.5f;
-        private CxPoint3D pointCloudCenter = new CxPoint3D(); //µãÔÆÖÐÐÄ
+        #region Private fields
 
-        private float originalZ = -10;
-        private bool firstFitView = true; // ÊÇ·ñµÚÒ»´ÎÊÊÓ¦ÊÓÍ¼
-        private bool disposedValue = false;
+        private OpenGLControl _glControl;
+        private float _translateX    = 0f;
+        private float _translateY    = 0f;
+        private float _translateZ    = -10f;
+        private bool  _isDragging    = false;
+        private bool  _isRotating    = false;
+        private int   _lastMouseX;
+        private int   _lastMouseY;
+        private float[] _rotationMatrix = new float[16];
+        private float _translateSpeed  = 0.5f;
+        private CxPoint3D _pointCloudCenter = new CxPoint3D();
+
+        private float _originalZ      = -10f;
+        private bool  _firstFitView   = true;
+        private bool  _disposed       = false;
+
         #endregion
-        #region ÊôÐÔ
+
+        #region Public properties
+
+        /// <inheritdoc/>
         public ViewMode ViewMode { get; set; } = ViewMode.Front;
+
+        /// <inheritdoc/>
         public bool Enable2DView { get; set; } = false;
-        public CxPoint3D? RotationPoint { get; set; } = null; //Ðý×ªµã
+
+        /// <inheritdoc/>
+        public CxPoint3D? RotationPoint { get; set; } = null;
+
         #endregion
-        #region ¹¹Ôìº¯Êý
-        public CxTrackBallCamera(OpenGLControl openGLControl)
+
+        #region Constructor
+
+        /// <summary>
+        /// Initializes the camera, resets the rotation matrix to identity,
+        /// and subscribes to control mouse events.
+        /// </summary>
+        /// <param name="glControl">The OpenGL host control.</param>
+        public CxTrackBallCamera(OpenGLControl glControl)
         {
-            this.openGLControl = openGLControl;
-            // ³õÊ¼»¯Ðý×ª¾ØÕóÎªµ¥Î»¾ØÕó
+            _glControl = glControl;
+
+            // Identity rotation matrix.
             for (int i = 0; i < 16; i++)
-                rotationMatrix[i] = (i % 5 == 0) ? 1.0f : 0.0f;
+                _rotationMatrix[i] = (i % 5 == 0) ? 1.0f : 0.0f;
 
-            // ¶©ÔÄÊÂ¼þ
-            this.openGLControl.MouseDown += OpenGLControl_MouseDown;
-            this.openGLControl.MouseMove += OpenGLControl_MouseMove;
-            this.openGLControl.MouseUp += OpenGLControl_MouseUp;
-            this.openGLControl.MouseWheel += OpenGLControl_MouseWheel;
-            this.openGLControl.MouseDoubleClick += OpenGLControl_MouseDoubleClick; // Ìí¼ÓË«»÷ÊÂ¼þ
-
+            _glControl.MouseDown        += GlControl_MouseDown;
+            _glControl.MouseMove        += GlControl_MouseMove;
+            _glControl.MouseUp          += GlControl_MouseUp;
+            _glControl.MouseWheel       += GlControl_MouseWheel;
+            _glControl.MouseDoubleClick += GlControl_MouseDoubleClick;
         }
+
         #endregion
-        #region Êó±êÊÂ¼þ´¦Àí
-        private void OpenGLControl_MouseDown(object sender, MouseEventArgs e)
+
+        #region Mouse event handlers
+
+        private void GlControl_MouseDown(object sender, MouseEventArgs e)
         {
             if (e.Button == MouseButtons.Middle)
             {
-                isDragging = true;
-                lastMouseX = e.X;
-                lastMouseY = e.Y;
+                _isDragging = true;
+                _lastMouseX = e.X;
+                _lastMouseY = e.Y;
             }
             else if (e.Button == MouseButtons.Left)
             {
-                isRotating = true;
-                lastMouseX = e.X;
-                lastMouseY = e.Y;
+                _isRotating = true;
+                _lastMouseX = e.X;
+                _lastMouseY = e.Y;
             }
         }
 
-        private void OpenGLControl_MouseMove(object sender, MouseEventArgs e)
+        private void GlControl_MouseMove(object sender, MouseEventArgs e)
         {
-            if (isDragging)
+            if (_isDragging)
             {
-                int deltaX = e.X - lastMouseX;
-                int deltaY = e.Y - lastMouseY;
+                int dx = e.X - _lastMouseX;
+                int dy = e.Y - _lastMouseY;
 
-                translateX += deltaX * translateSpeed;
-                translateY -= deltaY * translateSpeed;
+                _translateX += dx * _translateSpeed;
+                _translateY -= dy * _translateSpeed;
 
-                lastMouseX = e.X;
-                lastMouseY = e.Y;
+                _lastMouseX = e.X;
+                _lastMouseY = e.Y;
             }
-            else if (isRotating)
+            else if (_isRotating)
             {
-                int deltaX = e.X - lastMouseX;
-                int deltaY = e.Y - lastMouseY;
+                int dx = e.X - _lastMouseX;
+                int dy = e.Y - _lastMouseY;
 
-                // ¼ÆËãÐý×ª½Ç¶È
-                float angleX = -deltaY * 0.15f;
-                float angleY = -deltaX * 0.15f;
+                float angleX = -dy * 0.15f;
+                float angleY = -dx * 0.15f;
 
                 if (!Enable2DView)
-                {
-                    // ¸üÐÂÐý×ª¾ØÕó
                     UpdateRotationMatrix(angleX, angleY, RotationPoint);
-                }
 
-                lastMouseX = e.X;
-                lastMouseY = e.Y;
+                _lastMouseX = e.X;
+                _lastMouseY = e.Y;
             }
-            openGLControl.Invalidate();
+
+            _glControl.Invalidate();
         }
-        private void OpenGLControl_MouseUp(object sender, MouseEventArgs e)
+
+        private void GlControl_MouseUp(object sender, MouseEventArgs e)
         {
             if (e.Button == MouseButtons.Middle)
-            {
-                isDragging = false;
-            }
+                _isDragging = false;
             else if (e.Button == MouseButtons.Left)
-            {
-                isRotating = false;
-            }
+                _isRotating = false;
         }
-        private void OpenGLControl_MouseWheel(object sender, MouseEventArgs e)
+
+        private void GlControl_MouseWheel(object sender, MouseEventArgs e)
         {
-            // ¼ÆËãËõ·ÅÒò×Ó
-            //float delta = e.Delta > 0 ? 0.9f : 1.1f;
-            //translateZ *= delta;
-            float baseStep = 0.02f;
-            float speed = Math.Max(Math.Abs(translateZ) * baseStep, 0.005f); // ¾àÀëÔ½½ü£¬speed Ô½Ð¡£¬µ«ÓÐÏÂÏÞ
-            if (e.Delta > 0)
-                translateZ += speed;
-            else
-                translateZ -= speed;
-            openGLControl.Invalidate();
+            // Adaptive zoom: speed scales with current distance.
+            float speed = Math.Max(Math.Abs(_translateZ) * 0.02f, 0.005f);
+            _translateZ += e.Delta > 0 ? speed : -speed;
+            _glControl.Invalidate();
         }
-        private void OpenGLControl_MouseDoubleClick(object sender, MouseEventArgs e)
+
+        private void GlControl_MouseDoubleClick(object sender, MouseEventArgs e)
         {
             if (e.Button == MouseButtons.Left)
             {
-                // »ñÈ¡Êó±êµã»÷Î»ÖÃµÄÊÀ½ç×ø±ê
-                var worldPosition = GetMouseWorldPosition(e.X, e.Y);
-                if (worldPosition != null)
+                CxPoint3D? worldPos = GetMouseWorldPosition(e.X, e.Y);
+                if (worldPos.HasValue)
                 {
-                    // ½«ÊÀ½ç×ø±ê×ª»»µ½Ðý×ªºóµÄ×ø±êÏµ
-                    var adjustedPosition = ApplyInverseRotation(worldPosition.Value);
-
-                    // ¸ù¾Ýµ÷ÕûºóµÄ×ø±ê¼ÆËãÆ½ÒÆÁ¿
-                    translateX = -adjustedPosition.X;
-                    translateY = -adjustedPosition.Y;
-
-                    // ´¥·¢ÖØ»æ
-                    openGLControl.Invalidate();
+                    CxPoint3D adjusted = ApplyInverseRotation(worldPos.Value);
+                    _translateX = -adjusted.X;
+                    _translateY = -adjusted.Y;
+                    _glControl.Invalidate();
                 }
             }
         }
 
         #endregion
-        #region äÖÈ¾·½·¨
-        /// <summary>
+
+        #region ICamera implementation
+
+        /// <inheritdoc/>
         public void FitView(Box3D? viewBox)
         {
-            if (ViewMode == ViewMode.None && !firstFitView)
-            {
-                return;
-            }
-            firstFitView = false;
+            if (ViewMode == ViewMode.None && !_firstFitView) return;
+            _firstFitView = false;
 
-            translateX = 0f;
-            translateY = 0f;
-            translateZ = -10;
-            translateSpeed = 0.5f;
-            pointCloudCenter = new CxPoint3D();
-            //ÖØÖÃÊÓÍ¼Ðý×ª¾ØÕó
+            _translateX     = 0f;
+            _translateY     = 0f;
+            _translateZ     = -10f;
+            _translateSpeed = 0.5f;
+            _pointCloudCenter = new CxPoint3D();
+
+            // Reset to identity rotation.
             for (int i = 0; i < 16; i++)
-                rotationMatrix[i] = (i % 5 == 0) ? 1.0f : 0.0f;
-            //ÖØÖÃÊÓÍ¼ÖÐÐÄÎ»ÖÃ
+                _rotationMatrix[i] = (i % 5 == 0) ? 1.0f : 0.0f;
+
             if (viewBox.HasValue)
             {
-                // ¸üÐÂµãÔÆÖÐÐÄ
-                pointCloudCenter = new CxPoint3D(
+                _pointCloudCenter = new CxPoint3D(
                     (float)viewBox.Value.Center.X,
                     (float)viewBox.Value.Center.Y,
-                    (float)viewBox.Value.Center.Z
-                );
+                    (float)viewBox.Value.Center.Z);
 
-                // ¼ÆËãµãÔÆµÄ¿í¶È¡¢¸ß¶ÈºÍÉî¶È
-                double pointCloudWidth = viewBox.Value.Size.Width;
-                double pointCloudHeight = viewBox.Value.Size.Height;
-                double pointCloudDepth = viewBox.Value.Size.Depth;
+                double w = viewBox.Value.Size.Width;
+                double h = viewBox.Value.Size.Height;
+                double d = viewBox.Value.Size.Depth;
 
-                // ¼ÆËãÆ½ÒÆËõ·ÅµÄËÙ¶ÈÏµÊý
-                var min1 = Math.Min(pointCloudWidth, pointCloudHeight);
-                var min2 = Math.Min(pointCloudHeight, pointCloudDepth);
-                var min3 = Math.Min(pointCloudDepth, pointCloudWidth);
-                if (min1 == min2) // height min
-                    translateSpeed = (float)min3 / 400.0f;
-                if (min2 == min3) // depth min
-                    translateSpeed = (float)min1 / 400.0f;
-                if (min1 == min3) // width min
-                    translateSpeed = (float)min2 / 400.0f;
+                // Choose pan speed from the second-smallest dimension.
+                double min1 = Math.Min(w, h), min2 = Math.Min(h, d), min3 = Math.Min(d, w);
+                if (min1 == min2)      _translateSpeed = (float)min3 / 400f;
+                else if (min2 == min3) _translateSpeed = (float)min1 / 400f;
+                else                   _translateSpeed = (float)min2 / 400f;
 
-                // ¸ù¾Ý´°Ìå´óÐ¡ºÍµãÔÆµÄ´óÐ¡×ÔÊÊÓ¦ÉèÖÃ zoom
-                double aspectRatio = (double)openGLControl.Width / (double)openGLControl.Height;
-                double zoomFactor = Math.Max(pointCloudWidth / aspectRatio, pointCloudHeight);
+                double aspect   = (double)_glControl.Width / _glControl.Height;
+                double zoomDist = Math.Max(w / aspect, h);
 
-                translateX = (float)-viewBox.Value.Center.X;
-                translateY = (float)-viewBox.Value.Center.Y;
+                _translateX = -(float)viewBox.Value.Center.X;
+                _translateY = -(float)viewBox.Value.Center.Y;
+
                 if (!Enable2DView)
                 {
-                    translateZ = (float)-viewBox.Value.Center.Z - (float)zoomFactor * 1.2f; // ÊÊµ±µ÷ÕûÊÓ¾à
+                    _translateZ = -(float)viewBox.Value.Center.Z - (float)zoomDist * 1.2f;
                 }
                 else
                 {
-                    var scaleWdith = pointCloudWidth / aspectRatio;
-                    if (scaleWdith > pointCloudHeight)
-                        translateZ = (float)(openGLControl.Width / scaleWdith); // ÊÊµ±µ÷ÕûÊÓ¾à
-                    else
-                        translateZ = (float)(openGLControl.Height / pointCloudHeight); // ÊÊµ±µ÷ÕûÊÓ¾à
+                    double scaledW = w / aspect;
+                    _translateZ = scaledW > h
+                        ? (float)(_glControl.Width  / scaledW)
+                        : (float)(_glControl.Height / h);
                 }
-                originalZ = translateZ; // ±£´æÔ­Ê¼µÄZÖµ
+
+                _originalZ = _translateZ;
             }
+
             switch (ViewMode)
             {
-                case ViewMode.Top:
-                    break;
-                case ViewMode.Front:
-                    UpdateRotationMatrix(90, 0);
-                    break;
-                case ViewMode.Left:
-                    UpdateRotationMatrix(0, -90);
-                    break;
-                case ViewMode.Right:
-                    UpdateRotationMatrix(0, 90);
-                    break;
-                default: break;
+                case ViewMode.Front: UpdateRotationMatrix(90, 0);  break;
+                case ViewMode.Left:  UpdateRotationMatrix(0, -90); break;
+                case ViewMode.Right: UpdateRotationMatrix(0,  90); break;
             }
         }
 
-        /// <summary>
-        /// ÊÓÍ¼¿Õ¼äÉèÖÃ
-        /// </summary>
+        /// <inheritdoc/>
         public void LookAtMatrix(OpenGL gl)
         {
-            // ÉèÖÃÊÓ¿Ú
-            gl.Viewport(0, 0, openGLControl.Width, openGLControl.Height);
+            gl.Viewport(0, 0, _glControl.Width, _glControl.Height);
 
             gl.MatrixMode(OpenGL.GL_PROJECTION);
             gl.LoadIdentity();
 
             if (!Enable2DView)
             {
-                // ÉèÖÃÍ¸ÊÓÍ¶Ó°
-                double nearPlane = 0.01; // ½ü²Ã¼ôÃæ
-                double farPlane = 1000.0; // Ô¶²Ã¼ôÃæ
-                double aspectRatio = (double)openGLControl.Width / (double)openGLControl.Height;
-                double fov = 60.0; // ÊÓ³¡½Ç
-                gl.Perspective(fov, aspectRatio, nearPlane, farPlane); // ÉèÖÃÍ¸ÊÓÍ¶Ó°
+                double aspect = (double)_glControl.Width / _glControl.Height;
+                gl.Perspective(60.0, aspect, 0.01, 1000.0);
             }
             else
             {
-                // ÉèÖÃÕý½»Í¶Ó°
-                double left = -openGLControl.Width / 2;
-                double right = openGLControl.Width / 2;
-                double bottom = -openGLControl.Height / 2;
-                double top = openGLControl.Height / 2;
-                gl.Ortho(left, right, bottom, top, -1000.0, 1000.0); // ÉèÖÃÕý½»Í¶Ó°
+                double left   = -_glControl.Width  / 2.0;
+                double right  =  _glControl.Width  / 2.0;
+                double bottom = -_glControl.Height / 2.0;
+                double top    =  _glControl.Height / 2.0;
+                gl.Ortho(left, right, bottom, top, -1000.0, 1000.0);
             }
 
             gl.MatrixMode(OpenGL.GL_MODELVIEW);
             gl.LoadIdentity();
+
             if (!Enable2DView)
             {
-                gl.Translate(translateX, translateY, translateZ);
+                gl.Translate(_translateX, _translateY, _translateZ);
             }
             else
             {
-                gl.Translate(translateX, translateY, 0);
-                gl.Scale(translateZ, -translateZ, 1);
+                gl.Translate(_translateX, _translateY, 0);
+                gl.Scale(_translateZ, -_translateZ, 1);
             }
-            gl.MultMatrix(rotationMatrix);
+
+            gl.MultMatrix(_rotationMatrix);
         }
+
+        #endregion
+
+        #region Matrix helpers
+
+        /// <summary>
+        /// Incrementally applies X-axis and Y-axis rotations (in degrees) around
+        /// <paramref name="rotationPt"/> to the accumulated rotation matrix.
+        /// </summary>
+        /// <param name="angleX">Rotation around the screen-horizontal axis (degrees).</param>
+        /// <param name="angleY">Rotation around the screen-vertical axis (degrees).</param>
+        /// <param name="rotationPt">World-space pivot, or <c>null</c> to use the point-cloud centre.</param>
         private void UpdateRotationMatrix(float angleX, float angleY, CxPoint3D? rotationPt = null)
         {
-            if (!rotationPt.HasValue)
-            {
-                rotationPt = pointCloudCenter; // Èç¹ûÃ»ÓÐÖ¸¶¨Ðý×ªµã£¬ÔòÊ¹ÓÃµãÔÆÖÐÐÄ
-            }
-            // Æ½ÒÆµ½Ðý×ªÖÐÐÄ
-            float[] translateToCenter = new float[16];
-            for (int i = 0; i < 16; i++)
-                translateToCenter[i] = (i % 5 == 0) ? 1.0f : 0.0f;
-            translateToCenter[12] = -rotationPt.Value.X;
-            translateToCenter[13] = -rotationPt.Value.Y;
-            translateToCenter[14] = -rotationPt.Value.Z;
+            CxPoint3D pivot = rotationPt ?? _pointCloudCenter;
 
-            // Æ½ÒÆ»ØÔ­µã
-            float[] translateBack = new float[16];
-            for (int i = 0; i < 16; i++)
-                translateBack[i] = (i % 5 == 0) ? 1.0f : 0.0f;
-            translateBack[12] = rotationPt.Value.X;
-            translateBack[13] = rotationPt.Value.Y;
-            translateBack[14] = rotationPt.Value.Z;
+            float[] toCenter = Identity4x4();
+            toCenter[12] = -pivot.X;
+            toCenter[13] = -pivot.Y;
+            toCenter[14] = -pivot.Z;
 
-            // ¼ÆËãÐý×ª¾ØÕó
-            float[] rotationX = new float[16];
-            float[] rotationY = new float[16];
-            for (int i = 0; i < 16; i++)
-            {
-                rotationX[i] = (i % 5 == 0) ? 1.0f : 0.0f;
-                rotationY[i] = (i % 5 == 0) ? 1.0f : 0.0f;
-            }
+            float[] toBack = Identity4x4();
+            toBack[12] = pivot.X;
+            toBack[13] = pivot.Y;
+            toBack[14] = pivot.Z;
 
             float cosX = (float)Math.Cos(angleX * Math.PI / 180.0);
             float sinX = (float)Math.Sin(angleX * Math.PI / 180.0);
             float cosY = (float)Math.Cos(angleY * Math.PI / 180.0);
             float sinY = (float)Math.Sin(angleY * Math.PI / 180.0);
 
-            rotationX[5] = cosX;
-            rotationX[6] = -sinX;
-            rotationX[9] = sinX;
-            rotationX[10] = cosX;
+            float[] rotX = Identity4x4();
+            rotX[5]  =  cosX; rotX[6]  = -sinX;
+            rotX[9]  =  sinX; rotX[10] =  cosX;
 
-            rotationY[0] = cosY;
-            rotationY[2] = sinY;
-            rotationY[8] = -sinY;
-            rotationY[10] = cosY;
+            float[] rotY = Identity4x4();
+            rotY[0]  =  cosY; rotY[2]  = sinY;
+            rotY[8]  = -sinY; rotY[10] = cosY;
 
-            // ¸üÐÂÐý×ª¾ØÕó
-            MultiplyMatrix(rotationMatrix, translateToCenter);
-            MultiplyMatrix(rotationMatrix, rotationX);
-            MultiplyMatrix(rotationMatrix, rotationY);
-            MultiplyMatrix(rotationMatrix, translateBack);
+            MultiplyMatrix(_rotationMatrix, toCenter);
+            MultiplyMatrix(_rotationMatrix, rotX);
+            MultiplyMatrix(_rotationMatrix, rotY);
+            MultiplyMatrix(_rotationMatrix, toBack);
         }
-        private void SetRotationMatrix(float angle, float x, float y, float z)
+
+        /// <summary>Returns a new 4Ã—4 column-major identity matrix.</summary>
+        private static float[] Identity4x4()
         {
-            float radians = angle * (float)Math.PI / 180.0f;
-            float cos = (float)Math.Cos(radians);
-            float sin = (float)Math.Sin(radians);
-            float oneMinusCos = 1.0f - cos;
-
-            rotationMatrix[0] = cos + x * x * oneMinusCos;
-            rotationMatrix[1] = x * y * oneMinusCos - z * sin;
-            rotationMatrix[2] = x * z * oneMinusCos + y * sin;
-            rotationMatrix[3] = 0.0f;
-
-            rotationMatrix[4] = y * x * oneMinusCos + z * sin;
-            rotationMatrix[5] = cos + y * y * oneMinusCos;
-            rotationMatrix[6] = y * z * oneMinusCos - x * sin;
-            rotationMatrix[7] = 0.0f;
-
-            rotationMatrix[8] = z * x * oneMinusCos - y * sin;
-            rotationMatrix[9] = z * y * oneMinusCos + x * sin;
-            rotationMatrix[10] = cos + z * z * oneMinusCos;
-            rotationMatrix[11] = 0.0f;
-
-            rotationMatrix[12] = 0.0f;
-            rotationMatrix[13] = 0.0f;
-            rotationMatrix[14] = 0.0f;
-            rotationMatrix[15] = 1.0f;
+            float[] m = new float[16];
+            for (int i = 0; i < 16; i++)
+                m[i] = (i % 5 == 0) ? 1.0f : 0.0f;
+            return m;
         }
+
+        /// <summary>
+        /// Right-multiplies <paramref name="result"/> by <paramref name="matrix"/> in place
+        /// (<c>result = result Ã— matrix</c>).
+        /// </summary>
         private void MultiplyMatrix(float[] result, float[] matrix)
         {
             float[] temp = new float[16];
-            for (int i = 0; i < 4; i++)
-            {
-                for (int j = 0; j < 4; j++)
+            for (int row = 0; row < 4; row++)
+                for (int col = 0; col < 4; col++)
                 {
-                    temp[i * 4 + j] = 0;
+                    temp[row * 4 + col] = 0;
                     for (int k = 0; k < 4; k++)
-                    {
-                        temp[i * 4 + j] += result[i * 4 + k] * matrix[k * 4 + j];
-                    }
+                        temp[row * 4 + col] += result[row * 4 + k] * matrix[k * 4 + col];
                 }
-            }
             Array.Copy(temp, result, 16);
         }
+
+        /// <summary>
+        /// Un-projects the depth-buffer value at the given screen pixel to a world-space point.
+        /// Returns <c>null</c> if the pixel hits the far plane.
+        /// </summary>
         private CxPoint3D? GetMouseWorldPosition(int mouseX, int mouseY)
         {
-            OpenGL gl = openGLControl.OpenGL;
+            var gl = _glControl.OpenGL;
 
             int[] viewport = new int[4];
             gl.GetInteger(OpenGL.GL_VIEWPORT, viewport);
-            // µ÷ÕûY×ø±ê£¨OpenGL×ø±êÏµÔ­µãÔÚ×óÏÂ½Ç£©
             int adjustedY = viewport[3] - mouseY;
-            // ÎªÉî¶ÈÖµ´´½¨byteÊý×é
-            byte[] depthBuffer = new byte[4]; // µ¥¸öfloatÖµÐèÒª4¸ö×Ö½Ú
-            // ¶ÁÈ¡Éî¶ÈÖµµ½byteÊý×é
-            gl.ReadPixels(mouseX, adjustedY, 1, 1, OpenGL.GL_DEPTH_COMPONENT, OpenGL.GL_FLOAT, depthBuffer);
-            // ½«byteÊý×é×ª»»Îªfloat
-            float depth = BitConverter.ToSingle(depthBuffer, 0);
-            // ÔÚ×ª»»×ø±êÖ®Ç°¼ì²éÉî¶ÈÖµ
-            if (Math.Abs(depth - 1.0f) < 0.00001f)
-            {
-                // Éî¶ÈÖµÎª1.0£¬±íÊ¾µã»÷ÁË±³¾°
-                return null; // »òÕß·µ»ØÒ»¸öÌØÊâÖµ±íÊ¾ÎÞÐ§µã»÷
-            }
 
-            // ½«ÆÁÄ»×ø±ê×ª»»ÎªÊÀ½ç×ø±ê
+            byte[] depthBytes = new byte[4];
+            gl.ReadPixels(mouseX, adjustedY, 1, 1,
+                OpenGL.GL_DEPTH_COMPONENT, OpenGL.GL_FLOAT, depthBytes);
+            float depth = BitConverter.ToSingle(depthBytes, 0);
+
+            if (Math.Abs(depth - 1.0f) < 0.00001f) return null;
+
             var obj = gl.UnProject((double)mouseX, (double)adjustedY, (double)depth);
             return new CxPoint3D((float)obj[0], (float)obj[1], (float)obj[2]);
         }
-        // ½«µãÓ¦ÓÃÄæÐý×ª¾ØÕó
+
+        /// <summary>
+        /// Transforms <paramref name="point"/> by the transpose (inverse for pure-rotation matrices)
+        /// of the current rotation matrix.
+        /// </summary>
         private CxPoint3D ApplyInverseRotation(CxPoint3D point)
         {
-            // ¼ÆËãÐý×ª¾ØÕóµÄÄæ¾ØÕó
-            float[] inverseRotationMatrix = new float[16];
-            Array.Copy(rotationMatrix, inverseRotationMatrix, 16);
-            InvertMatrix(inverseRotationMatrix);
+            float[] inv = new float[16];
+            Array.Copy(_rotationMatrix, inv, 16);
+            TransposeRotation(inv);
 
-            // ½«µã×ª»»ÎªÆë´Î×ø±ê
-            float[] pointVector = { point.X, point.Y, point.Z, 1.0f };
-            float[] resultVector = new float[4];
-
-            // Ó¦ÓÃÄæÐý×ª¾ØÕó
+            float[] v = { point.X, point.Y, point.Z, 1.0f };
+            float[] r = new float[4];
             for (int i = 0; i < 4; i++)
             {
-                resultVector[i] = 0;
+                r[i] = 0;
                 for (int j = 0; j < 4; j++)
-                {
-                    resultVector[i] += inverseRotationMatrix[i * 4 + j] * pointVector[j];
-                }
+                    r[i] += inv[i * 4 + j] * v[j];
             }
 
-            // ·µ»Ø×ª»»ºóµÄµã
-            return new CxPoint3D(resultVector[0], resultVector[1], resultVector[2]);
+            return new CxPoint3D(r[0], r[1], r[2]);
         }
-        // ¾ØÕóÇóÄæ
-        private void InvertMatrix(float[] matrix)
+
+        /// <summary>
+        /// Transposes the 3Ã—3 rotation sub-matrix of a 4Ã—4 column-major matrix in place.
+        /// Equivalent to inverting a pure-rotation matrix.
+        /// </summary>
+        private static void TransposeRotation(float[] matrix)
         {
-            // ÎªÁË¼ò»¯£¬ÕâÀï¼ÙÉè¾ØÕóÊÇÕý½»¾ØÕó£¬Ö±½Ó×ªÖÃ¼´¿É
             for (int i = 0; i < 3; i++)
-            {
                 for (int j = i + 1; j < 3; j++)
                 {
-                    float temp = matrix[i * 4 + j];
-                    matrix[i * 4 + j] = matrix[j * 4 + i];
-                    matrix[j * 4 + i] = temp;
+                    float tmp           = matrix[i * 4 + j];
+                    matrix[i * 4 + j]   = matrix[j * 4 + i];
+                    matrix[j * 4 + i]   = tmp;
                 }
-            }
         }
 
+        #endregion
+
+        #region IDisposable
+
+        /// <summary>Releases event subscriptions.</summary>
         protected virtual void Dispose(bool disposing)
         {
-            if (!disposedValue)
+            if (!_disposed)
             {
-                if (disposing)
+                if (disposing && _glControl != null)
                 {
-                    // ×¢ÏúÊÂ¼þ£¬·ÀÖ¹ÄÚ´æÐ¹Â©
-                    if (openGLControl != null)
-                    {
-                        openGLControl.MouseDown -= OpenGLControl_MouseDown;
-                        openGLControl.MouseMove -= OpenGLControl_MouseMove;
-                        openGLControl.MouseUp -= OpenGLControl_MouseUp;
-                        openGLControl.MouseWheel -= OpenGLControl_MouseWheel;
-                        openGLControl.MouseDoubleClick -= OpenGLControl_MouseDoubleClick;
-                    }
+                    _glControl.MouseDown        -= GlControl_MouseDown;
+                    _glControl.MouseMove        -= GlControl_MouseMove;
+                    _glControl.MouseUp          -= GlControl_MouseUp;
+                    _glControl.MouseWheel       -= GlControl_MouseWheel;
+                    _glControl.MouseDoubleClick -= GlControl_MouseDoubleClick;
                 }
-
-                disposedValue = true;
+                _disposed = true;
             }
         }
+
+        /// <inheritdoc/>
         public void Dispose()
         {
-            // ²»Òª¸ü¸Ä´Ë´úÂë¡£Çë½«ÇåÀí´úÂë·ÅÈë¡°Dispose(bool disposing)¡±·½·¨ÖÐ
-            Dispose(disposing: true);
+            Dispose(true);
             GC.SuppressFinalize(this);
         }
 
-        // // TODO: ½öµ±¡°Dispose(bool disposing)¡±ÓµÓÐÓÃÓÚÊÍ·ÅÎ´ÍÐ¹Ü×ÊÔ´µÄ´úÂëÊ±²ÅÌæ´úÖÕ½áÆ÷
-        ~CxTrackBallCamera()
-        {
-            // ²»Òª¸ü¸Ä´Ë´úÂë¡£Çë½«ÇåÀí´úÂë·ÅÈë¡°Dispose(bool disposing)¡±·½·¨ÖÐ
-            Dispose(disposing: false);
-        }
+        /// <summary>Finalizer â€” releases event subscriptions if <see cref="Dispose()"/> was not called.</summary>
+        ~CxTrackBallCamera() => Dispose(false);
+
         #endregion
     }
 }

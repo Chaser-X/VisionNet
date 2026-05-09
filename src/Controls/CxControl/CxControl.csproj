@@ -85,7 +85,7 @@
     <EmbeddedResource Include="CxDisplay.resx">
       <DependentUpon>CxDisplay.cs</DependentUpon>
     </EmbeddedResource>
-    <Compile Include="ICamera.cs" />
+    <Compile Include="Camera\ICamera.cs" />
     <Compile Include="Camera\CxAdvancedTrackBallCamera.cs" />
     <Compile Include="Camera\CxTrackBallCamera.cs" />
     <Compile Include="RenderItem\Enums.cs" />

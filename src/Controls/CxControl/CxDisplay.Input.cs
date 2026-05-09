@@ -1,64 +1,21 @@
 using System;
 using System.Collections.Generic;
-using System.Drawing;
-using System.Numerics;
 using System.Windows.Forms;
 using SharpGL;
 using VisionNet.DataType;
 
 namespace VisionNet.Controls
 {
+    /// <summary>Mouse interaction, coordinate picking, and context-menu event handlers.</summary>
     public partial class CxDisplay
     {
-        /// <summary>
-        /// Resets the display. Clears all overlay geometry and reinitializes HUD items.
-        /// If <paramref name="resetAll"/> is <c>true</c>, also clears surface items (point clouds / meshes).
-        /// </summary>
-        /// <param name="resetAll">When <c>true</c>, removes all surface items in addition to overlays.</param>
-        public void ResetView(bool resetAll = true)
-        {
-            _renderItems.ForEach(item => item.Dispose());
-            _renderItems.Clear();
-
-            _coordinationItem = new CxCoordinateSystemItem();
-            _coordTagItem     = new CxCoordinationTagItem();
-            _colorBarItem     = new CxColorBarItem();
-
-            if (resetAll)
-                ClearSurfaceItems();
-
-            Invalidate();
-        }
-
-        /// <summary>Sets the camera focus (rotation pivot) to the given world-space position.</summary>
-        /// <param name="center">Target point in world space.</param>
-        public void SetViewCenter(CxPoint3D center)
-        {
-            _camera.FocusOnPoint(new Vector3(center.X, center.Y, center.Z));
-            Invalidate();
-        }
-
-        /// <summary>Sets the camera up-direction vector.</summary>
-        /// <param name="upDirection">Desired up vector in world space.</param>
-        public void SetViewUpDirection(CxVector3D upDirection)
-        {
-            _camera.SetDefaultUpView(new Vector3(upDirection.X, upDirection.Y, upDirection.Z));
-        }
-
-        /// <inheritdoc/>
-        protected override void DoGDIDraw(RenderEventArgs e) => base.DoGDIDraw(e);
-
-        /// <inheritdoc/>
-        protected override void OnResize(EventArgs e)
-        {
-            base.OnResize(e);
-            _camera?.LookAtMatrix(OpenGL);
-        }
+        // ── Mouse events ─────────────────────────────────────────────────────────
 
         /// <inheritdoc/>
         protected override void OnMouseDown(MouseEventArgs e)
         {
             _isMouseDown = true;
+            // Set the rotation pivot to the surface point under the cursor.
             _camera.RotationPoint = GetNearestSurfacePoint(e.X, e.Y).Location;
             base.OnMouseDown(e);
         }
@@ -86,9 +43,11 @@ namespace VisionNet.Controls
             base.OnMouseMove(e);
         }
 
+        // ── Coordinate picking ───────────────────────────────────────────────────
+
         /// <summary>
         /// Reads the depth buffer at the given screen pixel and un-projects it to a world-space point.
-        /// Returns <c>null</c> if the pixel hits the far plane (no geometry).
+        /// Returns <c>null</c> when the pixel hits the far plane (no geometry present).
         /// </summary>
         private CxPoint3D? ScreenToWorldCoordinate(int mouseX, int mouseY)
         {
@@ -98,10 +57,11 @@ namespace VisionNet.Controls
             int adjustedY = viewport[3] - mouseY;   // OpenGL Y is bottom-up.
 
             byte[] depthBytes = new byte[4];
-            gl.ReadPixels(mouseX, adjustedY, 1, 1, OpenGL.GL_DEPTH_COMPONENT, OpenGL.GL_FLOAT, depthBytes);
+            gl.ReadPixels(mouseX, adjustedY, 1, 1,
+                OpenGL.GL_DEPTH_COMPONENT, OpenGL.GL_FLOAT, depthBytes);
             float depth = BitConverter.ToSingle(depthBytes, 0);
 
-            if (Math.Abs(depth - 1.0f) < 0.00001f) return null;   // Far plane → no hit.
+            if (Math.Abs(depth - 1.0f) < 0.00001f) return null;
 
             var obj = gl.UnProject(mouseX, adjustedY, depth);
             return new CxPoint3D((float)obj[0], (float)obj[1], (float)obj[2]);
@@ -109,10 +69,10 @@ namespace VisionNet.Controls
 
         /// <summary>
         /// Finds the surface point nearest to the given screen pixel across all active surface items.
-        /// For structured surfaces a 5×5 neighbourhood search is performed; mesh-type items contribute
-        /// the un-projected world coordinate directly.
+        /// Structured surfaces use a 5×5 neighbourhood grid search; mesh-type items
+        /// and unordered point clouds contribute the un-projected world coordinate directly.
         /// </summary>
-        /// <returns>The nearest location and its intensity value, or <c>(null, null)</c> if none found.</returns>
+        /// <returns>Nearest world-space location and its intensity, or <c>(null, null)</c> if no hit.</returns>
         private (CxPoint3D? Location, byte? Intensity) GetNearestSurfacePoint(int mouseX, int mouseY)
         {
             var pos = ScreenToWorldCoordinate(mouseX, mouseY);
@@ -133,20 +93,20 @@ namespace VisionNet.Controls
             {
                 if (cur == null || cur.IsDisposed) continue;
 
-                // Mesh items: no per-point grid to refine; use the world coordinate directly.
+                // Mesh items: no per-point grid; use the world coordinate directly.
                 if (cur is CxMeshItem || cur is CxMeshAdvancedItem)
                 {
                     if (0f < bestDist) { bestDist = 0f; bestPoint = world; bestIntensity = null; }
                     continue;
                 }
 
-                // Resolve the underlying CxSurface from supported item types.
+                // Resolve the underlying CxSurface.
                 CxSurface surface = null;
                 if      (cur is CxSurfaceItem        si) surface = si.Surface;
                 else if (cur is CxSurfaceAdvancedItem ai) surface = ai.Surface;
                 if (surface == null) continue;
 
-                // Unordered point cloud: no grid structure to search; use world coordinate.
+                // Unordered point cloud: no grid; use world coordinate.
                 if (surface.Type != SurfaceType.Surface)
                 {
                     if (0f < bestDist) { bestDist = 0f; bestPoint = world; bestIntensity = null; }

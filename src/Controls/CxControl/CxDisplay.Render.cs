@@ -1,9 +1,11 @@
+using System;
 using System.Collections.Generic;
 using SharpGL;
 using SharpGL.SceneGraph;
 
 namespace VisionNet.Controls
 {
+    /// <summary>Render pipeline: GL lifecycle callbacks, frame processing, and draw dispatch.</summary>
     public partial class CxDisplay
     {
         /// <inheritdoc/>
@@ -15,8 +17,8 @@ namespace VisionNet.Controls
         }
 
         /// <summary>
-        /// Main render callback. Releases deferred GL resources, creates new ones,
-        /// then issues all draw calls.
+        /// Main render callback invoked each frame. Releases deferred GL resources,
+        /// creates/updates new ones, then issues all draw calls.
         /// </summary>
         protected override void DoOpenGLDraw(RenderEventArgs e)
         {
@@ -26,10 +28,10 @@ namespace VisionNet.Controls
             var gl = OpenGL;
             gl.Clear(OpenGL.GL_COLOR_BUFFER_BIT | OpenGL.GL_DEPTH_BUFFER_BIT);
 
-            // 1. Release GL resources that were dequeued by Dispose/Replace on another thread.
+            // 1. Release GL resources dequeued by Dispose/Replace on another thread.
             ProcessPendingRelease(gl);
 
-            // 2. Create or update GL resources for all items (full lock prevents concurrent Dispose).
+            // 2. Create or update GL resources (full lock prevents concurrent Dispose).
             ProcessResourcePool(gl);
 
             gl.Enable(OpenGL.GL_DEPTH_TEST);
@@ -45,6 +47,16 @@ namespace VisionNet.Controls
             gl.Disable(OpenGL.GL_BLEND);
         }
 
+        /// <inheritdoc/>
+        protected override void DoGDIDraw(RenderEventArgs e) => base.DoGDIDraw(e);
+
+        /// <inheritdoc/>
+        protected override void OnResize(EventArgs e)
+        {
+            base.OnResize(e);
+            _camera?.LookAtMatrix(OpenGL);
+        }
+
         /// <summary>Releases all GL resource handles waiting in the deferred-release queue.</summary>
         private void ProcessPendingRelease(OpenGL gl)
         {
@@ -54,7 +66,7 @@ namespace VisionNet.Controls
 
         /// <summary>
         /// Iterates the resource pool under full lock.
-        /// Creates GL resources for new items and recreates them for items whose data changed.
+        /// Creates GL resources for new items and recreates them for items whose CPU data changed.
         /// </summary>
         private void ProcessResourcePool(OpenGL gl)
         {
@@ -79,20 +91,21 @@ namespace VisionNet.Controls
         }
 
         /// <summary>
-        /// Issues all draw calls for one frame: coordinate system, surface items (with unified Z range),
-        /// color bar, coord tag, and overlay geometry.
+        /// Issues all draw calls for one frame:
+        /// world-space coordinate system → surface items (unified Z range) →
+        /// color bar → coord tag → overlay geometry → screen-space axes indicator.
         /// </summary>
         private void Render(OpenGL gl)
         {
             if (!_camera.Enable2DView && ShowCoordinateSystem)
                 _coordinationItem.Draw(gl);
 
-            // Take a lock-free snapshot to avoid holding the lock during GL calls.
+            // Snapshot under lock so GL calls are issued without holding it.
             List<ICxObjRenderItem> snapshot;
             lock (_resourceLock)
                 snapshot = new List<ICxObjRenderItem>(_surfaceItems);
 
-            // Phase 1: compute global Z range across all non-intensity items.
+            // Phase 1 — compute global Z range across all non-intensity items.
             float globalZMin = float.MaxValue, globalZMax = float.MinValue;
             foreach (var cur in snapshot)
             {
@@ -104,17 +117,15 @@ namespace VisionNet.Controls
                 }
             }
 
-            // Phase 2: propagate unified Z range so all items share the same color mapping.
+            // Phase 2 — propagate unified Z range so all items share the same colour mapping.
             if (globalZMin < globalZMax)
             {
                 foreach (var cur in snapshot)
-                {
                     if (cur != null && !cur.IsDisposed)
                         cur.SetGlobalZRange(globalZMin, globalZMax);
-                }
             }
 
-            // Phase 3: draw all surface items.
+            // Phase 3 — draw surface items.
             bool anyDrawn = false;
             foreach (var cur in snapshot)
             {
@@ -130,19 +141,17 @@ namespace VisionNet.Controls
                 anyDrawn = true;
             }
 
-            // Phase 4: draw HUD overlays.
+            // Phase 4 — HUD overlays.
             if (anyDrawn && globalZMin < globalZMax)
             {
                 _colorBarItem.SetRange(globalZMin, globalZMax);
                 _colorBarItem.Draw(gl);
             }
-
             if (anyDrawn)
                 _coordTagItem.Draw(gl);
 
-            // Phase 5: draw overlay geometry (segments, points, etc.).
-            var overlays = _renderItems.ToArray();
-            foreach (var item in overlays)
+            // Phase 5 — overlay geometry (segments, points, polygons, etc.).
+            foreach (var item in _renderItems.ToArray())
                 item.Draw(gl);
 
             if (!_camera.Enable2DView)

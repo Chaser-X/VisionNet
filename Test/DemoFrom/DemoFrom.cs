@@ -91,7 +91,7 @@ namespace DemoFrom
                     if (surfaceIntensityMsg != null)
                     {
                         IntPtr intensityPtr = surfaceIntensityMsg.Data;
-                        surface.SetInetnsity(intensityPtr);
+                        surface.SetIntensity(intensityPtr);
                     }
 
                     IntPtr surfacePtr2 = surfaceMsg.Data;
@@ -100,7 +100,7 @@ namespace DemoFrom
                     if (surfaceIntensityMsg != null)
                     {
                         IntPtr intensityPtr2 = surfaceIntensityMsg.Data;
-                        surface2.SetInetnsity(intensityPtr2);
+                        surface2.SetIntensity(intensityPtr2);
                     }
                 }
                 else
@@ -139,7 +139,7 @@ namespace DemoFrom
                     if (surfaceIntensityMsg != null)
                     {
                         IntPtr intensityPtr = surfaceIntensityMsg.Data;
-                        surface.SetInetnsity(intensityPtr);
+                        surface.SetIntensity(intensityPtr);
                     }
                 }
             }
@@ -183,7 +183,7 @@ namespace DemoFrom
             var points = surface.ToPoints();
             var heights = new float[points.Length];
             var intensitys = new byte[points.Length];
-            var surfacemap = VisionOperator.UniformSuface(points, surface.Intensity, 200, 3500,
+            var surfacemap = VisionOperator.UniformSurface(points, surface.Intensity, 200, 3500,
                 0.1f, 0.1f, surface.ZScale, -10, -175, surface.ZOffset);
 
             cxDisplay1.SetPointCloud(surfacemap);
