@@ -28,8 +28,6 @@ namespace VisionNet.Controls
             = new ConcurrentQueue<GLResourceHandle>();
 
         private readonly List<ICxObjRenderItem> _surfaceItems = new List<ICxObjRenderItem>();
-        private ICxObjRenderItem PrimaryItem =>
-            _surfaceItems.Count > 0 ? _surfaceItems[0] : null;
         private CxCoordinateSystemItem coordinationItem = new CxCoordinateSystemItem();
         private CxColorBarItem colorBarItem = new CxColorBarItem();
         private CxCoordinationTagItem coorTagItem = new CxCoordinationTagItem();
@@ -790,38 +788,40 @@ namespace VisionNet.Controls
             if (!pos.HasValue) return (null, null);
             var world = pos.Value;
 
-            var cur = PrimaryItem;
-            if (cur == null || cur.IsDisposed) return (null, null);
+            List<ICxObjRenderItem> snapshot;
+            lock (_resourceLock)
+                snapshot = new List<ICxObjRenderItem>(_surfaceItems);
 
-            if (cur is CxMeshItem || cur is CxMeshAdvancedItem)
-                return (world, null);
+            if (snapshot.Count == 0) return (null, null);
 
-            CxSurface surface = null;
-            if (cur is CxSurfaceItem si)
-            {
-                if (si.Surface == null) return (null, null);
-                surface = si.Surface;
-            }
-            else if (cur is CxSurfaceAdvancedItem ai)
-            {
-                if (ai.Surface == null) return (null, null);
-                surface = ai.Surface;
-            }
-            else
-            {
-                return (null, null);
-            }
+            CxPoint3D? bestPoint = null;
+            byte? bestIntensity = null;
+            float bestDist = float.MaxValue;
 
-            CxPoint3D? nearest = null;
-            byte? nearestIntensity = null;
-            float minDist = float.MaxValue;
-
-            if (surface.Type == SurfaceType.Surface)
+            foreach (var cur in snapshot)
             {
+                if (cur == null || cur.IsDisposed) continue;
+
+                if (cur is CxMeshItem || cur is CxMeshAdvancedItem)
+                {
+                    if (0f < bestDist) { bestDist = 0f; bestPoint = world; bestIntensity = null; }
+                    continue;
+                }
+
+                CxSurface surface = null;
+                if      (cur is CxSurfaceItem        si) surface = si.Surface;
+                else if (cur is CxSurfaceAdvancedItem ai) surface = ai.Surface;
+                if (surface == null) continue;
+
+                if (surface.Type != SurfaceType.Surface)
+                {
+                    if (0f < bestDist) { bestDist = 0f; bestPoint = world; bestIntensity = null; }
+                    continue;
+                }
+
                 int xi = (int)((world.X - surface.XOffset) / surface.XScale);
                 int yi = (int)((world.Y - surface.YOffset) / surface.YScale);
-                if (xi < 0 || xi >= surface.Width || yi < 0 || yi >= surface.Length)
-                    return (null, null);
+                if (xi < 0 || xi >= surface.Width || yi < 0 || yi >= surface.Length) continue;
 
                 float threshold = 5 * (surface.XScale * surface.XScale
                                      + surface.YScale * surface.YScale
@@ -846,22 +846,18 @@ namespace VisionNet.Controls
                                 + (y - world.Y) * (y - world.Y)
                                 + (z - world.Z) * (z - world.Z);
 
-                        if (d < minDist && d < threshold)
+                        if (d < bestDist && d < threshold)
                         {
-                            minDist = d;
-                            nearest = new CxPoint3D(x, y, z);
-                            if (surface.Intensity != null && surface.Intensity.Length > idx)
-                                nearestIntensity = surface.Intensity[idx];
+                            bestDist = d;
+                            bestPoint = new CxPoint3D(x, y, z);
+                            bestIntensity = (surface.Intensity != null && surface.Intensity.Length > idx)
+                                ? surface.Intensity[idx] : (byte?)null;
                         }
                     }
                 }
             }
-            else
-            {
-                nearest = world;
-            }
 
-            return (nearest, nearestIntensity);
+            return (bestPoint, bestIntensity);
         }
 
         #endregion
