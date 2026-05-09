@@ -399,9 +399,27 @@ namespace VisionNet.Controls
             lock (_resourceLock)
                 snapshot = new List<ICxObjRenderItem>(_surfaceItems);
 
-            float zMin = float.MaxValue, zMax = float.MinValue;
-            bool anyDrawn = false;
+            float globalZMin = float.MaxValue, globalZMax = float.MinValue;
+            foreach (var cur in snapshot)
+            {
+                if (cur == null || cur.IsDisposed) continue;
+                if (cur.SurfaceColorMode != SurfaceColorMode.Intensity)
+                {
+                    if (cur.ZMin < globalZMin) globalZMin = cur.ZMin;
+                    if (cur.ZMax > globalZMax) globalZMax = cur.ZMax;
+                }
+            }
 
+            if (globalZMin < globalZMax)
+            {
+                foreach (var cur in snapshot)
+                {
+                    if (cur != null && !cur.IsDisposed)
+                        cur.SetGlobalZRange(globalZMin, globalZMax);
+                }
+            }
+
+            bool anyDrawn = false;
             foreach (var cur in snapshot)
             {
                 if (cur == null || cur.IsDisposed) continue;
@@ -414,17 +432,11 @@ namespace VisionNet.Controls
 
                 cur.Draw(gl, handle);
                 anyDrawn = true;
-
-                if (cur.SurfaceColorMode != SurfaceColorMode.Intensity)
-                {
-                    if (cur.ZMin < zMin) zMin = cur.ZMin;
-                    if (cur.ZMax > zMax) zMax = cur.ZMax;
-                }
             }
 
-            if (anyDrawn && zMin < zMax)
+            if (anyDrawn && globalZMin < globalZMax)
             {
-                colorBarItem.SetRange(zMin, zMax);
+                colorBarItem.SetRange(globalZMin, globalZMax);
                 colorBarItem.Draw(gl);
             }
 

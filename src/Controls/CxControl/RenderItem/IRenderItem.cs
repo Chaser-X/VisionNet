@@ -126,5 +126,11 @@ namespace VisionNet.Controls
 
         /// <summary>执行渲染，使用 CxDisplay 传入的已创建好的 GL 资源句柄。</summary>
         void Draw(OpenGL gl, GLResourceHandle handle);
+
+        /// <summary>
+        /// 由 CxDisplay 在每帧渲染前调用，传入所有 Item 合并后的全局 Z 范围。
+        /// 使 Item 的颜色渲染与颜色条保持一致。
+        /// </summary>
+        void SetGlobalZRange(float zMin, float zMax);
     }
 }

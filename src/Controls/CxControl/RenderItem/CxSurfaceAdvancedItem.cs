@@ -237,6 +237,20 @@ namespace VisionNet.Controls
             gl.UseProgram(0);
         }
 
+        public void SetGlobalZRange(float zMin, float zMax)
+        {
+            if (_surfaceColorMode == SurfaceColorMode.Intensity) return;
+            if (Math.Abs(ZMin - zMin) < 1e-6f && Math.Abs(ZMax - zMax) < 1e-6f) return;
+
+            ZMin = zMin;
+            ZMax = zMax;
+            if (_cachedRenderData?.Uniforms != null)
+            {
+                _cachedRenderData.Uniforms["zMin"] = zMin;
+                _cachedRenderData.Uniforms["zMax"] = zMax;
+            }
+        }
+
         public void Dispose()
         {
             if (IsDisposed) return;

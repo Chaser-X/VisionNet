@@ -145,6 +145,17 @@ namespace VisionNet.Controls
             gl.DisableClientState(OpenGL.GL_COLOR_ARRAY);
         }
 
+        public void SetGlobalZRange(float zMin, float zMax)
+        {
+            if (_surfaceColorMode == SurfaceColorMode.Intensity) return;
+            if (Math.Abs(ZMin - zMin) < 1e-6f && Math.Abs(ZMax - zMax) < 1e-6f) return;
+
+            ZMin = zMin;
+            ZMax = zMax;
+            _cachedRenderData = null;
+            OnRenderDataChanged?.Invoke();
+        }
+
         public void Dispose()
         {
             if (IsDisposed) return;
