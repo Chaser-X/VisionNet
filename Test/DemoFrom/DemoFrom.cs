@@ -41,9 +41,13 @@ VisionOperator.InitialLib();
             cxDisplay1.SetViewUpDirection(new CxVector3D(-1, 0, 0));
         }
         CxSurface surface = null;
+        CxSurface surface2 = null;
+
         private void onData(GoDataSet obj)
         {
             surface = null;
+            surface2 = null;
+
             GoDataMsg msg = null;
             GoSurfaceIntensityMsg surfaceIntensityMsg = null;
             for (UInt32 i = 0; i < obj.Count; i++)
@@ -89,7 +93,16 @@ VisionOperator.InitialLib();
                     if (surfaceIntensityMsg != null)
                     {
                         IntPtr intensityPtr = surfaceIntensityMsg.Data;
-                        surface.SetInetnsity(intensityPtr);
+                        surface.SetIntensity(intensityPtr);
+                    }
+
+                    IntPtr surfacePtr2 = surfaceMsg.Data;
+                    surface2 = new CxSurface((int)width, (int)length, new short[bufferSize], new byte[0], xoffset + 10, yoffset, zoffset + 10, xscale, yscale, zscale, SurfaceType.Surface);
+                    surface2.SetData(surfacePtr2);
+                    if (surfaceIntensityMsg != null)
+                    {
+                        IntPtr intensityPtr2 = surfaceIntensityMsg.Data;
+                        surface2.SetIntensity(intensityPtr2);
                     }
                 }
                 else
@@ -128,7 +141,7 @@ VisionOperator.InitialLib();
                     if (surfaceIntensityMsg != null)
                     {
                         IntPtr intensityPtr = surfaceIntensityMsg.Data;
-                        surface.SetInetnsity(intensityPtr);
+                        surface.SetIntensity(intensityPtr);
                     }
                 }
             }
@@ -136,6 +149,8 @@ VisionOperator.InitialLib();
             //cxDisplay1.SurfaceMode = SurfaceMode.Mesh;
             //cxDisplay1.SurfaceColorMode = SurfaceColorMode.Intensity;
             cxDisplay1.SetSurfaceAdvancedItem(surface);
+            cxDisplay1.AddSurfaceAdvancedItem(surface2);
+
             ////添加平面 Plane3D
             //var plane = new Plane3D(new CxPoint3D(0, 0, 0), new CxVector3D(1, 1, 1));
             //cxDisplay1.SetPlane(plane, Color.FromArgb(100, Color.Blue));
@@ -171,7 +186,7 @@ VisionOperator.InitialLib();
             var points = surface.ToPoints();
             var heights = new float[points.Length];
             var intensitys = new byte[points.Length];
-            var surfacemap = VisionOperator.UniformSuface(points, surface.Intensity, 200, 3500,
+            var surfacemap = VisionOperator.UniformSurface(points, surface.Intensity, 200, 3500,
                 0.1f, 0.1f, surface.ZScale, -10, -175, surface.ZOffset);
 
             cxDisplay1.SetPointCloud(surfacemap);

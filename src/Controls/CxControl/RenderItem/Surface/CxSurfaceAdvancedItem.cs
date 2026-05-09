@@ -5,6 +5,11 @@ using VisionNet.DataType;
 
 namespace VisionNet.Controls
 {
+    /// <summary>
+    /// High-performance surface renderer using a VAO + GLSL shader pipeline with intensity texture.
+    /// Supports automatic down-sampling when the point count exceeds <c>maxPointCount</c>.
+    /// Colour mode changes update shader uniforms only — no VBO rebuild needed.
+    /// </summary>
     public class CxSurfaceAdvancedItem : ICxObjRenderItem
     {
         public event Action OnDisposed;
@@ -235,6 +240,20 @@ namespace VisionNet.Controls
             gl.BindTexture(OpenGL.GL_TEXTURE_2D, 0);
             gl.BindVertexArray(0);
             gl.UseProgram(0);
+        }
+
+        public void SetGlobalZRange(float zMin, float zMax)
+        {
+            if (_surfaceColorMode == SurfaceColorMode.Intensity) return;
+            if (Math.Abs(ZMin - zMin) < 1e-6f && Math.Abs(ZMax - zMax) < 1e-6f) return;
+
+            ZMin = zMin;
+            ZMax = zMax;
+            if (_cachedRenderData?.Uniforms != null)
+            {
+                _cachedRenderData.Uniforms["zMin"] = zMin;
+                _cachedRenderData.Uniforms["zMax"] = zMax;
+            }
         }
 
         public void Dispose()

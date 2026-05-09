@@ -1,15 +1,23 @@
 using SharpGL;
 using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
 using VisionNet.DataType;
 
 namespace VisionNet.Controls
 {
-    public class CxMeshItem : ICxObjRenderItem
+    /// <summary>
+    /// Renders a <see cref="CxSurface"/> as a point cloud or triangle mesh using the
+    /// fixed-function OpenGL pipeline (VBO + colour array).
+    /// Colours are baked into the VBO at prepare time; changing colour mode or the
+    /// global Z range triggers a VBO rebuild via <see cref="ICxObjRenderItem.OnRenderDataChanged"/>.
+    /// </summary>
+    public class CxSurfaceItem : ICxObjRenderItem
     {
         public event Action OnDisposed;
         public event Action OnRenderDataChanged;
 
-        public CxMesh Mesh { get; private set; }
+        public CxSurface Surface { get; private set; }
         public bool IsDisposed { get; private set; } = false;
         public float ZMin { get; set; }
         public float ZMax { get; set; }
@@ -19,7 +27,12 @@ namespace VisionNet.Controls
         public SurfaceMode SurfaceMode
         {
             get => _surfaceMode;
-            set => _surfaceMode = value; // 只影响 Draw() 的绘制调用，无需重建资源
+            set
+            {
+                // SurfaceMode 只影响 Draw() 选择 DrawArrays 还是 DrawElements
+                // 索引始终预计算，无需重建 GL 资源
+                _surfaceMode = value;
+            }
         }
 
         private SurfaceColorMode _surfaceColorMode;
@@ -31,6 +44,7 @@ namespace VisionNet.Controls
                 if (_surfaceColorMode != value)
                 {
                     _surfaceColorMode = value;
+                    // 颜色数组已缓存到 VBO，Mode 变化需重建
                     _cachedRenderData = null;
                     OnRenderDataChanged?.Invoke();
                 }
@@ -39,15 +53,17 @@ namespace VisionNet.Controls
 
         private RenderData _cachedRenderData;
 
-        public CxMeshItem(CxMesh mesh,
+        public CxSurfaceItem(CxSurface surface,
             SurfaceMode surfaceMode = SurfaceMode.PointCloud,
             SurfaceColorMode surfaceColorMode = SurfaceColorMode.Color)
         {
-            Mesh = mesh;
+            Surface = surface;
             _surfaceMode = surfaceMode;
             _surfaceColorMode = surfaceColorMode;
 
-            BoundingBox = CxExtension.CalculateBoundingBox(mesh?.Vertexs);
+            BoundingBox = surface?.Data != null && surface.Data.Length > 0
+                ? CxExtension.CalculateBoundingBox(surface.ToPoints())
+                : null;
             ZMax = (float)(BoundingBox?.Center.Z + BoundingBox?.Size.Depth / 2);
             ZMin = (float)(BoundingBox?.Center.Z - BoundingBox?.Size.Depth / 2);
         }
@@ -56,22 +72,22 @@ namespace VisionNet.Controls
         {
             if (_cachedRenderData != null) return _cachedRenderData;
 
-            if (IsDisposed || Mesh == null || Mesh.Vertexs == null || Mesh.Vertexs.Length == 0
-                || Mesh.Indices == null || Mesh.Indices.Length == 0)
+            if (IsDisposed || Surface == null || Surface.Data == null || Surface.Data.Length == 0)
                 return null;
 
-            var vertices = new float[Mesh.Vertexs.Length * 3];
-            var colors   = new float[Mesh.Vertexs.Length * 3];
+            var points = Surface.ToPoints();
+            var vertices = new float[points.Length * 3];
+            var colors = new float[points.Length * 3];
 
-            for (int i = 0; i < Mesh.Vertexs.Length; i++)
+            for (int i = 0; i < points.Length; i++)
             {
-                vertices[i * 3]     = Mesh.Vertexs[i].X;
-                vertices[i * 3 + 1] = Mesh.Vertexs[i].Y;
-                vertices[i * 3 + 2] = Mesh.Vertexs[i].Z;
+                vertices[i * 3]     = points[i].X;
+                vertices[i * 3 + 1] = points[i].Y;
+                vertices[i * 3 + 2] = points[i].Z;
 
                 float intensity = 1f;
-                if (Mesh.Intensity != null && Mesh.Intensity.Length > i)
-                    intensity = Mesh.Intensity[i] / 255f;
+                if (Surface.Intensity != null && Surface.Intensity.Length > i)
+                    intensity = Surface.Intensity[i] / 255f;
 
                 if (_surfaceColorMode == SurfaceColorMode.Intensity)
                 {
@@ -81,7 +97,7 @@ namespace VisionNet.Controls
                 }
                 else
                 {
-                    var c = CxExtension.GetColorByHeight(Mesh.Vertexs[i].Z, ZMin, ZMax);
+                    var c = CxExtension.GetColorByHeight(points[i].Z, ZMin, ZMax);
                     float factor = (_surfaceColorMode == SurfaceColorMode.Color) ? 1f : intensity;
                     colors[i * 3]     = Math.Min(c.r * factor, 1f);
                     colors[i * 3 + 1] = Math.Min(c.g * factor, 1f);
@@ -89,13 +105,16 @@ namespace VisionNet.Controls
                 }
             }
 
+            // 始终生成 Mesh 索引，Draw() 按 SurfaceMode 决定是否使用
+            uint[] indices = GenerateMeshIndices(Surface.Width, Surface.Length);
+
             _cachedRenderData = new RenderData
             {
                 Vertices    = vertices,
                 Colors      = colors,
-                Indices     = Mesh.Indices,
-                VertexCount = Mesh.Vertexs.Length,
-                IndexCount  = Mesh.Indices.Length,
+                Indices     = indices,
+                VertexCount = points.Length,
+                IndexCount  = indices.Length,
                 UseVAO      = false,
             };
 
@@ -132,13 +151,56 @@ namespace VisionNet.Controls
             gl.DisableClientState(OpenGL.GL_COLOR_ARRAY);
         }
 
+        public void SetGlobalZRange(float zMin, float zMax)
+        {
+            if (_surfaceColorMode == SurfaceColorMode.Intensity) return;
+            if (Math.Abs(ZMin - zMin) < 1e-6f && Math.Abs(ZMax - zMax) < 1e-6f) return;
+
+            ZMin = zMin;
+            ZMax = zMax;
+            _cachedRenderData = null;
+            OnRenderDataChanged?.Invoke();
+        }
+
         public void Dispose()
         {
             if (IsDisposed) return;
-            Mesh = null;
+            Surface?.Dispose();
+            Surface = null;
             _cachedRenderData = null;
             IsDisposed = true;
             OnDisposed?.Invoke();
+        }
+
+        private uint[] GenerateMeshIndices(int width, int height)
+        {
+            if (width <= 1 || height <= 1) return new uint[0];
+
+            int total = (width - 1) * (height - 1) * 6;
+            var indices = new uint[total];
+            int idx = 0;
+
+            // 顺序生成（非并行），保证索引顺序确定性
+            for (int y = 0; y < height - 1; y++)
+            {
+                uint rowStart  = (uint)(y * width);
+                uint nextStart = (uint)((y + 1) * width);
+                for (uint x = 0; x < width - 1; x++)
+                {
+                    uint tl = rowStart  + x;
+                    uint tr = tl + 1;
+                    uint bl = nextStart + x;
+                    uint br = bl + 1;
+                    indices[idx++] = tl;
+                    indices[idx++] = bl;
+                    indices[idx++] = tr;
+                    indices[idx++] = tr;
+                    indices[idx++] = bl;
+                    indices[idx++] = br;
+                }
+            }
+
+            return indices;
         }
     }
 }

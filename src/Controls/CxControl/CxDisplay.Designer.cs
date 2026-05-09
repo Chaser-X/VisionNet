@@ -5,7 +5,8 @@ namespace VisionNet.Controls
 {
     public partial class CxDisplay
     {
-        private ContextMenuStrip menu_right;
+        // ── Designer-generated UI component fields ───────────────────────────────
+        private ContextMenuStrip       menu_right;
         private System.ComponentModel.IContainer components;
         private ToolStripMenuItem viewModeToolStripMenuItem;
         private ToolStripMenuItem surfaceModeToolStripMenuItem;
@@ -22,70 +23,34 @@ namespace VisionNet.Controls
         private ToolStripMenuItem colorWithIntensityToolStripMenuItem;
         private ToolStripMenuItem d2DToolStripMenuItem;
 
-        #region 资源释放
+        // ── Dispose ──────────────────────────────────────────────────────────────
 
         private bool disposed = false;
 
         protected override void Dispose(bool disposing)
         {
-            // 确保在 UI/GL 线程执行（OpenGL 资源必须在 GL 上下文中释放）
-            if (InvokeRequired)
-            {
-                Invoke(new Action(() => Dispose(disposing)));
-                return;
-            }
+            if (InvokeRequired) { Invoke(new Action(() => Dispose(disposing))); return; }
 
             if (!disposed)
             {
                 if (disposing)
                 {
-                    var gl = this.OpenGL;
-
-                    // 释放待释放队列中的 GL 资源
-                    if (gl != null)
-                    {
-                        while (_pendingRelease.TryDequeue(out var pending))
-                            ReleaseGLResources(gl, pending);
-                    }
-
-                    // 释放资源池中的所有 GL 资源
-                    lock (_resourceLock)
-                    {
-                        if (gl != null)
-                        {
-                            foreach (var handle in _resourcePool.Values)
-                                ReleaseGLResources(gl, handle);
-                        }
-
-                        // 取消事件订阅并释放 Item CPU 数据
-                        foreach (var item in _resourcePool.Keys)
-                        {
-                            item.OnRenderDataChanged -= OnItemRenderDataChanged;
-                            item.Dispose();
-                        }
-                        _resourcePool.Clear();
-                    }
-
-                    surfaceItem = null;
-
-                    // 释放简单图元
-                    renderItem.ForEach(item => (item as IDisposable)?.Dispose());
-                    renderItem.Clear();
+                    // GL resource release is encapsulated in DisposeResources() (CxDisplay.cs).
+                    DisposeResources(this.OpenGL);
 
                     components?.Dispose();
-                    camera?.Dispose();
-                    coordinationItem?.Dispose();
-                    colorBarItem?.Dispose();
-                    coorTagItem?.Dispose();
+                    _camera?.Dispose();
+                    _coordinationItem?.Dispose();
+                    _colorBarItem?.Dispose();
+                    _coordTagItem?.Dispose();
                 }
-
                 disposed = true;
             }
 
             base.Dispose(disposing);
         }
 
-        #endregion
+        // ── InitializeComponent (designer-generated) ─────────────────────────────
 
         private void InitializeComponent()
         {

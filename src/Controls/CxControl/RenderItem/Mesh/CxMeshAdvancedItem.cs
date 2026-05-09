@@ -5,6 +5,11 @@ using VisionNet.DataType;
 
 namespace VisionNet.Controls
 {
+    /// <summary>
+    /// High-performance mesh renderer using a VAO + GLSL shader pipeline.
+    /// Colour is computed per-fragment in the GPU using the <c>zMin</c>/<c>zMax</c> uniforms,
+    /// so switching colour mode costs only a uniform update — no VBO rebuild required.
+    /// </summary>
     public class CxMeshAdvancedItem : ICxObjRenderItem
     {
         public event Action OnDisposed;
@@ -40,6 +45,60 @@ namespace VisionNet.Controls
 
         private RenderData _cachedRenderData;
 
+        #region Shader 源码（与 CxSurfaceAdvancedItem 内容一致，为解耦独立维护）
+        internal static readonly string VertexShaderSource =
+            @"#version 330 core
+            layout (location = 0) in vec3 aPos;
+            layout (location = 1) in vec2 aTexCoord;
+
+            uniform mat4 view;
+            uniform mat4 projection;
+
+            out float height;
+            out vec2 TexCoord;
+
+            void main()
+            {
+                gl_Position = projection * view * vec4(aPos, 1.0);
+                height = aPos.z;
+                TexCoord = aTexCoord;
+            }";
+
+        internal static readonly string FragmentShaderSource =
+            @"#version 330 core
+            in float height;
+            in vec2 TexCoord;
+            out vec4 FragColor;
+
+            uniform float zMin;
+            uniform float zMax;
+            uniform int colorMode;
+            uniform sampler2D intensityTexture;
+
+            vec3 getColorByHeight(float h)
+            {
+                float n = clamp((h - zMin) / (zMax - zMin), 0.0, 1.0);
+                if (n < 0.2) return mix(vec3(0,0,1), vec3(0,1,1), n * 5.0);
+                if (n < 0.4) return mix(vec3(0,1,1), vec3(0,1,0), (n-0.2)*5.0);
+                if (n < 0.6) return mix(vec3(0,1,0), vec3(1,1,0), (n-0.4)*5.0);
+                if (n < 0.8) return mix(vec3(1,1,0), vec3(1,0,0), (n-0.6)*5.0);
+                return mix(vec3(1,0,0), vec3(1,0,1), (n-0.8)*5.0);
+            }
+
+            void main()
+            {
+                if (isinf(height)) discard;
+                float intensity = texture(intensityTexture, TexCoord).r;
+                if (colorMode == 0) {
+                    FragColor = vec4(getColorByHeight(height), 1.0);
+                } else if (colorMode == 1) {
+                    FragColor = vec4(vec3(intensity), 1.0);
+                } else {
+                    FragColor = vec4(mix(vec3(intensity), getColorByHeight(height), 0.5), 1.0);
+                }
+            }";
+        #endregion
+
         public CxMeshAdvancedItem(CxMesh mesh,
             SurfaceMode surfaceMode = SurfaceMode.PointCloud,
             SurfaceColorMode surfaceColorMode = SurfaceColorMode.Color)
@@ -48,7 +107,7 @@ namespace VisionNet.Controls
             _surfaceMode = surfaceMode;
             _surfaceColorMode = surfaceColorMode;
 
-            BoundingBox = CxExtension.CalculateBoundingBox(mesh?.Vertexs);
+            BoundingBox = CxExtension.CalculateBoundingBox(mesh?.Vertices);
             ZMax = (float)(BoundingBox?.Center.Z + BoundingBox?.Size.Depth / 2);
             ZMin = (float)(BoundingBox?.Center.Z - BoundingBox?.Size.Depth / 2);
         }
@@ -57,15 +116,15 @@ namespace VisionNet.Controls
         {
             if (_cachedRenderData != null) return _cachedRenderData;
 
-            if (IsDisposed || Mesh == null || Mesh.Vertexs == null || Mesh.Vertexs.Length == 0)
+            if (IsDisposed || Mesh == null || Mesh.Vertices == null || Mesh.Vertices.Length == 0)
                 return null;
 
-            var vertices = new float[Mesh.Vertexs.Length * 3];
-            for (int i = 0; i < Mesh.Vertexs.Length; i++)
+            var vertices = new float[Mesh.Vertices.Length * 3];
+            for (int i = 0; i < Mesh.Vertices.Length; i++)
             {
-                vertices[i * 3]     = Mesh.Vertexs[i].X;
-                vertices[i * 3 + 1] = Mesh.Vertexs[i].Y;
-                vertices[i * 3 + 2] = Mesh.Vertexs[i].Z;
+                vertices[i * 3]     = Mesh.Vertices[i].X;
+                vertices[i * 3 + 1] = Mesh.Vertices[i].Y;
+                vertices[i * 3 + 2] = Mesh.Vertices[i].Z;
             }
 
             var uvCoords = new float[Mesh.UVs.Length * 2];
@@ -82,13 +141,13 @@ namespace VisionNet.Controls
                 Vertices    = vertices,
                 UVCoords    = uvCoords,
                 Indices     = Mesh.Indices,
-                VertexCount = Mesh.Vertexs.Length,
+                VertexCount = Mesh.Vertices.Length,
                 IndexCount  = Mesh.Indices?.Length ?? 0,
                 UseVAO      = true,
                 ShaderSource = new ShaderSource
                 {
-                    VertexSource   = CxSurfaceAdvancedItem.VertexShaderSource,
-                    FragmentSource = CxSurfaceAdvancedItem.FragmentShaderSource,
+                    VertexSource   = VertexShaderSource,
+                    FragmentSource = FragmentShaderSource,
                 },
                 TextureData = new TextureData
                 {
@@ -142,6 +201,20 @@ namespace VisionNet.Controls
             gl.BindTexture(OpenGL.GL_TEXTURE_2D, 0);
             gl.BindVertexArray(0);
             gl.UseProgram(0);
+        }
+
+        public void SetGlobalZRange(float zMin, float zMax)
+        {
+            if (_surfaceColorMode == SurfaceColorMode.Intensity) return;
+            if (Math.Abs(ZMin - zMin) < 1e-6f && Math.Abs(ZMax - zMax) < 1e-6f) return;
+
+            ZMin = zMin;
+            ZMax = zMax;
+            if (_cachedRenderData?.Uniforms != null)
+            {
+                _cachedRenderData.Uniforms["zMin"] = zMin;
+                _cachedRenderData.Uniforms["zMax"] = zMax;
+            }
         }
 
         public void Dispose()
