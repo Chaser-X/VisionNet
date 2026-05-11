@@ -197,8 +197,12 @@ namespace VisionNet
         {
             if (surface == null || matrix == null) return null;
 
-            var transformer = new CxTransformSurface(matrix);
-            var (transformedPoints, intensities) = transformer.Transform(surface);
+            CxPoint3D[] transformedPoints;
+            byte[]      intensities;
+            using (var transformer = new CxTransformSurface(matrix))
+            {
+                (transformedPoints, intensities) = transformer.Transform(surface);
+            }
 
             if (transformedPoints == null || transformedPoints.Length == 0) return null;
 
@@ -214,12 +218,15 @@ namespace VisionNet
             float zOffset = box.Value.Center.Z;
             float zScale  = box.Value.Size.Depth / ushort.MaxValue;
 
-            return new CxUniformSurface().Sample(
-                transformedPoints, intensities,
-                width, height,
-                xScale, yScale, zScale,
-                xOffset, yOffset, zOffset,
-                sampleMode);
+            using (var sampler = new CxUniformSurface())
+            {
+                return sampler.Sample(
+                    transformedPoints, intensities,
+                    width, height,
+                    xScale, yScale, zScale,
+                    xOffset, yOffset, zOffset,
+                    sampleMode);
+            }
         }
     }
 }

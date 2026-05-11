@@ -7,19 +7,25 @@ namespace VisionNet.Compute
 {
     /// <summary>
     /// GPU-accelerated surface transformation: applies a 4×4 matrix to every valid point
-    /// of a <see cref="CxSurface"/> height map on the OpenCL device and returns the
-    /// resulting point array for further processing.
+    /// of a <see cref="CxSurface"/> height map on the OpenCL device.
+    /// <para>
+    /// The transformation matrix is uploaded to GPU memory once on the first call and
+    /// retained as a persistent buffer for the lifetime of this instance, avoiding
+    /// redundant host-to-device transfers across repeated calls with the same matrix.
+    /// </para>
     /// </summary>
     public class CxTransformSurface : OpenCLComputation
     {
         private const string KernelName = "TransformSurface";
 
         private readonly CxMatrix4X4 _matrix;
+        private readonly object _matrixLock = new object();
+        private IMem _matrixBuf;    // persistent: uploaded once, reused across Transform() calls
 
         /// <summary>
         /// Initialises the computation with the transformation matrix to apply.
         /// </summary>
-        /// <param name="matrix">4×4 column-major transformation matrix (OpenGL convention).</param>
+        /// <param name="matrix">4×4 row-major transformation matrix.</param>
         public CxTransformSurface(CxMatrix4X4 matrix) : base("CxTransformSurfaceProgram")
         {
             _matrix = matrix ?? throw new ArgumentNullException(nameof(matrix));
@@ -29,39 +35,30 @@ namespace VisionNet.Compute
         protected override string[] GetKernelNames() => new[] { KernelName };
 
         /// <inheritdoc/>
-        protected override string GetKernelSource() => @"
-            __kernel void TransformSurface(
-                __global const short* data,     // height map (Width X Length), -32768 = invalid
-                __global float*       dstPoints,// output float4 per cell (x, y, z, w)
-                int   width,
-                int   length,
-                float xOffset, float yOffset, float zOffset,
-                float xScale,  float yScale,  float zScale,
-                __global const float* matrix)   // 16-element column-major 4x4 matrix
+        protected override string GetKernelSource() =>
+            LoadEmbeddedResource("VisionNet.Compute.Kernels.TransformSurface.cl");
+
+        /// <summary>
+        /// Ensures the matrix buffer has been uploaded to GPU memory.
+        /// Must be called after <see cref="OpenCLComputation.EnsureInitialized"/>.
+        /// </summary>
+        private void EnsureMatrixBuffer()
+        {
+            if (_matrixBuf != null) return;
+            lock (_matrixLock)
             {
-                int gid = get_global_id(0);
-                int x   = gid % width;
-                int y   = gid / width;
-                if (x >= width || y >= length) return;
-                int idx = y * width + x;
-                float px = x * xScale + xOffset;
-                float py = y * yScale + yOffset;
-                float pz = zOffset + data[idx] * zScale;
-                float4 p = (float4)(px, py, pz, 1.0f);
-                float4 r;
-                r.x = matrix[0]*p.x + matrix[1]*p.y + matrix[2]*p.z  + matrix[3]*p.w;
-                r.y = matrix[4]*p.x + matrix[5]*p.y + matrix[6]*p.z  + matrix[7]*p.w;
-                r.z = matrix[8]*p.x + matrix[9]*p.y + matrix[10]*p.z + matrix[11]*p.w;
-                r.w = matrix[12]*p.x+ matrix[13]*p.y+ matrix[14]*p.z + matrix[15]*p.w;
-                dstPoints[gid * 4]     = r.x;
-                dstPoints[gid * 4 + 1] = r.y;
-                dstPoints[gid * 4 + 2] = data[idx] == -32768 ? NAN : r.z;
-                dstPoints[gid * 4 + 3] = r.w;
-            }";
+                if (_matrixBuf != null) return;
+                _matrixBuf = AllocatePersistent<float>(
+                    MemFlags.ReadOnly | MemFlags.CopyHostPtr, _matrix.Data);
+                if (_matrixBuf == null)
+                    throw new InvalidOperationException(
+                        "Failed to allocate persistent matrix buffer on GPU.");
+            }
+        }
 
         /// <summary>
         /// Transforms all valid cells of <paramref name="surface"/> by the matrix supplied
-        /// at construction time and returns the resulting point cloud.
+        /// at construction time and returns the resulting point cloud on the CPU.
         /// </summary>
         /// <param name="surface">Source height-map surface.</param>
         /// <returns>
@@ -86,27 +83,21 @@ namespace VisionNet.Compute
             if (!EnsureInitialized())
                 throw new InvalidOperationException("OpenCL environment could not be initialised.");
 
-            var dataBuf   = CreateBuffer<short>(MemFlags.ReadOnly  | MemFlags.CopyHostPtr, data);
-            var matrixBuf = CreateBuffer<float>(MemFlags.ReadOnly  | MemFlags.CopyHostPtr, _matrix.Data);
-            var dstBuf    = CreateBufferWithSize<float>(MemFlags.WriteOnly, count * 4);
+            EnsureMatrixBuffer();
 
-            bool ok = true;
-            ok &= SetKernelArg(KernelName,  0, dataBuf);
-            ok &= SetKernelArg(KernelName,  1, dstBuf);
-            ok &= SetKernelArg(KernelName,  2, width);
-            ok &= SetKernelArg(KernelName,  3, length);
-            ok &= SetKernelArg(KernelName,  4, surface.XOffset);
-            ok &= SetKernelArg(KernelName,  5, surface.YOffset);
-            ok &= SetKernelArg(KernelName,  6, surface.ZOffset);
-            ok &= SetKernelArg(KernelName,  7, surface.XScale);
-            ok &= SetKernelArg(KernelName,  8, surface.YScale);
-            ok &= SetKernelArg(KernelName,  9, surface.ZScale);
-            ok &= SetKernelArg(KernelName, 10, matrixBuf);
+            var dataBuf = AllocateTransient<short>(MemFlags.ReadOnly | MemFlags.CopyHostPtr, data);
+            var dstBuf  = AllocateTransientWithSize<float>(MemFlags.WriteOnly, count * 4);
+
+            bool ok = SetKernelArgs(KernelName,
+                dataBuf, dstBuf, width, length,
+                surface.XOffset, surface.YOffset, surface.ZOffset,
+                surface.XScale, surface.YScale, surface.ZScale,
+                _matrixBuf);
 
             ok &= ExecuteKernel(KernelName, new[] { new IntPtr(count) });
             ok &= ReadBuffer(dstBuf, dst);
 
-            Cleanup();
+            ReleaseTransient();
 
             if (!ok)
                 throw new InvalidOperationException("OpenCL kernel execution failed.");
@@ -135,12 +126,54 @@ namespace VisionNet.Compute
             if (validCount == count)
                 return (tempPoints, hasIntensity ? tempIntensity : null);
 
-            var result    = new CxPoint3D[validCount];
-            var resultI   = new byte[validCount];
+            var result  = new CxPoint3D[validCount];
+            var resultI = new byte[validCount];
             Array.Copy(tempPoints,    result,  validCount);
             if (hasIntensity) Array.Copy(tempIntensity, resultI, validCount);
 
             return (result, hasIntensity ? resultI : null);
+        }
+
+        /// <summary>
+        /// Transforms all cells of <paramref name="surface"/> on the GPU and returns the
+        /// output buffer directly, without reading data back to the CPU.
+        /// The buffer holds one <c>float4</c> (XYZW) per input cell; cells that were invalid
+        /// in the source (Z == <c>-32768</c>) carry <c>NaN</c> as their Z component.
+        /// </summary>
+        /// <remarks>
+        /// The returned buffer is tracked as a transient resource on this instance.
+        /// After the downstream computation (e.g., <see cref="CxUniformSurface"/>) has
+        /// finished consuming the buffer, the caller must invoke
+        /// <see cref="OpenCLComputation.ReleaseTransient"/> on <b>this</b> instance to
+        /// free the GPU memory.
+        /// </remarks>
+        /// <param name="surface">Source height-map surface.</param>
+        /// <returns>
+        /// GPU buffer (float4 per cell, stride = 4) and the total cell count.
+        /// </returns>
+        /// <exception cref="InvalidOperationException">Thrown if initialisation or kernel execution fails.</exception>
+        internal (IMem DstBuf, int CellCount) TransformToBuffer(CxSurface surface)
+        {
+            int count = surface.Width * surface.Length;
+
+            if (!EnsureInitialized())
+                throw new InvalidOperationException("OpenCL environment could not be initialised.");
+
+            EnsureMatrixBuffer();
+
+            var dataBuf = AllocateTransient<short>(MemFlags.ReadOnly | MemFlags.CopyHostPtr, surface.Data);
+            var dstBuf  = AllocateTransientWithSize<float>(MemFlags.WriteOnly, count * 4);
+
+            bool ok = SetKernelArgs(KernelName,
+                dataBuf, dstBuf, surface.Width, surface.Length,
+                surface.XOffset, surface.YOffset, surface.ZOffset,
+                surface.XScale, surface.YScale, surface.ZScale,
+                _matrixBuf);
+
+            if (!ok || !ExecuteKernel(KernelName, new[] { new IntPtr(count) }))
+                throw new InvalidOperationException("OpenCL kernel execution failed.");
+
+            return (dstBuf, count);
         }
     }
 }

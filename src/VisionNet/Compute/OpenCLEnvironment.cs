@@ -1,7 +1,10 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Runtime.InteropServices;
+using System.Threading.Tasks;
 using OpenCL.Net;
 using OpenCL.Net.Extensions;
 
@@ -9,7 +12,12 @@ namespace VisionNet.Compute
 {
     /// <summary>
     /// Thread-safe singleton that owns the shared OpenCL context, command queue,
-    /// compiled programs, and kernel objects for the application lifetime.
+    /// and compiled programs for the application lifetime.
+    /// <para>
+    /// Each <see cref="OpenCLComputation"/> subclass instance creates its own
+    /// <see cref="Kernel"/> objects via <see cref="CreateKernelInstance"/>, keeping
+    /// argument state isolated per instance and safe for concurrent use.
+    /// </para>
     /// <para>
     /// Usage:
     /// <code>
@@ -120,7 +128,7 @@ namespace VisionNet.Compute
         }
 
         /// <summary>
-        /// Compiles an OpenCL program and creates its kernels if not already done.
+        /// Compiles an OpenCL program and creates prototype kernel objects if not already done.
         /// Subsequent calls with the same <paramref name="programId"/> are no-ops.
         /// </summary>
         /// <param name="programId">Unique identifier for this program (used as cache key).</param>
@@ -182,7 +190,47 @@ namespace VisionNet.Compute
             }
         }
 
-        /// <summary>Returns the compiled kernel identified by program and kernel name, or <c>null</c>.</summary>
+        /// <summary>
+        /// Creates a new, independent kernel instance from the compiled program.
+        /// Each caller receives its own <see cref="Kernel"/> object with separate argument
+        /// state, making concurrent <c>SetKernelArg</c> calls safe across instances.
+        /// The returned kernel is owned by the caller and must be released via
+        /// <c>Cl.ReleaseKernel</c> when no longer needed (handled automatically by
+        /// <see cref="OpenCLComputation.Dispose"/>).
+        /// </summary>
+        /// <param name="programId">Identifier of the compiled program (must have been built via <see cref="BuildProgram"/>).</param>
+        /// <param name="kernelName">Name of the kernel function.</param>
+        /// <returns>A fresh <see cref="Kernel"/> instance, or <c>null</c> on failure.</returns>
+        public Kernel? CreateKernelInstance(string programId, string kernelName)
+        {
+            if (!IsInitialized) return null;
+
+            Program program;
+            lock (_buildLock)
+            {
+                if (!_programs.TryGetValue(programId, out program)) return null;
+            }
+
+            var kernel = Cl.CreateKernel(program, kernelName, out ErrorCode err);
+            if (err != ErrorCode.Success || !kernel.IsValid())
+            {
+                Console.WriteLine($"CreateKernelInstance '{kernelName}' failed: {err}");
+                return null;
+            }
+            return kernel;
+        }
+
+        /// <summary>
+        /// Returns the shared prototype kernel for the given program and kernel name, or <c>null</c>.
+        /// </summary>
+        /// <remarks>
+        /// The returned kernel is shared across all callers with the same
+        /// <paramref name="programId"/> / <paramref name="kernelName"/> pair.
+        /// Concurrent <c>SetKernelArg</c> calls on this shared object are not thread-safe.
+        /// Use <see cref="CreateKernelInstance"/> to obtain a per-instance kernel.
+        /// </remarks>
+        [Obsolete("Kernels from GetKernel are shared across instances and not safe for concurrent " +
+                  "SetKernelArg calls. Use CreateKernelInstance for a per-instance kernel.")]
         public Kernel? GetKernel(string programId, string kernelName)
         {
             if (!IsInitialized) return null;
@@ -201,6 +249,7 @@ namespace VisionNet.Compute
         /// <summary>
         /// Releases all kernels, programs, the command queue, and the context.
         /// Resets <see cref="IsInitialized"/> to <c>false</c>.
+        /// After cleanup, <see cref="Initialize"/> may be called again to reinitialise.
         /// </summary>
         public void Cleanup()
         {
@@ -228,20 +277,33 @@ namespace VisionNet.Compute
 
     /// <summary>
     /// Abstract base class for OpenCL compute operations.
-    /// Manages buffer allocation, kernel argument binding, and kernel execution
-    /// through the shared <see cref="OpenCLEnvironment"/> singleton.
+    /// <para>
+    /// Each instance owns its own <see cref="Kernel"/> objects (created via
+    /// <see cref="OpenCLEnvironment.CreateKernelInstance"/>), ensuring that concurrent
+    /// instances of the same subclass do not share mutable kernel argument state.
+    /// </para>
+    /// <para>
+    /// GPU buffers are tracked in two tiers:
+    /// <list type="bullet">
+    ///   <item><b>Persistent</b> — allocated once and released in <see cref="Dispose"/>.
+    ///   Use for data that does not change across calls (e.g., configuration matrices).</item>
+    ///   <item><b>Transient</b> — allocated per compute call and released by
+    ///   <see cref="ReleaseTransient"/> at the end of each call.
+    ///   Use for input/output data buffers.</item>
+    /// </list>
+    /// </para>
     /// </summary>
     public abstract class OpenCLComputation : IDisposable
     {
         private bool _disposed;
-
-        /// <summary>All memory objects allocated by this computation (released on <see cref="Cleanup"/>).</summary>
-        protected List<IMem> MemObjects { get; } = new List<IMem>();
+        private readonly Dictionary<string, Kernel> _ownedKernels = new Dictionary<string, Kernel>();
+        private readonly List<IMem> _persistentMem = new List<IMem>();
+        private readonly List<IMem> _transientMem  = new List<IMem>();
 
         /// <summary>Last OpenCL error code produced by this computation.</summary>
         protected ErrorCode Error;
 
-        /// <summary>Unique program identifier used to look up compiled kernels.</summary>
+        /// <summary>Unique program identifier used to look up compiled programs.</summary>
         protected string ProgramId { get; }
 
         /// <summary>Reference to the shared OpenCL environment.</summary>
@@ -260,7 +322,8 @@ namespace VisionNet.Compute
         protected abstract string[] GetKernelNames();
 
         /// <summary>
-        /// Ensures the OpenCL environment is ready and this computation's program is compiled.
+        /// Ensures the OpenCL environment is ready, this computation's program is compiled,
+        /// and per-instance kernel objects are created.
         /// </summary>
         public bool EnsureInitialized(int platformIndex = 0, int deviceIndex = 0,
             DeviceType deviceType = DeviceType.Default)
@@ -268,13 +331,36 @@ namespace VisionNet.Compute
             if (!ClEnvironment.IsInitialized &&
                 !ClEnvironment.Initialize(platformIndex, deviceIndex, deviceType))
                 return false;
-            return ClEnvironment.BuildProgram(ProgramId, GetKernelSource(), GetKernelNames());
+
+            if (!ClEnvironment.BuildProgram(ProgramId, GetKernelSource(), GetKernelNames()))
+                return false;
+
+            foreach (var name in GetKernelNames())
+            {
+                if (_ownedKernels.ContainsKey(name)) continue;
+                var k = ClEnvironment.CreateKernelInstance(ProgramId, name);
+                if (!k.HasValue) return false;
+                _ownedKernels[name] = k.Value;
+            }
+            return true;
+        }
+
+        /// <summary>Loads an embedded text resource from the assembly.</summary>
+        protected static string LoadEmbeddedResource(string resourceName)
+        {
+            var assembly = Assembly.GetExecutingAssembly();
+            using (var stream = assembly.GetManifestResourceStream(resourceName))
+            {
+                if (stream == null)
+                    throw new InvalidOperationException($"Embedded resource '{resourceName}' not found.");
+                using (var reader = new StreamReader(stream))
+                    return reader.ReadToEnd();
+            }
         }
 
         // ── Buffer helpers ───────────────────────────────────────────────────────
 
-        /// <summary>Allocates a GPU buffer and optionally copies <paramref name="data"/> to it.</summary>
-        protected IMem CreateBuffer<T>(MemFlags flags, T[] data) where T : struct
+        private IMem CreateBufferCore<T>(MemFlags flags, T[] data, List<IMem> target) where T : struct
         {
             int byteSize = Marshal.SizeOf<T>() * data.Length;
             if (byteSize == 0) return null;
@@ -296,23 +382,50 @@ namespace VisionNet.Compute
                     new IntPtr(byteSize), IntPtr.Zero, out Error);
             }
 
-            if (Error == ErrorCode.Success) { MemObjects.Add(mem); return mem; }
+            if (Error == ErrorCode.Success) { target.Add(mem); return mem; }
             Console.WriteLine($"CreateBuffer failed: {Error}");
             return null;
         }
 
-        /// <summary>Allocates a GPU buffer of <paramref name="elementCount"/> uninitialized elements.</summary>
-        protected IMem CreateBufferWithSize<T>(MemFlags flags, int elementCount) where T : struct
+        private IMem CreateBufferWithSizeCore<T>(MemFlags flags, int elementCount, List<IMem> target) where T : struct
         {
             int byteSize = Marshal.SizeOf<T>() * elementCount;
             if (byteSize == 0) return null;
 
             var mem = Cl.CreateBuffer(ClEnvironment.Context.Value, flags,
                 new IntPtr(byteSize), IntPtr.Zero, out Error);
-            if (Error == ErrorCode.Success) { MemObjects.Add(mem); return mem; }
+            if (Error == ErrorCode.Success) { target.Add(mem); return mem; }
             Console.WriteLine($"CreateBuffer (sized) failed: {Error}");
             return null;
         }
+
+        /// <summary>
+        /// Allocates a GPU buffer with initial data, tracked as <b>persistent</b>
+        /// (released only in <see cref="Dispose"/>).
+        /// </summary>
+        protected IMem AllocatePersistent<T>(MemFlags flags, T[] data) where T : struct
+            => CreateBufferCore(flags, data, _persistentMem);
+
+        /// <summary>
+        /// Allocates an uninitialised GPU buffer of <paramref name="elementCount"/> elements,
+        /// tracked as <b>persistent</b> (released only in <see cref="Dispose"/>).
+        /// </summary>
+        protected IMem AllocatePersistentWithSize<T>(MemFlags flags, int elementCount) where T : struct
+            => CreateBufferWithSizeCore<T>(flags, elementCount, _persistentMem);
+
+        /// <summary>
+        /// Allocates a GPU buffer with initial data, tracked as <b>transient</b>
+        /// (released by <see cref="ReleaseTransient"/> at the end of each compute call).
+        /// </summary>
+        protected IMem AllocateTransient<T>(MemFlags flags, T[] data) where T : struct
+            => CreateBufferCore(flags, data, _transientMem);
+
+        /// <summary>
+        /// Allocates an uninitialised GPU buffer of <paramref name="elementCount"/> elements,
+        /// tracked as <b>transient</b> (released by <see cref="ReleaseTransient"/>).
+        /// </summary>
+        protected IMem AllocateTransientWithSize<T>(MemFlags flags, int elementCount) where T : struct
+            => CreateBufferWithSizeCore<T>(flags, elementCount, _transientMem);
 
         /// <summary>Reads <paramref name="data"/> back from a GPU buffer (blocking by default).</summary>
         protected bool ReadBuffer<T>(IMem buffer, T[] data, bool blocking = true) where T : struct
@@ -338,9 +451,12 @@ namespace VisionNet.Compute
         /// <summary>Binds a GPU memory object to the specified kernel argument slot.</summary>
         protected bool SetKernelArg(string kernelName, int index, IMem value)
         {
-            var kernel = ClEnvironment.GetKernel(ProgramId, kernelName);
-            if (!kernel.HasValue) { Console.WriteLine($"Kernel '{kernelName}' not found."); return false; }
-            Error = Cl.SetKernelArg(kernel.Value, (uint)index, value);
+            if (!_ownedKernels.TryGetValue(kernelName, out var kernel))
+            {
+                Console.WriteLine($"Kernel '{kernelName}' not found. Call EnsureInitialized first.");
+                return false;
+            }
+            Error = Cl.SetKernelArg(kernel, (uint)index, value);
             if (Error != ErrorCode.Success) Console.WriteLine($"SetKernelArg[{index}] failed: {Error}");
             return Error == ErrorCode.Success;
         }
@@ -348,17 +464,61 @@ namespace VisionNet.Compute
         /// <summary>Binds a value-type scalar to the specified kernel argument slot.</summary>
         protected bool SetKernelArg<T>(string kernelName, int index, T value) where T : struct
         {
-            var kernel = ClEnvironment.GetKernel(ProgramId, kernelName);
-            if (!kernel.HasValue) { Console.WriteLine($"Kernel '{kernelName}' not found."); return false; }
-            Error = Cl.SetKernelArg(kernel.Value, (uint)index, value);
+            if (!_ownedKernels.TryGetValue(kernelName, out var kernel))
+            {
+                Console.WriteLine($"Kernel '{kernelName}' not found. Call EnsureInitialized first.");
+                return false;
+            }
+            Error = Cl.SetKernelArg(kernel, (uint)index, value);
             if (Error != ErrorCode.Success) Console.WriteLine($"SetKernelArg[{index}] failed: {Error}");
             return Error == ErrorCode.Success;
+        }
+
+        /// <summary>
+        /// Binds multiple kernel arguments in order using a params array.
+        /// Supports <see cref="IMem"/>, <see cref="int"/>, and <see cref="float"/>.
+        /// </summary>
+        protected bool SetKernelArgs(string kernelName, params object[] args)
+        {
+            if (!_ownedKernels.TryGetValue(kernelName, out var kernel))
+            {
+                Console.WriteLine($"Kernel '{kernelName}' not found. Call EnsureInitialized first.");
+                return false;
+            }
+
+            for (int i = 0; i < args.Length; i++)
+            {
+                if (args[i] is IMem mem)
+                    Error = Cl.SetKernelArg(kernel, (uint)i, mem);
+                else if (args[i] is int v)
+                    Error = Cl.SetKernelArg(kernel, (uint)i, v);
+                else if (args[i] is float f)
+                    Error = Cl.SetKernelArg(kernel, (uint)i, f);
+                else if (args[i] is uint u)
+                    Error = Cl.SetKernelArg(kernel, (uint)i, u);
+                else if (args[i] is short s)
+                    Error = Cl.SetKernelArg(kernel, (uint)i, s);
+                else if (args[i] is byte b)
+                    Error = Cl.SetKernelArg(kernel, (uint)i, b);
+                else
+                {
+                    Console.WriteLine($"SetKernelArg[{i}]: unsupported type {args[i]?.GetType()}");
+                    return false;
+                }
+
+                if (Error != ErrorCode.Success)
+                {
+                    Console.WriteLine($"SetKernelArg[{i}] failed: {Error}");
+                    return false;
+                }
+            }
+            return true;
         }
 
         // ── Execution ────────────────────────────────────────────────────────────
 
         /// <summary>
-        /// Enqueues an ND-range kernel dispatch and waits for completion.
+        /// Enqueues an ND-range kernel dispatch and waits for completion (blocking).
         /// </summary>
         /// <param name="kernelName">Name of the kernel to execute.</param>
         /// <param name="globalWorkSize">Total number of work items per dimension.</param>
@@ -366,10 +526,13 @@ namespace VisionNet.Compute
         protected bool ExecuteKernel(string kernelName, IntPtr[] globalWorkSize,
             IntPtr[] localWorkSize = null)
         {
-            var kernel = ClEnvironment.GetKernel(ProgramId, kernelName);
-            if (!kernel.HasValue) { Console.WriteLine($"Kernel '{kernelName}' not found."); return false; }
+            if (!_ownedKernels.TryGetValue(kernelName, out var kernel))
+            {
+                Console.WriteLine($"Kernel '{kernelName}' not found. Call EnsureInitialized first.");
+                return false;
+            }
 
-            Error = Cl.EnqueueNDRangeKernel(ClEnvironment.Queue.Value, kernel.Value,
+            Error = Cl.EnqueueNDRangeKernel(ClEnvironment.Queue.Value, kernel,
                 (uint)globalWorkSize.Length, null,
                 globalWorkSize, localWorkSize, 0, null, out Event ev);
             if (Error != ErrorCode.Success)
@@ -381,24 +544,53 @@ namespace VisionNet.Compute
             return true;
         }
 
-        // ── Cleanup ──────────────────────────────────────────────────────────────
-
-        /// <summary>Releases all GPU memory objects allocated by this computation.</summary>
-        protected virtual void Cleanup()
+        /// <summary>
+        /// Enqueues an ND-range kernel dispatch asynchronously.
+        /// The returned <see cref="Task{T}"/> completes when the GPU finishes execution.
+        /// The blocking wait is offloaded to a thread-pool thread so the calling thread
+        /// remains free to perform CPU work in parallel.
+        /// </summary>
+        /// <param name="kernelName">Name of the kernel to execute.</param>
+        /// <param name="globalWorkSize">Total number of work items per dimension.</param>
+        /// <param name="localWorkSize">Work-group size, or <c>null</c> for driver-chosen.</param>
+        protected Task<bool> ExecuteKernelAsync(string kernelName, IntPtr[] globalWorkSize,
+            IntPtr[] localWorkSize = null)
         {
-            foreach (var mem in MemObjects)
-                if (mem != null) Cl.ReleaseMemObject(mem);
-            MemObjects.Clear();
+            return Task.Run(() => ExecuteKernel(kernelName, globalWorkSize, localWorkSize));
         }
 
-        /// <inheritdoc/>
+        // ── Lifecycle ────────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Releases all transient GPU buffers allocated since the last call to this method.
+        /// Call this at the end of each compute operation to free per-call resources.
+        /// Persistent buffers and owned kernels are unaffected.
+        /// </summary>
+        protected void ReleaseTransient()
+        {
+            foreach (var mem in _transientMem)
+                if (mem != null) Cl.ReleaseMemObject(mem);
+            _transientMem.Clear();
+        }
+
+        /// <summary>
+        /// Releases all GPU resources: transient buffers, persistent buffers, and owned kernels.
+        /// </summary>
         public void Dispose()
         {
-            if (!_disposed) { Cleanup(); _disposed = true; }
+            if (_disposed) return;
+            ReleaseTransient();
+            foreach (var mem in _persistentMem)
+                if (mem != null) Cl.ReleaseMemObject(mem);
+            _persistentMem.Clear();
+            foreach (var k in _ownedKernels.Values)
+                if (k.IsValid()) Cl.ReleaseKernel(k);
+            _ownedKernels.Clear();
+            _disposed = true;
             GC.SuppressFinalize(this);
         }
 
         /// <summary>Finalizer fallback in case <see cref="Dispose"/> was not called.</summary>
-        ~OpenCLComputation() => Cleanup();
+        ~OpenCLComputation() => Dispose();
     }
 }

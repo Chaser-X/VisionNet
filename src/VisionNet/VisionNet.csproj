@@ -76,6 +76,9 @@
     <Compile Include="VisionOperator.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
-  <ItemGroup />
+  <ItemGroup>
+    <EmbeddedResource Include="Compute\Kernels\UniformSurface.cl" />
+    <EmbeddedResource Include="Compute\Kernels\TransformSurface.cl" />
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>
