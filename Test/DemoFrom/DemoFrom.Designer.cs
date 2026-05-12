@@ -22,6 +22,8 @@
             this.splitContainer2 = new System.Windows.Forms.SplitContainer();
             this.cxDisplay1 = new VisionNet.Controls.CxDisplay();
             this.cxDisplay2 = new VisionNet.Controls.CxDisplay();
+            this.btn_meshToSurface = new System.Windows.Forms.Button();
+            this.btn_surfaceToMesh = new System.Windows.Forms.Button();
             this.button1 = new System.Windows.Forms.Button();
             this.btn_addSeg3D = new System.Windows.Forms.Button();
             this.button2 = new System.Windows.Forms.Button();
@@ -52,6 +54,8 @@
             // 
             // splitContainer1.Panel2
             // 
+            this.splitContainer1.Panel2.Controls.Add(this.btn_meshToSurface);
+            this.splitContainer1.Panel2.Controls.Add(this.btn_surfaceToMesh);
             this.splitContainer1.Panel2.Controls.Add(this.button1);
             this.splitContainer1.Panel2.Controls.Add(this.btn_addSeg3D);
             this.splitContainer1.Panel2.Controls.Add(this.button2);
@@ -160,6 +164,28 @@
             this.btn_test.UseVisualStyleBackColor = true;
             this.btn_test.Click += new System.EventHandler(this.btn_test_Click);
             // 
+            // btn_surfaceToMesh
+            // 
+            this.btn_surfaceToMesh.Location = new System.Drawing.Point(29, 287);
+            this.btn_surfaceToMesh.Margin = new System.Windows.Forms.Padding(4);
+            this.btn_surfaceToMesh.Name = "btn_surfaceToMesh";
+            this.btn_surfaceToMesh.Size = new System.Drawing.Size(123, 28);
+            this.btn_surfaceToMesh.TabIndex = 0;
+            this.btn_surfaceToMesh.Text = "Surface→Mesh";
+            this.btn_surfaceToMesh.UseVisualStyleBackColor = true;
+            this.btn_surfaceToMesh.Click += new System.EventHandler(this.btn_surfaceToMesh_Click);
+            // 
+            // btn_meshToSurface
+            // 
+            this.btn_meshToSurface.Location = new System.Drawing.Point(29, 344);
+            this.btn_meshToSurface.Margin = new System.Windows.Forms.Padding(4);
+            this.btn_meshToSurface.Name = "btn_meshToSurface";
+            this.btn_meshToSurface.Size = new System.Drawing.Size(123, 28);
+            this.btn_meshToSurface.TabIndex = 0;
+            this.btn_meshToSurface.Text = "Mesh→Surface";
+            this.btn_meshToSurface.UseVisualStyleBackColor = true;
+            this.btn_meshToSurface.Click += new System.EventHandler(this.btn_meshToSurface_Click);
+            // 
             // DemoFrom
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(8F, 16F);
@@ -194,5 +220,7 @@
         private System.Windows.Forms.SplitContainer splitContainer2;
         private System.Windows.Forms.Button button1;
         private System.Windows.Forms.Button button2;
+        private System.Windows.Forms.Button btn_surfaceToMesh;
+        private System.Windows.Forms.Button btn_meshToSurface;
     }
 }

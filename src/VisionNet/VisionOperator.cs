@@ -228,5 +228,212 @@ namespace VisionNet
                     sampleMode);
             }
         }
+        /// <summary>
+        /// Projects a triangle mesh onto a uniform XY height map at the specified
+        /// pose and resolution using GPU-accelerated rasterisation.
+        /// Grid origin and Z scale are automatically derived from the projected bounding box.
+        /// </summary>
+        /// <param name="mesh">Source triangle mesh.</param>
+        /// <param name="matrix">4×4 transformation matrix (world to target local).</param>
+        /// <param name="xScale">Grid cell width along X.</param>
+        /// <param name="yScale">Grid cell height along Y.</param>
+        /// <param name="mode">Rasterisation aggregation mode (Max / Min).</param>
+        /// <returns>Height-map surface (<see cref="SurfaceType.Surface"/>), or <c>null</c> on invalid input.</returns>
+        public static CxSurface MeshToSurface(CxMesh mesh, CxMatrix4X4 matrix,
+            float xScale = 0.01f, float yScale = 0.01f,
+            ProjectionMode mode = ProjectionMode.Max)
+        {
+            if (mesh == null || matrix == null || mesh.Vertices == null || mesh.Indices == null)
+                return null;
+            if (xScale <= 0 || yScale <= 0)
+                return null;
+
+            using (var projector = new CxMeshToSurface(mesh))
+            {
+                return projector.Project(matrix, xScale, yScale, mode);
+            }
+        }
+
+        /// <summary>
+        /// Projects a triangle mesh onto a uniform XY height map within a specified bounding box.
+        /// </summary>
+        /// <param name="mesh">Source triangle mesh.</param>
+        /// <param name="matrix">4×4 transformation matrix (world to target local).</param>
+        /// <param name="bounds">Target XY bounding box (grid origin and Z scale derived from this box).</param>
+        /// <param name="xScale">Grid cell width along X.</param>
+        /// <param name="yScale">Grid cell height along Y.</param>
+        /// <param name="mode">Rasterisation aggregation mode (Max / Min).</param>
+        /// <returns>Height-map surface, or <c>null</c> on invalid input.</returns>
+        public static CxSurface MeshToSurface(CxMesh mesh, CxMatrix4X4 matrix,
+            Box3D bounds,
+            float xScale = 0.01f, float yScale = 0.01f,
+            ProjectionMode mode = ProjectionMode.Max)
+        {
+            if (mesh == null || matrix == null || mesh.Vertices == null || mesh.Indices == null)
+                return null;
+            if (xScale <= 0 || yScale <= 0 || bounds.Size.Width <= 0 || bounds.Size.Height <= 0)
+                return null;
+
+            int width  = Math.Max(1, (int)Math.Ceiling(bounds.Size.Width  / xScale));
+            int height = Math.Max(1, (int)Math.Ceiling(bounds.Size.Height / yScale));
+            float xOffset = bounds.Center.X - width  * xScale / 2f;
+            float yOffset = bounds.Center.Y - height * yScale / 2f;
+            float zOffset = bounds.Center.Z;
+            float zScale  = Math.Max(bounds.Size.Depth / ushort.MaxValue, 1e-6f);
+
+            using (var projector = new CxMeshToSurface(mesh))
+            {
+                return projector.Project(matrix,
+                    xOffset, yOffset, zOffset,
+                    xScale, yScale, zScale,
+                    width, height, mode);
+            }
+        }
+
+        /// <summary>
+        /// Converts a <see cref="CxSurface"/> to a mesh.
+        /// Each valid quad produces two CCW triangles; invalid cells leave holes.
+        /// Intensity data is propagated per-vertex when present.
+        /// </summary>
+        /// <param name="surface">Source surface. Supports both Surface and PointCloud data layouts.</param>
+        /// <param name="generateUVs">
+        /// When <c>true</c>, populates <see cref="CxMesh.UVs"/> with normalized UV coordinates
+        /// and sets <see cref="CxMesh.TextureWidth"/>/<see cref="CxMesh.TextureHeight"/>.
+        /// </param>
+        /// <returns>A <see cref="CxMesh"/>, or <c>null</c> if the surface contains no valid cells.</returns>
+        public static CxMesh SurfaceToMesh(CxSurface surface, bool generateUVs = false)
+        {
+            if (surface == null || surface.Data == null || surface.Data.Length == 0)
+                return null;
+
+            int W = surface.Width, H = surface.Length;
+            int total = W * H;
+            bool isPointCloud = surface.Type == SurfaceType.PointCloud;
+
+            if (isPointCloud && surface.Data.Length < total * 3)
+                throw new ArgumentException(
+                    "PointCloud surface Data length must be Width × Length × 3.");
+
+            // Phase 1a: parallel valid-cell marking
+            bool[] valid = new bool[total];
+            Parallel.For(0, total, i =>
+            {
+                valid[i] = isPointCloud
+                    ? surface.Data[i * 3] != short.MinValue
+                    : surface.Data[i] != short.MinValue;
+            });
+
+            // Phase 1b: prefix sum → indexMap
+            int[] indexMap = new int[total];
+            int validCount = 0;
+            for (int i = 0; i < total; i++)
+                indexMap[i] = valid[i] ? validCount++ : -1;
+
+            if (validCount == 0) return null;
+
+            // Phase 1c: parallel vertex + UV fill
+            var vertices = new CxPoint3D[validCount];
+            var uvs = generateUVs ? new CxPoint2D[validCount] : null;
+            bool hasIntensity = surface.Intensity != null && surface.Intensity.Length >= total;
+            float uDenom = W > 1 ? W - 1f : 1f;
+            float vDenom = H > 1 ? H - 1f : 1f;
+
+            Parallel.For(0, total, i =>
+            {
+                if (!valid[i]) return;
+                int vi = indexMap[i];
+                int col = i % W, row = i / W;
+
+                if (isPointCloud)
+                {
+                    vertices[vi] = new CxPoint3D(
+                        surface.XOffset + surface.Data[i * 3]     * surface.XScale,
+                        surface.YOffset + surface.Data[i * 3 + 1] * surface.YScale,
+                        surface.ZOffset + surface.Data[i * 3 + 2] * surface.ZScale);
+                }
+                else
+                {
+                    vertices[vi] = new CxPoint3D(
+                        surface.XOffset + col * surface.XScale,
+                        surface.YOffset + row * surface.YScale,
+                        surface.ZOffset + surface.Data[i] * surface.ZScale);
+                }
+
+                if (generateUVs)
+                    uvs[vi] = new CxPoint2D(col / uDenom, row / vDenom);
+            });
+
+            // Intensity: compressed per-vertex for CxMeshItem, or full W×H grid for CxMeshAdvancedItem
+            byte[] intensity = null;
+            if (hasIntensity)
+            {
+                if (generateUVs)
+                {
+                    // W×H texture layout: preserve grid positions, fill invalid cells with 0
+                    intensity = new byte[total];
+                    Parallel.For(0, total, i =>
+                    {
+                        intensity[i] = valid[i] ? surface.Intensity[i] : (byte)0;
+                    });
+                }
+                else
+                {
+                    // Compressed per-vertex layout
+                    intensity = new byte[validCount];
+                    Parallel.For(0, total, i =>
+                    {
+                        if (valid[i]) intensity[indexMap[i]] = surface.Intensity[i];
+                    });
+                }
+            }
+
+            var mesh = new CxMesh
+            {
+                Vertices = vertices,
+                Intensity = intensity,
+            };
+
+            // Phase 2: quad triangulation (CCW)
+            int quadRowLimit = H - 1;
+            int quadColLimit = W - 1;
+            uint[] indices = new uint[Math.Max(quadRowLimit, 0) * Math.Max(quadColLimit, 0) * 6];
+            int triIdx = 0;
+
+            for (int row = 0; row < quadRowLimit; row++)
+            {
+                for (int col = 0; col < quadColLimit; col++)
+                {
+                    int v00 = indexMap[row * W + col];
+                    int v01 = indexMap[row * W + col + 1];
+                    int v10 = indexMap[(row + 1) * W + col];
+                    int v11 = indexMap[(row + 1) * W + col + 1];
+                    if (v00 < 0 || v01 < 0 || v10 < 0 || v11 < 0) continue;
+
+                    indices[triIdx++] = (uint)v00;
+                    indices[triIdx++] = (uint)v10;
+                    indices[triIdx++] = (uint)v11;
+                    indices[triIdx++] = (uint)v00;
+                    indices[triIdx++] = (uint)v11;
+                    indices[triIdx++] = (uint)v01;
+                }
+            }
+
+            if (triIdx < indices.Length)
+            {
+                uint[] compact = new uint[triIdx];
+                Array.Copy(indices, compact, triIdx);
+                indices = compact;
+            }
+            mesh.Indices = indices;
+
+            if (generateUVs)
+            {
+                mesh.UVs = uvs;
+                mesh.TextureWidth = W;
+                mesh.TextureHeight = H;
+            }
+
+            return mesh;
+        }
     }
 }

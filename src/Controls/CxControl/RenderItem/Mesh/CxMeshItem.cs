@@ -75,8 +75,22 @@ namespace VisionNet.Controls
                 vertices[i * 3 + 2] = Mesh.Vertices[i].Z;
 
                 float intensity = 1f;
-                if (Mesh.Intensity != null && Mesh.Intensity.Length > i)
-                    intensity = Mesh.Intensity[i] / 255f;
+                if (Mesh.Intensity != null)
+                {
+                    if (Mesh.UVs != null && Mesh.TextureWidth > 0 && Mesh.TextureHeight > 0
+                        && i < Mesh.UVs.Length)
+                    {
+                        int tx = (int)(Mesh.UVs[i].X * (Mesh.TextureWidth  - 1) + 0.5f);
+                        int ty = (int)(Mesh.UVs[i].Y * (Mesh.TextureHeight - 1) + 0.5f);
+                        int si = ty * Mesh.TextureWidth + tx;
+                        if (si < Mesh.Intensity.Length)
+                            intensity = Mesh.Intensity[si] / 255f;
+                    }
+                    else if (Mesh.Intensity.Length > i)
+                    {
+                        intensity = Mesh.Intensity[i] / 255f;
+                    }
+                }
 
                 if (_surfaceColorMode == SurfaceColorMode.Intensity)
                 {

@@ -15,4 +15,14 @@ namespace VisionNet.DataType
         /// <summary>Store the arithmetic mean of all Z values in each cell.</summary>
         Average = 2,
     }
+
+    /// <summary>Grid-cell aggregation mode for GPU rasterisation.</summary>
+    public enum ProjectionMode
+    {
+        /// <summary>Keep the highest Z value in each cell.</summary>
+        Max = 0,
+
+        /// <summary>Keep the lowest Z value in each cell.</summary>
+        Min = 1,
+    }
 }

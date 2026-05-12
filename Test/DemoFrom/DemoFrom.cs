@@ -42,6 +42,7 @@ VisionOperator.InitialLib();
         }
         CxSurface surface = null;
         CxSurface surface2 = null;
+        private CxMesh _currentMesh;
 
         private void onData(GoDataSet obj)
         {
@@ -257,6 +258,28 @@ VisionOperator.InitialLib();
         private void DemoFrom_Load(object sender, EventArgs e)
         {
 
+        }
+
+        private void btn_surfaceToMesh_Click(object sender, EventArgs e)
+        {
+            if (surface == null) return;
+            _currentMesh = VisionOperator.SurfaceToMesh(surface, generateUVs: true);
+            if (_currentMesh == null || _currentMesh.Vertices.Length == 0) return;
+
+            cxDisplay2.ResetView();
+            cxDisplay2.SetMesh(_currentMesh);
+        }
+
+        private void btn_meshToSurface_Click(object sender, EventArgs e)
+        {
+            if (_currentMesh == null) return;
+
+            var matrix = CxMatrix4X4.RotationY((float)Math.PI / 4);
+            var result = VisionOperator.MeshToSurface(_currentMesh,matrix,new Box3D(new CxPoint3D(2,4,1.2f),new CxSize3D(15,25,2)),0.01f, 0.01f);
+            if (result == null) return;
+
+            cxDisplay1.ResetView();
+            cxDisplay1.SetSurfaceAdvancedItem(result);
         }
     }
 }

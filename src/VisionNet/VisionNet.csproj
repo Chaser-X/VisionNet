@@ -72,6 +72,7 @@
     <Compile Include="Compute\OpenCLEnvironment.cs" />
     <Compile Include="Compute\CxUniformSurface.cs" />
     <Compile Include="Compute\CxTransformSurface.cs" />
+    <Compile Include="Compute\CxMeshToSurface.cs" />
     <Compile Include="Export.cs" />
     <Compile Include="VisionOperator.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
@@ -79,6 +80,7 @@
   <ItemGroup>
     <EmbeddedResource Include="Compute\Kernels\UniformSurface.cl" />
     <EmbeddedResource Include="Compute\Kernels\TransformSurface.cl" />
+    <EmbeddedResource Include="Compute\Kernels\MeshToSurface.cl" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>
