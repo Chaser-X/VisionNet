@@ -216,7 +216,7 @@ namespace VisionNet
             float xOffset = box.Value.Center.X - width  * xScale / 2f;
             float yOffset = box.Value.Center.Y - height * yScale / 2f;
             float zOffset = box.Value.Center.Z;
-            float zScale  = box.Value.Size.Depth / ushort.MaxValue;
+            float zScale  = Math.Max(box.Value.Size.Depth / ushort.MaxValue, 1e-6f);
 
             using (var sampler = new CxUniformSurface())
             {

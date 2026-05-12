@@ -86,9 +86,10 @@ namespace VisionNet.Compute
             EnsureMatrixBuffer();
 
             var dataBuf = AllocateTransient<short>(MemFlags.ReadOnly | MemFlags.CopyHostPtr, data);
-            var dstBuf  = AllocateTransientWithSize<float>(MemFlags.WriteOnly, count * 4);
+            var dstBuf  = AllocateTransientWithSize<float>(MemFlags.ReadWrite, count * 4);
 
-            bool ok = SetKernelArgs(KernelName,
+            bool ok = true;
+            ok &= SetKernelArgs(KernelName,
                 dataBuf, dstBuf, width, length,
                 surface.XOffset, surface.YOffset, surface.ZOffset,
                 surface.XScale, surface.YScale, surface.ZScale,
@@ -162,7 +163,7 @@ namespace VisionNet.Compute
             EnsureMatrixBuffer();
 
             var dataBuf = AllocateTransient<short>(MemFlags.ReadOnly | MemFlags.CopyHostPtr, surface.Data);
-            var dstBuf  = AllocateTransientWithSize<float>(MemFlags.WriteOnly, count * 4);
+            var dstBuf  = AllocateTransientWithSize<float>(MemFlags.ReadWrite, count * 4);
 
             bool ok = SetKernelArgs(KernelName,
                 dataBuf, dstBuf, surface.Width, surface.Length,

@@ -325,6 +325,8 @@ namespace VisionNet.Compute
         /// Ensures the OpenCL environment is ready, this computation's program is compiled,
         /// and per-instance kernel objects are created.
         /// </summary>
+        private readonly object _kernelLock = new object();
+
         public bool EnsureInitialized(int platformIndex = 0, int deviceIndex = 0,
             DeviceType deviceType = DeviceType.Default)
         {
@@ -335,12 +337,15 @@ namespace VisionNet.Compute
             if (!ClEnvironment.BuildProgram(ProgramId, GetKernelSource(), GetKernelNames()))
                 return false;
 
-            foreach (var name in GetKernelNames())
+            lock (_kernelLock)
             {
-                if (_ownedKernels.ContainsKey(name)) continue;
-                var k = ClEnvironment.CreateKernelInstance(ProgramId, name);
-                if (!k.HasValue) return false;
-                _ownedKernels[name] = k.Value;
+                foreach (var name in GetKernelNames())
+                {
+                    if (_ownedKernels.ContainsKey(name)) continue;
+                    var k = ClEnvironment.CreateKernelInstance(ProgramId, name);
+                    if (!k.HasValue) return false;
+                    _ownedKernels[name] = k.Value;
+                }
             }
             return true;
         }
