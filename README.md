@@ -255,11 +255,15 @@ var mesh = new CxMesh
     Vertices      = new CxPoint3D[n],  // 顶点世界坐标
     Indices       = new uint[m * 3],   // 三角形索引（每三个为一个面片）
     UVs           = new CxPoint2D[n],  // 强度纹理 UV 坐标
-    Intensity     = new byte[w * h],   // 强度纹理像素
+    Intensity     = new byte[w * h],   // 强度纹理像素（W×H 网格）或逐顶点（压缩）
     TextureWidth  = w,
     TextureHeight = h,
 };
 ```
+
+`SurfaceToMesh` 生成的 mesh：
+- `generateUVs=false`：`Intensity` 为压缩逐顶点格式（`length = validCount`），供 `CxMeshItem` 固定管线渲染
+- `generateUVs=true`：`Intensity` 为 W×H 网格格式（`length = W×H`，无效格填 0），供 `CxMeshAdvancedItem` Shader 路径渲染
 
 **`CxImage<T>`** — 泛型 2D 图像
 
@@ -268,7 +272,7 @@ var img = new CxImage<byte>(640, 480);
 // 行主序访问：img.Data[row * img.Width + col]
 ```
 
-**`CxMatrix4X4`** — 4×4 列主序矩阵（OpenGL 约定）
+**`CxMatrix4X4`** — 4×4 行主序矩阵（`Data[i*4+j]` = 第 i 行第 j 列；传给 OpenGL 时需先转置）
 
 </details>
 
@@ -296,6 +300,15 @@ Box3D? boxFast = VisionOperator.CalculateBoundingBoxSIMD(points);
 VisionOperator.InitialLib();
 CxSurface transformed = VisionOperator.TransformSurface(surface, matrix, SampleMode.Max);
 VisionOperator.DestroyLib();
+
+// Mesh → Surface 高度图投影（全自动，Box3D 范围从 mesh 包围盒推导）
+CxSurface heightMap = VisionOperator.MeshToSurface(mesh, matrix, 0.01f, 0.01f);
+
+// Mesh → Surface 高度图投影（指定固定 Box3D 范围，用于对齐多帧）
+CxSurface heightMapFixed = VisionOperator.MeshToSurface(mesh, matrix, bounds, 0.01f, 0.01f);
+
+// Surface → Mesh 三角网格转换（generateUVs=true 时含 UV + W×H 纹理强度）
+CxMesh mesh = VisionOperator.SurfaceToMesh(surface, generateUVs: true);
 ```
 
 #### OpenCL GPU 计算模块（`VisionNet.Compute`）
@@ -306,6 +319,7 @@ VisionOperator.DestroyLib();
 | `OpenCLComputation` | 抽象基类，封装 Buffer 分配、Kernel 参数绑定和 NDRange 执行 |
 | `CxUniformSurface` | GPU 点云均匀重采样，支持 Max / Min / Average 聚合模式 |
 | `CxTransformSurface` | GPU 结构化表面矩阵变换，返回变换后的点云 |
+| `CxMeshToSurface` | GPU 网格自动栅格化，将三角 mesh 投影到指定位姿和分辨率的 CxSurface |
 
 ```csharp
 // 直接使用底层 GPU 采样（绕过 VisionOperator 包装）
@@ -320,6 +334,10 @@ CxSurface gridded = sampler.Sample(points, intensity,
 
 var transformer = new CxTransformSurface(matrix);
 var (pts, intensities) = transformer.Transform(surface);
+
+// GPU 网格 → 高度图投影
+var projector = new CxMeshToSurface(mesh);
+CxSurface projected = projector.Project(matrix, 0.01f, 0.01f);
 
 VisionOperator.DestroyLib();
 ```
