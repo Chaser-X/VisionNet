@@ -37,7 +37,7 @@ namespace DemoFrom
                 //MessageBox.Show("OpenGL不可用，请检查您的系统配置。");
                 return;
             }
-VisionOperator.InitialLib();
+            VisionOperator.InitialLib();
             cxDisplay1.SetViewUpDirection(new CxVector3D(-1, 0, 0));
         }
         CxSurface surface = null;
@@ -260,7 +260,7 @@ VisionOperator.InitialLib();
             //    0, 0, 0, 1
             //});
             var matrix = CxMatrix4X4.RotationY((float)Math.PI / 4);
-            var points = VisionOperator.TransformSurface(surface, matrix,SampleMode.Average);
+            var points = VisionOperator.TransformSurface(surface, matrix, 0.01f, 0.01f, SampleMode.Average);
             cxDisplay2.ResetView();
             cxDisplay2.SetSurface(points);
         }
@@ -285,7 +285,7 @@ VisionOperator.InitialLib();
             if (_currentMesh == null) return;
 
             var matrix = CxMatrix4X4.RotationY((float)Math.PI / 4);
-            var result = VisionOperator.MeshToSurface(_currentMesh,matrix,new Box3D(new CxPoint3D(2,4,1.2f),new CxSize3D(15,25,2)),0.01f, 0.01f);
+            var result = VisionOperator.MeshToSurface(_currentMesh, matrix, new Box3D(new CxPoint3D(2, 4, 1.2f), new CxSize3D(15, 25, 2)), 0.01f, 0.01f);
             if (result == null) return;
 
             cxDisplay1.ResetView();
