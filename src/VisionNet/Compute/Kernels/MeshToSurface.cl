@@ -78,11 +78,11 @@ __kernel void RasterizeTriangles(
             float w1 = edge(v2.xy, v0.xy, p);
             float w2 = edge(v0.xy, v1.xy, p);
 
-            if (w0 < 0 || w1 < 0 || w2 < 0) continue;
-
             w0 /= denom2D;
             w1 /= denom2D;
             w2 /= denom2D;
+
+            if (w0 < 0 || w1 < 0 || w2 < 0) continue;
 
             float zInterp = w0 * v0.z + w1 * v1.z + w2 * v2.z;
             int   idx     = py * width + px;
