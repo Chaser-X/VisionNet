@@ -42,12 +42,14 @@ VisionOperator.InitialLib();
         }
         CxSurface surface = null;
         CxSurface surface2 = null;
+        private CxPointCloud _pointCloud;
         private CxMesh _currentMesh;
 
         private void onData(GoDataSet obj)
         {
             surface = null;
             surface2 = null;
+            _pointCloud = null;
 
             GoDataMsg msg = null;
             GoSurfaceIntensityMsg surfaceIntensityMsg = null;
@@ -89,7 +91,7 @@ VisionOperator.InitialLib();
                     float yscale = surfaceMsg.YResolution / 1000000.0f;
                     float zscale = surfaceMsg.ZResolution / 1000000.0f;
                     IntPtr surfacePtr = surfaceMsg.Data;
-                    surface = new CxSurface((int)width, (int)length, new short[bufferSize], new byte[0], xoffset, yoffset, zoffset, xscale, yscale, zscale, SurfaceType.Surface);
+                    surface = new CxSurface((int)width, (int)length, new short[bufferSize], new byte[0], xoffset, yoffset, zoffset, xscale, yscale, zscale);
                     surface.SetData(surfacePtr);
                     if (surfaceIntensityMsg != null)
                     {
@@ -98,7 +100,7 @@ VisionOperator.InitialLib();
                     }
 
                     IntPtr surfacePtr2 = surfaceMsg.Data;
-                    surface2 = new CxSurface((int)width, (int)length, new short[bufferSize], new byte[0], xoffset + 10, yoffset, zoffset + 10, xscale, yscale, zscale, SurfaceType.Surface);
+                    surface2 = new CxSurface((int)width, (int)length, new short[bufferSize], new byte[0], xoffset + 10, yoffset, zoffset + 10, xscale, yscale, zscale);
                     surface2.SetData(surfacePtr2);
                     if (surfaceIntensityMsg != null)
                     {
@@ -136,21 +138,29 @@ VisionOperator.InitialLib();
                     //        points[(i * width / 2 + j) * 3 + 2] = Data[index * 3 + 2];
                     //    }
                     //}
-                    surface = new CxSurface((int)width / 2, (int)length, new short[bufferSize * 3], new byte[0], xoffset, yoffset, zoffset, xscale, yscale, zscale, SurfaceType.PointCloud);
-                    surface.SetData(surfacePtr);
+                    _pointCloud = new CxPointCloud((int)width / 2, (int)length, new short[bufferSize * 3], new byte[0], xoffset, yoffset, zoffset, xscale, yscale, zscale);
+                    _pointCloud.SetData(surfacePtr);
 
                     if (surfaceIntensityMsg != null)
                     {
                         IntPtr intensityPtr = surfaceIntensityMsg.Data;
-                        surface.SetIntensity(intensityPtr);
+                        _pointCloud.SetIntensity(intensityPtr);
                     }
                 }
             }
             cxDisplay1.ResetView();
-            //cxDisplay1.SurfaceMode = SurfaceMode.Mesh;
-            //cxDisplay1.SurfaceColorMode = SurfaceColorMode.Intensity;
-            cxDisplay1.SetSurfaceAdvancedItem(surface);
-            cxDisplay1.AddSurfaceAdvancedItem(surface2);
+
+            if (_pointCloud != null)
+            {
+                cxDisplay1.SetPointCloudAdvancedItem(_pointCloud);
+            }
+            else
+            {
+                if (surface != null)
+                    cxDisplay1.SetSurfaceAdvancedItem(surface);
+                if (surface2 != null)
+                    cxDisplay1.AddSurfaceAdvancedItem(surface2);
+            }
 
             ////添加平面 Plane3D
             //var plane = new Plane3D(new CxPoint3D(0, 0, 0), new CxVector3D(1, 1, 1));
@@ -190,7 +200,7 @@ VisionOperator.InitialLib();
             var surfacemap = VisionOperator.UniformSurface(points, surface.Intensity, 200, 3500,
                 0.1f, 0.1f, surface.ZScale, -10, -175, surface.ZOffset);
 
-            cxDisplay1.SetPointCloud(surfacemap);
+            cxDisplay1.SetSurface(surfacemap);
         }
 
         private void btn_addSeg3D_Click(object sender, EventArgs e)
@@ -252,7 +262,7 @@ VisionOperator.InitialLib();
             var matrix = CxMatrix4X4.RotationY((float)Math.PI / 4);
             var points = VisionOperator.TransformSurface(surface, matrix,SampleMode.Average);
             cxDisplay2.ResetView();
-            cxDisplay2.SetPointCloud(points);
+            cxDisplay2.SetSurface(points);
         }
 
         private void DemoFrom_Load(object sender, EventArgs e)
