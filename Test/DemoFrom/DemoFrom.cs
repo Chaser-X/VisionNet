@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
 using System.Drawing;
+using System.Drawing.Drawing2D;
 using System.Linq;
 using System.Runtime.InteropServices.ComTypes;
 using System.Runtime.InteropServices;
@@ -36,10 +37,12 @@ namespace DemoFrom
                 //MessageBox.Show("OpenGL不可用，请检查您的系统配置。");
                 return;
             }
+VisionOperator.InitialLib();
             cxDisplay1.SetViewUpDirection(new CxVector3D(-1, 0, 0));
         }
         CxSurface surface = null;
         CxSurface surface2 = null;
+        private CxMesh _currentMesh;
 
         private void onData(GoDataSet obj)
         {
@@ -169,6 +172,7 @@ namespace DemoFrom
             GocatorHandle.GocatorHandle.Instance.DisConnect();
             cxDisplay1.Dispose();
             cxDisplay2.Dispose();
+            VisionOperator.DestroyLib();
             //  Environment.Exit(0);
         }
 
@@ -234,6 +238,48 @@ namespace DemoFrom
         private void button1_Click(object sender, EventArgs e)
         {
             cxDisplay1.ResetView();
+        }
+
+        private void button2_Click(object sender, EventArgs e)
+        {
+            //var ps = surface.ToPoints();
+            //var matrix = new CxMatrix4X4(new float[16] {
+            //    1, 0, 0, 0,
+            //    0, -1, 0, 0,
+            //    0, 0, 1, 0,
+            //    0, 0, 0, 1
+            //});
+            var matrix = CxMatrix4X4.RotationY((float)Math.PI / 4);
+            var points = VisionOperator.TransformSurface(surface, matrix,SampleMode.Average);
+            cxDisplay2.ResetView();
+            cxDisplay2.SetPointCloud(points);
+        }
+
+        private void DemoFrom_Load(object sender, EventArgs e)
+        {
+
+        }
+
+        private void btn_surfaceToMesh_Click(object sender, EventArgs e)
+        {
+            if (surface == null) return;
+            _currentMesh = VisionOperator.SurfaceToMesh(surface, generateUVs: true);
+            if (_currentMesh == null || _currentMesh.Vertices.Length == 0) return;
+
+            cxDisplay2.ResetView();
+            cxDisplay2.SetMesh(_currentMesh);
+        }
+
+        private void btn_meshToSurface_Click(object sender, EventArgs e)
+        {
+            if (_currentMesh == null) return;
+
+            var matrix = CxMatrix4X4.RotationY((float)Math.PI / 4);
+            var result = VisionOperator.MeshToSurface(_currentMesh,matrix,new Box3D(new CxPoint3D(2,4,1.2f),new CxSize3D(15,25,2)),0.01f, 0.01f);
+            if (result == null) return;
+
+            cxDisplay1.ResetView();
+            cxDisplay1.SetSurfaceAdvancedItem(result);
         }
     }
 }

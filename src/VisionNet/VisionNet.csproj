@@ -34,8 +34,12 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="OpenCL.Net">
+      <HintPath>..\..\3rd\OpenCL.Net.dll</HintPath>
+    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
+    <Reference Include="System.Numerics" />
     <Reference Include="System.Xml.Linq" />
     <Reference Include="System.Data.DataSetExtensions" />
     <Reference Include="Microsoft.CSharp" />
@@ -64,9 +68,19 @@
     <Compile Include="DataType\Models\CxMesh.cs" />
     <Compile Include="DataType\Models\CxImage.cs" />
     <Compile Include="DataType\Models\CxMatrix4X4.cs" />
+    <Compile Include="DataType\CxEmunType.cs" />
+    <Compile Include="Compute\OpenCLEnvironment.cs" />
+    <Compile Include="Compute\CxUniformSurface.cs" />
+    <Compile Include="Compute\CxTransformSurface.cs" />
+    <Compile Include="Compute\CxMeshToSurface.cs" />
     <Compile Include="Export.cs" />
     <Compile Include="VisionOperator.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Compute\Kernels\UniformSurface.cl" />
+    <EmbeddedResource Include="Compute\Kernels\TransformSurface.cl" />
+    <EmbeddedResource Include="Compute\Kernels\MeshToSurface.cl" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

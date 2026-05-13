@@ -1,0 +1,156 @@
+[33mcommit ed7c1f8617dd465d3b285ee7bdccf4775e5e113b[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmaster[m[33m, [m[1;31morigin/master[m[33m, [m[1;31morigin/HEAD[m[33m)[m
+Author: binhe <binhe@lmi3d.com>
+Date:   Mon Jul 28 09:25:31 2025 +0800
+
+    noupdata
+
+[33mcommit a177dfaacae1dfd621e38c8dfde4aa5145b8715a[m
+Author: binhe <binhe@lmi3d.com>
+Date:   Wed Jul 16 10:00:20 2025 +0800
+
+    CxSurfaceAdvancedItem使用VAO/VBO纹理渲染
+
+[33mcommit e4c69abc022376143f04cb6ff3339ad0693eb423[m
+Author: binhe <binhe@lmi3d.com>
+Date:   Fri Jul 11 09:49:01 2025 +0800
+
+    CxSurfaceAdvancedItem，纹理渲染CxSuface
+
+[33mcommit 7bb16da523a0e54073e00d73838629c77258e98a[m
+Author: binhe <binhe@lmi3d.com>
+Date:   Tue Jun 24 16:48:08 2025 +0800
+
+    优化相机控制类，旋转和双击居中
+
+[33mcommit 66ae35514ec78cb366bc5679242058ef698cbcd3[m
+Author: binhe <binhe@lmi3d.com>
+Date:   Mon Jun 23 20:26:53 2025 +0800
+
+    0619延迟释放
+
+[33mcommit 41112932766cf52b6d4ec15214e9b28227ff72a2[m
+Author: binhe <binhe@lmi3d.com>
+Date:   Tue Jun 17 10:19:35 2025 +0800
+
+    优化meshitem和surfaceitem的释放，避免内存泄露
+
+[33mcommit a0189bad76b9f1011895eac5718b580590731b09[m
+Author: binhe <binhe@lmi3d.com>
+Date:   Sat Jun 14 11:38:20 2025 +0800
+
+    滚动速度优化
+
+[33mcommit cecab0e43c4962a0984d5e2ec719e900ee22cf0d[m
+Author: binhe <binhe@lmi3d.com>
+Date:   Sat Jun 7 17:17:04 2025 +0800
+
+    渲染刷新模式，优先改为手动刷新，降低CPU占用
+
+[33mcommit 25f49420136e86fe5c032851685b94ee75a9e8bc[m
+Author: binhe <binhe@lmi3d.com>
+Date:   Wed May 14 10:27:29 2025 +0800
+
+    增加2D文本显示
+
+[33mcommit ec09892d8fa00da686e9946d427e93950a83f07a[m
+Author: binhe <binhe@lmi3d.com>
+Date:   Mon Apr 28 11:31:05 2025 +0800
+
+    修复文本显示的一些bugs
+
+[33mcommit 90762a5a5e415d7b42ad9e232cd461e7dd74070a[m
+Author: binhe <binhe@lmi3d.com>
+Date:   Fri Apr 25 15:05:19 2025 +0800
+
+    优化renderitem线程安全
+
+[33mcommit d1d46c7f75e1258910cfbc25dc4da7ebc1eec2eb[m
+Author: binhe <binhe@lmi3d.com>
+Date:   Wed Apr 23 16:33:18 2025 +0800
+
+    新增设置mesh方法接口
+
+[33mcommit 1c9d713785c2c4f6e558d3fa9e34f2a9af1f45a2[m
+Author: binhe <binhe@lmi3d.com>
+Date:   Thu Apr 17 16:40:35 2025 +0800
+
+    优化图像元素绘制
+
+[33mcommit b76b38bfba46dea18a052bec4115a93a9404af2f[m
+Author: binhe <binhe@lmi3d.com>
+Date:   Thu Apr 10 14:57:28 2025 +0800
+
+    增加2D视图
+
+[33mcommit e27df3eb5cf14ad5e43c4b6931bacd83382eccc5[m
+Author: binhe <binhe@lmi3d.com>
+Date:   Mon Mar 31 11:44:07 2025 +0800
+
+    添加绘图控件的一些图像元素；
+
+[33mcommit c13b8ce8be37cfab24c5acc0b3d172d62840a36b[m
+Author: binhe <binhe@lmi3d.com>
+Date:   Thu Mar 27 11:54:46 2025 +0800
+
+    重构显示控件
+
+[33mcommit 61acbdad6be879fd6f86b2872b7d0ba29d4f5494[m
+Author: binhe <binhe@lmi3d.com>
+Date:   Thu Mar 27 09:44:23 2025 +0800
+
+    #Add Visualize Control and  some renderitem
+
+[33mcommit 0ae754ab64429ceb570565a979332b80bb1a572b[m
+Author: binhe <binhe@lmi3d.com>
+Date:   Fri Mar 21 17:21:43 2025 +0800
+
+    1.新增点云重采样算子；
+    2.增加点云显示控件；
+
+[33mcommit bc3c13f6f5ae12aaab3c0cd07f4dc3b13f8a299a[m
+Author: Chaser-X <294252594@qq.com>
+Date:   Tue Jan 10 18:10:40 2023 +0800
+
+    add ignore
+
+[33mcommit f24fa3a7effe64c7e1b3d488b585d844407c5fe7[m
+Author: Chaser-X <294252594@qq.com>
+Date:   Tue Jan 10 18:06:56 2023 +0800
+
+    frist draft
+
+[33mcommit 271cd1ccd8b447ba14df6e874bae31a6d51d88f2[m
+Author: H.Bin <42021698+Chaser-X@users.noreply.github.com>
+Date:   Tue Jan 10 15:13:38 2023 +0800
+
+    Update README.md
+
+[33mcommit f9a527fd13072f057fcf87dcc70986f83041b4d5[m
+Author: H.Bin <42021698+Chaser-X@users.noreply.github.com>
+Date:   Tue Jan 10 15:08:15 2023 +0800
+
+    Update README.md
+
+[33mcommit 22bf42844ba296b6e9772e0f18e41c1087964843[m
+Author: H.Bin <42021698+Chaser-X@users.noreply.github.com>
+Date:   Tue Jan 10 15:06:20 2023 +0800
+
+    Update README.md
+
+[33mcommit 5ef62fd02e171488cb2a6c1d3e7d211e3a774a0c[m
+Author: H.Bin <42021698+Chaser-X@users.noreply.github.com>
+Date:   Tue Jan 10 15:05:47 2023 +0800
+
+    Update README.md
+
+[33mcommit 8d4dc75939362d269a4363896885ac121dcfa17a[m
+Author: H.Bin <42021698+Chaser-X@users.noreply.github.com>
+Date:   Tue Jan 10 15:05:30 2023 +0800
+
+    Update README.md
+
+[33mcommit ee84efc249fd2dc04f805ab288efcffe5e800d77[m
+Author: H.Bin <42021698+Chaser-X@users.noreply.github.com>
+Date:   Tue Jan 10 15:03:44 2023 +0800
+
+    Initial commit

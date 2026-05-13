@@ -12,8 +12,8 @@ public:
 	CxUniformGridSampler(float xScale, float yScale, float xMin, float xMax, float yMin, float yMax)
 		: m_xScale(xScale), m_yScale(yScale), m_xMin(xMin), m_xMax(xMax), m_yMin(yMin), m_yMax(yMax) {
 
-		m_wdith = static_cast<int>(std::ceil((m_xMax - m_xMin) / m_xScale));
-		m_height = static_cast<int>(std::ceil((m_yMax - m_yMin) / m_yScale));
+		m_wdith = static_cast<int>(std::round((m_xMax - m_xMin) / m_xScale));
+		m_height = static_cast<int>(std::round((m_yMax - m_yMin) / m_yScale));
 	}
 
 	void processPointCloud(const std::vector<Point3D>& points, const std::vector<uint8_t>& intensity = std::vector<uint8_t>()) {
