@@ -20,9 +20,9 @@
 
 VisionNet 由两个互相独立的库组成：
 
-| 库 | 说明 |
-|----|------|
-| **VisionNet.dll** | 核心数据类型（点云、网格、几何体）+ 静态算子 API（通过 P/Invoke 调用本地 C++ 库） |
+| 库                 | 说明                                                            |
+| ----------------- | ------------------------------------------------------------- |
+| **VisionNet.dll** | 核心数据类型（点云、网格、几何体）+ 静态算子 API（通过 P/Invoke 调用本地 C++ 库）           |
 | **CxControl.dll** | 基于 SharpGL/OpenGL 的高性能 3D 渲染控件 `CxDisplay`，支持点云、网格、几何叠加层的实时渲染 |
 
 ### 主要特性
@@ -32,7 +32,7 @@ VisionNet 由两个互相独立的库组成：
 - 🎨 多 Item 叠加：点云、网格、几何图元可同时显示，颜色条自动同步全局 Z 范围
 - 🖱️ 完整鼠标交互：追踪球旋转、平移、缩放、双击对焦、悬停坐标标签
 - 🔒 线程安全：GL 资源延迟释放机制，数据更新可在后台线程执行
-- 🚀 **OpenCL GPU 计算**：并行包围盒计算、GPU 点云重采样（`CxUniformSurface`）、GPU 表面变换（`CxTransformSurface`）
+- 🚀 **OpenCL GPU 计算**：并行包围盒计算、GPU 点云重采样（`CxUniformSurface`）、GPU 表面变换（`CxTransformSurface` / `CxTransformPointCloud`）、GPU 网格栅格化（`CxMeshToSurface`）
 
 ---
 
@@ -52,15 +52,15 @@ VisionNet 由两个互相独立的库组成：
 
 ## 环境要求
 
-| 依赖 | 版本 | 说明 |
-|------|------|------|
-| Windows | 10 / 11 | 仅支持 Windows |
-| .NET Framework | 4.8 | 目标框架 |
-| Visual Studio | 2019+ | 推荐开发环境 |
-| OpenGL | 3.3+ | 需要独立显卡或支持 OpenGL 3.3 的集成显卡 |
-| OpenCL | 1.2+ | GPU 计算（可选，无 OpenCL 设备时自动降级到 CPU 路径） |
-| VisionLib.dll | — | 本地 C++ 算法库，仅 x64 |
-| OpenCL.Net.dll | — | OpenCL .NET 绑定，位于 `3rd/` 目录 |
+| 依赖             | 版本      | 说明                                  |
+| -------------- | ------- | ----------------------------------- |
+| Windows        | 10 / 11 | 仅支持 Windows                         |
+| .NET Framework | 4.8     | 目标框架                                |
+| Visual Studio  | 2019+   | 推荐开发环境                              |
+| OpenGL         | 3.3+    | 需要独立显卡或支持 OpenGL 3.3 的集成显卡          |
+| OpenCL         | 1.2+    | GPU 计算（可选，无 OpenCL 设备时自动降级到 CPU 路径） |
+| VisionLib.dll  | —       | 本地 C++ 算法库，仅 x64                    |
+| OpenCL.Net.dll | —       | OpenCL .NET 绑定，位于 `3rd/` 目录         |
 
 ---
 
@@ -88,7 +88,7 @@ display.Dock = DockStyle.Fill;
 this.Controls.Add(display);
 ```
 
-### 3. 显示点云
+### 3. 显示结构化表面 / 点云
 
 ```csharp
 using VisionNet;
@@ -98,19 +98,24 @@ using VisionNet.Controls;
 // 构造结构化高度图（short[] 编码，-32768 = 无效点）
 var surface = new CxSurface(
     width: 500, length: 500,
-    data: heightData,          // short[]，Z 高度，-32768 表示无效
+    data: heightData,          // short[]，Z 高度
     intensity: intensityData,  // byte[]，强度 0–255（可为 null）
     xOffset: 0f, yOffset: 0f, zOffset: 0f,
     xScale: 0.1f, yScale: 0.1f, zScale: 0.001f);
 
-cxDisplay1.SetPointCloud(surface);
+cxDisplay1.SetSurface(surface);              // 结构化表面
+// 或：有序点云
+cxDisplay1.SetPointCloud(cloud);            // CxPointCloud
+// 或：高性能 Shader 路径
+cxDisplay1.SetSurfaceAdvancedItem(surface); // 结构化
+cxDisplay1.SetPointCloudAdvancedItem(cloud);// 点云
 ```
 
 ### 4. 叠加多个对象
 
 ```csharp
-// 追加第二个点云（不清空已有内容）
-cxDisplay1.AddPointCloud(surface2);
+// 追加第二个结构化表面（不清空已有内容）
+cxDisplay1.AddSurface(surface2);
 
 // 叠加包围盒
 cxDisplay1.SetBox(new[] {
@@ -146,7 +151,14 @@ VisionNet/
 │   │   ├── DataType/
 │   │   │   ├── Geometry3D/         # CxPoint3D, CxVector3D, Box3D, Plane3D ...
 │   │   │   ├── Geometry2D/         # CxPoint2D, Segment2D, Polygon2D ...
-│   │   │   └── Models/             # CxSurface, CxMesh, CxImage, CxMatrix4X4
+│   │   │   └── Models/             # CxSurface, CxPointCloud, CxMesh, CxImage, CxMatrix4X4
+│   │   ├── Compute/                # OpenCL GPU 计算模块
+│   │   │   ├── Kernels/            # .cl 内核源码（嵌入资源）
+│   │   │   ├── OpenCLEnvironment   # 单例：上下文 / 命令队列 / 编译程序
+│   │   │   ├── CxUniformSurface    # GPU 点云均匀重采样
+│   │   │   ├── CxTransformSurface  # GPU 表面变换
+│   │   │   ├── CxTransformPointCloud# GPU 点云变换
+│   │   │   └── CxMeshToSurface     # GPU 网格栅格化
 │   │   ├── VisionOperator.cs       # 静态算子 API
 │   │   └── Export.cs               # P/Invoke 声明（VisionLib.dll）
 │   └── Controls/
@@ -154,6 +166,7 @@ VisionNet/
 │           ├── Camera/             # ICamera, CxAdvancedTrackBallCamera
 │           ├── RenderItem/
 │           │   ├── Surface/        # CxSurfaceItem, CxSurfaceAdvancedItem
+│           │   ├── PointCloud/     # CxPointCloudItem, CxPointCloudAdvancedItem
 │           │   ├── Mesh/           # CxMeshItem, CxMeshAdvancedItem
 │           │   ├── Geometry/       # Point / Segment / Polygon / Plane / Box
 │           │   └── Overlay/        # ColorBar, CoordinateSystem, Tag, Text
@@ -199,45 +212,43 @@ VisionNet/
 <details>
 <summary><b>3D 几何类型（VisionNet.DataType）</b></summary>
 
-| 类型 | 说明 |
-|------|------|
-| `CxPoint3D` | 3D 点（X, Y, Z）—— `StructLayout.Explicit`，可直接与 C++ 互操作 |
-| `CxPoint3DI` | 带强度的 3D 点 |
-| `CxVector3D` | 3D 向量，支持 `+` `-` `×` `÷` `Dot` `Cross` `Normalize` |
-| `CxSize3D` | 3D 尺寸（Width, Height, Depth） |
-| `Box3D` | 轴对齐包围盒（Center + Size） |
-| `Plane3D` | 平面（Point + Normal） |
-| `Sphere` | 球体（Center + Radius） |
-| `Circle3D` | 3D 圆（Center + Normal + Radius） |
-| `Segment3D` | 线段（Start + End） |
-| `Polygon3D` | 多边形顶点序列（`IsClosed` 控制是否闭合） |
-| `CxCoordination3D` | 3D 坐标系（Origin + XAxis + YAxis + ZAxis） |
-| `TextInfo` | 世界坐标锚定文本标签（Location + Text + Size） |
+| 类型                 | 说明                                                   |
+| ------------------ | ---------------------------------------------------- |
+| `CxPoint3D`        | 3D 点（X, Y, Z）—— `StructLayout.Explicit`，可直接与 C++ 互操作 |
+| `CxPoint3DI`       | 带强度的 3D 点                                            |
+| `CxVector3D`       | 3D 向量，支持 `+` `-` `×` `÷` `Dot` `Cross` `Normalize`   |
+| `CxSize3D`         | 3D 尺寸（Width, Height, Depth）                          |
+| `Box3D`            | 轴对齐包围盒（Center + Size）                                |
+| `Plane3D`          | 平面（Point + Normal）                                   |
+| `Sphere`           | 球体（Center + Radius）                                  |
+| `Circle3D`         | 3D 圆（Center + Normal + Radius）                       |
+| `Segment3D`        | 线段（Start + End）                                      |
+| `Polygon3D`        | 多边形顶点序列（`IsClosed` 控制是否闭合）                           |
+| `CxCoordination3D` | 3D 坐标系（Origin + XAxis + YAxis + ZAxis）               |
+| `TextInfo`         | 世界坐标锚定文本标签（Location + Text + Size）                   |
 
 </details>
 
 <details>
 <summary><b>2D 几何类型</b></summary>
 
-| 类型 | 说明 |
-|------|------|
-| `CxPoint2D` / `CxVector2D` | 2D 点 / 向量 |
-| `Segment2D` | 2D 线段 |
-| `Polygon2D` | 2D 多边形 |
-| `Circle2D` | 2D 圆 |
-| `Text2D` | 屏幕空间文本（Location + Text + FontSize） |
+| 类型                         | 说明                                 |
+| -------------------------- | ---------------------------------- |
+| `CxPoint2D` / `CxVector2D` | 2D 点 / 向量                          |
+| `Segment2D`                | 2D 线段                              |
+| `Polygon2D`                | 2D 多边形                             |
+| `Circle2D`                 | 2D 圆                               |
+| `Text2D`                   | 屏幕空间文本（Location + Text + FontSize） |
 
 </details>
 
 <details>
 <summary><b>主数据模型</b></summary>
 
-**`CxSurface`** — 结构化高度图 或 无序点云
+**`CxSurface`** — 结构化高度图
 
 ```csharp
-// 结构化高度图：Data 长度 = Width × Length，每个元素为 Z 高度（short）
-// 无序点云：    Data 长度 = Width × Length × 3，每个点为 (X, Y, Z) 三元组
-// 无效点：      对应位置值为 -32768
+// Data 长度 = Width × Length，每个元素为 Z 高度（short），-32768 = 无效点
 
 var surface = new CxSurface(width, length, data, intensity,
     xOffset, yOffset, zOffset, xScale, yScale, zScale);
@@ -245,6 +256,20 @@ var surface = new CxSurface(width, length, data, intensity,
 surface.SetData(nativePtr);      // 从非托管内存加载数据
 surface.SetIntensity(nativePtr); // 从非托管内存加载强度
 CxPoint3D[] pts = surface.ToPoints(); // 转换为世界坐标点数组
+```
+
+**`CxPointCloud`** — 有序点云
+
+```csharp
+// Data 长度 = Width × Length × 3，每格存 (X, Y, Z) 三元组，-32768 = 无效点
+// 保留完整网格拓扑（Width × Length），可生成三角形索引和强度纹理
+
+var cloud = new CxPointCloud(width, length, data, intensity,
+    xOffset, yOffset, zOffset, xScale, yScale, zScale);
+
+cloud.SetData(nativePtr);       // 从非托管内存加载 XYZ 三元组
+cloud.SetIntensity(nativePtr);  // 从非托管内存加载强度
+CxPoint3D[] pts = cloud.ToPoints(); // 解码为世界坐标点数组
 ```
 
 **`CxMesh`** — 三角面片网格
@@ -262,6 +287,7 @@ var mesh = new CxMesh
 ```
 
 `SurfaceToMesh` 生成的 mesh：
+
 - `generateUVs=false`：`Intensity` 为压缩逐顶点格式（`length = validCount`），供 `CxMeshItem` 固定管线渲染
 - `generateUVs=true`：`Intensity` 为 W×H 网格格式（`length = W×H`，无效格填 0），供 `CxMeshAdvancedItem` Shader 路径渲染
 
@@ -298,8 +324,14 @@ Box3D? boxFast = VisionOperator.CalculateBoundingBoxSIMD(points);
 
 // GPU 表面变换（OpenCL，需先调用 InitialLib）
 VisionOperator.InitialLib();
-CxSurface transformed = VisionOperator.TransformSurface(surface, matrix, SampleMode.Max);
+CxSurface transformed = VisionOperator.TransformSurface(surface, matrix);
+// 指定输出网格分辨率：
+CxSurface transformedFine = VisionOperator.TransformSurface(surface, matrix,
+    SampleMode.Max, xScale: 0.005f, yScale: 0.005f);
 VisionOperator.DestroyLib();
+
+// GPU 点云矩阵变换（方案 A：复用 TransformVertices kernel）
+var (pts, intensities) = VisionOperator.TransformPointCloud(cloud, matrix);
 
 // Mesh → Surface 高度图投影（全自动，Box3D 范围从 mesh 包围盒推导）
 CxSurface heightMap = VisionOperator.MeshToSurface(mesh, matrix, 0.01f, 0.01f);
@@ -307,19 +339,23 @@ CxSurface heightMap = VisionOperator.MeshToSurface(mesh, matrix, 0.01f, 0.01f);
 // Mesh → Surface 高度图投影（指定固定 Box3D 范围，用于对齐多帧）
 CxSurface heightMapFixed = VisionOperator.MeshToSurface(mesh, matrix, bounds, 0.01f, 0.01f);
 
-// Surface → Mesh 三角网格转换（generateUVs=true 时含 UV + W×H 纹理强度）
+// Surface → Mesh 三角网格转换（结构化表面）
 CxMesh mesh = VisionOperator.SurfaceToMesh(surface, generateUVs: true);
+
+// PointCloud → Mesh 三角网格转换（有序点云）
+CxMesh meshFromCloud = VisionOperator.PointCloudToMesh(cloud, generateUVs: true);
 ```
 
 #### OpenCL GPU 计算模块（`VisionNet.Compute`）
 
-| 类 | 说明 |
-|----|------|
-| `OpenCLEnvironment` | 单例，管理 OpenCL 上下文、命令队列、已编译程序和 Kernel |
-| `OpenCLComputation` | 抽象基类，封装 Buffer 分配、Kernel 参数绑定和 NDRange 执行 |
-| `CxUniformSurface` | GPU 点云均匀重采样，支持 Max / Min / Average 聚合模式 |
-| `CxTransformSurface` | GPU 结构化表面矩阵变换，返回变换后的点云 |
-| `CxMeshToSurface` | GPU 网格自动栅格化，将三角 mesh 投影到指定位姿和分辨率的 CxSurface |
+| 类                       | 说明                                          |
+| ----------------------- | ------------------------------------------- |
+| `OpenCLEnvironment`     | 单例，管理 OpenCL 上下文、命令队列、已编译程序和 Kernel         |
+| `OpenCLComputation`     | 抽象基类，封装 Buffer 分配、Kernel 参数绑定和 NDRange 执行   |
+| `CxUniformSurface`      | GPU 点云均匀重采样，支持 Max / Min / Average 聚合模式     |
+| `CxTransformSurface`    | GPU 结构化表面矩阵变换，返回变换后的点云                      |
+| `CxTransformPointCloud` | GPU 有序点云矩阵变换（复用 TransformVertices kernel）   |
+| `CxMeshToSurface`       | GPU 网格自动栅格化，将三角 mesh 投影到指定位姿和分辨率的 CxSurface |
 
 ```csharp
 // 直接使用底层 GPU 采样（绕过 VisionOperator 包装）
@@ -346,38 +382,42 @@ VisionOperator.DestroyLib();
 
 #### 公共 API 速查
 
-| 方法 | 语义 | 说明 |
-|------|------|------|
-| `SetPointCloud(surface)` | 替换 | 显示点云，清空原有表面 |
-| `SetMesh(mesh)` | 替换 | 显示网格 |
-| `SetSurfaceAdvancedItem(surface)` | 替换 | 高性能 Shader 路径，≤ 200 万点 |
-| `SetMeshAdvancedItem(mesh)` | 替换 | 高性能 Shader 路径网格 |
-| `AddPointCloud(surface)` | 追加 | 叠加点云，不清空已有内容 |
-| `AddMesh(mesh)` | 追加 | 叠加网格 |
-| `AddSurfaceAdvancedItem(surface)` | 追加 | 叠加高性能点云 |
-| `AddMeshAdvancedItem(mesh)` | 追加 | 叠加高性能网格 |
-| `AddSurfaceItem(item)` | 追加 | 叠加自定义渲染 Item |
-| `ClearSurfaceItems()` | — | 清空所有表面对象 |
-| `SetSegment(segs, color, size)` | 追加 | 添加线段叠加层 |
-| `SetPoint(pts, color, size, shape)` | 追加 | 添加点叠加层 |
-| `SetPolygon(polys, color, size)` | 追加 | 添加多边形叠加层 |
-| `SetPlane(planes, color, size)` | 追加 | 添加平面叠加层 |
-| `SetBox(boxes, color, size)` | 追加 | 添加包围盒叠加层 |
-| `SetTextInfo(infos, color)` | 追加 | 添加世界坐标文本标签 |
-| `SetText2D(texts, color)` | 追加 | 添加屏幕空间文本 |
-| `SetCoordinate3DSystem(coord, length)` | 追加 | 添加坐标系指示器 |
-| `ResetView(resetAll)` | — | 重置视图（可选是否清空表面） |
-| `SetViewCenter(point)` | — | 设置相机旋转焦点 |
-| `SetViewUpDirection(dir)` | — | 设置相机上向量 |
+| 方法                                     | 语义  | 说明                  |
+| -------------------------------------- | --- | ------------------- |
+| `SetSurface(surface)`                  | 替换  | 显示结构化表面，清空原有内容      |
+| `SetPointCloud(cloud)`                 | 替换  | 显示有序点云，清空原有内容       |
+| `SetSurfaceAdvancedItem(surface)`      | 替换  | 高性能结构化表面路径，≤ 200 万点 |
+| `SetPointCloudAdvancedItem(cloud)`     | 替换  | 高性能有序点云路径，≤ 200 万点  |
+| `SetMesh(mesh)`                        | 替换  | 显示网格                |
+| `SetMeshAdvancedItem(mesh)`            | 替换  | 高性能 Shader 路径网格     |
+| `AddSurface(surface)`                  | 追加  | 叠加结构化表面             |
+| `AddPointCloud(cloud)`                 | 追加  | 叠加有序点云              |
+| `AddSurfaceAdvancedItem(surface)`      | 追加  | 叠加高性能结构化表面          |
+| `AddPointCloudAdvancedItem(cloud)`     | 追加  | 叠加高性能有序点云           |
+| `AddMesh(mesh)`                        | 追加  | 叠加网格                |
+| `AddMeshAdvancedItem(mesh)`            | 追加  | 叠加高性能网格             |
+| `AddSurfaceItem(item)`                 | 追加  | 叠加自定义渲染 Item        |
+| `ClearSurfaceItems()`                  | —   | 清空所有表面对象            |
+| `SetSegment(segs, color, size)`        | 追加  | 添加线段叠加层             |
+| `SetPoint(pts, color, size, shape)`    | 追加  | 添加点叠加层              |
+| `SetPolygon(polys, color, size)`       | 追加  | 添加多边形叠加层            |
+| `SetPlane(planes, color, size)`        | 追加  | 添加平面叠加层             |
+| `SetBox(boxes, color, size)`           | 追加  | 添加包围盒叠加层            |
+| `SetTextInfo(infos, color)`            | 追加  | 添加世界坐标文本标签          |
+| `SetText2D(texts, color)`              | 追加  | 添加屏幕空间文本            |
+| `SetCoordinate3DSystem(coord, length)` | 追加  | 添加坐标系指示器            |
+| `ResetView(resetAll)`                  | —   | 重置视图（可选是否清空表面）      |
+| `SetViewCenter(point)`                 | —   | 设置相机旋转焦点            |
+| `SetViewUpDirection(dir)`              | —   | 设置相机上向量             |
 
 #### 渲染模式
 
-| 属性 | 可选值 | 说明 |
-|------|--------|------|
-| `SurfaceMode` | `PointCloud` `Mesh` | 点云或三角面片 |
-| `SurfaceColorMode` | `Color` `Intensity` `ColorWithIntensity` | 颜色来源 |
-| `SurfaceViewMode` | `Top` `Front` `Left` `Right` `None` | 预设视角 |
-| `ShowCoordinateSystem` | `bool` | 显示世界坐标轴 |
+| 属性                     | 可选值                                      | 说明      |
+| ---------------------- | ---------------------------------------- | ------- |
+| `SurfaceMode`          | `PointCloud` `Mesh`                      | 点云或三角面片 |
+| `SurfaceColorMode`     | `Color` `Intensity` `ColorWithIntensity` | 颜色来源    |
+| `SurfaceViewMode`      | `Top` `Front` `Left` `Right` `None`      | 预设视角    |
+| `ShowCoordinateSystem` | `bool`                                   | 显示世界坐标轴 |
 
 颜色梯度（`Color` / `ColorWithIntensity` 模式，Z 由低到高）：
 
@@ -389,35 +429,37 @@ VisionOperator.DestroyLib();
 
 #### 鼠标交互
 
-| 操作 | 效果 |
-|------|------|
-| 左键拖拽 | 追踪球旋转（以最近表面点为轴心） |
-| 中键拖拽 | 平移（速度自适应场景大小） |
-| 滚轮 | 缩放（±5% 每格） |
-| 左键双击 | 焦点对准点击处 |
+| 操作   | 效果                      |
+| ---- | ----------------------- |
+| 左键拖拽 | 追踪球旋转（以最近表面点为轴心）        |
+| 中键拖拽 | 平移（速度自适应场景大小）           |
+| 滚轮   | 缩放（±5% 每格）              |
+| 左键双击 | 焦点对准点击处                 |
 | 鼠标悬停 | 显示世界坐标 X / Y / Z / 强度标签 |
-| 右键菜单 | 切换视角 / 渲染模式 / 颜色模式 |
+| 右键菜单 | 切换视角 / 渲染模式 / 颜色模式      |
 
 ---
 
 ## 渲染 Item 体系
 
-| 类 | 渲染路径 | 适用场景 |
-|----|---------|---------|
-| `CxSurfaceItem` | 固定管线（VBO + 颜色数组） | 中小规模结构化表面 |
-| `CxSurfaceAdvancedItem` | VAO + GLSL + 强度纹理 | 大规模点云（自动降采样至 ≤ 200 万）|
-| `CxMeshItem` | 固定管线（VBO + 颜色数组） | 中小规模三角网格 |
-| `CxMeshAdvancedItem` | VAO + GLSL + 强度纹理 | 高性能三角网格 |
-| `CxPoint3DItem` | 点精灵 / 实例化球体 | 离散点集 |
-| `CxSegment3DItem` | `GL_LINES` | 线段集合 |
-| `CxPolygon3DItem` | `GL_LINE_LOOP` / `GL_LINE_STRIP` | 开放 / 闭合多边形 |
-| `CxPlane3DItem` | `GL_QUADS` | 平面区域 |
-| `CxBox3DItem` | `GL_QUADS` + `GL_LINES` | 半透明填充 + 线框包围盒 |
-| `CxColorBarItem` | 2D 正交 HUD | Z 高度颜色条 |
-| `CxCoordinateSystemItem` | 圆柱 + 圆锥 | 坐标轴（世界空间 + 屏幕左下角）|
-| `CxCoordinationTagItem` | 2D 正交 HUD | 鼠标悬停坐标标签 |
-| `CxTextInfoItem` | 世界坐标投影 | 世界锚定文本 |
-| `CxText2DItem` | 2D 正交 HUD | 屏幕固定文本 |
+| 类                          | 渲染路径                             | 适用场景                     |
+| -------------------------- | -------------------------------- | ------------------------ |
+| `CxSurfaceItem`            | 固定管线（VBO + 颜色数组）                 | 中小规模结构化表面                |
+| `CxSurfaceAdvancedItem`    | VAO + GLSL + 强度纹理                | 大规模结构化表面（自动降采样至 ≤ 200 万） |
+| `CxPointCloudItem`         | 固定管线（VBO + 颜色数组）                 | 中小规模有序点云                 |
+| `CxPointCloudAdvancedItem` | VAO + GLSL + 强度纹理                | 大规模有序点云（自动降采样至 ≤ 200 万）  |
+| `CxMeshItem`               | 固定管线（VBO + 颜色数组）                 | 中小规模三角网格                 |
+| `CxMeshAdvancedItem`       | VAO + GLSL + 强度纹理                | 高性能三角网格                  |
+| `CxPoint3DItem`            | 点精灵 / 实例化球体                      | 离散点集                     |
+| `CxSegment3DItem`          | `GL_LINES`                       | 线段集合                     |
+| `CxPolygon3DItem`          | `GL_LINE_LOOP` / `GL_LINE_STRIP` | 开放 / 闭合多边形               |
+| `CxPlane3DItem`            | `GL_QUADS`                       | 平面区域                     |
+| `CxBox3DItem`              | `GL_QUADS` + `GL_LINES`          | 半透明填充 + 线框包围盒            |
+| `CxColorBarItem`           | 2D 正交 HUD                        | Z 高度颜色条                  |
+| `CxCoordinateSystemItem`   | 圆柱 + 圆锥                          | 坐标轴（世界空间 + 屏幕左下角）        |
+| `CxCoordinationTagItem`    | 2D 正交 HUD                        | 鼠标悬停坐标标签                 |
+| `CxTextInfoItem`           | 世界坐标投影                           | 世界锚定文本                   |
+| `CxText2DItem`             | 2D 正交 HUD                        | 屏幕固定文本                   |
 
 ---
 
@@ -428,8 +470,8 @@ VisionOperator.DestroyLib();
 > 不要在 `Dispose()` 中直接调用 GL 删除函数——`CxDisplay` 通过内部的 `_pendingRelease` 队列在下一渲染帧内统一回收。
 
 > **大数据自动降采样**
-> `SetPointCloud` / `AddPointCloud`：点数超过 **1 亿** 时自动降采样至 1000 万。
-> `SetSurfaceAdvancedItem` / `AddSurfaceAdvancedItem`：最大处理 **200 万** 点。
+> `SetPointCloud` / `AddPointCloud`：点云点数超过 **1 亿** 时自动降采样至 1000 万结构化表面。
+> `SetSurfaceAdvancedItem` / `AddSurfaceAdvancedItem` / `SetPointCloudAdvancedItem` / `AddPointCloudAdvancedItem。
 > GPU 纹理超过硬件最大尺寸时也会自动进行双线性下采样。
 
 > **多 Item 颜色一致性**
