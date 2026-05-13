@@ -188,14 +188,18 @@ namespace VisionNet
         /// </summary>
         /// <param name="surface">Source height-map surface.</param>
         /// <param name="matrix">4×4 column-major transformation matrix.</param>
+        /// <param name="xScale">Grid cell width along X. Must be positive. Default 0.01.</param>
+        /// <param name="yScale">Grid cell height along Y. Must be positive. Default 0.01.</param>
         /// <param name="sampleMode">
         /// Grid-cell aggregation mode when multiple source points map to the same output cell.
         /// </param>
         /// <returns>Transformed surface, or <c>null</c> if the input is invalid.</returns>
         public static CxSurface TransformSurface(CxSurface surface, CxMatrix4X4 matrix,
+            float xScale = 0.01f, float yScale = 0.01f,
             SampleMode sampleMode = SampleMode.Average)
         {
             if (surface == null || matrix == null) return null;
+            if (xScale <= 0 || yScale <= 0) return null;
 
             CxPoint3D[] transformedPoints;
             byte[]      intensities;
@@ -209,8 +213,7 @@ namespace VisionNet
             var box = CalculateBoundingBoxSIMD(transformedPoints);
             if (box == null) return null;
 
-            float xScale  = 0.01f;
-            float yScale  = 0.01f;
+
             int   width   = (int)Math.Ceiling(box.Value.Size.Width  / xScale);
             int   height  = (int)Math.Ceiling(box.Value.Size.Height / yScale);
             float xOffset = box.Value.Center.X - width  * xScale / 2f;
