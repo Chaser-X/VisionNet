@@ -138,7 +138,7 @@ namespace DemoFrom
                     //        points[(i * width / 2 + j) * 3 + 2] = Data[index * 3 + 2];
                     //    }
                     //}
-                    _pointCloud = new CxPointCloud((int)width / 2, (int)length, new short[bufferSize * 3], new byte[0], xoffset, yoffset, zoffset, xscale, yscale, zscale);
+                    _pointCloud = new CxPointCloud((int)width, (int)length, new short[bufferSize * 3], new byte[0], xoffset, yoffset, zoffset, xscale, yscale, zscale);
                     _pointCloud.SetData(surfacePtr);
 
                     if (surfaceIntensityMsg != null)
