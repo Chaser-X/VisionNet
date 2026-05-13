@@ -6,17 +6,16 @@ using VisionNet.DataType;
 namespace VisionNet.Controls
 {
     /// <summary>
-    /// High-performance surface renderer using a VAO + GLSL shader pipeline with intensity texture.
+    /// High-performance point cloud renderer using a VAO + GLSL shader pipeline with intensity texture.
     /// Supports automatic down-sampling when the point count exceeds <c>maxPointCount</c>.
     /// Colour mode changes update shader uniforms only — no VBO rebuild needed.
     /// </summary>
-    public class CxSurfaceAdvancedItem : ICxObjRenderItem
+    public class CxPointCloudAdvancedItem : ICxObjRenderItem
     {
         public event Action OnDisposed;
-        // colorMode 通过 Uniform 传入 Shader，不需要重建 GL 资源，不触发此事件
         public event Action OnRenderDataChanged;
 
-        public CxSurface Surface { get; private set; }
+        public CxPointCloud PointCloud { get; private set; }
         public bool IsDisposed { get; private set; } = false;
         public float ZMin { get; set; }
         public float ZMax { get; set; }
@@ -30,7 +29,7 @@ namespace VisionNet.Controls
         public SurfaceMode SurfaceMode
         {
             get => _surfaceMode;
-            set => _surfaceMode = value; // 只影响 Draw() 选择 DrawArrays/DrawElements
+            set => _surfaceMode = value;
         }
 
         private SurfaceColorMode _surfaceColorMode;
@@ -42,7 +41,6 @@ namespace VisionNet.Controls
                 if (_surfaceColorMode != value)
                 {
                     _surfaceColorMode = value;
-                    // colorMode 以 Uniform 传入 Shader，只需更新缓存中的 Uniform 值
                     if (_cachedRenderData?.Uniforms != null)
                         _cachedRenderData.Uniforms["colorMode"] = (int)value;
                 }
@@ -51,7 +49,7 @@ namespace VisionNet.Controls
 
         private RenderData _cachedRenderData;
 
-        #region Shader 源码（静态，与 MeshAdvancedItem 共用）
+        #region Shader 源码
         internal static readonly string VertexShaderSource =
             @"#version 330 core
             layout (location = 0) in vec3 aPos;
@@ -105,20 +103,20 @@ namespace VisionNet.Controls
             }";
         #endregion
 
-        public CxSurfaceAdvancedItem(CxSurface surface,
+        public CxPointCloudAdvancedItem(CxPointCloud pointCloud,
             SurfaceMode surfaceMode = SurfaceMode.PointCloud,
             SurfaceColorMode surfaceColorMode = SurfaceColorMode.Color,
             int maxPointCount = int.MaxValue)
         {
-            Surface = surface;
+            PointCloud = pointCloud;
             _surfaceMode = surfaceMode;
             _surfaceColorMode = surfaceColorMode;
             MaxPointCount = maxPointCount;
 
             CalculateSamplingFactors();
 
-            BoundingBox = surface?.Data != null && surface.Data.Length > 0
-                ? CxExtension.CalculateBoundingBox(surface.ToPoints())
+            BoundingBox = pointCloud?.Data != null && pointCloud.Data.Length > 0
+                ? CxExtension.CalculateBoundingBox(pointCloud.ToPoints())
                 : null;
             ZMax = (float)(BoundingBox?.Center.Z + BoundingBox?.Size.Depth / 2);
             ZMin = (float)(BoundingBox?.Center.Z - BoundingBox?.Size.Depth / 2);
@@ -128,36 +126,40 @@ namespace VisionNet.Controls
         {
             if (_cachedRenderData != null) return _cachedRenderData;
 
-            if (IsDisposed || Surface == null || Surface.Data == null || Surface.Data.Length == 0)
+            if (IsDisposed || PointCloud == null || PointCloud.Data == null || PointCloud.Data.Length == 0)
                 return null;
 
             CalculateSamplingFactors();
 
-            int sampledWidth  = (Surface.Width  + _samplingFactorX - 1) / _samplingFactorX;
-            int sampledLength = (Surface.Length + _samplingFactorY - 1) / _samplingFactorY;
+            int sampledWidth  = (PointCloud.Width  + _samplingFactorX - 1) / _samplingFactorX;
+            int sampledLength = (PointCloud.Length + _samplingFactorY - 1) / _samplingFactorY;
             int totalVertices = sampledWidth * sampledLength;
 
             var vertices = new float[totalVertices * 3];
             var uvCoords = new float[totalVertices * 2];
 
             int vi = 0;
-            for (int y = 0; y < Surface.Length && vi < totalVertices; y += _samplingFactorY)
+            for (int y = 0; y < PointCloud.Length && vi < totalVertices; y += _samplingFactorY)
             {
-                for (int x = 0; x < Surface.Width && vi < totalVertices; x += _samplingFactorX)
+                for (int x = 0; x < PointCloud.Width && vi < totalVertices; x += _samplingFactorX)
                 {
-                    int si = y * Surface.Width + x;
+                    int si = y * PointCloud.Width + x;
 
-                    float xPos = Surface.XOffset + x * Surface.XScale;
-                    float yPos = Surface.YOffset + y * Surface.YScale;
-                    float zPos = Surface.Data[si] == -32768
+                    float xPos = PointCloud.Data[si * 3]     == -32768
                         ? float.NegativeInfinity
-                        : Surface.ZOffset + Surface.Data[si] * Surface.ZScale;
+                        : PointCloud.XOffset + PointCloud.Data[si * 3]     * PointCloud.XScale;
+                    float yPos = PointCloud.Data[si * 3 + 1] == -32768
+                        ? float.NegativeInfinity
+                        : PointCloud.YOffset + PointCloud.Data[si * 3 + 1] * PointCloud.YScale;
+                    float zPos = PointCloud.Data[si * 3 + 2] == -32768
+                        ? float.NegativeInfinity
+                        : PointCloud.ZOffset + PointCloud.Data[si * 3 + 2] * PointCloud.ZScale;
 
                     vertices[vi * 3]     = xPos;
                     vertices[vi * 3 + 1] = yPos;
                     vertices[vi * 3 + 2] = zPos;
-                    uvCoords[vi * 2]     = (float)x / Math.Max(Surface.Width  - 1, 1);
-                    uvCoords[vi * 2 + 1] = (float)y / Math.Max(Surface.Length - 1, 1);
+                    uvCoords[vi * 2]     = (float)x / Math.Max(PointCloud.Width  - 1, 1);
+                    uvCoords[vi * 2 + 1] = (float)y / Math.Max(PointCloud.Length - 1, 1);
                     vi++;
                 }
             }
@@ -180,8 +182,8 @@ namespace VisionNet.Controls
                 },
                 TextureData = new TextureData
                 {
-                    Width  = Surface.Width,
-                    Height = Surface.Length,
+                    Width  = PointCloud.Width,
+                    Height = PointCloud.Length,
                     Data   = textureBytes,
                 },
                 Uniforms = new Dictionary<string, object>
@@ -249,8 +251,8 @@ namespace VisionNet.Controls
         public void Dispose()
         {
             if (IsDisposed) return;
-            Surface?.Dispose();
-            Surface = null;
+            PointCloud?.Dispose();
+            PointCloud = null;
             _cachedRenderData = null;
             IsDisposed = true;
             OnDisposed?.Invoke();
@@ -258,8 +260,8 @@ namespace VisionNet.Controls
 
         private byte[] GenerateIntensityTextureData()
         {
-            int w = Surface.Width;
-            int h = Surface.Length;
+            int w = PointCloud.Width;
+            int h = PointCloud.Length;
             var data = new byte[w * h * 4];
 
             for (int y = 0; y < h; y++)
@@ -268,8 +270,8 @@ namespace VisionNet.Controls
                 {
                     int si = y * w + x;
                     byte v = 255;
-                    if (Surface.Intensity != null && Surface.Intensity.Length > si)
-                        v = Surface.Intensity[si];
+                    if (PointCloud.Intensity != null && PointCloud.Intensity.Length > si)
+                        v = PointCloud.Intensity[si];
                     int di = si * 4;
                     data[di] = data[di + 1] = data[di + 2] = data[di + 3] = v;
                 }
@@ -310,9 +312,9 @@ namespace VisionNet.Controls
 
         private void CalculateSamplingFactors()
         {
-            if (Surface == null || Surface.Width <= 0 || Surface.Length <= 0) return;
+            if (PointCloud == null || PointCloud.Width <= 0 || PointCloud.Length <= 0) return;
 
-            int total = Surface.Width * Surface.Length;
+            int total = PointCloud.Width * PointCloud.Length;
             if (total <= MaxPointCount)
             {
                 _samplingFactorX = _samplingFactorY = 1;
@@ -323,14 +325,14 @@ namespace VisionNet.Controls
             _samplingFactorX = Math.Max(1, (int)(1.0 / rate));
             _samplingFactorY = Math.Max(1, (int)(1.0 / rate));
 
-            while ((Surface.Width / _samplingFactorX) * (Surface.Length / _samplingFactorY) > MaxPointCount)
+            while ((PointCloud.Width / _samplingFactorX) * (PointCloud.Length / _samplingFactorY) > MaxPointCount)
             {
                 if (_samplingFactorX <= _samplingFactorY) _samplingFactorX++;
                 else _samplingFactorY++;
             }
 
-            int sw = (Surface.Width  + _samplingFactorX - 1) / _samplingFactorX;
-            int sl = (Surface.Length + _samplingFactorY - 1) / _samplingFactorY;
+            int sw = (PointCloud.Width  + _samplingFactorX - 1) / _samplingFactorX;
+            int sl = (PointCloud.Length + _samplingFactorY - 1) / _samplingFactorY;
             if (sw * sl > MaxPointCount)
             {
                 double ratio = Math.Sqrt((double)(sw * sl) / MaxPointCount);

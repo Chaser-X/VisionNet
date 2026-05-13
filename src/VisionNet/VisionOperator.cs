@@ -308,19 +308,12 @@ namespace VisionNet
 
             int W = surface.Width, H = surface.Length;
             int total = W * H;
-            bool isPointCloud = surface.Type == SurfaceType.PointCloud;
-
-            if (isPointCloud && surface.Data.Length < total * 3)
-                throw new ArgumentException(
-                    "PointCloud surface Data length must be Width × Length × 3.");
 
             // Phase 1a: parallel valid-cell marking
             bool[] valid = new bool[total];
             Parallel.For(0, total, i =>
             {
-                valid[i] = isPointCloud
-                    ? surface.Data[i * 3] != short.MinValue
-                    : surface.Data[i] != short.MinValue;
+                valid[i] = surface.Data[i] != short.MinValue;
             });
 
             // Phase 1b: prefix sum → indexMap
@@ -344,20 +337,10 @@ namespace VisionNet
                 int vi = indexMap[i];
                 int col = i % W, row = i / W;
 
-                if (isPointCloud)
-                {
-                    vertices[vi] = new CxPoint3D(
-                        surface.XOffset + surface.Data[i * 3]     * surface.XScale,
-                        surface.YOffset + surface.Data[i * 3 + 1] * surface.YScale,
-                        surface.ZOffset + surface.Data[i * 3 + 2] * surface.ZScale);
-                }
-                else
-                {
-                    vertices[vi] = new CxPoint3D(
-                        surface.XOffset + col * surface.XScale,
-                        surface.YOffset + row * surface.YScale,
-                        surface.ZOffset + surface.Data[i] * surface.ZScale);
-                }
+                vertices[vi] = new CxPoint3D(
+                    surface.XOffset + col * surface.XScale,
+                    surface.YOffset + row * surface.YScale,
+                    surface.ZOffset + surface.Data[i] * surface.ZScale);
 
                 if (generateUVs)
                     uvs[vi] = new CxPoint2D(col / uDenom, row / vDenom);
@@ -369,7 +352,6 @@ namespace VisionNet
             {
                 if (generateUVs)
                 {
-                    // W×H texture layout: preserve grid positions, fill invalid cells with 0
                     intensity = new byte[total];
                     Parallel.For(0, total, i =>
                     {
@@ -378,7 +360,6 @@ namespace VisionNet
                 }
                 else
                 {
-                    // Compressed per-vertex layout
                     intensity = new byte[validCount];
                     Parallel.For(0, total, i =>
                     {
@@ -417,6 +398,138 @@ namespace VisionNet
                     indices[triIdx++] = (uint)v01;
                 }
             }
+
+            if (triIdx < indices.Length)
+            {
+                uint[] compact = new uint[triIdx];
+                Array.Copy(indices, compact, triIdx);
+                indices = compact;
+            }
+            mesh.Indices = indices;
+
+            if (generateUVs)
+            {
+                mesh.UVs = uvs;
+                mesh.TextureWidth = W;
+                mesh.TextureHeight = H;
+            }
+
+            return mesh;
+        }
+
+        /// <summary>
+        /// Applies a 4×4 transformation matrix to an ordered point cloud on the GPU.
+        /// </summary>
+        /// <param name="cloud">Source ordered point cloud.</param>
+        /// <param name="matrix">4×4 transformation matrix.</param>
+        /// <returns>Transformed point array and intensities, or <c>null</c> on invalid input.</returns>
+        public static (CxPoint3D[] Points, byte[] Intensities) TransformPointCloud(
+            CxPointCloud cloud, CxMatrix4X4 matrix)
+        {
+            if (cloud == null || matrix == null) return (null, null);
+
+            using (var transformer = new CxTransformPointCloud(matrix))
+                return transformer.Transform(cloud);
+        }
+
+        /// <summary>
+        /// Converts an ordered point cloud to a mesh.
+        /// Each valid quad produces two CCW triangles; invalid cells leave holes.
+        /// </summary>
+        /// <param name="cloud">Source ordered point cloud.</param>
+        /// <param name="generateUVs">
+        /// When <c>true</c>, populates <see cref="CxMesh.UVs"/> with normalized UV coordinates
+        /// and sets <see cref="CxMesh.TextureWidth"/>/<see cref="CxMesh.TextureHeight"/>.
+        /// </param>
+        /// <returns>A <see cref="CxMesh"/>, or <c>null</c> if the cloud contains no valid points.</returns>
+        public static CxMesh PointCloudToMesh(CxPointCloud cloud, bool generateUVs = false)
+        {
+            if (cloud == null || cloud.Data == null || cloud.Data.Length == 0)
+                return null;
+
+            int W = cloud.Width, H = cloud.Length;
+            int total = W * H;
+
+            if (cloud.Data.Length < total * 3)
+                throw new ArgumentException("Point cloud Data length must be Width × Length × 3.");
+
+            bool[] valid = new bool[total];
+            Parallel.For(0, total, i => valid[i] = cloud.Data[i * 3] != short.MinValue);
+
+            int[] indexMap = new int[total];
+            int validCount = 0;
+            for (int i = 0; i < total; i++)
+                indexMap[i] = valid[i] ? validCount++ : -1;
+
+            if (validCount == 0) return null;
+
+            var vertices = new CxPoint3D[validCount];
+            var uvs = generateUVs ? new CxPoint2D[validCount] : null;
+            bool hasIntensity = cloud.Intensity != null && cloud.Intensity.Length >= total;
+            float uDenom = W > 1 ? W - 1f : 1f;
+            float vDenom = H > 1 ? H - 1f : 1f;
+
+            Parallel.For(0, total, i =>
+            {
+                if (!valid[i]) return;
+                int vi = indexMap[i];
+                int col = i % W, row = i / W;
+
+                vertices[vi] = new CxPoint3D(
+                    cloud.XOffset + cloud.Data[i * 3]     * cloud.XScale,
+                    cloud.YOffset + cloud.Data[i * 3 + 1] * cloud.YScale,
+                    cloud.ZOffset + cloud.Data[i * 3 + 2] * cloud.ZScale);
+
+                if (generateUVs)
+                    uvs[vi] = new CxPoint2D(col / uDenom, row / vDenom);
+            });
+
+            byte[] intensity = null;
+            if (hasIntensity)
+            {
+                if (generateUVs)
+                {
+                    intensity = new byte[total];
+                    Parallel.For(0, total, i =>
+                        intensity[i] = valid[i] ? cloud.Intensity[i] : (byte)0);
+                }
+                else
+                {
+                    intensity = new byte[validCount];
+                    Parallel.For(0, total, i =>
+                    {
+                        if (valid[i]) intensity[indexMap[i]] = cloud.Intensity[i];
+                    });
+                }
+            }
+
+            var mesh = new CxMesh
+            {
+                Vertices = vertices,
+                Intensity = intensity,
+            };
+
+            int quadRowLimit = H - 1;
+            int quadColLimit = W - 1;
+            uint[] indices = new uint[Math.Max(quadRowLimit, 0) * Math.Max(quadColLimit, 0) * 6];
+            int triIdx = 0;
+
+            for (int row = 0; row < quadRowLimit; row++)
+                for (int col = 0; col < quadColLimit; col++)
+                {
+                    int v00 = indexMap[row * W + col];
+                    int v01 = indexMap[row * W + col + 1];
+                    int v10 = indexMap[(row + 1) * W + col];
+                    int v11 = indexMap[(row + 1) * W + col + 1];
+                    if (v00 < 0 || v01 < 0 || v10 < 0 || v11 < 0) continue;
+
+                    indices[triIdx++] = (uint)v00;
+                    indices[triIdx++] = (uint)v10;
+                    indices[triIdx++] = (uint)v11;
+                    indices[triIdx++] = (uint)v00;
+                    indices[triIdx++] = (uint)v11;
+                    indices[triIdx++] = (uint)v01;
+                }
 
             if (triIdx < indices.Length)
             {

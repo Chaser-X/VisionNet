@@ -100,18 +100,18 @@ namespace VisionNet.Controls
                     continue;
                 }
 
-                // Resolve the underlying CxSurface.
-                CxSurface surface = null;
-                if      (cur is CxSurfaceItem        si) surface = si.Surface;
-                else if (cur is CxSurfaceAdvancedItem ai) surface = ai.Surface;
-                if (surface == null) continue;
-
-                // Unordered point cloud: no grid; use world coordinate.
-                if (surface.Type != SurfaceType.Surface)
+                // Point cloud items: no per-point grid; use world coordinate directly.
+                if (cur is CxPointCloudItem || cur is CxPointCloudAdvancedItem)
                 {
                     if (0f < bestDist) { bestDist = 0f; bestPoint = world; bestIntensity = null; }
                     continue;
                 }
+
+                // Resolve the underlying CxSurface for structured surface search.
+                CxSurface surface = null;
+                if      (cur is CxSurfaceItem        si) surface = si.Surface;
+                else if (cur is CxSurfaceAdvancedItem ai) surface = ai.Surface;
+                if (surface == null) continue;
 
                 // Structured surface: 5×5 neighbourhood search.
                 int xi = (int)((world.X - surface.XOffset) / surface.XScale);

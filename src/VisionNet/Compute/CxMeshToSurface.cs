@@ -8,7 +8,7 @@ namespace VisionNet.Compute
     /// <summary>
     /// GPU-accelerated mesh-to-height-map projection.
     /// Rasterises a triangle mesh onto a regular XY grid at a given pose and resolution,
-    /// producing a <see cref="CxSurface"/> with <see cref="SurfaceType.Surface"/>.
+    /// producing a structured <see cref="CxSurface"/> height map.
     /// </summary>
     public class CxMeshToSurface : OpenCLComputation
     {
@@ -243,7 +243,7 @@ namespace VisionNet.Compute
             {
                 int raw = heightMap[i];
 
-                // ÎŞÈı½ÇĞÎ¸²¸ÇµÄÉÚ±ø£¬»ò Z ³¬³ö Box ·¶Î§ ¡ú ¾ù±ê¼ÇÎªÎŞĞ§
+                // æ— ä¸‰è§’å½¢è¦†ç›–çš„å“¨å…µï¼Œæˆ– Z è¶…å‡º Box èŒƒå›´ â†’ å‡æ ‡è®°ä¸ºæ— æ•ˆ
                 if (raw == int.MinValue || raw == int.MaxValue
                     || raw < (short.MinValue + 1) || raw > short.MaxValue)
                 {
@@ -259,8 +259,7 @@ namespace VisionNet.Compute
 
             return new CxSurface(width, height, data,
                 hasIntensity ? intensityOutput : new byte[0],
-                xOffset, yOffset, zOffset, xScale, yScale, zScale,
-                SurfaceType.Surface);
+                xOffset, yOffset, zOffset, xScale, yScale, zScale);
         }
     }
 }

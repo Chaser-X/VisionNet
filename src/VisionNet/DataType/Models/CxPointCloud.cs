@@ -4,27 +4,27 @@ using System.Runtime.InteropServices;
 namespace VisionNet.DataType
 {
     /// <summary>
-    /// Stores a structured height map as a compact short-integer array.
-    /// <see cref="Data"/> has <c>Width × Length</c> elements representing Z heights.
+    /// Stores an ordered point cloud as a compact short-integer array.
+    /// Data has <c>Width × Length × 3</c> elements representing (X, Y, Z) triples.
     /// A value of <c>-32768</c> marks an invalid / no-data point.
     /// </summary>
-    public class CxSurface
+    public class CxPointCloud
     {
         private readonly object _lock = new object();
 
-        /// <summary>Initializes an empty surface.</summary>
-        public CxSurface() { }
+        /// <summary>Initializes an empty point cloud.</summary>
+        public CxPointCloud() { }
 
-        /// <summary>Initializes a surface with the given dimensions and allocates a zeroed data array.</summary>
-        public CxSurface(int width, int length)
+        /// <summary>Initializes a point cloud with the given dimensions and allocates a zeroed data array.</summary>
+        public CxPointCloud(int width, int length)
         {
             Width = width;
             Length = length;
-            Data = new short[width * length];
+            Data = new short[width * length * 3];
         }
 
-        /// <summary>Initializes a surface with all fields provided.</summary>
-        public CxSurface(int width, int length, short[] data, byte[] intensity,
+        /// <summary>Initializes a point cloud with all fields provided.</summary>
+        public CxPointCloud(int width, int length, short[] data, byte[] intensity,
             float xOffset, float yOffset, float zOffset,
             float xScale, float yScale, float zScale)
             : this(width, length)
@@ -46,40 +46,43 @@ namespace VisionNet.DataType
         public int Length { get; set; }
 
         /// <summary>
-        /// Gets or sets the raw data array. <c>Width × Length</c> Z heights. <c>-32768</c> = invalid.
+        /// Gets or sets the raw data array. <c>Width × Length × 3</c> (X,Y,Z) triples. <c>-32768</c> = invalid.
         /// </summary>
         public short[] Data { get; set; }
 
         /// <summary>Gets or sets per-point intensity values (0–255), or <c>null</c> if not available.</summary>
         public byte[] Intensity { get; set; }
 
-        /// <summary>Gets or sets the world-space X origin of the grid.</summary>
+        /// <summary>Gets or sets the world-space X origin.</summary>
         public float XOffset { get; set; }
 
-        /// <summary>Gets or sets the world-space Y origin of the grid.</summary>
+        /// <summary>Gets or sets the world-space Y origin.</summary>
         public float YOffset { get; set; }
 
-        /// <summary>Gets or sets the world-space Z origin (added to each height value).</summary>
+        /// <summary>Gets or sets the world-space Z origin (added to each point).</summary>
         public float ZOffset { get; set; }
 
-        /// <summary>Gets or sets the grid spacing along X.</summary>
+        /// <summary>Gets or sets the scale factor for X.</summary>
         public float XScale { get; set; }
 
-        /// <summary>Gets or sets the grid spacing along Y.</summary>
+        /// <summary>Gets or sets the scale factor for Y.</summary>
         public float YScale { get; set; }
 
-        /// <summary>Gets or sets the scale factor applied to each raw Z value.</summary>
+        /// <summary>Gets or sets the scale factor for Z.</summary>
         public float ZScale { get; set; }
 
+        /// <summary>Gets or sets the bounding box of all valid points.</summary>
+        public Box3D? BoundingBox { get; set; }
+
         /// <summary>
-        /// Copies height data from an unmanaged memory block into <see cref="Data"/>.
+        /// Copies point data from an unmanaged memory block into <see cref="Data"/>.
         /// Thread-safe.
         /// </summary>
         public void SetData(IntPtr dataPtr)
         {
             lock (_lock)
             {
-                int size = Width * Length;
+                int size = Width * Length * 3;
                 Data = new short[size];
                 Marshal.Copy(dataPtr, Data, 0, size);
             }
@@ -108,27 +111,25 @@ namespace VisionNet.DataType
         {
             lock (_lock)
             {
-                var points = new CxPoint3D[Width * Length];
-                for (int row = 0; row < Length; row++)
+                int count = Width * Length;
+                var pts = new CxPoint3D[count];
+                for (int i = 0; i < count; i++)
                 {
-                    for (int col = 0; col < Width; col++)
+                    short sx = Data[i * 3];
+                    short sy = Data[i * 3 + 1];
+                    short sz = Data[i * 3 + 2];
+                    pts[i] = new CxPoint3D
                     {
-                        int index = row * Width + col;
-                        points[index] = new CxPoint3D
-                        {
-                            X = XOffset + col * XScale,
-                            Y = YOffset + row * YScale,
-                            Z = Data[index] == -32768
-                                ? float.NegativeInfinity
-                                : ZOffset + Data[index] * ZScale,
-                        };
-                    }
+                        X = sx == -32768 ? float.NegativeInfinity : XOffset + sx * XScale,
+                        Y = sy == -32768 ? float.NegativeInfinity : YOffset + sy * YScale,
+                        Z = sz == -32768 ? float.NegativeInfinity : ZOffset + sz * ZScale,
+                    };
                 }
-                return points;
+                return pts;
             }
         }
 
-        /// <summary>Releases all managed arrays and resets the surface to its default state.</summary>
+        /// <summary>Releases all managed arrays and resets to default state.</summary>
         public void Dispose()
         {
             Width = 0;
@@ -141,6 +142,7 @@ namespace VisionNet.DataType
             XScale = 1;
             YScale = 1;
             ZScale = 1;
+            BoundingBox = null;
         }
     }
 }

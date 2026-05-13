@@ -76,23 +76,32 @@ namespace VisionNet.Controls
 
         // ── Surface: Set* (replace semantics) ───────────────────────────────────
 
+        // ── Surface: Set* (replace semantics) ───────────────────────────────────
+
+        /// <summary>Replaces the current view with a structured surface (fixed pipeline).</summary>
+        public void SetSurface(CxSurface surface)
+            => ReplaceSurfaceItem(new CxSurfaceItem(surface, SurfaceMode, SurfaceColorMode));
+
         /// <summary>
-        /// Replaces the current view with a single point cloud.
-        /// Surfaces larger than 100 M points are automatically down-sampled to ≤ 10 M.
+        /// Replaces the current view with a point cloud.
+        /// Clouds larger than 100 M points are automatically down-sampled to ≤ 10 M.
         /// </summary>
-        public void SetPointCloud(CxSurface pointCloud)
+        public void SetPointCloud(CxPointCloud pointCloud)
         {
-            var surface = pointCloud;
             if (pointCloud.Width * pointCloud.Length > 100_000_000)
             {
                 var points = pointCloud.ToPoints();
                 float ratio = points.Length / 10_000_000f;
-                surface = VisionOperator.UniformSurface(points, pointCloud.Intensity,
+                var surface = VisionOperator.UniformSurface(points, pointCloud.Intensity,
                     (int)(pointCloud.Width  / ratio), (int)(pointCloud.Length / ratio),
                     pointCloud.XScale * ratio, pointCloud.YScale * ratio,
                     pointCloud.ZScale, pointCloud.XOffset, pointCloud.YOffset, pointCloud.ZOffset);
+                ReplaceSurfaceItem(new CxSurfaceItem(surface, SurfaceMode, SurfaceColorMode));
             }
-            ReplaceSurfaceItem(new CxSurfaceItem(surface, SurfaceMode, SurfaceColorMode));
+            else
+            {
+                ReplaceSurfaceItem(new CxPointCloudItem(pointCloud, SurfaceMode, SurfaceColorMode));
+            }
         }
 
         /// <summary>Replaces the current view with a single mesh.</summary>
@@ -106,29 +115,43 @@ namespace VisionNet.Controls
         public void SetSurfaceAdvancedItem(CxSurface surface)
             => ReplaceSurfaceItem(new CxSurfaceAdvancedItem(surface, SurfaceMode, SurfaceColorMode, 2_000_000));
 
+        /// <summary>
+        /// Replaces the current view with a point cloud rendered via the high-performance shader path
+        /// (VAO + GLSL, max 2 000 000 points).
+        /// </summary>
+        public void SetPointCloudAdvancedItem(CxPointCloud pointCloud)
+            => ReplaceSurfaceItem(new CxPointCloudAdvancedItem(pointCloud, SurfaceMode, SurfaceColorMode, 2_000_000));
+
         /// <summary>Replaces the current view with a mesh rendered via the high-performance shader path.</summary>
         public void SetMeshAdvancedItem(CxMesh mesh)
             => ReplaceSurfaceItem(new CxMeshAdvancedItem(mesh, SurfaceMode, SurfaceColorMode));
 
         // ── Surface: Add* (append semantics) ────────────────────────────────────
 
+        /// <summary>Appends a structured surface without clearing existing items (fixed pipeline).</summary>
+        public void AddSurface(CxSurface surface)
+            => AppendSurfaceItem(new CxSurfaceItem(surface, SurfaceMode, SurfaceColorMode));
+
         /// <summary>
         /// Appends a point cloud without clearing existing surface items.
-        /// Surfaces larger than 100 M points are automatically down-sampled to ≤ 10 M.
+        /// Clouds larger than 100 M points are automatically down-sampled to ≤ 10 M.
         /// </summary>
-        public void AddPointCloud(CxSurface pointCloud)
+        public void AddPointCloud(CxPointCloud pointCloud)
         {
-            var surface = pointCloud;
             if (pointCloud.Width * pointCloud.Length > 100_000_000)
             {
                 var points = pointCloud.ToPoints();
                 float ratio = points.Length / 10_000_000f;
-                surface = VisionOperator.UniformSurface(points, pointCloud.Intensity,
+                var surface = VisionOperator.UniformSurface(points, pointCloud.Intensity,
                     (int)(pointCloud.Width  / ratio), (int)(pointCloud.Length / ratio),
                     pointCloud.XScale * ratio, pointCloud.YScale * ratio,
                     pointCloud.ZScale, pointCloud.XOffset, pointCloud.YOffset, pointCloud.ZOffset);
+                AppendSurfaceItem(new CxSurfaceItem(surface, SurfaceMode, SurfaceColorMode));
             }
-            AppendSurfaceItem(new CxSurfaceItem(surface, SurfaceMode, SurfaceColorMode));
+            else
+            {
+                AppendSurfaceItem(new CxPointCloudItem(pointCloud, SurfaceMode, SurfaceColorMode));
+            }
         }
 
         /// <summary>Appends a mesh without clearing existing surface items.</summary>
@@ -138,6 +161,10 @@ namespace VisionNet.Controls
         /// <summary>Appends a surface via the high-performance shader path without clearing existing items.</summary>
         public void AddSurfaceAdvancedItem(CxSurface surface)
             => AppendSurfaceItem(new CxSurfaceAdvancedItem(surface, SurfaceMode, SurfaceColorMode, 2_000_000));
+
+        /// <summary>Appends a point cloud via the high-performance shader path without clearing existing items.</summary>
+        public void AddPointCloudAdvancedItem(CxPointCloud pointCloud)
+            => AppendSurfaceItem(new CxPointCloudAdvancedItem(pointCloud, SurfaceMode, SurfaceColorMode, 2_000_000));
 
         /// <summary>Appends a mesh via the high-performance shader path without clearing existing items.</summary>
         public void AddMeshAdvancedItem(CxMesh mesh)

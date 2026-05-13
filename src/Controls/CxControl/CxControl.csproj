@@ -95,6 +95,8 @@
     <Compile Include="RenderItem\GLResourceHandle.cs" />
     <Compile Include="RenderItem\Surface\CxSurfaceItem.cs" />
     <Compile Include="RenderItem\Surface\CxSurfaceAdvancedItem.cs" />
+    <Compile Include="RenderItem\PointCloud\CxPointCloudItem.cs" />
+    <Compile Include="RenderItem\PointCloud\CxPointCloudAdvancedItem.cs" />
     <Compile Include="RenderItem\Mesh\CxMeshItem.cs" />
     <Compile Include="RenderItem\Mesh\CxMeshAdvancedItem.cs" />
     <Compile Include="RenderItem\Geometry\CxPoint3DItem.cs" />
