@@ -114,7 +114,9 @@ namespace VisionNet
 
         // ── CxPointCloud ─────────────────────────────────────────────────────────
 
-        /// <summary>Serializes a <see cref="CxPointCloud"/> to a binary file.</summary>
+        /// <summary>Serializes a <see cref="CxPointCloud"/> to a file.
+        /// Supports <c>.cxpc</c> (binary) and <c>.pcd</c> (ASCII) formats.
+        /// The format is chosen based on the file extension.</summary>
         /// <param name="cloud">The point cloud to save. Must not be null.</param>
         /// <param name="filePath">Destination file path.</param>
         /// <exception cref="ArgumentNullException"><paramref name="cloud"/> is null.</exception>
@@ -122,6 +124,12 @@ namespace VisionNet
         public static void SavePointCloud(CxPointCloud cloud, string filePath)
         {
             if (cloud == null) throw new ArgumentNullException(nameof(cloud));
+
+            if (string.Equals(Path.GetExtension(filePath), ".pcd", StringComparison.OrdinalIgnoreCase))
+            {
+                SavePointCloudToPcd(cloud, filePath);
+                return;
+            }
 
             using (var writer = new BinaryWriter(File.Open(filePath, FileMode.Create)))
             {
@@ -154,7 +162,9 @@ namespace VisionNet
             }
         }
 
-        /// <summary>Deserializes a <see cref="CxPointCloud"/> from a binary file.</summary>
+        /// <summary>Deserializes a <see cref="CxPointCloud"/> from a file.
+        /// Supports <c>.cxpc</c> (binary) and <c>.pcd</c> (PCL Point Cloud Data, ASCII and binary) formats.
+        /// The format is chosen based on the file extension.</summary>
         /// <param name="filePath">Source file path.</param>
         /// <returns>The loaded point cloud, or <c>null</c> if the file does not exist.</returns>
         /// <exception cref="InvalidDataException">The file format or magic number is invalid.</exception>
@@ -162,6 +172,9 @@ namespace VisionNet
         public static CxPointCloud LoadPointCloud(string filePath)
         {
             if (!File.Exists(filePath)) return null;
+
+            if (string.Equals(Path.GetExtension(filePath), ".pcd", StringComparison.OrdinalIgnoreCase))
+                return LoadPointCloudFromPcd(filePath);
 
             using (var reader = new BinaryReader(File.Open(filePath, FileMode.Open, FileAccess.Read, FileShare.Read)))
             {
@@ -198,6 +211,266 @@ namespace VisionNet
                 return new CxPointCloud(width, length, data, intensity,
                     xOffset, yOffset, zOffset, xScale, yScale, zScale);
             }
+        }
+
+        // ── PCD format (PCL Point Cloud Data) ──────────────────────────────────
+
+        private static void SavePointCloudToPcd(CxPointCloud cloud, string filePath)
+        {
+            int total = cloud.Width * cloud.Length;
+            bool hasIntensity = cloud.Intensity != null && cloud.Intensity.Length == total;
+            var inv = CultureInfo.InvariantCulture;
+
+            using (var writer = new StreamWriter(filePath, append: false, new UTF8Encoding(false)))
+            {
+                writer.WriteLine("# .PCD v0.7 - exported by VisionNet");
+                writer.WriteLine("VERSION 0.7");
+                writer.WriteLine(hasIntensity ? "FIELDS x y z intensity" : "FIELDS x y z");
+                writer.WriteLine(hasIntensity ? "SIZE 4 4 4 4" : "SIZE 4 4 4");
+                writer.WriteLine(hasIntensity ? "TYPE F F F F" : "TYPE F F F");
+                writer.WriteLine(hasIntensity ? "COUNT 1 1 1 1" : "COUNT 1 1 1");
+                writer.WriteLine($"WIDTH {cloud.Width}");
+                writer.WriteLine($"HEIGHT {cloud.Length}");
+                writer.WriteLine("VIEWPOINT 0 0 0 1 0 0 0");
+                writer.WriteLine($"POINTS {total}");
+                writer.WriteLine("DATA ascii");
+
+                for (int i = 0; i < total; i++)
+                {
+                    short sx = cloud.Data[i * 3];
+                    short sy = cloud.Data[i * 3 + 1];
+                    short sz = cloud.Data[i * 3 + 2];
+
+                    float x = sx == short.MinValue ? float.NaN : cloud.XOffset + sx * cloud.XScale;
+                    float y = sy == short.MinValue ? float.NaN : cloud.YOffset + sy * cloud.YScale;
+                    float z = sz == short.MinValue ? float.NaN : cloud.ZOffset + sz * cloud.ZScale;
+
+                    if (hasIntensity)
+                        writer.WriteLine($"{x.ToString("G9", inv)} {y.ToString("G9", inv)} {z.ToString("G9", inv)} {((float)cloud.Intensity[i]).ToString("G9", inv)}");
+                    else
+                        writer.WriteLine($"{x.ToString("G9", inv)} {y.ToString("G9", inv)} {z.ToString("G9", inv)}");
+                }
+            }
+        }
+
+        private static CxPointCloud LoadPointCloudFromPcd(string filePath)
+        {
+            var allLines = File.ReadAllLines(filePath);
+            int lineIdx = 0;
+
+            // ── Parse header up to DATA ──
+            string dataMode = null;
+            string[] fields = null;
+            int[] sizes = null;
+            char[] types = null;
+            int width = 0, height = 0, pointCount = 0;
+
+            for (; lineIdx < allLines.Length; lineIdx++)
+            {
+                string line = allLines[lineIdx].Trim();
+                if (line.Length == 0 || line[0] == '#') continue;
+
+                string[] parts = line.Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+                if (parts.Length < 2) continue;
+
+                switch (parts[0])
+                {
+                    case "FIELDS":
+                        fields = parts.Skip(1).ToArray();
+                        break;
+                    case "SIZE":
+                        sizes = parts.Skip(1).Select(int.Parse).ToArray();
+                        break;
+                    case "TYPE":
+                        types = parts.Skip(1).Select(s => s[0]).ToArray();
+                        break;
+                    case "WIDTH":
+                        width = int.Parse(parts[1]);
+                        break;
+                    case "HEIGHT":
+                        height = int.Parse(parts[1]);
+                        break;
+                    case "POINTS":
+                        pointCount = int.Parse(parts[1]);
+                        break;
+                    case "DATA":
+                        dataMode = parts[1];
+                        lineIdx++; // move past DATA line
+                        goto headerDone;
+                }
+            }
+            headerDone:
+
+            if (fields == null || dataMode == null || pointCount <= 0)
+                throw new InvalidDataException("Invalid PCD header: missing FIELDS, DATA, or POINTS.");
+
+            if (dataMode == "binary_compressed")
+                throw new NotSupportedException("PCD binary_compressed format is not supported.");
+
+            // ── Locate field indices ──
+            int xIdx = -1, yIdx = -1, zIdx = -1, intIdx = -1;
+            int xOff = 0, yOff = 0, zOff = 0, intOff = 0;
+            int offset = 0;
+            for (int i = 0; i < fields.Length; i++)
+            {
+                string f = fields[i].ToLowerInvariant();
+                int size = sizes != null && i < sizes.Length ? sizes[i] : 4;
+                if (f == "x") { xIdx = i; xOff = offset; }
+                else if (f == "y") { yIdx = i; yOff = offset; }
+                else if (f == "z") { zIdx = i; zOff = offset; }
+                else if (f == "intensity") { intIdx = i; intOff = offset; }
+                offset += size;
+            }
+
+            if (xIdx < 0 || yIdx < 0 || zIdx < 0)
+                throw new InvalidDataException("PCD file must contain x, y, z fields.");
+
+            bool hasPcdIntensity = intIdx >= 0;
+            int pointStride = offset;
+
+            // ── Parse data ──
+            var rawX = new float[pointCount];
+            var rawY = new float[pointCount];
+            var rawZ = new float[pointCount];
+            var rawI = hasPcdIntensity ? new float[pointCount] : null;
+
+            if (dataMode == "ascii")
+            {
+                for (int p = 0; p < pointCount && lineIdx < allLines.Length; p++, lineIdx++)
+                {
+                    string line = allLines[lineIdx].Trim();
+                    if (line.Length == 0 || line[0] == '#') { p--; continue; }
+
+                    string[] vals = line.Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+                    if (vals.Length < fields.Length) { p--; continue; }
+
+                    rawX[p] = float.Parse(vals[xIdx], CultureInfo.InvariantCulture);
+                    rawY[p] = float.Parse(vals[yIdx], CultureInfo.InvariantCulture);
+                    rawZ[p] = float.Parse(vals[zIdx], CultureInfo.InvariantCulture);
+                    if (hasPcdIntensity)
+                        rawI[p] = float.Parse(vals[intIdx], CultureInfo.InvariantCulture);
+                }
+            }
+            else // binary
+            {
+                // Scan file byte-by-byte to find the exact offset after DATA line
+                long dataStartOffset = 0;
+                using (var fs2 = new FileStream(filePath, FileMode.Open, FileAccess.Read))
+                {
+                    var lineBuf = new List<byte>(128);
+                    int b;
+                    while ((b = fs2.ReadByte()) != -1)
+                    {
+                        if (b == '\n')
+                        {
+                            string lineStr = Encoding.UTF8.GetString(lineBuf.ToArray()).Trim();
+                            lineBuf.Clear();
+                            if (lineStr.StartsWith("DATA", StringComparison.OrdinalIgnoreCase))
+                            {
+                                dataStartOffset = fs2.Position;
+                                break;
+                            }
+                        }
+                        else if (b != '\r')
+                        {
+                            lineBuf.Add((byte)b);
+                        }
+                    }
+                }
+
+                using (var fs = File.OpenRead(filePath))
+                {
+                    fs.Seek(dataStartOffset, SeekOrigin.Begin);
+                    byte[] pointBuf = new byte[pointStride];
+                    for (int p = 0; p < pointCount; p++)
+                    {
+                        int read = fs.Read(pointBuf, 0, pointStride);
+                        if (read < pointStride) break;
+
+                        rawX[p] = DecodePcdField(pointBuf, xOff, sizes[xIdx], types[xIdx]);
+                        rawY[p] = DecodePcdField(pointBuf, yOff, sizes[yIdx], types[yIdx]);
+                        rawZ[p] = DecodePcdField(pointBuf, zOff, sizes[zIdx], types[zIdx]);
+                        if (hasPcdIntensity)
+                            rawI[p] = DecodePcdField(pointBuf, intOff, sizes[intIdx], types[intIdx]);
+                    }
+                }
+            }
+
+            // ── Compute encode parameters ──
+            float xMin = float.MaxValue, xMax = float.MinValue;
+            float yMin = float.MaxValue, yMax = float.MinValue;
+            float zMin = float.MaxValue, zMax = float.MinValue;
+            int validCount = 0;
+
+            for (int i = 0; i < pointCount; i++)
+            {
+                if (float.IsNaN(rawX[i]) || float.IsInfinity(rawX[i]) ||
+                    float.IsNaN(rawY[i]) || float.IsInfinity(rawY[i]) ||
+                    float.IsNaN(rawZ[i]) || float.IsInfinity(rawZ[i]))
+                    continue;
+                validCount++;
+                if (rawX[i] < xMin) xMin = rawX[i];
+                if (rawX[i] > xMax) xMax = rawX[i];
+                if (rawY[i] < yMin) yMin = rawY[i];
+                if (rawY[i] > yMax) yMax = rawY[i];
+                if (rawZ[i] < zMin) zMin = rawZ[i];
+                if (rawZ[i] > zMax) zMax = rawZ[i];
+            }
+
+            if (validCount == 0) return null;
+
+            float xScale = (xMax - xMin) > 1e-12f ? (xMax - xMin) / 65534f : 1e-6f;
+            float yScale = (yMax - yMin) > 1e-12f ? (yMax - yMin) / 65534f : 1e-6f;
+            float zScale = (zMax - zMin) > 1e-12f ? (zMax - zMin) / 65534f : 1e-6f;
+
+            // ── Encode ──
+            var data = new short[pointCount * 3];
+            byte[] intensity = hasPcdIntensity ? new byte[pointCount] : null;
+
+            for (int i = 0; i < pointCount; i++)
+            {
+                data[i * 3]     = EncodePcdCoord(rawX[i], xMin, xScale);
+                data[i * 3 + 1] = EncodePcdCoord(rawY[i], yMin, yScale);
+                data[i * 3 + 2] = EncodePcdCoord(rawZ[i], zMin, zScale);
+
+                if (hasPcdIntensity && intensity != null)
+                {
+                    float fi = rawI[i];
+                    if (float.IsNaN(fi) || float.IsInfinity(fi))
+                        intensity[i] = 0;
+                    else
+                        intensity[i] = (byte)Math.Max(0, Math.Min(255, (int)Math.Round(fi)));
+                }
+            }
+
+            return new CxPointCloud(width, height, data, intensity,
+                xMin, yMin, zMin, xScale, yScale, zScale);
+        }
+
+        private static short EncodePcdCoord(float v, float offset, float scale)
+        {
+            if (float.IsNaN(v) || float.IsInfinity(v))
+                return short.MinValue;
+            return (short)Math.Max(short.MinValue + 1,
+                Math.Min(short.MaxValue, (int)Math.Round((v - offset) / scale)));
+        }
+
+        private static float DecodePcdField(byte[] buf, int off, int size, char type)
+        {
+            if (type == 'F' && size == 4) return BitConverter.ToSingle(buf, off);
+            if (type == 'U')
+            {
+                if (size == 1) return buf[off];
+                if (size == 2) return BitConverter.ToUInt16(buf, off);
+                if (size == 4) return BitConverter.ToUInt32(buf, off);
+            }
+            if (type == 'I')
+            {
+                if (size == 1) return (sbyte)buf[off];
+                if (size == 2) return BitConverter.ToInt16(buf, off);
+                if (size == 4) return BitConverter.ToInt32(buf, off);
+            }
+            return BitConverter.ToSingle(buf, off);
         }
 
         // ── CxMesh ───────────────────────────────────────────────────────────────

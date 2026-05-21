@@ -354,12 +354,14 @@ CxMesh meshFromCloud = VisionOperator.PointCloudToMesh(cloud, generateUVs: true)
 // 保存
 VisionOperator.SaveSurface(surface, @"C:\data.cxsurface");   // 二进制 .cxsurface
 VisionOperator.SavePointCloud(cloud, @"C:\data.cxpc");        // 二进制 .cxpc
+VisionOperator.SavePointCloud(cloud, @"C:\data.pcd");         // PCL PCD ASCII
 VisionOperator.SaveMesh(mesh, @"C:\data.cxmesh");             // 二进制 .cxmesh
 VisionOperator.SaveMesh(mesh, @"C:\data.obj");                // Wavefront OBJ
 
 // 加载（文件不存在返回 null，格式错误抛 InvalidDataException）
 CxSurface s = VisionOperator.LoadSurface(@"C:\data.cxsurface");
 CxPointCloud c = VisionOperator.LoadPointCloud(@"C:\data.cxpc");
+CxPointCloud c2 = VisionOperator.LoadPointCloud(@"C:\data.pcd");          // 自动识别 .pcd
 CxMesh m = VisionOperator.LoadMesh(@"C:\data.cxmesh");
 CxMesh m2 = VisionOperator.LoadMesh(@"C:\data.obj");          // 自动识别 .obj
 ```
@@ -522,6 +524,14 @@ VisionNet 使用自定义紧凑二进制格式和标准 Wavefront OBJ 格式。
 | `.cxsurface` | `CxSurface` | `CXSRF1` |
 | `.cxpc` | `CxPointCloud` | `CXPC01` |
 | `.cxmesh` | `CxMesh` | `CXMSH1` |
+
+### PCD 格式（PCL 点云互通）
+
+- 导出：`SavePointCloud(cloud, "*.pcd")` → ASCII v0.7，含可选的 intensity 字段
+- 导入：`LoadPointCloud("*.pcd")` → 支持 **ASCII** 和 **binary** 两种 DATA 模式
+- 类型自适应：binary 模式按 `TYPE`/`SIZE`（`F`/`U`/`I`，1/2/4 字节）自动解码字段
+- 坐标编码：加载时自动推导 Offset/Scale 阈值，编码为内部 `short[]`，NaN 映射为无效点
+- 不支持 `binary_compressed` |
 
 - 使用 `BinaryWriter` / `BinaryReader`，无外部依赖
 - `short[]` / `uint[]` 通过 `Buffer.BlockCopy` 批量读写，性能高
