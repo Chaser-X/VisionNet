@@ -387,15 +387,24 @@ VisionOperator.DestroyLib();
 | `SetSurface(surface)`                  | 替换  | 显示结构化表面，清空原有内容      |
 | `SetPointCloud(cloud)`                 | 替换  | 显示有序点云，清空原有内容       |
 | `SetSurfaceAdvancedItem(surface)`      | 替换  | 高性能结构化表面路径，≤ 200 万点 |
+| `SetSurfaceAdvancedItem(surface, pose)`| 替换  | 同上，带初始位姿（`ModelMatrix`） |
 | `SetPointCloudAdvancedItem(cloud)`     | 替换  | 高性能有序点云路径，≤ 200 万点  |
+| `SetPointCloudAdvancedItem(cloud, pose)`| 替换  | 同上，带初始位姿             |
 | `SetMesh(mesh)`                        | 替换  | 显示网格                |
 | `SetMeshAdvancedItem(mesh)`            | 替换  | 高性能 Shader 路径网格     |
+| `SetMeshAdvancedItem(mesh, pose)`      | 替换  | 同上，带初始位姿             |
 | `AddSurface(surface)`                  | 追加  | 叠加结构化表面             |
 | `AddPointCloud(cloud)`                 | 追加  | 叠加有序点云              |
 | `AddSurfaceAdvancedItem(surface)`      | 追加  | 叠加高性能结构化表面          |
+| `AddSurfaceAdvancedItem(surface, pose)`| 追加  | 同上，带初始位姿             |
 | `AddPointCloudAdvancedItem(cloud)`     | 追加  | 叠加高性能有序点云           |
+| `AddPointCloudAdvancedItem(cloud, pose)`| 追加  | 同上，带初始位姿             |
 | `AddMesh(mesh)`                        | 追加  | 叠加网格                |
 | `AddMeshAdvancedItem(mesh)`            | 追加  | 叠加高性能网格             |
+| `AddMeshAdvancedItem(mesh, pose)`      | 追加  | 同上，带初始位姿             |
+| `SetSurfaceAdvancedItemPose(pose)`     | —    | 运行时更新所有 Surface 位姿    |
+| `SetPointCloudAdvancedItemPose(pose)`  | —    | 运行时更新所有 PointCloud 位姿 |
+| `SetMeshAdvancedItemPose(pose)`        | —    | 运行时更新所有 Mesh 位姿      |
 | `AddSurfaceItem(item)`                 | 追加  | 叠加自定义渲染 Item        |
 | `ClearSurfaceItems()`                  | —   | 清空所有表面对象            |
 | `SetSegment(segs, color, size)`        | 追加  | 添加线段叠加层             |
