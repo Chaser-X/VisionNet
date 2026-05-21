@@ -22,6 +22,13 @@ namespace VisionNet.Controls
         public Box3D? BoundingBox { get; private set; }
         public int MaxPointCount { get; set; } = int.MaxValue;
 
+        /// <summary>
+        /// Model matrix applied to this item's geometry before the camera transform.
+        /// Represents the item's pose (position and orientation) in world space.
+        /// Defaults to identity (no transform).
+        /// </summary>
+        public CxMatrix4X4 ModelMatrix { get; set; } = CxMatrix4X4.Identity();
+
         private int _samplingFactorX = 1;
         private int _samplingFactorY = 1;
 
@@ -57,13 +64,14 @@ namespace VisionNet.Controls
 
             uniform mat4 view;
             uniform mat4 projection;
+            uniform mat4 model;
 
             out float height;
             out vec2 TexCoord;
 
             void main()
             {
-                gl_Position = projection * view * vec4(aPos, 1.0);
+                gl_Position = projection * view * model * vec4(aPos, 1.0);
                 height = aPos.z;
                 TexCoord = aTexCoord;
             }";
@@ -212,6 +220,8 @@ namespace VisionNet.Controls
             gl.GetFloat(OpenGL.GL_MODELVIEW_MATRIX, view);
             gl.UniformMatrix4(gl.GetUniformLocation(handle.ShaderProgram, "view"),       1, false, view);
             gl.UniformMatrix4(gl.GetUniformLocation(handle.ShaderProgram, "projection"), 1, false, proj);
+            var modelData = (ModelMatrix ?? CxMatrix4X4.Identity()).Data;
+            gl.UniformMatrix4(gl.GetUniformLocation(handle.ShaderProgram, "model"), 1, true, modelData);
 
             foreach (var kv in data.Uniforms)
             {

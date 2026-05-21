@@ -28,6 +28,7 @@
             this.btn_addSeg3D = new System.Windows.Forms.Button();
             this.button2 = new System.Windows.Forms.Button();
             this.btn_test = new System.Windows.Forms.Button();
+            this.btn_testPose = new System.Windows.Forms.Button();
             ((System.ComponentModel.ISupportInitialize)(this.splitContainer1)).BeginInit();
             this.splitContainer1.Panel1.SuspendLayout();
             this.splitContainer1.Panel2.SuspendLayout();
@@ -60,6 +61,7 @@
             this.splitContainer1.Panel2.Controls.Add(this.btn_addSeg3D);
             this.splitContainer1.Panel2.Controls.Add(this.button2);
             this.splitContainer1.Panel2.Controls.Add(this.btn_test);
+            this.splitContainer1.Panel2.Controls.Add(this.btn_testPose);
             this.splitContainer1.Size = new System.Drawing.Size(1224, 545);
             this.splitContainer1.SplitterDistance = 1053;
             this.splitContainer1.SplitterWidth = 5;
@@ -164,6 +166,17 @@
             this.btn_test.UseVisualStyleBackColor = true;
             this.btn_test.Click += new System.EventHandler(this.btn_test_Click);
             // 
+            // btn_testPose
+            // 
+            this.btn_testPose.Location = new System.Drawing.Point(29, 401);
+            this.btn_testPose.Margin = new System.Windows.Forms.Padding(4);
+            this.btn_testPose.Name = "btn_testPose";
+            this.btn_testPose.Size = new System.Drawing.Size(123, 28);
+            this.btn_testPose.TabIndex = 0;
+            this.btn_testPose.Text = "Test Pose";
+            this.btn_testPose.UseVisualStyleBackColor = true;
+            this.btn_testPose.Click += new System.EventHandler(this.btn_testPose_Click);
+            // 
             // btn_surfaceToMesh
             // 
             this.btn_surfaceToMesh.Location = new System.Drawing.Point(29, 287);
@@ -222,5 +235,6 @@
         private System.Windows.Forms.Button button2;
         private System.Windows.Forms.Button btn_surfaceToMesh;
         private System.Windows.Forms.Button btn_meshToSurface;
+        private System.Windows.Forms.Button btn_testPose;
     }
 }

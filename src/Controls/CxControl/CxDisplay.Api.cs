@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Linq;
 using System.Numerics;
 using VisionNet.DataType;
 
@@ -125,6 +126,102 @@ namespace VisionNet.Controls
         /// <summary>Replaces the current view with a mesh rendered via the high-performance shader path.</summary>
         public void SetMeshAdvancedItem(CxMesh mesh)
             => ReplaceSurfaceItem(new CxMeshAdvancedItem(mesh, SurfaceMode, SurfaceColorMode));
+
+        // ── Surface: Set* with initial pose (replace semantics) ──────────────────
+
+        /// <summary>
+        /// Replaces the current view with a surface rendered via the high-performance shader path,
+        /// with an initial model matrix (pose).
+        /// </summary>
+        public void SetSurfaceAdvancedItem(CxSurface surface, CxMatrix4X4 pose)
+        {
+            var item = new CxSurfaceAdvancedItem(surface, SurfaceMode, SurfaceColorMode, 2_000_000)
+                { ModelMatrix = pose };
+            ReplaceSurfaceItem(item);
+        }
+
+        /// <summary>
+        /// Replaces the current view with a point cloud rendered via the high-performance shader path,
+        /// with an initial model matrix (pose).
+        /// </summary>
+        public void SetPointCloudAdvancedItem(CxPointCloud cloud, CxMatrix4X4 pose)
+        {
+            var item = new CxPointCloudAdvancedItem(cloud, SurfaceMode, SurfaceColorMode, 2_000_000)
+                { ModelMatrix = pose };
+            ReplaceSurfaceItem(item);
+        }
+
+        /// <summary>
+        /// Replaces the current view with a mesh rendered via the high-performance shader path,
+        /// with an initial model matrix (pose).
+        /// </summary>
+        public void SetMeshAdvancedItem(CxMesh mesh, CxMatrix4X4 pose)
+        {
+            var item = new CxMeshAdvancedItem(mesh, SurfaceMode, SurfaceColorMode)
+                { ModelMatrix = pose };
+            ReplaceSurfaceItem(item);
+        }
+
+        // ── Surface: runtime pose update ─────────────────────────────────────────
+
+        /// <summary>Sets the model matrix (pose) of all <see cref="CxSurfaceAdvancedItem"/>s.</summary>
+        public void SetSurfaceAdvancedItemPose(CxMatrix4X4 pose)
+        {
+            lock (_resourceLock)
+                foreach (var item in _surfaceItems.OfType<CxSurfaceAdvancedItem>())
+                    item.ModelMatrix = pose;
+            Invalidate();
+        }
+
+        /// <summary>Sets the model matrix (pose) of all <see cref="CxPointCloudAdvancedItem"/>s.</summary>
+        public void SetPointCloudAdvancedItemPose(CxMatrix4X4 pose)
+        {
+            lock (_resourceLock)
+                foreach (var item in _surfaceItems.OfType<CxPointCloudAdvancedItem>())
+                    item.ModelMatrix = pose;
+            Invalidate();
+        }
+
+        /// <summary>Sets the model matrix (pose) of all <see cref="CxMeshAdvancedItem"/>s.</summary>
+        public void SetMeshAdvancedItemPose(CxMatrix4X4 pose)
+        {
+            lock (_resourceLock)
+                foreach (var item in _surfaceItems.OfType<CxMeshAdvancedItem>())
+                    item.ModelMatrix = pose;
+            Invalidate();
+        }
+
+        // ── Surface: Add* with initial pose (append semantics) ───────────────────
+
+        /// <summary>
+        /// Appends a surface via the high-performance shader path with an initial model matrix (pose).
+        /// </summary>
+        public void AddSurfaceAdvancedItem(CxSurface surface, CxMatrix4X4 pose)
+        {
+            var item = new CxSurfaceAdvancedItem(surface, SurfaceMode, SurfaceColorMode, 2_000_000)
+                { ModelMatrix = pose };
+            AppendSurfaceItem(item);
+        }
+
+        /// <summary>
+        /// Appends a point cloud via the high-performance shader path with an initial model matrix (pose).
+        /// </summary>
+        public void AddPointCloudAdvancedItem(CxPointCloud cloud, CxMatrix4X4 pose)
+        {
+            var item = new CxPointCloudAdvancedItem(cloud, SurfaceMode, SurfaceColorMode, 2_000_000)
+                { ModelMatrix = pose };
+            AppendSurfaceItem(item);
+        }
+
+        /// <summary>
+        /// Appends a mesh via the high-performance shader path with an initial model matrix (pose).
+        /// </summary>
+        public void AddMeshAdvancedItem(CxMesh mesh, CxMatrix4X4 pose)
+        {
+            var item = new CxMeshAdvancedItem(mesh, SurfaceMode, SurfaceColorMode)
+                { ModelMatrix = pose };
+            AppendSurfaceItem(item);
+        }
 
         // ── Surface: Add* (append semantics) ────────────────────────────────────
 

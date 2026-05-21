@@ -39,6 +39,7 @@ namespace DemoFrom
             }
             VisionOperator.InitialLib();
             cxDisplay1.SetViewUpDirection(new CxVector3D(-1, 0, 0));
+            cxDisplay1.Camera.Enable2DView = false;
         }
         CxSurface surface = null;
         CxSurface surface2 = null;
@@ -159,7 +160,7 @@ namespace DemoFrom
                 if (surface != null)
                     cxDisplay1.SetSurfaceAdvancedItem(surface);
                 if (surface2 != null)
-                    cxDisplay1.AddSurfaceAdvancedItem(surface2);
+                    cxDisplay1.AddSurfaceAdvancedItem(surface2, CxMatrix4X4.RotationZ((float)Math.PI / 4) * CxMatrix4X4.Translation(5, 3, 2));
             }
 
             ////添加平面 Plane3D
@@ -290,6 +291,22 @@ namespace DemoFrom
 
             cxDisplay1.ResetView();
             cxDisplay1.SetSurfaceAdvancedItem(result);
+        }
+
+        private bool _poseApplied = false;
+
+        private void btn_testPose_Click(object sender, EventArgs e)
+        {
+            _poseApplied = !_poseApplied;
+            var pose = _poseApplied
+                ? CxMatrix4X4.RotationZ((float)Math.PI / 4) * CxMatrix4X4.Translation(5, 3, 2)
+                : CxMatrix4X4.Identity();
+
+            cxDisplay1.SetSurfaceAdvancedItemPose(pose);
+            cxDisplay1.SetPointCloudAdvancedItemPose(pose);
+            cxDisplay1.SetMeshAdvancedItemPose(pose);
+
+            btn_testPose.Text = _poseApplied ? "Reset Pose" : "Test Pose";
         }
     }
 }
