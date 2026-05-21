@@ -7,6 +7,7 @@ using System.ComponentModel;
 using System.Data;
 using System.Drawing;
 using System.Drawing.Drawing2D;
+using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices.ComTypes;
 using System.Runtime.InteropServices;
@@ -307,6 +308,57 @@ namespace DemoFrom
             cxDisplay1.SetMeshAdvancedItemPose(pose);
 
             btn_testPose.Text = _poseApplied ? "Reset Pose" : "Test Pose";
+        }
+
+        private void btn_ioSave_Click(object sender, EventArgs e)
+        {
+            string dir = "";
+
+            if (surface != null)
+            {
+                string path = Path.Combine(dir, "test_surface.cxsurface");
+                VisionOperator.SaveSurface(surface, path);
+                var loaded = VisionOperator.LoadSurface(path);
+                if (loaded != null)
+                {
+                    cxDisplay2.ResetView();
+                    cxDisplay2.SetSurfaceAdvancedItem(loaded);
+                    MessageBox.Show($"Surface saved → loaded\n{path}", "Save R/L");
+                }
+            }
+            else if (_currentMesh != null)
+            {
+                string path = Path.Combine(dir, "test_mesh.obj");
+                VisionOperator.SaveMesh(_currentMesh, path);
+                var loaded = VisionOperator.LoadMesh(path);
+                if (loaded != null)
+                {
+                    cxDisplay2.ResetView();
+                    cxDisplay2.SetMesh(loaded);
+                    MessageBox.Show($"Mesh saved → loaded (OBJ)\n{path}", "Save R/L");
+                }
+            }
+            else
+            {
+                MessageBox.Show("No surface or mesh data available.", "Save R/L");
+            }
+        }
+
+        private void btn_ioLoadObj_Click(object sender, EventArgs e)
+        {
+            using (var dlg = new OpenFileDialog { Filter = "Mesh files|*.obj;*.cxmesh|OBJ files|*.obj|CxMesh binary|*.cxmesh" })
+            {
+                if (dlg.ShowDialog() != DialogResult.OK) return;
+                var mesh = VisionOperator.LoadMesh(dlg.FileName);
+                if (mesh == null)
+                {
+                    MessageBox.Show("Failed to load mesh.", "Load Mesh");
+                    return;
+                }
+                _currentMesh = mesh;
+                cxDisplay2.ResetView();
+                cxDisplay2.SetMesh(mesh);
+            }
         }
     }
 }
