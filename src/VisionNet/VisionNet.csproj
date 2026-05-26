@@ -76,6 +76,14 @@
     <Compile Include="Compute\CxTransformPointCloud.cs" />
     <Compile Include="Compute\CxMeshToSurface.cs" />
     <Compile Include="Export.cs" />
+    <Compile Include="Filter\VisionOperator.Filter.cs" />
+    <Compile Include="Transform\VisionOperator.Transform.cs" />
+    <Compile Include="Surface\VisionOperator.Surface.cs" />
+    <Compile Include="Analysis\VisionOperator.Analysis.cs" />
+    <Compile Include="Geometry\VisionOperator.Geometry.cs" />
+    <Compile Include="Feature\VisionOperator.Feature.cs" />
+    <Compile Include="Segmentation\VisionOperator.Segmentation.cs" />
+    <Compile Include="Detection\VisionOperator.Detection.cs" />
     <Compile Include="IO\VisionOperator.IO.cs" />
     <Compile Include="VisionOperator.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
