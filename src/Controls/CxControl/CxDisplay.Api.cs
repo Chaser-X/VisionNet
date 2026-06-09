@@ -322,6 +322,18 @@ namespace VisionNet.Controls
         public void SetText2D(Text2D[] text2Ds, Color color)
         { _renderItems.Add(new CxText2DItem(text2Ds, color, 1)); Invalidate(); }
 
+        // ── Coordinate system ────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Sets whether the rendering coordinate system is left-handed.
+        /// Default is right-handed (standard OpenGL convention).
+        /// </summary>
+        /// <param name="leftHanded"><c>true</c> for left-handed, <c>false</c> for right-handed.</param>
+        public void SetCoordinateSystemLeftHanded(bool leftHanded)
+        {
+            IsLeftHanded = leftHanded;
+        }
+
         /// <summary>
         /// Appends a 3D coordinate-frame axes indicator to the overlay layer.
         /// If <paramref name="coordination"/> is <c>null</c>, the world-origin axes are used.

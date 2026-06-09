@@ -39,7 +39,8 @@ namespace DemoFrom
                 return;
             }
             VisionOperator.InitialLib();
-            cxDisplay1.SetViewUpDirection(new CxVector3D(-1, 0, 0));
+           // cxDisplay1.SetViewUpDirection(new CxVector3D(0, 1, 0));
+            cxDisplay1.SetCoordinateSystemLeftHanded(true);
             cxDisplay1.Camera.Enable2DView = false;
         }
         CxSurface surface = null;
