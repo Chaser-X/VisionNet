@@ -34,6 +34,7 @@ VisionNet 由两个互相独立的库组成：
 - 🔒 线程安全：GL 资源延迟释放机制，数据更新可在后台线程执行
 - 💾 **文件 I/O**：自定义紧凑二进制格式（`.cxsurface` / `.cxpc` / `.cxmesh`）及 Wavefront OBJ（`.obj`）的保存/加载
 - 🚀 **OpenCL GPU 计算**：并行包围盒计算、GPU 点云重采样（`CxUniformSurface`）、GPU 表面变换（`CxTransformSurface` / `CxTransformPointCloud`）、GPU 网格栅格化（`CxMeshToSurface`）
+- 🔄 **坐标系切换**：一行代码在右手系与左手系之间切换，视角预设（Top / Front / Left / Right）自动适配，无需修改数据
 
 ---
 
@@ -435,6 +436,7 @@ VisionOperator.DestroyLib();
 | `SetTextInfo(infos, color)`            | 追加  | 添加世界坐标文本标签          |
 | `SetText2D(texts, color)`              | 追加  | 添加屏幕空间文本            |
 | `SetCoordinate3DSystem(coord, length)` | 追加  | 添加坐标系指示器            |
+| `SetCoordinateSystemLeftHanded(bool)`  | —   | 切换左手 / 右手坐标系（默认右手）  |
 | `ResetView(resetAll)`                  | —   | 重置视图（可选是否清空表面）      |
 | `SetViewCenter(point)`                 | —   | 设置相机旋转焦点            |
 | `SetViewUpDirection(dir)`              | —   | 设置相机上向量             |
@@ -447,6 +449,7 @@ VisionOperator.DestroyLib();
 | `SurfaceColorMode`     | `Color` `Intensity` `ColorWithIntensity` | 颜色来源    |
 | `SurfaceViewMode`      | `Top` `Front` `Left` `Right` `None`      | 预设视角    |
 | `ShowCoordinateSystem` | `bool`                                   | 显示世界坐标轴 |
+| `IsLeftHanded`         | `bool`                                   | 左手坐标系（默认 `false`） |
 
 颜色梯度（`Color` / `ColorWithIntensity` 模式，Z 由低到高）：
 
