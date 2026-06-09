@@ -41,6 +41,8 @@ namespace VisionNet.Controls
             gl.LoadIdentity();
 
             _camera.LookAtMatrix(gl);
+            if (_isLeftHanded)
+                gl.Scale(1.0f, -1.0f, 1.0f);
             Render(gl);
 
             gl.Disable(OpenGL.GL_DEPTH_TEST);
@@ -55,6 +57,8 @@ namespace VisionNet.Controls
         {
             base.OnResize(e);
             _camera?.LookAtMatrix(OpenGL);
+            if (_isLeftHanded)
+                OpenGL.Scale(1.0f, -1.0f, 1.0f);
         }
 
         /// <summary>Releases all GL resource handles waiting in the deferred-release queue.</summary>
