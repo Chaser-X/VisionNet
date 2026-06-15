@@ -50,6 +50,10 @@ namespace VisionNet.Controls
         private bool _firstFitView = true;
         private bool _disposed     = false;
 
+        // View-transform overrides.
+        private bool  _isLeftHanded = false;
+        private float _zScale       = 1.0f;
+
         #endregion
 
         #region Public properties
@@ -62,6 +66,28 @@ namespace VisionNet.Controls
 
         /// <inheritdoc/>
         public CxPoint3D? RotationPoint { get; set; } = null;
+
+        /// <summary>
+        /// Gets or sets whether the coordinate system is left-handed.
+        /// When <c>true</c>, a Y-axis flip is appended to the Modelview matrix after
+        /// <c>gl.LookAt</c>, inverting the Y direction so that left-handed data renders correctly.
+        /// </summary>
+        public bool IsLeftHanded
+        {
+            get => _isLeftHanded;
+            set { _isLeftHanded = value; _glControl.Invalidate(); }
+        }
+
+        /// <summary>
+        /// Gets or sets the Z-axis display scale factor appended to the Modelview matrix.
+        /// Values greater than 1 stretch the Z axis; values in (0, 1) compress it.
+        /// Clamped to [0.01, ∞). Default is <c>1.0</c>.
+        /// </summary>
+        public float ZScale
+        {
+            get => _zScale;
+            set { _zScale = Math.Max(0.01f, value); _glControl.Invalidate(); }
+        }
 
         #endregion
 
@@ -147,9 +173,18 @@ namespace VisionNet.Controls
 
         private void GlControl_MouseWheel(object sender, MouseEventArgs e)
         {
-            // 5 % zoom step per wheel notch.
-            ZoomCamera(e.Delta > 0 ? 1.05f : 0.95f);
-            _glControl.Invalidate();
+            if (Control.ModifierKeys.HasFlag(Keys.Shift))
+            {
+                // Shift + scroll → Z-scale; camera distance unchanged.
+                // ZScale setter calls Invalidate() internally.
+                ZScale *= e.Delta > 0 ? 1.05f : 0.95f;
+            }
+            else
+            {
+                // 5 % zoom step per wheel notch.
+                ZoomCamera(e.Delta > 0 ? 1.05f : 0.95f);
+                _glControl.Invalidate();
+            }
         }
 
         private void GlControl_MouseDoubleClick(object sender, MouseEventArgs e)
@@ -383,6 +418,11 @@ namespace VisionNet.Controls
                 _position.X, _position.Y, _position.Z,
                 _target.X,   _target.Y,   _target.Z,
                 _up.X,       _up.Y,       _up.Z);
+
+            if (_isLeftHanded)
+                gl.Scale(1.0f, -1.0f, 1.0f);
+            if (_zScale != 1.0f)
+                gl.Scale(1.0f, 1.0f, _zScale);
         }
 
         #endregion
