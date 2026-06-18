@@ -51,15 +51,20 @@ namespace VisionNet.Controls
         private bool _disposed     = false;
 
         // View-transform overrides.
-        private bool  _isLeftHanded = false;
-        private float _zScale       = 1.0f;
+        private bool     _isLeftHanded = false;
+        private float    _zScale       = 1.0f;
+        private ViewMode _viewMode     = ViewMode.Front;
 
         #endregion
 
         #region Public properties
 
         /// <inheritdoc/>
-        public ViewMode ViewMode { get; set; } = ViewMode.Front;
+        public ViewMode ViewMode
+        {
+            get => _viewMode;
+            set { _viewMode = value; _zScale = 1.0f; }
+        }
 
         /// <inheritdoc/>
         public bool Enable2DView { get; set; } = false;

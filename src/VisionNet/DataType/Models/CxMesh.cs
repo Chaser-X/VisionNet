@@ -10,13 +10,13 @@ namespace VisionNet.DataType
         public CxMesh() { }
 
         /// <summary>Gets or sets the vertex positions of the mesh.</summary>
-        public CxPoint3D[] Vertices { get; set; }
+        public CxPoint3D[] Vertices { get; set; } = new CxPoint3D[0];
 
         /// <summary>Gets or sets the triangle index buffer (three indices per triangle).</summary>
-        public uint[] Indices { get; set; }
+        public uint[] Indices { get; set; } = new uint[0];
 
         /// <summary>Gets or sets per-vertex intensity values (0–255), or <c>null</c> if not available.</summary>
-        public byte[] Intensity { get; set; }
+        public byte[] Intensity { get; set; } = new byte[0];
 
         /// <summary>Gets or sets the width (columns) of the intensity texture.</summary>
         public int TextureWidth { get; set; } = 0;
@@ -25,7 +25,7 @@ namespace VisionNet.DataType
         public int TextureHeight { get; set; } = 0;
 
         /// <summary>Gets or sets UV texture coordinates, one per vertex.</summary>
-        public CxPoint2D[] UVs { get; set; }
+        public CxPoint2D[] UVs { get; set; } = new CxPoint2D[0];
 
         /// <summary>Releases all managed arrays held by this mesh.</summary>
         public void Dispose()
