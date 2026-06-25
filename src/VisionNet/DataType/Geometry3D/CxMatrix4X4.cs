@@ -31,10 +31,42 @@ namespace VisionNet.DataType
         }
 
         /// <summary>
+        /// Initialises the matrix from a 4x4 two-dimensional array in row-major order.
+        /// </summary>
+        /// <param name="data">A 4x4 two-dimensional array in row-major order.</param>
+        /// <exception cref="ArgumentException">
+        /// Thrown when <paramref name="data"/> is not a 4x4 two-dimensional array.
+        /// </exception>
+        public CxMatrix4X4(float[,] data)
+        {
+            if (data.Rank != 2 || data.GetLength(0) != 4 || data.GetLength(1) != 4)
+                throw new ArgumentException("Matrix data must be a 4x4 two-dimensional array.", nameof(data));
+            Data = new float[16];
+            for (int i = 0; i < 4; i++)
+                for (int j = 0; j < 4; j++)
+                    Data[i * 4 + j] = data[i, j];
+        }
+
+        /// <summary>
         /// Gets or sets the 16 matrix elements in row-major order
         /// (<c>Data[i * 4 + j]</c> = element at row <c>i</c>, column <c>j</c>).
         /// </summary>
         public float[] Data { get; set; } = new float[16];
+
+        /// <summary>
+        /// Gets the 16 matrix elements as a 4x4 two-dimensional array in row-major order.
+        /// </summary>
+        public float[,] Data2D
+        {
+            get
+            {
+                var result = new float[4, 4];
+                for (int i = 0; i < 4; i++)
+                    for (int j = 0; j < 4; j++)
+                        result[i, j] = Data[i * 4 + j];
+                return result;
+            }
+        }
 
         // ── Factory methods ──────────────────────────────────────────────────────
 
@@ -242,6 +274,38 @@ namespace VisionNet.DataType
             }
 
             return new CxMatrix4X4(inv);
+        }
+
+        /// <summary>
+        /// Transforms a 3D point by this matrix using row-major convention (column vector on the right).
+        /// Performs perspective divide when the homogeneous <c>w</c> component is non-zero.
+        /// </summary>
+        /// <param name="point">The 3D point to transform.</param>
+        /// <returns>The transformed 3D point.</returns>
+        public CxPoint3D TransformPoint3D(CxPoint3D point)
+        {
+            float x = point.X, y = point.Y, z = point.Z;
+            float tx = Data[0] * x + Data[1] * y + Data[2]  * z + Data[3];
+            float ty = Data[4] * x + Data[5] * y + Data[6]  * z + Data[7];
+            float tz = Data[8] * x + Data[9] * y + Data[10] * z + Data[11];
+            float tw = Data[12]* x + Data[13]* y + Data[14] * z + Data[15];
+            if (Math.Abs(tw) > 1e-6f) { tx /= tw; ty /= tw; tz /= tw; }
+            return new CxPoint3D(tx, ty, tz);
+        }
+
+        /// <summary>
+        /// Transforms a 3D vector by the upper-left 3x3 submatrix (rotation + scale).
+        /// Vectors are not affected by translation or perspective.
+        /// </summary>
+        /// <param name="vector">The 3D vector to transform.</param>
+        /// <returns>The transformed 3D vector.</returns>
+        public CxVector3D TransformVector3D(CxVector3D vector)
+        {
+            float x = vector.X, y = vector.Y, z = vector.Z;
+            return new CxVector3D(
+                Data[0] * x + Data[1] * y + Data[2]  * z,
+                Data[4] * x + Data[5] * y + Data[6]  * z,
+                Data[8] * x + Data[9] * y + Data[10] * z);
         }
     }
 }
