@@ -42,9 +42,6 @@ namespace VisionNet.Controls
         private SurfaceMode      _surfaceMode      = SurfaceMode.PointCloud;
         private SurfaceColorMode _surfaceColorMode = SurfaceColorMode.ColorWithIntensity;
 
-        // ── Coordinate system ──────────────────────────────────────────────────
-        private bool _isLeftHanded = false;
-
         // ── Public properties ────────────────────────────────────────────────────
 
         /// <summary>Gets the trackball camera controlling the 3D view.</summary>
@@ -97,13 +94,12 @@ namespace VisionNet.Controls
 
         /// <summary>
         /// Gets or sets whether the coordinate system is left-handed.
-        /// When <c>false</c> (default), the standard OpenGL right-handed system is used.
-        /// Changes take effect on the next render frame.
+        /// Delegates to <see cref="CxAdvancedTrackBallCamera.IsLeftHanded"/>.
         /// </summary>
         public bool IsLeftHanded
         {
-            get => _isLeftHanded;
-            set { _isLeftHanded = value; Invalidate(); }
+            get => _camera.IsLeftHanded;
+            set => _camera.IsLeftHanded = value;
         }
 
         // ── Constructors ─────────────────────────────────────────────────────────

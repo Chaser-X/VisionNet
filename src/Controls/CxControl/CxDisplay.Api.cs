@@ -331,7 +331,18 @@ namespace VisionNet.Controls
         /// <param name="leftHanded"><c>true</c> for left-handed, <c>false</c> for right-handed.</param>
         public void SetCoordinateSystemLeftHanded(bool leftHanded)
         {
-            IsLeftHanded = leftHanded;
+            _camera.IsLeftHanded = leftHanded;
+        }
+
+        /// <summary>
+        /// Sets the Z-axis display scale factor.
+        /// Values greater than 1 stretch the Z axis; values between 0 and 1 compress it.
+        /// Can also be adjusted interactively via Shift + mouse wheel.
+        /// </summary>
+        /// <param name="scale">Scale factor, clamped to [0.01, ∞).</param>
+        public void SetZScale(float scale)
+        {
+            _camera.ZScale = scale;
         }
 
         /// <summary>
