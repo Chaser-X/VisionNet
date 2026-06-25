@@ -364,3 +364,6 @@ docs/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+
+# OpenCode instruction files
+AGENTS.md

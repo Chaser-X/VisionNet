@@ -46,5 +46,20 @@ namespace VisionNet.DataType
 
         /// <summary>Returns a unit vector in the same direction. Behaviour is undefined if length is zero.</summary>
         public CxVector3D Normalize() => new CxVector3D(X / Length, Y / Length, Z / Length);
+
+        /// <summary>
+        /// Creates a unit direction vector from spherical coordinates (standard math convention).
+        /// </summary>
+        /// <param name="pitch">Polar angle from the +Z axis, in radians. Range [0, π].</param>
+        /// <param name="roll">Azimuth angle from the +X axis in the XY plane, in radians.</param>
+        /// <returns>A unit direction vector.</returns>
+        public static CxVector3D FromSpherical(float pitch, float roll)
+        {
+            float sp = (float)Math.Sin(pitch);
+            return new CxVector3D(
+                sp * (float)Math.Cos(roll),
+                sp * (float)Math.Sin(roll),
+                (float)Math.Cos(pitch));
+        }
     }
 }

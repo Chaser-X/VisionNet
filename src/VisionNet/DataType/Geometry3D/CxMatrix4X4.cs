@@ -142,6 +142,42 @@ namespace VisionNet.DataType
         }
 
         /// <summary>
+        /// Creates a rotation matrix around an arbitrary unit axis by <paramref name="angle"/> radians
+        /// using Rodrigues' rotation formula.
+        /// </summary>
+        /// <param name="axis">Rotation axis (will be normalized to unit length).</param>
+        /// <param name="angle">Rotation angle in radians.</param>
+        public static CxMatrix4X4 RotationAxis(CxVector3D axis, float angle)
+        {
+            float kx = axis.X, ky = axis.Y, kz = axis.Z;
+            float len = (float)Math.Sqrt(kx * kx + ky * ky + kz * kz);
+            if (len > 1e-6f) { kx /= len; ky /= len; kz /= len; }
+
+            float c = (float)Math.Cos(angle);
+            float s = (float)Math.Sin(angle);
+            float t = 1f - c;
+
+            float txx = t * kx * kx;
+            float txy = t * kx * ky;
+            float txz = t * kx * kz;
+            float tyy = t * ky * ky;
+            float tyz = t * ky * kz;
+            float tzz = t * kz * kz;
+
+            float sxz = s * kz;
+            float sxy = s * ky;
+            float syx = s * kx;
+
+            return new CxMatrix4X4(new float[]
+            {
+                txx + c,    txy - sxz,  txz + sxy,  0,
+                txy + sxz,  tyy + c,    tyz - syx,  0,
+                txz - sxy,  tyz + syx,  tzz + c,    0,
+                0,          0,          0,          1,
+            });
+        }
+
+        /// <summary>
         /// Creates a non-uniform scale matrix with independent factors along each axis.
         /// </summary>
         public static CxMatrix4X4 Scale(float x, float y, float z) =>
@@ -306,6 +342,49 @@ namespace VisionNet.DataType
                 Data[0] * x + Data[1] * y + Data[2]  * z,
                 Data[4] * x + Data[5] * y + Data[6]  * z,
                 Data[8] * x + Data[9] * y + Data[10] * z);
+        }
+
+        /// <summary>
+        /// Solves the 3×3 linear system <c>A·x = b</c> using Cramer's rule,
+        /// where <c>A</c> is the upper-left 3×3 submatrix of this 4×4 matrix.
+        /// </summary>
+        /// <param name="b">The right-hand side vector.</param>
+        /// <returns>The solution vector <c>x</c>.</returns>
+        /// <exception cref="InvalidOperationException">
+        /// Thrown when the determinant of the 3×3 submatrix is zero (within a tolerance of 1e-6).
+        /// </exception>
+        public CxVector3D Solve3x3(CxVector3D b)
+        {
+            float a00 = Data[0], a01 = Data[1], a02 = Data[2];
+            float a10 = Data[4], a11 = Data[5], a12 = Data[6];
+            float a20 = Data[8], a21 = Data[9], a22 = Data[10];
+            float b0 = b.X, b1 = b.Y, b2 = b.Z;
+
+            float c11a22 = a11 * a22, c12a21 = a12 * a21;
+            float c10a22 = a10 * a22, c12a20 = a12 * a20;
+            float c10a21 = a10 * a21, c11a20 = a11 * a20;
+
+            float det = a00 * (c11a22 - c12a21)
+                      - a01 * (c10a22 - c12a20)
+                      + a02 * (c10a21 - c11a20);
+
+            if (Math.Abs(det) < 1e-6f)
+                throw new InvalidOperationException(
+                    "The 3×3 submatrix is singular; Cramer's rule cannot be applied.");
+
+            float detX = b0 * (c11a22 - c12a21)
+                       - a01 * (b1 * a22 - a12 * b2)
+                       + a02 * (b1 * a21 - a11 * b2);
+
+            float detY = a00 * (b1 * a22 - a12 * b2)
+                       - b0 * (c10a22 - c12a20)
+                       + a02 * (a10 * b2 - b1 * a20);
+
+            float detZ = a00 * (a11 * b2 - b1 * a21)
+                       - a01 * (a10 * b2 - b1 * a20)
+                       + b0 * (c10a21 - c11a20);
+
+            return new CxVector3D(detX / det, detY / det, detZ / det);
         }
     }
 }
