@@ -221,7 +221,7 @@ VisionNet/
 | ------------------ | ---------------------------------------------------- |
 | `CxPoint3D`        | 3D 点（X, Y, Z）—— `StructLayout.Explicit`，可直接与 C++ 互操作 |
 | `CxPoint3DI`       | 带强度的 3D 点                                            |
-| `CxVector3D`       | 3D 向量，支持 `+` `-` `×` `÷` `Dot` `Cross` `Normalize`   |
+| `CxVector3D`       | 3D 向量，支持 `+` `-` `×` `÷` `Dot` `Cross` `Normalize` `FromSpherical` |
 | `CxSize3D`         | 3D 尺寸（Width, Height, Depth）                          |
 | `Box3D`            | 轴对齐包围盒（Center + Size）                                |
 | `Plane3D`          | 平面（Point + Normal）                                   |
@@ -304,6 +304,21 @@ var img = new CxImage<byte>(640, 480);
 ```
 
 **`CxMatrix4X4`** — 4×4 行主序矩阵（`Data[i*4+j]` = 第 i 行第 j 列；传给 OpenGL 时需先转置）
+
+```csharp
+var m = CxMatrix4X4.RotationZ((float)Math.PI / 4);      // Z 轴旋转
+var r = CxMatrix4X4.RotationAxis(axis, angle);           // 罗德里格任意轴旋转
+var t = CxMatrix4X4.Translation(1, 2, 3);                // 平移
+var s = CxMatrix4X4.Scale(0.5f, 1f, 2f);                 // 缩放
+var v = CxMatrix4X4.LookAt(eye, center, up);             // 视图矩阵
+
+var product = m * t;                                      // 矩阵乘法
+var inv     = product.Inverse();                          // 高斯-约旦求逆
+var trans   = product.Transpose();                        // 转置
+var pt      = product.TransformPoint3D(point);            // 点变换（含透视除除）
+var vec     = product.TransformVector3D(vector);          // 向量变换（仅 3×3 子块）
+var x       = product.Solve3x3(b);                        // 克莱默法则求解 3×3 线性方程组
+```
 
 </details>
 
