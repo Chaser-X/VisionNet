@@ -20,6 +20,11 @@ namespace VisionNet.Controls
         private CxAdvancedTrackBallCamera _camera;
         private bool _isMouseDown;
 
+        // ── Active-object selection state ────────────────────────────────────────
+        private AbstractRenderItem _selectedItem     = null;
+        private bool               _isDraggingItem   = false;
+        private CxPoint3D?         _lastDragWorldPos = null;
+
         // ── GL resource pool (all GL objects owned here; items hold only CPU data) ─
         private readonly Dictionary<ICxObjRenderItem, GLResourceHandle> _resourcePool
             = new Dictionary<ICxObjRenderItem, GLResourceHandle>();
@@ -91,6 +96,12 @@ namespace VisionNet.Controls
 
         /// <summary>Gets or sets whether the 3D coordinate system axes are shown in world space.</summary>
         public bool ShowCoordinateSystem { get; set; }
+
+        /// <summary>
+        /// Gets the currently selected geometry overlay item, or <c>null</c> if nothing is selected.
+        /// Only one item can be selected at a time within this display.
+        /// </summary>
+        public AbstractRenderItem SelectedItem => _selectedItem;
 
         /// <summary>
         /// Gets or sets whether the coordinate system is left-handed.

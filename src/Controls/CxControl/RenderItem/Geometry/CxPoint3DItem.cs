@@ -254,6 +254,30 @@ namespace VisionNet.Controls
         }
 
         /// <inheritdoc/>
+        public override bool HitTest(CxPoint3D worldPos)
+        {
+            if (Point3Ds == null) return false;
+            float t2 = HitThreshold * HitThreshold;
+            foreach (var p in Point3Ds)
+            {
+                float dx = p.X - worldPos.X, dy = p.Y - worldPos.Y, dz = p.Z - worldPos.Z;
+                if (dx * dx + dy * dy + dz * dz <= t2) return true;
+            }
+            return false;
+        }
+
+        /// <inheritdoc/>
+        public override void Translate(double dx, double dy, double dz)
+        {
+            if (Point3Ds == null) return;
+            for (int i = 0; i < Point3Ds.Length; i++)
+                Point3Ds[i] = new CxPoint3D(
+                    (float)(Point3Ds[i].X + dx),
+                    (float)(Point3Ds[i].Y + dy),
+                    (float)(Point3Ds[i].Z + dz));
+        }
+
+        /// <inheritdoc/>
         protected override void Dispose(bool disposing)
         {
             if (disposing)

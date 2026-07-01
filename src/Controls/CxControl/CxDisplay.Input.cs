@@ -15,7 +15,35 @@ namespace VisionNet.Controls
         protected override void OnMouseDown(MouseEventArgs e)
         {
             _isMouseDown = true;
-            // Set the rotation pivot to the surface point under the cursor.
+
+            if (e.Button == MouseButtons.Left)
+            {
+                var worldPos = ScreenToWorldCoordinate(e.X, e.Y);
+                if (worldPos.HasValue)
+                {
+                    var hit = FindActiveItemHit(worldPos.Value);
+
+                    // Deselect previous if different from hit.
+                    if (_selectedItem != null && _selectedItem != hit)
+                        _selectedItem.OnDeselected();
+
+                    _selectedItem = hit;
+
+                    if (hit != null)
+                    {
+                        hit.OnMouseDown(worldPos.Value);
+                        _isDraggingItem   = true;
+                        _lastDragWorldPos = worldPos;
+                        Invalidate();
+                        return;   // suppress camera rotation while dragging an item
+                    }
+
+                    // No active item hit — clear selection.
+                    ClearSelection();
+                }
+            }
+
+            // Normal camera interaction.
             _camera.RotationPoint = GetNearestSurfacePoint(e.X, e.Y).Location;
             base.OnMouseDown(e);
         }
@@ -23,13 +51,29 @@ namespace VisionNet.Controls
         /// <inheritdoc/>
         protected override void OnMouseUp(MouseEventArgs e)
         {
-            _isMouseDown = false;
+            if (_isDraggingItem && _selectedItem != null)
+                _selectedItem.OnMouseUp();
+            _isDraggingItem   = false;
+            _lastDragWorldPos = null;
+            _isMouseDown      = false;
             base.OnMouseUp(e);
         }
 
         /// <inheritdoc/>
         protected override void OnMouseMove(MouseEventArgs e)
         {
+            if (_isDraggingItem && _isMouseDown && _selectedItem != null)
+            {
+                var worldPos = ScreenToWorldCoordinate(e.X, e.Y);
+                if (worldPos.HasValue && _lastDragWorldPos.HasValue)
+                {
+                    _selectedItem.OnMouseMove(worldPos.Value, _lastDragWorldPos.Value);
+                    _lastDragWorldPos = worldPos;
+                    Invalidate();
+                }
+                return;
+            }
+
             var pos = GetNearestSurfacePoint(e.X, e.Y);
             if (pos.Location.HasValue && !_isMouseDown)
             {
@@ -41,6 +85,20 @@ namespace VisionNet.Controls
                 _coordTagItem.Visible = false;
             }
             base.OnMouseMove(e);
+        }
+
+        /// <summary>
+        /// Returns the first <see cref="AbstractRenderItem"/> in the overlay layer whose
+        /// <see cref="AbstractRenderItem.IsActiveObj"/> is <c>true</c> and whose
+        /// <see cref="AbstractRenderItem.HitTest"/> returns <c>true</c> for the given world position.
+        /// Returns <c>null</c> when no item is hit.
+        /// </summary>
+        private AbstractRenderItem FindActiveItemHit(CxPoint3D worldPos)
+        {
+            foreach (var item in _renderItems.ToArray())
+                if (item is AbstractRenderItem ar && ar.IsActiveObj && ar.HitTest(worldPos))
+                    return ar;
+            return null;
         }
 
         // ── Coordinate picking ───────────────────────────────────────────────────
@@ -73,7 +131,7 @@ namespace VisionNet.Controls
         /// and unordered point clouds contribute the un-projected world coordinate directly.
         /// </summary>
         /// <returns>Nearest world-space location and its intensity, or <c>(null, null)</c> if no hit.</returns>
-        private (CxPoint3D? Location, byte? Intensity) GetNearestSurfacePoint(int mouseX, int mouseY)
+        public (CxPoint3D? Location, byte? Intensity) GetNearestSurfacePoint(int mouseX, int mouseY)
         {
             var pos = ScreenToWorldCoordinate(mouseX, mouseY);
             if (!pos.HasValue) return (null, null);

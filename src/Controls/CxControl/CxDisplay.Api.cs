@@ -364,6 +364,34 @@ namespace VisionNet.Controls
             Invalidate();
         }
 
+        // ── Active-object selection management ──────────────────────────────────
+
+        /// <summary>
+        /// Clears the current selection: notifies the selected item via
+        /// <see cref="AbstractRenderItem.OnDeselected"/> and sets <see cref="SelectedItem"/> to <c>null</c>.
+        /// </summary>
+        public void ClearSelection()
+        {
+            if (_selectedItem == null) return;
+            _selectedItem.OnDeselected();
+            _selectedItem = null;
+            Invalidate();
+        }
+
+        /// <summary>
+        /// Programmatically selects <paramref name="item"/>, clearing any previous selection.
+        /// Does nothing when <paramref name="item"/> is <c>null</c> or its
+        /// <see cref="AbstractRenderItem.IsActiveObj"/> is <c>false</c>.
+        /// </summary>
+        public void SelectItem(AbstractRenderItem item)
+        {
+            if (item == null || !item.IsActiveObj) return;
+            ClearSelection();
+            _selectedItem = item;
+            _selectedItem.OnMouseDown(default);
+            Invalidate();
+        }
+
         // ── View management ──────────────────────────────────────────────────────
 
         /// <summary>

@@ -37,5 +37,30 @@ namespace VisionNet.Controls
             }
             gl.End();
         }
+
+        /// <inheritdoc/>
+        public override bool HitTest(CxPoint3D worldPos)
+        {
+            if (Segment3Ds == null) return false;
+            float t2 = HitThreshold * HitThreshold;
+            foreach (var seg in Segment3Ds)
+            {
+                float dxS = seg.Start.X - worldPos.X, dyS = seg.Start.Y - worldPos.Y, dzS = seg.Start.Z - worldPos.Z;
+                float dxE = seg.End.X   - worldPos.X, dyE = seg.End.Y   - worldPos.Y, dzE = seg.End.Z   - worldPos.Z;
+                if (dxS * dxS + dyS * dyS + dzS * dzS <= t2) return true;
+                if (dxE * dxE + dyE * dyE + dzE * dzE <= t2) return true;
+            }
+            return false;
+        }
+
+        /// <inheritdoc/>
+        public override void Translate(double dx, double dy, double dz)
+        {
+            if (Segment3Ds == null) return;
+            for (int i = 0; i < Segment3Ds.Length; i++)
+                Segment3Ds[i] = new Segment3D(
+                    new CxPoint3D((float)(Segment3Ds[i].Start.X + dx), (float)(Segment3Ds[i].Start.Y + dy), (float)(Segment3Ds[i].Start.Z + dz)),
+                    new CxPoint3D((float)(Segment3Ds[i].End.X   + dx), (float)(Segment3Ds[i].End.Y   + dy), (float)(Segment3Ds[i].End.Z   + dz)));
+        }
     }
 }
