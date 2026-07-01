@@ -30,7 +30,7 @@
             this.btn_test = new System.Windows.Forms.Button();
             this.btn_testPose = new System.Windows.Forms.Button();
             this.btn_ioSave = new System.Windows.Forms.Button();
-            this.btn_ioLoadObj = new System.Windows.Forms.Button();
+            this.btn_ioLoadMesh = new System.Windows.Forms.Button();
             ((System.ComponentModel.ISupportInitialize)(this.splitContainer1)).BeginInit();
             this.splitContainer1.Panel1.SuspendLayout();
             this.splitContainer1.Panel2.SuspendLayout();
@@ -65,7 +65,7 @@
             this.splitContainer1.Panel2.Controls.Add(this.btn_test);
             this.splitContainer1.Panel2.Controls.Add(this.btn_testPose);
             this.splitContainer1.Panel2.Controls.Add(this.btn_ioSave);
-            this.splitContainer1.Panel2.Controls.Add(this.btn_ioLoadObj);
+            this.splitContainer1.Panel2.Controls.Add(this.btn_ioLoadMesh);
             this.splitContainer1.Size = new System.Drawing.Size(1224, 545);
             this.splitContainer1.SplitterDistance = 1053;
             this.splitContainer1.SplitterWidth = 5;
@@ -214,16 +214,16 @@
             this.btn_ioSave.UseVisualStyleBackColor = true;
             this.btn_ioSave.Click += new System.EventHandler(this.btn_ioSave_Click);
             // 
-            // btn_ioLoadObj
+            // btn_ioLoadMesh
             // 
-            this.btn_ioLoadObj.Location = new System.Drawing.Point(29, 515);
-            this.btn_ioLoadObj.Margin = new System.Windows.Forms.Padding(4);
-            this.btn_ioLoadObj.Name = "btn_ioLoadObj";
-            this.btn_ioLoadObj.Size = new System.Drawing.Size(123, 28);
-            this.btn_ioLoadObj.TabIndex = 0;
-            this.btn_ioLoadObj.Text = "Load OBJ";
-            this.btn_ioLoadObj.UseVisualStyleBackColor = true;
-            this.btn_ioLoadObj.Click += new System.EventHandler(this.btn_ioLoadObj_Click);
+            this.btn_ioLoadMesh.Location = new System.Drawing.Point(29, 515);
+            this.btn_ioLoadMesh.Margin = new System.Windows.Forms.Padding(4);
+            this.btn_ioLoadMesh.Name = "btn_ioLoadMesh";
+            this.btn_ioLoadMesh.Size = new System.Drawing.Size(123, 28);
+            this.btn_ioLoadMesh.TabIndex = 0;
+            this.btn_ioLoadMesh.Text = "Load Mesh";
+            this.btn_ioLoadMesh.UseVisualStyleBackColor = true;
+            this.btn_ioLoadMesh.Click += new System.EventHandler(this.btn_ioLoadMesh_Click);
             // 
             // DemoFrom
             // 
@@ -263,6 +263,6 @@
         private System.Windows.Forms.Button btn_meshToSurface;
         private System.Windows.Forms.Button btn_testPose;
         private System.Windows.Forms.Button btn_ioSave;
-        private System.Windows.Forms.Button btn_ioLoadObj;
+        private System.Windows.Forms.Button btn_ioLoadMesh;
     }
 }

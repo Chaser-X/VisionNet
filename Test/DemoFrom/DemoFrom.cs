@@ -345,9 +345,12 @@ namespace DemoFrom
             }
         }
 
-        private void btn_ioLoadObj_Click(object sender, EventArgs e)
+        private void btn_ioLoadMesh_Click(object sender, EventArgs e)
         {
-            using (var dlg = new OpenFileDialog { Filter = "Mesh files|*.obj;*.cxmesh|OBJ files|*.obj|CxMesh binary|*.cxmesh" })
+            using (var dlg = new OpenFileDialog
+            {
+                Filter = "Mesh files|*.obj;*.cxmesh;*.stl;*.stla|OBJ files|*.obj|CxMesh binary|*.cxmesh|STL binary|*.stl|STL ASCII|*.stla"
+            })
             {
                 if (dlg.ShowDialog() != DialogResult.OK) return;
                 var mesh = VisionOperator.LoadMesh(dlg.FileName);
