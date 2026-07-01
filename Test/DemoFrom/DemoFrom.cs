@@ -246,6 +246,7 @@ namespace DemoFrom
             //添加Text2D
             var text2d = new Text2D(new CxPoint2D(10, 50), "2D Labels", 10);
             cxDisplay2.SetText2D(new Text2D[] { text2d }, Color.Green);
+            cxDisplay2.ActivateAllItems();
         }
 
         private void button1_Click(object sender, EventArgs e)

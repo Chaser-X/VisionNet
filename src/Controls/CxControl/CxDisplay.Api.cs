@@ -392,6 +392,30 @@ namespace VisionNet.Controls
             Invalidate();
         }
 
+        /// <summary>
+        /// Sets <see cref="AbstractRenderItem.IsActiveObj"/> to <c>true</c> for all geometry
+        /// overlay items currently in the display, enabling selection and drag interaction.
+        /// </summary>
+        public void ActivateAllItems()
+        {
+            foreach (var item in _renderItems.ToArray())
+                if (item is AbstractRenderItem ar)
+                    ar.IsActiveObj = true;
+        }
+
+        /// <summary>
+        /// Sets <see cref="AbstractRenderItem.IsActiveObj"/> to <c>false</c> for all geometry
+        /// overlay items, disabling selection and drag interaction.
+        /// Also clears the current selection.
+        /// </summary>
+        public void DeactivateAllItems()
+        {
+            ClearSelection();
+            foreach (var item in _renderItems.ToArray())
+                if (item is AbstractRenderItem ar)
+                    ar.IsActiveObj = false;
+        }
+
         // ── View management ──────────────────────────────────────────────────────
 
         /// <summary>
