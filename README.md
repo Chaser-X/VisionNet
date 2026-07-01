@@ -32,7 +32,7 @@ VisionNet 由两个互相独立的库组成：
 - 🎨 多 Item 叠加：点云、网格、几何图元可同时显示，颜色条自动同步全局 Z 范围
 - 🖱️ 完整鼠标交互：追踪球旋转、平移、缩放、双击对焦、悬停坐标标签
 - 🔒 线程安全：GL 资源延迟释放机制，数据更新可在后台线程执行
-- 💾 **文件 I/O**：自定义紧凑二进制格式（`.cxsurface` / `.cxpc` / `.cxmesh`）及 Wavefront OBJ（`.obj`）的保存/加载
+- 💾 **文件 I/O**：自定义紧凑二进制格式（`.cxsurface` / `.cxpc` / `.cxmesh`）及标准工业格式 OBJ（`.obj`）、STL（`.stl` / `.stla`）的保存/加载
 - 🚀 **OpenCL GPU 计算**：并行包围盒计算、GPU 点云重采样（`CxUniformSurface`）、GPU 表面变换（`CxTransformSurface` / `CxTransformPointCloud`）、GPU 网格栅格化（`CxMeshToSurface`）
 - 🔄 **坐标系切换**：一行代码在右手系与左手系之间切换，视角预设（Top / Front / Left / Right）自动适配，无需修改数据
 
@@ -163,7 +163,7 @@ VisionNet/
 │   │   │   ├── CxTransformPointCloud# GPU 点云变换
 │   │   │   └── CxMeshToSurface     # GPU 网格栅格化
 │   │   ├── IO/                     # 文件序列化
-│   │   │   └── VisionOperator.IO.cs# SaveSurface / LoadMesh / LoadObj 等
+│                   │   │   └── VisionOperator.IO.cs# SaveSurface / LoadMesh / LoadObj / STL 等
 │   │   ├── VisionOperator.cs       # 静态算子 API
 │   │   └── Export.cs               # P/Invoke 声明（VisionLib.dll）
 │   └── Controls/
@@ -365,21 +365,24 @@ CxMesh mesh = VisionOperator.SurfaceToMesh(surface, generateUVs: true);
 // PointCloud → Mesh 三角网格转换（有序点云）
 CxMesh meshFromCloud = VisionOperator.PointCloudToMesh(cloud, generateUVs: true);
 
-// ── 文件 I/O（自动按扩展名分支：.cxmesh 二进制 / .obj 文本） ──────────────
+// ── 文件 I/O（自动按扩展名分支） ─────────────────────────────────
 
 // 保存
-VisionOperator.SaveSurface(surface, @"C:\data.cxsurface");   // 二进制 .cxsurface
-VisionOperator.SavePointCloud(cloud, @"C:\data.cxpc");        // 二进制 .cxpc
-VisionOperator.SavePointCloud(cloud, @"C:\data.pcd");         // PCL PCD ASCII
-VisionOperator.SaveMesh(mesh, @"C:\data.cxmesh");             // 二进制 .cxmesh
-VisionOperator.SaveMesh(mesh, @"C:\data.obj");                // Wavefront OBJ
+VisionOperator.SaveSurface(surface, @"C:\data.cxsurface");     // 二进制 .cxsurface
+VisionOperator.SavePointCloud(cloud, @"C:\data.cxpc");          // 二进制 .cxpc
+VisionOperator.SavePointCloud(cloud, @"C:\data.pcd");           // PCL PCD ASCII
+VisionOperator.SaveMesh(mesh, @"C:\data.cxmesh");               // 二进制 .cxmesh
+VisionOperator.SaveMesh(mesh, @"C:\data.obj");                  // Wavefront OBJ
+VisionOperator.SaveMesh(mesh, @"C:\data.stl");                  // STL 二进制
+VisionOperator.SaveMesh(mesh, @"C:\data.stla");                 // STL ASCII
 
 // 加载（文件不存在返回 null，格式错误抛 InvalidDataException）
 CxSurface s = VisionOperator.LoadSurface(@"C:\data.cxsurface");
 CxPointCloud c = VisionOperator.LoadPointCloud(@"C:\data.cxpc");
-CxPointCloud c2 = VisionOperator.LoadPointCloud(@"C:\data.pcd");          // 自动识别 .pcd
+CxPointCloud c2 = VisionOperator.LoadPointCloud(@"C:\data.pcd");// 自动识别 .pcd
 CxMesh m = VisionOperator.LoadMesh(@"C:\data.cxmesh");
-CxMesh m2 = VisionOperator.LoadMesh(@"C:\data.obj");          // 自动识别 .obj
+CxMesh m2 = VisionOperator.LoadMesh(@"C:\data.obj");            // 自动识别 .obj
+CxMesh m3 = VisionOperator.LoadMesh(@"C:\data.stl");            // 自动识别 .stl
 ```
 
 #### OpenCL GPU 计算模块（`VisionNet.Compute`）
@@ -533,7 +536,7 @@ VisionOperator.DestroyLib();
 
 ## 文件格式
 
-VisionNet 使用自定义紧凑二进制格式和标准 Wavefront OBJ 格式。
+VisionNet 使用自定义紧凑二进制格式和标准工业格式（OBJ / STL）。
 
 ### 二进制格式（紧凑、快速、零依赖）
 
@@ -560,6 +563,17 @@ VisionNet 使用自定义紧凑二进制格式和标准 Wavefront OBJ 格式。
 - 导出：`SaveMesh(mesh, "*.obj")` → UV 正确映射、无 BOM 的 UTF-8
 - 导入：`LoadMesh("*.obj")` → 支持 `v` / `v/vt` / `v//vn` / `v/vt/vn` 四种面格式、负索引、多边形三角化
 - 法线自动忽略
+
+### STL 格式（3D 打印 / CAD 互通）
+
+| 扩展名 | 格式 | 说明 |
+|--------|------|------|
+| `.stl`  | Binary | 50 字节 / 三角面片，工业软件通用格式 |
+| `.stla` | ASCII | 可读文本，`solid/facet/vertex/endfacet/endsolid` 结构 |
+
+- 法线由三角面片两条边的叉积自动计算，导出时自动归一化
+- 导入时顶点不共享（STL 规范），生成 3N 顶点 + 顺序索引 `[0,1,2, 3,4,5, ...]`
+- 仅支持三角形网格（`Indices` 长度须为 3 的倍数）
 
 ---
 
