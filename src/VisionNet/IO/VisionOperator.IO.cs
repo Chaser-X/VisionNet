@@ -20,7 +20,8 @@ namespace VisionNet
 
         /// <summary>
         /// Default file extension for <see cref="CxMesh"/> binary serialization.
-        /// <see cref="LoadMesh"/> and <see cref="SaveMesh"/> also support <c>.obj</c>.
+        /// <see cref="LoadMesh"/> and <see cref="SaveMesh"/> also support
+        /// <c>.obj</c>, <c>.stl</c> (binary) and <c>.stla</c> (ASCII).
         /// </summary>
         public const string MeshFileExtension       = ".cxmesh";
 
@@ -486,9 +487,20 @@ namespace VisionNet
         {
             if (mesh == null) throw new ArgumentNullException(nameof(mesh));
 
-            if (string.Equals(Path.GetExtension(filePath), ".obj", StringComparison.OrdinalIgnoreCase))
+            string ext = Path.GetExtension(filePath);
+            if (string.Equals(ext, ".obj", StringComparison.OrdinalIgnoreCase))
             {
                 SaveMeshToObj(mesh, filePath);
+                return;
+            }
+            if (string.Equals(ext, ".stl", StringComparison.OrdinalIgnoreCase))
+            {
+                SaveMeshToStlBinary(mesh, filePath);
+                return;
+            }
+            if (string.Equals(ext, ".stla", StringComparison.OrdinalIgnoreCase))
+            {
+                SaveMeshToStlAscii(mesh, filePath);
                 return;
             }
 
@@ -553,8 +565,13 @@ namespace VisionNet
         {
             if (!File.Exists(filePath)) return null;
 
-            if (string.Equals(Path.GetExtension(filePath), ".obj", StringComparison.OrdinalIgnoreCase))
+            string ext = Path.GetExtension(filePath);
+            if (string.Equals(ext, ".obj", StringComparison.OrdinalIgnoreCase))
                 return LoadMeshFromObj(filePath);
+            if (string.Equals(ext, ".stl", StringComparison.OrdinalIgnoreCase))
+                return LoadMeshFromStlBinary(filePath);
+            if (string.Equals(ext, ".stla", StringComparison.OrdinalIgnoreCase))
+                return LoadMeshFromStlAscii(filePath);
 
             using (var reader = new BinaryReader(File.Open(filePath, FileMode.Open, FileAccess.Read, FileShare.Read)))
             {
@@ -774,6 +791,167 @@ namespace VisionNet
                 outUVs.Add(corner.vt >= 0 ? uvCoords[corner.vt] : new CxPoint2D(0f, 0f));
             }
             indices.Add((uint)idx);
+        }
+
+        // ── STL (stereolithography) ──────────────────────────────────────────────
+
+        private static void SaveMeshToStlBinary(CxMesh mesh, string filePath)
+        {
+            if (mesh.Vertices == null || mesh.Vertices.Length == 0)
+                throw new ArgumentException("CxMesh has no vertices.", nameof(mesh));
+            if (mesh.Indices == null || mesh.Indices.Length < 3 || mesh.Indices.Length % 3 != 0)
+                throw new ArgumentException("CxMesh must have valid triangle indices (multiple of 3).", nameof(mesh));
+
+            int triCount = mesh.Indices.Length / 3;
+            var vertices = mesh.Vertices;
+            var indices  = mesh.Indices;
+
+            using (var writer = new BinaryWriter(File.Open(filePath, FileMode.Create)))
+            {
+                writer.Write(new byte[80]);
+                writer.Write((uint)triCount);
+
+                for (int t = 0; t < triCount; t++)
+                {
+                    int i0 = (int)indices[t * 3];
+                    int i1 = (int)indices[t * 3 + 1];
+                    int i2 = (int)indices[t * 3 + 2];
+
+                    var v0 = vertices[i0];
+                    var v1 = vertices[i1];
+                    var v2 = vertices[i2];
+
+                    float nx = (v1.Y - v0.Y) * (v2.Z - v0.Z) - (v1.Z - v0.Z) * (v2.Y - v0.Y);
+                    float ny = (v1.Z - v0.Z) * (v2.X - v0.X) - (v1.X - v0.X) * (v2.Z - v0.Z);
+                    float nz = (v1.X - v0.X) * (v2.Y - v0.Y) - (v1.Y - v0.Y) * (v2.X - v0.X);
+                    float len = (float)Math.Sqrt(nx * nx + ny * ny + nz * nz);
+                    if (len > 1e-10f) { nx /= len; ny /= len; nz /= len; }
+
+                    writer.Write(nx); writer.Write(ny); writer.Write(nz);
+                    writer.Write(v0.X); writer.Write(v0.Y); writer.Write(v0.Z);
+                    writer.Write(v1.X); writer.Write(v1.Y); writer.Write(v1.Z);
+                    writer.Write(v2.X); writer.Write(v2.Y); writer.Write(v2.Z);
+                    writer.Write((ushort)0);
+                }
+            }
+        }
+
+        private static void SaveMeshToStlAscii(CxMesh mesh, string filePath)
+        {
+            if (mesh.Vertices == null || mesh.Vertices.Length == 0)
+                throw new ArgumentException("CxMesh has no vertices.", nameof(mesh));
+            if (mesh.Indices == null || mesh.Indices.Length < 3 || mesh.Indices.Length % 3 != 0)
+                throw new ArgumentException("CxMesh must have valid triangle indices (multiple of 3).", nameof(mesh));
+
+            int triCount = mesh.Indices.Length / 3;
+            var vertices = mesh.Vertices;
+            var indices  = mesh.Indices;
+            var inv = CultureInfo.InvariantCulture;
+
+            using (var writer = new StreamWriter(filePath, append: false, new UTF8Encoding(false)))
+            {
+                writer.WriteLine("solid CxMesh");
+
+                for (int t = 0; t < triCount; t++)
+                {
+                    int i0 = (int)indices[t * 3];
+                    int i1 = (int)indices[t * 3 + 1];
+                    int i2 = (int)indices[t * 3 + 2];
+
+                    var v0 = vertices[i0];
+                    var v1 = vertices[i1];
+                    var v2 = vertices[i2];
+
+                    float nx = (v1.Y - v0.Y) * (v2.Z - v0.Z) - (v1.Z - v0.Z) * (v2.Y - v0.Y);
+                    float ny = (v1.Z - v0.Z) * (v2.X - v0.X) - (v1.X - v0.X) * (v2.Z - v0.Z);
+                    float nz = (v1.X - v0.X) * (v2.Y - v0.Y) - (v1.Y - v0.Y) * (v2.X - v0.X);
+                    float len = (float)Math.Sqrt(nx * nx + ny * ny + nz * nz);
+                    if (len > 1e-10f) { nx /= len; ny /= len; nz /= len; }
+
+                    writer.WriteLine($"  facet normal {nx.ToString("G9", inv)} {ny.ToString("G9", inv)} {nz.ToString("G9", inv)}");
+                    writer.WriteLine("    outer loop");
+                    writer.WriteLine($"      vertex {v0.X.ToString("G9", inv)} {v0.Y.ToString("G9", inv)} {v0.Z.ToString("G9", inv)}");
+                    writer.WriteLine($"      vertex {v1.X.ToString("G9", inv)} {v1.Y.ToString("G9", inv)} {v1.Z.ToString("G9", inv)}");
+                    writer.WriteLine($"      vertex {v2.X.ToString("G9", inv)} {v2.Y.ToString("G9", inv)} {v2.Z.ToString("G9", inv)}");
+                    writer.WriteLine("    endloop");
+                    writer.WriteLine("  endfacet");
+                }
+
+                writer.WriteLine("endsolid CxMesh");
+            }
+        }
+
+        private static CxMesh LoadMeshFromStlBinary(string filePath)
+        {
+            using (var reader = new BinaryReader(File.Open(filePath, FileMode.Open, FileAccess.Read, FileShare.Read)))
+            {
+                reader.ReadBytes(80);
+                uint triCount = reader.ReadUInt32();
+
+                var vertices = new CxPoint3D[triCount * 3];
+                var indices  = new uint[triCount * 3];
+
+                for (int t = 0; t < triCount; t++)
+                {
+                    reader.ReadBytes(12);
+                    int baseIdx = t * 3;
+                    vertices[baseIdx]     = new CxPoint3D(reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle());
+                    vertices[baseIdx + 1] = new CxPoint3D(reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle());
+                    vertices[baseIdx + 2] = new CxPoint3D(reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle());
+                    reader.ReadBytes(2);
+
+                    indices[baseIdx]     = (uint)baseIdx;
+                    indices[baseIdx + 1] = (uint)(baseIdx + 1);
+                    indices[baseIdx + 2] = (uint)(baseIdx + 2);
+                }
+
+                return new CxMesh { Vertices = vertices, Indices = indices };
+            }
+        }
+
+        private static CxMesh LoadMeshFromStlAscii(string filePath)
+        {
+            var vertList = new List<CxPoint3D>();
+            var idxList  = new List<uint>();
+            var inv = CultureInfo.InvariantCulture;
+
+            int vertexCountInFacet = 0;
+
+            foreach (string rawLine in File.ReadLines(filePath))
+            {
+                string line = rawLine.Trim();
+                if (line.Length == 0 || line[0] == '#') continue;
+
+                string[] parts = line.Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+
+                if (parts[0] == "vertex" && parts.Length >= 4)
+                {
+                    vertList.Add(new CxPoint3D(
+                        float.Parse(parts[1], inv),
+                        float.Parse(parts[2], inv),
+                        float.Parse(parts[3], inv)));
+                    vertexCountInFacet++;
+                }
+                else if (parts[0] == "endfacet")
+                {
+                    if (vertexCountInFacet != 3)
+                        throw new InvalidDataException($"Expected 3 vertices per facet, got {vertexCountInFacet}.");
+                    int count = vertList.Count;
+                    idxList.Add((uint)(count - 3));
+                    idxList.Add((uint)(count - 2));
+                    idxList.Add((uint)(count - 1));
+                    vertexCountInFacet = 0;
+                }
+            }
+
+            if (vertList.Count == 0 || idxList.Count == 0)
+                return null;
+
+            return new CxMesh
+            {
+                Vertices = vertList.ToArray(),
+                Indices  = idxList.ToArray(),
+            };
         }
     }
 }
