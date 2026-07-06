@@ -32,6 +32,7 @@
             this.btn_ioSave = new System.Windows.Forms.Button();
             this.btn_ioLoadMesh = new System.Windows.Forms.Button();
             this.btn_dragMark = new System.Windows.Forms.Button();
+            this.btn_boxDemo = new System.Windows.Forms.Button();
             this.lbl_markPos = new System.Windows.Forms.Label();
             ((System.ComponentModel.ISupportInitialize)(this.splitContainer1)).BeginInit();
             this.splitContainer1.Panel1.SuspendLayout();
@@ -68,6 +69,7 @@
             this.splitContainer1.Panel2.Controls.Add(this.btn_ioSave);
             this.splitContainer1.Panel2.Controls.Add(this.btn_ioLoadMesh);
             this.splitContainer1.Panel2.Controls.Add(this.btn_dragMark);
+            this.splitContainer1.Panel2.Controls.Add(this.btn_boxDemo);
             this.splitContainer1.Panel2.Controls.Add(this.lbl_markPos);
             this.splitContainer1.Size = new System.Drawing.Size(932, 547);
             this.splitContainer1.SplitterDistance = 761;
@@ -228,6 +230,16 @@
             this.btn_dragMark.UseVisualStyleBackColor = true;
             this.btn_dragMark.Click += new System.EventHandler(this.btn_dragMark_Click);
             //
+            // btn_boxDemo
+            //
+            this.btn_boxDemo.Location = new System.Drawing.Point(22, 520);
+            this.btn_boxDemo.Name = "btn_boxDemo";
+            this.btn_boxDemo.Size = new System.Drawing.Size(92, 23);
+            this.btn_boxDemo.TabIndex = 0;
+            this.btn_boxDemo.Text = "Box3D 拖拽";
+            this.btn_boxDemo.UseVisualStyleBackColor = true;
+            this.btn_boxDemo.Click += new System.EventHandler(this.btn_boxDemo_Click);
+            //
             // lbl_markPos
             //
             this.lbl_markPos.Location = new System.Drawing.Point(5, 480);
@@ -275,6 +287,7 @@
         private System.Windows.Forms.Button btn_ioSave;
         private System.Windows.Forms.Button btn_ioLoadMesh;
         private System.Windows.Forms.Button btn_dragMark;
+        private System.Windows.Forms.Button btn_boxDemo;
         private System.Windows.Forms.Label lbl_markPos;
     }
 }

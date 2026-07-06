@@ -275,6 +275,34 @@ namespace DemoFrom
             };
         }
 
+        private void btn_boxDemo_Click(object sender, EventArgs e)
+        {
+            cxDisplay2.ResetView();
+
+            // 1. 平坦参考面（为深度缓冲提供有效值，触发 FitView）
+            const int W = 60, L = 60;
+            var flatData = new short[W * L];
+            var flatSurf = new CxSurface(W, L, flatData, null,
+                xOffset: 0, yOffset: 0, zOffset: 0,
+                xScale: 0.2f, yScale: 0.2f, zScale: 0.001f);
+            cxDisplay2.SetSurface(flatSurf);  // 12×12 平面
+
+            // 2. 放置可拖拽 Box（位于平面中央）
+            var initBox = new Box3D(new CxPoint3D(6.0f, 6.0f, 0.5f), new CxSize3D(4.0f, 3.0f, 1.0f));
+            var box = cxDisplay2.SetBox(new[] { initBox }, Color.FromArgb(80, Color.Cyan));
+            box.IsActiveObj  = true;
+            box.HitThreshold = 1f;
+
+            // 3. 实时显示 Box 的 Center 和 Size
+            box.OnChanged += item =>
+            {
+                var b = ((CxBox3DItem)item).Box3Ds[0];
+                lbl_markPos.Text =
+                    $"C({b.Center.X:F2},{b.Center.Y:F2},{b.Center.Z:F2})\n" +
+                    $"W{b.Size.Width:F2} H{b.Size.Height:F2} D{b.Size.Depth:F2}";
+            };
+        }
+
         private void button1_Click(object sender, EventArgs e)
         {
             cxDisplay1.ResetView();

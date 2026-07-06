@@ -78,7 +78,7 @@ namespace VisionNet.Controls
         /// World-space proximity threshold used by <see cref="HitTest"/>.
         /// Default is <c>1.0</c> world unit — adjust to match the scene scale.
         /// </summary>
-        public float HitThreshold { get; set; } = 1.0f;
+        public float HitThreshold { get; set; } = 0.2f;
 
         /// <summary>
         /// Returns <c>true</c> if <paramref name="worldPos"/> is within <see cref="HitThreshold"/>
@@ -131,5 +131,8 @@ namespace VisionNet.Controls
         /// The argument is the item itself; cast to the concrete type to read updated data.
         /// </summary>
         public event Action<AbstractRenderItem> OnChanged;
+
+        /// <summary>Raises <see cref="OnChanged"/>. Call from subclass overrides of mouse methods.</summary>
+        protected void RaiseOnChanged() => OnChanged?.Invoke(this);
     }
 }
