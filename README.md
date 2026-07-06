@@ -33,6 +33,7 @@ VisionNet 由两个互相独立的库组成：
 - 🖱️ 完整鼠标交互：追踪球旋转、平移、缩放、双击对焦、悬停坐标标签
 - 🔒 线程安全：GL 资源延迟释放机制，数据更新可在后台线程执行
 - 💾 **文件 I/O**：自定义紧凑二进制格式（`.cxsurface` / `.cxpc` / `.cxmesh`）及标准工业格式 OBJ（`.obj`）、STL（`.stl` / `.stla`）的保存/加载
+- ✂️ **ROI 裁剪**：`ClipMesh` / `ClipPointCloud` / `ClipSurface` — 以 `Box3D` 为 ROI 对三种数据类型做空间裁剪，全程并行加速
 - 🚀 **OpenCL GPU 计算**：并行包围盒计算、GPU 点云重采样（`CxUniformSurface`）、GPU 表面变换（`CxTransformSurface` / `CxTransformPointCloud`）、GPU 网格栅格化（`CxMeshToSurface`）
 - 🔄 **坐标系切换**：一行代码在右手系与左手系之间切换，视角预设（Top / Front / Left / Right）自动适配，无需修改数据
 
@@ -364,6 +365,19 @@ CxMesh mesh = VisionOperator.SurfaceToMesh(surface, generateUVs: true);
 
 // PointCloud → Mesh 三角网格转换（有序点云）
 CxMesh meshFromCloud = VisionOperator.PointCloudToMesh(cloud, generateUVs: true);
+
+// ── ROI 裁剪（Box3D，CPU 并行） ──────────────────────────────────
+
+var roi = new Box3D(new CxPoint3D(0, 0, 0), new CxSize3D(10, 10, 5));
+
+// 保留三顶点全在 ROI 内的三角形，压缩顶点索引，UV/Intensity 随顶点保留
+CxMesh clippedMesh = VisionOperator.ClipMesh(mesh, roi);
+
+// 越界点设为 -32768（无效），保留 Width × Length 网格结构
+CxPointCloud clippedCloud = VisionOperator.ClipPointCloud(cloud, roi);
+
+// 按 XY 网格裁剪（返回更小网格），Z 越界单元设为 -32768
+CxSurface clippedSurface = VisionOperator.ClipSurface(surface, roi);
 
 // ── 文件 I/O（自动按扩展名分支） ─────────────────────────────────
 
