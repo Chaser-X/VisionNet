@@ -29,9 +29,9 @@ namespace VisionNet.Controls
         {
             if (TextInfos == null || TextInfos.Length == 0) return;
 
-            float r = Color.R / 255.0f;
-            float g = Color.G / 255.0f;
-            float b = Color.B / 255.0f;
+            float r = DrawColor.R / 255.0f;
+            float g = DrawColor.G / 255.0f;
+            float b = DrawColor.B / 255.0f;
 
             foreach (var info in TextInfos)
             {

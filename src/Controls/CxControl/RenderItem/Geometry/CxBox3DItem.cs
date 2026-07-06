@@ -39,7 +39,7 @@ namespace VisionNet.Controls
                 float cx = box.Center.X, cy = box.Center.Y, cz = box.Center.Z;
 
                 // --- Semi-transparent filled faces ---
-                gl.Color(Color.R / 255.0, Color.G / 255.0, Color.B / 255.0, Color.A / 255.0);
+                gl.Color(DrawColor.R / 255.0, DrawColor.G / 255.0, DrawColor.B / 255.0, DrawColor.A / 255.0);
                 gl.Begin(OpenGL.GL_QUADS);
                 // Front (+Z)
                 gl.Vertex(cx - hx, cy - hy, cz + hz); gl.Vertex(cx + hx, cy - hy, cz + hz);
@@ -62,7 +62,7 @@ namespace VisionNet.Controls
                 gl.End();
 
                 // --- Opaque wireframe edges ---
-                gl.Color(Color.R / 255.0, Color.G / 255.0, Color.B / 255.0, 1.0);
+                gl.Color(DrawColor.R / 255.0, DrawColor.G / 255.0, DrawColor.B / 255.0, 1.0);
                 gl.LineWidth(Size);
                 gl.Begin(OpenGL.GL_LINES);
                 // Front face edges

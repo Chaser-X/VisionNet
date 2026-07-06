@@ -29,7 +29,7 @@ namespace VisionNet.Controls
         {
             if (Planes == null || Planes.Length == 0) return;
 
-            gl.Color(Color.R / 255.0, Color.G / 255.0, Color.B / 255.0, Color.A / 255.0);
+            gl.Color(DrawColor.R / 255.0, DrawColor.G / 255.0, DrawColor.B / 255.0, DrawColor.A / 255.0);
 
             foreach (var plane in Planes)
             {

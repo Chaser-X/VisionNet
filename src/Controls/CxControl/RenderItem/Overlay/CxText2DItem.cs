@@ -44,9 +44,9 @@ namespace VisionNet.Controls
             gl.PushMatrix();
             gl.LoadIdentity();
 
-            float r = Color.R / 255.0f;
-            float g = Color.G / 255.0f;
-            float b = Color.B / 255.0f;
+            float r = DrawColor.R / 255.0f;
+            float g = DrawColor.G / 255.0f;
+            float b = DrawColor.B / 255.0f;
 
             foreach (var item in TextItems)
             {

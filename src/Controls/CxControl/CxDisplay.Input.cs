@@ -41,6 +41,11 @@ namespace VisionNet.Controls
                     // No active item hit — clear selection.
                     ClearSelection();
                 }
+                else
+                {
+                    // No world coordinate under mouse — clear selection.
+                    ClearSelection();
+                }
             }
 
             // Normal camera interaction.

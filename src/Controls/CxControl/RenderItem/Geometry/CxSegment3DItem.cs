@@ -27,7 +27,7 @@ namespace VisionNet.Controls
         {
             if (Segment3Ds == null || Segment3Ds.Length == 0) return;
 
-            gl.Color(Color.R / 255.0, Color.G / 255.0, Color.B / 255.0);
+            gl.Color(DrawColor.R / 255.0, DrawColor.G / 255.0, DrawColor.B / 255.0);
             gl.LineWidth(Size);
             gl.Begin(OpenGL.GL_LINES);
             foreach (var seg in Segment3Ds)

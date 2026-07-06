@@ -49,7 +49,7 @@ namespace VisionNet.Controls
 
             if (Shape == PointShape.Point)
             {
-                gl.Color(Color.R / 255.0, Color.G / 255.0, Color.B / 255.0);
+                gl.Color(DrawColor.R / 255.0, DrawColor.G / 255.0, DrawColor.B / 255.0);
                 gl.PointSize(Size);
                 gl.Begin(OpenGL.GL_POINTS);
                 foreach (var p in Point3Ds)
@@ -73,7 +73,7 @@ namespace VisionNet.Controls
                 gl.UniformMatrix4(gl.GetUniformLocation(shader, "view"),       1, false, view);
                 gl.UniformMatrix4(gl.GetUniformLocation(shader, "projection"), 1, false, proj);
                 gl.Uniform4(gl.GetUniformLocation(shader, "aColor"),
-                    Color.R / 255.0f, Color.G / 255.0f, Color.B / 255.0f, 1f);
+                    DrawColor.R / 255.0f, DrawColor.G / 255.0f, DrawColor.B / 255.0f, 1f);
 
                 gl.BindVertexArray(vao[0]);
                 gl.DrawElementsInstanced(OpenGL.GL_TRIANGLES, indexCount,

@@ -27,7 +27,7 @@ namespace VisionNet.Controls
         {
             if (Polygon3Ds == null || Polygon3Ds.Length == 0) return;
 
-            gl.Color(Color.R / 255.0, Color.G / 255.0, Color.B / 255.0);
+            gl.Color(DrawColor.R / 255.0, DrawColor.G / 255.0, DrawColor.B / 255.0);
             gl.LineWidth(Size);
             gl.Enable(OpenGL.GL_LINE_SMOOTH);
             gl.Hint(OpenGL.GL_LINE_SMOOTH_HINT, OpenGL.GL_NICEST);

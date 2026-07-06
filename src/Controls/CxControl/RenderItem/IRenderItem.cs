@@ -54,6 +54,12 @@ namespace VisionNet.Controls
         /// <inheritdoc/>
         public Color Color { get; set; } = Color.White;
 
+        /// <summary>Gets or sets the colour used to render this item when it is selected. Default: bright yellow.</summary>
+        public Color SelectedColor { get; set; } = Color.FromArgb(255, 255, 50);
+
+        /// <summary>The effective rendering colour: <see cref="SelectedColor"/> when <see cref="IsSelected"/>, otherwise <see cref="Color"/>.</summary>
+        protected Color DrawColor => IsSelected ? SelectedColor : Color;
+
         /// <inheritdoc/>
         public abstract void Draw(OpenGL gl);
 
