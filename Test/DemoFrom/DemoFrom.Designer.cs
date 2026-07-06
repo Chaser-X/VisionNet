@@ -33,6 +33,8 @@
             this.btn_ioLoadMesh = new System.Windows.Forms.Button();
             this.btn_dragMark = new System.Windows.Forms.Button();
             this.btn_boxDemo = new System.Windows.Forms.Button();
+            this.btn_segDemo = new System.Windows.Forms.Button();
+            this.btn_polyDemo = new System.Windows.Forms.Button();
             this.lbl_markPos = new System.Windows.Forms.Label();
             ((System.ComponentModel.ISupportInitialize)(this.splitContainer1)).BeginInit();
             this.splitContainer1.Panel1.SuspendLayout();
@@ -70,6 +72,8 @@
             this.splitContainer1.Panel2.Controls.Add(this.btn_ioLoadMesh);
             this.splitContainer1.Panel2.Controls.Add(this.btn_dragMark);
             this.splitContainer1.Panel2.Controls.Add(this.btn_boxDemo);
+            this.splitContainer1.Panel2.Controls.Add(this.btn_segDemo);
+            this.splitContainer1.Panel2.Controls.Add(this.btn_polyDemo);
             this.splitContainer1.Panel2.Controls.Add(this.lbl_markPos);
             this.splitContainer1.Size = new System.Drawing.Size(1093, 729);
             this.splitContainer1.SplitterDistance = 922;
@@ -239,9 +243,29 @@
             this.btn_boxDemo.Text = "Box3D 拖拽";
             this.btn_boxDemo.UseVisualStyleBackColor = true;
             this.btn_boxDemo.Click += new System.EventHandler(this.btn_boxDemo_Click);
-            // 
+            //
+            // btn_segDemo
+            //
+            this.btn_segDemo.Location = new System.Drawing.Point(22, 560);
+            this.btn_segDemo.Name = "btn_segDemo";
+            this.btn_segDemo.Size = new System.Drawing.Size(92, 23);
+            this.btn_segDemo.TabIndex = 0;
+            this.btn_segDemo.Text = "Segment 拖拽";
+            this.btn_segDemo.UseVisualStyleBackColor = true;
+            this.btn_segDemo.Click += new System.EventHandler(this.btn_segDemo_Click);
+            //
+            // btn_polyDemo
+            //
+            this.btn_polyDemo.Location = new System.Drawing.Point(22, 600);
+            this.btn_polyDemo.Name = "btn_polyDemo";
+            this.btn_polyDemo.Size = new System.Drawing.Size(92, 23);
+            this.btn_polyDemo.TabIndex = 0;
+            this.btn_polyDemo.Text = "Polygon 拖拽";
+            this.btn_polyDemo.UseVisualStyleBackColor = true;
+            this.btn_polyDemo.Click += new System.EventHandler(this.btn_polyDemo_Click);
+            //
             // lbl_markPos
-            // 
+            //
             this.lbl_markPos.Font = new System.Drawing.Font("Consolas", 8F);
             this.lbl_markPos.Location = new System.Drawing.Point(5, 480);
             this.lbl_markPos.Name = "lbl_markPos";
@@ -289,6 +313,8 @@
         private System.Windows.Forms.Button btn_ioLoadMesh;
         private System.Windows.Forms.Button btn_dragMark;
         private System.Windows.Forms.Button btn_boxDemo;
+        private System.Windows.Forms.Button btn_segDemo;
+        private System.Windows.Forms.Button btn_polyDemo;
         private System.Windows.Forms.Label lbl_markPos;
     }
 }

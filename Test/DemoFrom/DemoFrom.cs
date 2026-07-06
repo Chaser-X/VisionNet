@@ -303,6 +303,68 @@ namespace DemoFrom
             };
         }
 
+        private void btn_segDemo_Click(object sender, EventArgs e)
+        {
+            cxDisplay2.ResetView();
+
+            // 参考平面（深度缓冲）
+            const int W = 60, L = 60;
+            var flatSurf = new CxSurface(W, L, new short[W * L], null,
+                xOffset: 0, yOffset: 0, zOffset: 0, xScale: 0.2f, yScale: 0.2f, zScale: 0.001f);
+            cxDisplay2.SetSurface(flatSurf);
+
+            // 放置三条可拖拽线段
+            var seg = cxDisplay2.SetSegment(new[]
+            {
+                new Segment3D(new CxPoint3D(2f, 4f, 0f), new CxPoint3D(8f, 4f, 0f)),
+                new Segment3D(new CxPoint3D(3f, 7f, 0f), new CxPoint3D(9f, 9f, 0f)),
+            }, Color.Lime, 2f);
+            seg.IsActiveObj  = true;
+            seg.HitThreshold = 0.3f;
+
+            seg.OnChanged += item =>
+            {
+                var s = ((CxSegment3DItem)item).Segment3Ds[0];
+                lbl_markPos.Text =
+                    $"S({s.Start.X:F2},{s.Start.Y:F2})\n" +
+                    $"E({s.End.X:F2},{s.End.Y:F2})";
+            };
+        }
+
+        private void btn_polyDemo_Click(object sender, EventArgs e)
+        {
+            cxDisplay2.ResetView();
+
+            // 参考平面（深度缓冲）
+            const int W = 60, L = 60;
+            var flatSurf = new CxSurface(W, L, new short[W * L], null,
+                xOffset: 0, yOffset: 0, zOffset: 0, xScale: 0.2f, yScale: 0.2f, zScale: 0.001f);
+            cxDisplay2.SetSurface(flatSurf);
+
+            // 放置一个矩形多边形（闭合）和一条折线（开放）
+            var rect = new Polygon3D(new[]
+            {
+                new CxPoint3D(2f, 3f, 0f), new CxPoint3D(8f, 3f, 0f),
+                new CxPoint3D(8f, 7f, 0f), new CxPoint3D(2f, 7f, 0f),
+            }, isClosed: true);
+            var open = new Polygon3D(new[]
+            {
+                new CxPoint3D(3f, 9f, 0f), new CxPoint3D(6f, 10f, 0f), new CxPoint3D(9f, 9f, 0f),
+            }, isClosed: false);
+
+            var poly = cxDisplay2.SetPolygon(new[] { rect, open }, Color.Cyan, 2f);
+            poly.IsActiveObj  = true;
+            poly.HitThreshold = 0.3f;
+
+            poly.OnChanged += item =>
+            {
+                var pts = ((CxPolygon3DItem)item).Polygon3Ds[0].Points;
+                lbl_markPos.Text = pts.Length > 0
+                    ? $"V0({pts[0].X:F2},{pts[0].Y:F2})\nV2({pts[2].X:F2},{pts[2].Y:F2})"
+                    : "--";
+            };
+        }
+
         private void button1_Click(object sender, EventArgs e)
         {
             cxDisplay1.ResetView();
