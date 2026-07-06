@@ -294,33 +294,62 @@ namespace VisionNet.Controls
         // ── Geometric overlays (always append) ──────────────────────────────────
 
         /// <summary>Appends a set of 3D line segments to the overlay layer.</summary>
-        public void SetSegment(Segment3D[] segment, Color color, float size = 1.0f)
-        { _renderItems.Add(new CxSegment3DItem(segment, color, size)); Invalidate(); }
+        /// <returns>The created item; configure <see cref="AbstractRenderItem.IsActiveObj"/> and
+        /// subscribe to <see cref="AbstractRenderItem.OnChanged"/> before or after this call.</returns>
+        public CxSegment3DItem SetSegment(Segment3D[] segment, Color color, float size = 1.0f)
+        {
+            var item = new CxSegment3DItem(segment, color, size);
+            _renderItems.Add(item); Invalidate(); return item;
+        }
 
         /// <summary>Appends a set of 3D points to the overlay layer.</summary>
-        public void SetPoint(CxPoint3D[] point, Color color, float size = 1.0f,
+        /// <returns>The created item.</returns>
+        public CxPoint3DItem SetPoint(CxPoint3D[] point, Color color, float size = 1.0f,
             PointShape shape = PointShape.Point)
-        { _renderItems.Add(new CxPoint3DItem(point, color, size, shape)); Invalidate(); }
+        {
+            var item = new CxPoint3DItem(point, color, size, shape);
+            _renderItems.Add(item); Invalidate(); return item;
+        }
 
         /// <summary>Appends a set of 3D polygons to the overlay layer.</summary>
-        public void SetPolygon(Polygon3D[] polygon, Color color, float size = 1.0f)
-        { _renderItems.Add(new CxPolygon3DItem(polygon, color, size)); Invalidate(); }
+        /// <returns>The created item.</returns>
+        public CxPolygon3DItem SetPolygon(Polygon3D[] polygon, Color color, float size = 1.0f)
+        {
+            var item = new CxPolygon3DItem(polygon, color, size);
+            _renderItems.Add(item); Invalidate(); return item;
+        }
 
         /// <summary>Appends a set of 3D planes to the overlay layer.</summary>
-        public void SetPlane(Plane3D[] plane, Color color, float size = 100.0f)
-        { _renderItems.Add(new CxPlane3DItem(plane, color, size)); Invalidate(); }
+        /// <returns>The created item.</returns>
+        public CxPlane3DItem SetPlane(Plane3D[] plane, Color color, float size = 100.0f)
+        {
+            var item = new CxPlane3DItem(plane, color, size);
+            _renderItems.Add(item); Invalidate(); return item;
+        }
 
         /// <summary>Appends a set of axis-aligned bounding boxes to the overlay layer.</summary>
-        public void SetBox(Box3D[] box, Color color, float size = 1.0f)
-        { _renderItems.Add(new CxBox3DItem(box, color, size)); Invalidate(); }
+        /// <returns>The created item.</returns>
+        public CxBox3DItem SetBox(Box3D[] box, Color color, float size = 1.0f)
+        {
+            var item = new CxBox3DItem(box, color, size);
+            _renderItems.Add(item); Invalidate(); return item;
+        }
 
         /// <summary>Appends world-anchored text labels to the overlay layer.</summary>
-        public void SetTextInfo(TextInfo[] textInfo, Color color)
-        { _renderItems.Add(new CxTextInfoItem(textInfo, color, 1)); Invalidate(); }
+        /// <returns>The created item.</returns>
+        public CxTextInfoItem SetTextInfo(TextInfo[] textInfo, Color color)
+        {
+            var item = new CxTextInfoItem(textInfo, color, 1);
+            _renderItems.Add(item); Invalidate(); return item;
+        }
 
         /// <summary>Appends screen-space 2D text overlays.</summary>
-        public void SetText2D(Text2D[] text2Ds, Color color)
-        { _renderItems.Add(new CxText2DItem(text2Ds, color, 1)); Invalidate(); }
+        /// <returns>The created item.</returns>
+        public CxText2DItem SetText2D(Text2D[] text2Ds, Color color)
+        {
+            var item = new CxText2DItem(text2Ds, color, 1);
+            _renderItems.Add(item); Invalidate(); return item;
+        }
 
         // ── Coordinate system ────────────────────────────────────────────────────
 

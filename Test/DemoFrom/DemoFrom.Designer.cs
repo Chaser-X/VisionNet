@@ -31,6 +31,8 @@
             this.btn_testPose = new System.Windows.Forms.Button();
             this.btn_ioSave = new System.Windows.Forms.Button();
             this.btn_ioLoadMesh = new System.Windows.Forms.Button();
+            this.btn_dragMark = new System.Windows.Forms.Button();
+            this.lbl_markPos = new System.Windows.Forms.Label();
             ((System.ComponentModel.ISupportInitialize)(this.splitContainer1)).BeginInit();
             this.splitContainer1.Panel1.SuspendLayout();
             this.splitContainer1.Panel2.SuspendLayout();
@@ -48,7 +50,6 @@
             this.splitContainer1.Dock = System.Windows.Forms.DockStyle.Fill;
             this.splitContainer1.FixedPanel = System.Windows.Forms.FixedPanel.Panel2;
             this.splitContainer1.Location = new System.Drawing.Point(0, 0);
-            this.splitContainer1.Margin = new System.Windows.Forms.Padding(4);
             this.splitContainer1.Name = "splitContainer1";
             // 
             // splitContainer1.Panel1
@@ -66,16 +67,16 @@
             this.splitContainer1.Panel2.Controls.Add(this.btn_testPose);
             this.splitContainer1.Panel2.Controls.Add(this.btn_ioSave);
             this.splitContainer1.Panel2.Controls.Add(this.btn_ioLoadMesh);
-            this.splitContainer1.Size = new System.Drawing.Size(1224, 545);
-            this.splitContainer1.SplitterDistance = 1053;
-            this.splitContainer1.SplitterWidth = 5;
+            this.splitContainer1.Panel2.Controls.Add(this.btn_dragMark);
+            this.splitContainer1.Panel2.Controls.Add(this.lbl_markPos);
+            this.splitContainer1.Size = new System.Drawing.Size(932, 547);
+            this.splitContainer1.SplitterDistance = 761;
             this.splitContainer1.TabIndex = 1;
             // 
             // splitContainer2
             // 
             this.splitContainer2.Dock = System.Windows.Forms.DockStyle.Fill;
             this.splitContainer2.Location = new System.Drawing.Point(0, 0);
-            this.splitContainer2.Margin = new System.Windows.Forms.Padding(4);
             this.splitContainer2.Name = "splitContainer2";
             // 
             // splitContainer2.Panel1
@@ -85,9 +86,8 @@
             // splitContainer2.Panel2
             // 
             this.splitContainer2.Panel2.Controls.Add(this.cxDisplay2);
-            this.splitContainer2.Size = new System.Drawing.Size(1053, 545);
-            this.splitContainer2.SplitterDistance = 519;
-            this.splitContainer2.SplitterWidth = 5;
+            this.splitContainer2.Size = new System.Drawing.Size(761, 547);
+            this.splitContainer2.SplitterDistance = 375;
             this.splitContainer2.TabIndex = 0;
             // 
             // cxDisplay1
@@ -95,14 +95,15 @@
             this.cxDisplay1.Dock = System.Windows.Forms.DockStyle.Fill;
             this.cxDisplay1.DrawFPS = false;
             this.cxDisplay1.FrameRate = 10;
+            this.cxDisplay1.IsLeftHanded = false;
             this.cxDisplay1.Location = new System.Drawing.Point(0, 0);
-            this.cxDisplay1.Margin = new System.Windows.Forms.Padding(5);
+            this.cxDisplay1.Margin = new System.Windows.Forms.Padding(4, 4, 4, 4);
             this.cxDisplay1.Name = "cxDisplay1";
             this.cxDisplay1.OpenGLVersion = SharpGL.Version.OpenGLVersion.OpenGL2_1;
             this.cxDisplay1.RenderContextType = SharpGL.RenderContextType.FBO;
             this.cxDisplay1.RenderTrigger = SharpGL.RenderTrigger.Manual;
             this.cxDisplay1.ShowCoordinateSystem = false;
-            this.cxDisplay1.Size = new System.Drawing.Size(519, 545);
+            this.cxDisplay1.Size = new System.Drawing.Size(375, 547);
             this.cxDisplay1.SurfaceColorMode = VisionNet.Controls.SurfaceColorMode.ColorWithIntensity;
             this.cxDisplay1.SurfaceMode = VisionNet.Controls.SurfaceMode.PointCloud;
             this.cxDisplay1.SurfaceViewMode = VisionNet.Controls.ViewMode.None;
@@ -113,25 +114,45 @@
             this.cxDisplay2.Dock = System.Windows.Forms.DockStyle.Fill;
             this.cxDisplay2.DrawFPS = false;
             this.cxDisplay2.FrameRate = 10;
+            this.cxDisplay2.IsLeftHanded = false;
             this.cxDisplay2.Location = new System.Drawing.Point(0, 0);
-            this.cxDisplay2.Margin = new System.Windows.Forms.Padding(5);
+            this.cxDisplay2.Margin = new System.Windows.Forms.Padding(4, 4, 4, 4);
             this.cxDisplay2.Name = "cxDisplay2";
             this.cxDisplay2.OpenGLVersion = SharpGL.Version.OpenGLVersion.OpenGL2_1;
             this.cxDisplay2.RenderContextType = SharpGL.RenderContextType.FBO;
             this.cxDisplay2.RenderTrigger = SharpGL.RenderTrigger.Manual;
             this.cxDisplay2.ShowCoordinateSystem = false;
-            this.cxDisplay2.Size = new System.Drawing.Size(529, 545);
+            this.cxDisplay2.Size = new System.Drawing.Size(382, 547);
             this.cxDisplay2.SurfaceColorMode = VisionNet.Controls.SurfaceColorMode.ColorWithIntensity;
             this.cxDisplay2.SurfaceMode = VisionNet.Controls.SurfaceMode.PointCloud;
             this.cxDisplay2.SurfaceViewMode = VisionNet.Controls.ViewMode.Top;
             this.cxDisplay2.TabIndex = 2;
             // 
+            // btn_meshToSurface
+            // 
+            this.btn_meshToSurface.Location = new System.Drawing.Point(22, 280);
+            this.btn_meshToSurface.Name = "btn_meshToSurface";
+            this.btn_meshToSurface.Size = new System.Drawing.Size(92, 23);
+            this.btn_meshToSurface.TabIndex = 0;
+            this.btn_meshToSurface.Text = "Mesh→Surface";
+            this.btn_meshToSurface.UseVisualStyleBackColor = true;
+            this.btn_meshToSurface.Click += new System.EventHandler(this.btn_meshToSurface_Click);
+            // 
+            // btn_surfaceToMesh
+            // 
+            this.btn_surfaceToMesh.Location = new System.Drawing.Point(22, 233);
+            this.btn_surfaceToMesh.Name = "btn_surfaceToMesh";
+            this.btn_surfaceToMesh.Size = new System.Drawing.Size(92, 23);
+            this.btn_surfaceToMesh.TabIndex = 0;
+            this.btn_surfaceToMesh.Text = "Surface→Mesh";
+            this.btn_surfaceToMesh.UseVisualStyleBackColor = true;
+            this.btn_surfaceToMesh.Click += new System.EventHandler(this.btn_surfaceToMesh_Click);
+            // 
             // button1
             // 
-            this.button1.Location = new System.Drawing.Point(29, 174);
-            this.button1.Margin = new System.Windows.Forms.Padding(4);
+            this.button1.Location = new System.Drawing.Point(22, 141);
             this.button1.Name = "button1";
-            this.button1.Size = new System.Drawing.Size(123, 28);
+            this.button1.Size = new System.Drawing.Size(92, 23);
             this.button1.TabIndex = 0;
             this.button1.Text = "Reset";
             this.button1.UseVisualStyleBackColor = true;
@@ -139,10 +160,9 @@
             // 
             // btn_addSeg3D
             // 
-            this.btn_addSeg3D.Location = new System.Drawing.Point(29, 103);
-            this.btn_addSeg3D.Margin = new System.Windows.Forms.Padding(4);
+            this.btn_addSeg3D.Location = new System.Drawing.Point(22, 84);
             this.btn_addSeg3D.Name = "btn_addSeg3D";
-            this.btn_addSeg3D.Size = new System.Drawing.Size(123, 28);
+            this.btn_addSeg3D.Size = new System.Drawing.Size(92, 23);
             this.btn_addSeg3D.TabIndex = 0;
             this.btn_addSeg3D.Text = "AddSegment3D";
             this.btn_addSeg3D.UseVisualStyleBackColor = true;
@@ -150,10 +170,9 @@
             // 
             // button2
             // 
-            this.button2.Location = new System.Drawing.Point(29, 230);
-            this.button2.Margin = new System.Windows.Forms.Padding(4);
+            this.button2.Location = new System.Drawing.Point(22, 187);
             this.button2.Name = "button2";
-            this.button2.Size = new System.Drawing.Size(123, 28);
+            this.button2.Size = new System.Drawing.Size(92, 23);
             this.button2.TabIndex = 0;
             this.button2.Text = "Tranform";
             this.button2.UseVisualStyleBackColor = true;
@@ -161,10 +180,9 @@
             // 
             // btn_test
             // 
-            this.btn_test.Location = new System.Drawing.Point(29, 46);
-            this.btn_test.Margin = new System.Windows.Forms.Padding(4);
+            this.btn_test.Location = new System.Drawing.Point(22, 37);
             this.btn_test.Name = "btn_test";
-            this.btn_test.Size = new System.Drawing.Size(123, 28);
+            this.btn_test.Size = new System.Drawing.Size(92, 23);
             this.btn_test.TabIndex = 0;
             this.btn_test.Text = "Test";
             this.btn_test.UseVisualStyleBackColor = true;
@@ -172,43 +190,19 @@
             // 
             // btn_testPose
             // 
-            this.btn_testPose.Location = new System.Drawing.Point(29, 401);
-            this.btn_testPose.Margin = new System.Windows.Forms.Padding(4);
+            this.btn_testPose.Location = new System.Drawing.Point(22, 326);
             this.btn_testPose.Name = "btn_testPose";
-            this.btn_testPose.Size = new System.Drawing.Size(123, 28);
+            this.btn_testPose.Size = new System.Drawing.Size(92, 23);
             this.btn_testPose.TabIndex = 0;
             this.btn_testPose.Text = "Test Pose";
             this.btn_testPose.UseVisualStyleBackColor = true;
             this.btn_testPose.Click += new System.EventHandler(this.btn_testPose_Click);
             // 
-            // btn_surfaceToMesh
-            // 
-            this.btn_surfaceToMesh.Location = new System.Drawing.Point(29, 287);
-            this.btn_surfaceToMesh.Margin = new System.Windows.Forms.Padding(4);
-            this.btn_surfaceToMesh.Name = "btn_surfaceToMesh";
-            this.btn_surfaceToMesh.Size = new System.Drawing.Size(123, 28);
-            this.btn_surfaceToMesh.TabIndex = 0;
-            this.btn_surfaceToMesh.Text = "Surface→Mesh";
-            this.btn_surfaceToMesh.UseVisualStyleBackColor = true;
-            this.btn_surfaceToMesh.Click += new System.EventHandler(this.btn_surfaceToMesh_Click);
-            // 
-            // btn_meshToSurface
-            // 
-            this.btn_meshToSurface.Location = new System.Drawing.Point(29, 344);
-            this.btn_meshToSurface.Margin = new System.Windows.Forms.Padding(4);
-            this.btn_meshToSurface.Name = "btn_meshToSurface";
-            this.btn_meshToSurface.Size = new System.Drawing.Size(123, 28);
-            this.btn_meshToSurface.TabIndex = 0;
-            this.btn_meshToSurface.Text = "Mesh→Surface";
-            this.btn_meshToSurface.UseVisualStyleBackColor = true;
-            this.btn_meshToSurface.Click += new System.EventHandler(this.btn_meshToSurface_Click);
-            // 
             // btn_ioSave
             // 
-            this.btn_ioSave.Location = new System.Drawing.Point(29, 458);
-            this.btn_ioSave.Margin = new System.Windows.Forms.Padding(4);
+            this.btn_ioSave.Location = new System.Drawing.Point(22, 372);
             this.btn_ioSave.Name = "btn_ioSave";
-            this.btn_ioSave.Size = new System.Drawing.Size(123, 28);
+            this.btn_ioSave.Size = new System.Drawing.Size(92, 23);
             this.btn_ioSave.TabIndex = 0;
             this.btn_ioSave.Text = "Save R/L";
             this.btn_ioSave.UseVisualStyleBackColor = true;
@@ -216,22 +210,38 @@
             // 
             // btn_ioLoadMesh
             // 
-            this.btn_ioLoadMesh.Location = new System.Drawing.Point(29, 515);
-            this.btn_ioLoadMesh.Margin = new System.Windows.Forms.Padding(4);
+            this.btn_ioLoadMesh.Location = new System.Drawing.Point(22, 418);
             this.btn_ioLoadMesh.Name = "btn_ioLoadMesh";
-            this.btn_ioLoadMesh.Size = new System.Drawing.Size(123, 28);
+            this.btn_ioLoadMesh.Size = new System.Drawing.Size(92, 23);
             this.btn_ioLoadMesh.TabIndex = 0;
             this.btn_ioLoadMesh.Text = "Load Mesh";
             this.btn_ioLoadMesh.UseVisualStyleBackColor = true;
             this.btn_ioLoadMesh.Click += new System.EventHandler(this.btn_ioLoadMesh_Click);
-            // 
+            //
+            // btn_dragMark
+            //
+            this.btn_dragMark.Location = new System.Drawing.Point(22, 450);
+            this.btn_dragMark.Name = "btn_dragMark";
+            this.btn_dragMark.Size = new System.Drawing.Size(92, 23);
+            this.btn_dragMark.TabIndex = 0;
+            this.btn_dragMark.Text = "拖动MARK";
+            this.btn_dragMark.UseVisualStyleBackColor = true;
+            this.btn_dragMark.Click += new System.EventHandler(this.btn_dragMark_Click);
+            //
+            // lbl_markPos
+            //
+            this.lbl_markPos.Location = new System.Drawing.Point(5, 480);
+            this.lbl_markPos.Name = "lbl_markPos";
+            this.lbl_markPos.Size = new System.Drawing.Size(155, 36);
+            this.lbl_markPos.Text = "X:--  Y:--  Z:--";
+            this.lbl_markPos.Font = new System.Drawing.Font("Consolas", 8f);
+            //
             // DemoFrom
-            // 
-            this.AutoScaleDimensions = new System.Drawing.SizeF(8F, 16F);
+            //
+            this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(1224, 545);
+            this.ClientSize = new System.Drawing.Size(932, 547);
             this.Controls.Add(this.splitContainer1);
-            this.Margin = new System.Windows.Forms.Padding(4);
             this.Name = "DemoFrom";
             this.Text = "Form1";
             this.FormClosing += new System.Windows.Forms.FormClosingEventHandler(this.DemoFrom_FormClosing);
@@ -264,5 +274,7 @@
         private System.Windows.Forms.Button btn_testPose;
         private System.Windows.Forms.Button btn_ioSave;
         private System.Windows.Forms.Button btn_ioLoadMesh;
+        private System.Windows.Forms.Button btn_dragMark;
+        private System.Windows.Forms.Label lbl_markPos;
     }
 }

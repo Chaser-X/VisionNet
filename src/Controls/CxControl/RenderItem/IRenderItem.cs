@@ -90,7 +90,8 @@ namespace VisionNet.Controls
 
         /// <summary>
         /// Called by <see cref="CxDisplay"/> while the mouse moves with this item selected.
-        /// Default: delegates to <see cref="Translate"/> with the XYZ delta between frames.
+        /// Default: delegates to <see cref="Translate"/> with the XYZ delta between frames,
+        /// then raises <see cref="OnChanged"/>.
         /// Override for custom drag behaviour (e.g., axis-constrained movement, rotation).
         /// </summary>
         public virtual void OnMouseMove(CxPoint3D worldPos, CxPoint3D prevWorldPos)
@@ -98,6 +99,7 @@ namespace VisionNet.Controls
             Translate(worldPos.X - prevWorldPos.X,
                       worldPos.Y - prevWorldPos.Y,
                       worldPos.Z - prevWorldPos.Z);
+            OnChanged?.Invoke(this);
         }
 
         /// <summary>
@@ -117,5 +119,11 @@ namespace VisionNet.Controls
         /// Override in subclasses to update vertex data. No-op by default.
         /// </summary>
         public virtual void Translate(double dx, double dy, double dz) { }
+
+        /// <summary>
+        /// Raised after this item's geometry is modified via <see cref="OnMouseMove"/>.
+        /// The argument is the item itself; cast to the concrete type to read updated data.
+        /// </summary>
+        public event Action<AbstractRenderItem> OnChanged;
     }
 }

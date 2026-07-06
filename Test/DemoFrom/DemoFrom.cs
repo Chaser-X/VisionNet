@@ -249,6 +249,32 @@ namespace DemoFrom
             cxDisplay2.ActivateAllItems();
         }
 
+        private void btn_dragMark_Click(object sender, EventArgs e)
+        {
+            cxDisplay2.ResetView();
+
+            // 1. 程序生成平坦参考面（为深度缓冲提供有效值，并触发 FitView）
+            const int W = 50, L = 50;
+            var flatData = new short[W * L]; // 全零 = Z=0
+            var flatSurf = new CxSurface(W, L, flatData, null,
+                xOffset: 0, yOffset: 0, zOffset: 0,
+                xScale: 0.2f, yScale: 0.2f, zScale: 0.001f);
+            cxDisplay2.SetSurface(flatSurf); // 10×10 平面，FitView 自动对齐相机
+
+            // 2. 放置可拖动 MARK 点（位于平面中心 5,5,0）
+            var mark = cxDisplay2.SetPoint(
+                new[] { new CxPoint3D(5.0f, 5.0f, 0f) }, Color.Red, 1f, PointShape.Sphere);
+            mark.IsActiveObj  = true;
+            mark.HitThreshold = 2f;
+
+            // 3. 订阅 OnChanged，实时更新坐标标签
+            mark.OnChanged += item =>
+            {
+                var pos = ((CxPoint3DItem)item).Point3Ds[0];
+                lbl_markPos.Text = $"X:{pos.X:F3}  Y:{pos.Y:F3}  Z:{pos.Z:F3}";
+            };
+        }
+
         private void button1_Click(object sender, EventArgs e)
         {
             cxDisplay1.ResetView();
