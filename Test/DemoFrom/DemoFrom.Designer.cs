@@ -71,8 +71,8 @@
             this.splitContainer1.Panel2.Controls.Add(this.btn_dragMark);
             this.splitContainer1.Panel2.Controls.Add(this.btn_boxDemo);
             this.splitContainer1.Panel2.Controls.Add(this.lbl_markPos);
-            this.splitContainer1.Size = new System.Drawing.Size(932, 547);
-            this.splitContainer1.SplitterDistance = 761;
+            this.splitContainer1.Size = new System.Drawing.Size(1093, 729);
+            this.splitContainer1.SplitterDistance = 922;
             this.splitContainer1.TabIndex = 1;
             // 
             // splitContainer2
@@ -88,8 +88,8 @@
             // splitContainer2.Panel2
             // 
             this.splitContainer2.Panel2.Controls.Add(this.cxDisplay2);
-            this.splitContainer2.Size = new System.Drawing.Size(761, 547);
-            this.splitContainer2.SplitterDistance = 375;
+            this.splitContainer2.Size = new System.Drawing.Size(922, 729);
+            this.splitContainer2.SplitterDistance = 454;
             this.splitContainer2.TabIndex = 0;
             // 
             // cxDisplay1
@@ -99,13 +99,13 @@
             this.cxDisplay1.FrameRate = 10;
             this.cxDisplay1.IsLeftHanded = false;
             this.cxDisplay1.Location = new System.Drawing.Point(0, 0);
-            this.cxDisplay1.Margin = new System.Windows.Forms.Padding(4, 4, 4, 4);
+            this.cxDisplay1.Margin = new System.Windows.Forms.Padding(4);
             this.cxDisplay1.Name = "cxDisplay1";
             this.cxDisplay1.OpenGLVersion = SharpGL.Version.OpenGLVersion.OpenGL2_1;
             this.cxDisplay1.RenderContextType = SharpGL.RenderContextType.FBO;
             this.cxDisplay1.RenderTrigger = SharpGL.RenderTrigger.Manual;
             this.cxDisplay1.ShowCoordinateSystem = false;
-            this.cxDisplay1.Size = new System.Drawing.Size(375, 547);
+            this.cxDisplay1.Size = new System.Drawing.Size(454, 729);
             this.cxDisplay1.SurfaceColorMode = VisionNet.Controls.SurfaceColorMode.ColorWithIntensity;
             this.cxDisplay1.SurfaceMode = VisionNet.Controls.SurfaceMode.PointCloud;
             this.cxDisplay1.SurfaceViewMode = VisionNet.Controls.ViewMode.None;
@@ -118,13 +118,13 @@
             this.cxDisplay2.FrameRate = 10;
             this.cxDisplay2.IsLeftHanded = false;
             this.cxDisplay2.Location = new System.Drawing.Point(0, 0);
-            this.cxDisplay2.Margin = new System.Windows.Forms.Padding(4, 4, 4, 4);
+            this.cxDisplay2.Margin = new System.Windows.Forms.Padding(4);
             this.cxDisplay2.Name = "cxDisplay2";
             this.cxDisplay2.OpenGLVersion = SharpGL.Version.OpenGLVersion.OpenGL2_1;
             this.cxDisplay2.RenderContextType = SharpGL.RenderContextType.FBO;
             this.cxDisplay2.RenderTrigger = SharpGL.RenderTrigger.Manual;
             this.cxDisplay2.ShowCoordinateSystem = false;
-            this.cxDisplay2.Size = new System.Drawing.Size(382, 547);
+            this.cxDisplay2.Size = new System.Drawing.Size(464, 729);
             this.cxDisplay2.SurfaceColorMode = VisionNet.Controls.SurfaceColorMode.ColorWithIntensity;
             this.cxDisplay2.SurfaceMode = VisionNet.Controls.SurfaceMode.PointCloud;
             this.cxDisplay2.SurfaceViewMode = VisionNet.Controls.ViewMode.Top;
@@ -219,9 +219,9 @@
             this.btn_ioLoadMesh.Text = "Load Mesh";
             this.btn_ioLoadMesh.UseVisualStyleBackColor = true;
             this.btn_ioLoadMesh.Click += new System.EventHandler(this.btn_ioLoadMesh_Click);
-            //
+            // 
             // btn_dragMark
-            //
+            // 
             this.btn_dragMark.Location = new System.Drawing.Point(22, 450);
             this.btn_dragMark.Name = "btn_dragMark";
             this.btn_dragMark.Size = new System.Drawing.Size(92, 23);
@@ -229,9 +229,9 @@
             this.btn_dragMark.Text = "拖动MARK";
             this.btn_dragMark.UseVisualStyleBackColor = true;
             this.btn_dragMark.Click += new System.EventHandler(this.btn_dragMark_Click);
-            //
+            // 
             // btn_boxDemo
-            //
+            // 
             this.btn_boxDemo.Location = new System.Drawing.Point(22, 520);
             this.btn_boxDemo.Name = "btn_boxDemo";
             this.btn_boxDemo.Size = new System.Drawing.Size(92, 23);
@@ -239,20 +239,21 @@
             this.btn_boxDemo.Text = "Box3D 拖拽";
             this.btn_boxDemo.UseVisualStyleBackColor = true;
             this.btn_boxDemo.Click += new System.EventHandler(this.btn_boxDemo_Click);
-            //
+            // 
             // lbl_markPos
-            //
+            // 
+            this.lbl_markPos.Font = new System.Drawing.Font("Consolas", 8F);
             this.lbl_markPos.Location = new System.Drawing.Point(5, 480);
             this.lbl_markPos.Name = "lbl_markPos";
             this.lbl_markPos.Size = new System.Drawing.Size(155, 36);
+            this.lbl_markPos.TabIndex = 1;
             this.lbl_markPos.Text = "X:--  Y:--  Z:--";
-            this.lbl_markPos.Font = new System.Drawing.Font("Consolas", 8f);
-            //
+            // 
             // DemoFrom
-            //
+            // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(932, 547);
+            this.ClientSize = new System.Drawing.Size(1093, 729);
             this.Controls.Add(this.splitContainer1);
             this.Name = "DemoFrom";
             this.Text = "Form1";
