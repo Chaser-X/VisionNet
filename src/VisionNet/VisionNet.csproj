@@ -77,6 +77,7 @@
     <Compile Include="Compute\CxMeshToSurface.cs" />
     <Compile Include="Export.cs" />
     <Compile Include="Filter\VisionOperator.Filter.cs" />
+    <Compile Include="Filter\VisionOperator.Clip.cs" />
     <Compile Include="Transform\VisionOperator.Transform.cs" />
     <Compile Include="Surface\VisionOperator.Surface.cs" />
     <Compile Include="Analysis\VisionOperator.Analysis.cs" />

@@ -29,6 +29,9 @@ namespace VisionNet
             float maxZ = roi.Center.Z + roi.Size.Depth  / 2f;
 
             int vertCount = mesh.Vertices.Length;
+            int triTotal  = mesh.Indices.Length / 3;
+
+            // Step 1: parallel vertex inside-test.
             bool[] inside = new bool[vertCount];
             Parallel.For(0, vertCount, i =>
             {
@@ -36,40 +39,46 @@ namespace VisionNet
                 inside[i] = InsideBox(v.X, v.Y, v.Z, minX, maxX, minY, maxY, minZ, maxZ);
             });
 
-            // Count and collect surviving triangles (all three vertices must be inside).
-            int triTotal = mesh.Indices.Length / 3;
-            var keptTris = new System.Collections.Generic.List<int>(triTotal);
+            // Step 2: parallel triangle test.
+            bool[] triKept = new bool[triTotal];
+            Parallel.For(0, triTotal, t =>
+            {
+                triKept[t] = inside[mesh.Indices[t * 3]]
+                          && inside[mesh.Indices[t * 3 + 1]]
+                          && inside[mesh.Indices[t * 3 + 2]];
+            });
+
+            // Step 3: exclusive prefix sum → output position of each kept triangle.
+            int[] triStart = new int[triTotal + 1];
             for (int t = 0; t < triTotal; t++)
+                triStart[t + 1] = triStart[t] + (triKept[t] ? 1 : 0);
+            int keptCount = triStart[triTotal];
+            if (keptCount == 0) return null;
+
+            // Step 4: parallel mark which vertices are referenced by surviving triangles.
+            // Writing true is idempotent; bool writes are word-atomic on x86/x64.
+            bool[] vertUsed = new bool[vertCount];
+            Parallel.For(0, triTotal, t =>
             {
-                int i0 = (int)mesh.Indices[t * 3];
-                int i1 = (int)mesh.Indices[t * 3 + 1];
-                int i2 = (int)mesh.Indices[t * 3 + 2];
-                if (inside[i0] && inside[i1] && inside[i2])
-                    keptTris.Add(t);
-            }
+                if (!triKept[t]) return;
+                vertUsed[mesh.Indices[t * 3]]     = true;
+                vertUsed[mesh.Indices[t * 3 + 1]] = true;
+                vertUsed[mesh.Indices[t * 3 + 2]] = true;
+            });
 
-            if (keptTris.Count == 0) return null;
-
-            // Build vertex remap: old index → new compact index.
+            // Step 5: sequential prefix sum → compact vertex remap.
             int[] remap = new int[vertCount];
-            for (int i = 0; i < vertCount; i++) remap[i] = -1;
-            foreach (int t in keptTris)
-            {
-                remap[mesh.Indices[t * 3]]     = 0;
-                remap[mesh.Indices[t * 3 + 1]] = 0;
-                remap[mesh.Indices[t * 3 + 2]] = 0;
-            }
             int newVertCount = 0;
             for (int i = 0; i < vertCount; i++)
-                if (remap[i] == 0) remap[i] = newVertCount++;
+                remap[i] = vertUsed[i] ? newVertCount++ : -1;
 
             bool hasIntensity = mesh.Intensity != null && mesh.Intensity.Length >= vertCount;
             bool hasUVs       = mesh.UVs       != null && mesh.UVs.Length       >= vertCount;
 
+            // Step 6: parallel vertex copy.
             var newVerts     = new CxPoint3D[newVertCount];
-            var newIntensity = hasIntensity ? new byte[newVertCount]     : null;
+            var newIntensity = hasIntensity ? new byte[newVertCount]      : null;
             var newUVs       = hasUVs       ? new CxPoint2D[newVertCount] : null;
-
             Parallel.For(0, vertCount, i =>
             {
                 int ni = remap[i];
@@ -79,14 +88,16 @@ namespace VisionNet
                 if (hasUVs)       newUVs[ni]       = mesh.UVs[i];
             });
 
-            var newIndices = new uint[keptTris.Count * 3];
-            for (int k = 0; k < keptTris.Count; k++)
+            // Step 7: parallel index write — each triangle knows its output slot from triStart.
+            var newIndices = new uint[keptCount * 3];
+            Parallel.For(0, triTotal, t =>
             {
-                int t = keptTris[k];
-                newIndices[k * 3]     = (uint)remap[mesh.Indices[t * 3]];
-                newIndices[k * 3 + 1] = (uint)remap[mesh.Indices[t * 3 + 1]];
-                newIndices[k * 3 + 2] = (uint)remap[mesh.Indices[t * 3 + 2]];
-            }
+                if (!triKept[t]) return;
+                int outBase = triStart[t] * 3;
+                newIndices[outBase]     = (uint)remap[mesh.Indices[t * 3]];
+                newIndices[outBase + 1] = (uint)remap[mesh.Indices[t * 3 + 1]];
+                newIndices[outBase + 2] = (uint)remap[mesh.Indices[t * 3 + 2]];
+            });
 
             return new CxMesh
             {
