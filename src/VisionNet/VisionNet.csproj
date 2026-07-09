@@ -69,6 +69,7 @@
     <Compile Include="DataType\Models\CxMesh.cs" />
     <Compile Include="DataType\Models\CxImage.cs" />
     <Compile Include="DataType\Geometry3D\CxMatrix4X4.cs" />
+    <Compile Include="DataType\Geometry3D\CxPose3D.cs" />
     <Compile Include="DataType\CxEmunType.cs" />
     <Compile Include="Compute\OpenCLEnvironment.cs" />
     <Compile Include="Compute\CxUniformSurface.cs" />
