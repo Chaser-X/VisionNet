@@ -8,6 +8,46 @@ namespace VisionNet.Controls
     /// <summary>Public API surface: image data, geometric overlays, and view management.</summary>
     public partial class CxDisplay2D
     {
+        // ── Coordinate system ─────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Sets the scale factors for converting image pixel coordinates to world coordinates.
+        /// Default: (1, 1, 1) — no scaling applied.
+        /// </summary>
+        public void SetCoordinateScale(float xScale, float yScale, float zScale = 1f)
+        {
+            XScale = xScale;
+            YScale = yScale;
+            ZScale = zScale;
+        }
+
+        /// <summary>
+        /// Sets the offsets applied after scaling to produce world (X, Y, Z) values.
+        /// Default: (0, 0, 0) — no offset applied.
+        /// </summary>
+        public void SetCoordinateOffset(float xOffset, float yOffset, float zOffset = 0f)
+        {
+            XOffset = xOffset;
+            YOffset = yOffset;
+            ZOffset = zOffset;
+        }
+
+        /// <summary>
+        /// Converts a plot-space pixel coordinate to world (X, Y, Z) using the current
+        /// scale and offset. Z is derived from the image pixel value at the given position;
+        /// returns null when no image is loaded or the coordinate is outside image bounds.
+        /// </summary>
+        internal (float X, float Y, float? Z) PlotToWorld(CxPoint2D plotCoord)
+        {
+            float wx = plotCoord.X * XScale + XOffset;
+            float wy = plotCoord.Y * YScale + YOffset;
+            int   px = (int)Math.Round(plotCoord.X);
+            int   py = (int)Math.Round(plotCoord.Y);
+            float? rawZ = _imageItem?.GetPixelFloat(px, py);
+            float? wz   = rawZ.HasValue ? rawZ.Value * ZScale + ZOffset : (float?)null;
+            return (wx, wy, wz);
+        }
+
         // ── Image management ──────────────────────────────────────────────────────
 
         /// <summary>
@@ -55,6 +95,7 @@ namespace VisionNet.Controls
                 _imageWidth  = 0;
                 _imageHeight = 0;
             }
+            HideCoordAnnotation();
             RefreshDisplay();
         }
 

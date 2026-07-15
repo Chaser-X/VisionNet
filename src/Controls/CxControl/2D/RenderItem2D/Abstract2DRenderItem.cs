@@ -65,6 +65,7 @@ namespace VisionNet.Controls
         public virtual void OnMouseMove(CxPoint2D plotPos, CxPoint2D prevPlotPos)
         {
             Translate(plotPos.X - prevPlotPos.X, plotPos.Y - prevPlotPos.Y);
+            UpdatePlottable();
             OnChanged?.Invoke(this);
         }
 

@@ -22,11 +22,15 @@ namespace VisionNet.Controls
         private int _width;
         private int _height;
 
+        private float[] _pixelFloats;
+        private int _queryWidth;
+        private int _queryHeight;
+
         Color I2DRenderItem.Color { get => Color.White; set { } }
-        float I2DRenderItem.Size  { get => 1f;          set { } }
+        float I2DRenderItem.Size { get => 1f; set { } }
 
         /// <summary>Gets the image width in pixels.</summary>
-        public int Width  => _width;
+        public int Width => _width;
 
         /// <summary>Gets the image height in pixels.</summary>
         public int Height => _height;
@@ -44,8 +48,13 @@ namespace VisionNet.Controls
         {
             if (image == null || image.Data == null) return;
 
-            _width  = image.Width;
+            _width = image.Width;
             _height = image.Height;
+
+            // Build float array for Z-coordinate query (raw pixel values, no normalisation)
+            _queryWidth = image.Width;
+            _queryHeight = image.Height;
+            _pixelFloats = BuildPixelFloats(image.Data);
 
             var scottImage = BuildScottImage(image, colorMap);
 
@@ -64,7 +73,7 @@ namespace VisionNet.Controls
             {
                 // Deferred: stored until AddToPlot is called
                 _pendingImage = scottImage;
-                _plottable    = null;
+                _plottable = null;
             }
         }
 
@@ -105,8 +114,36 @@ namespace VisionNet.Controls
         public void Dispose()
         {
             _pendingImage = null;
-            _plottable    = null;
-            _plot         = null;
+            _plottable = null;
+            _plot = null;
+            _pixelFloats = null;
+        }
+
+        /// <summary>Returns the raw pixel value at image coordinate (x, y) as float, or null if out of range.</summary>
+        public float? GetPixelFloat(int x, int y)
+        {
+            if (_pixelFloats == null || x < 0 || x >= _queryWidth || y < 0 || y >= _queryHeight)
+                return null;
+            return _pixelFloats[y * _queryWidth + x];
+        }
+
+        private static float[] BuildPixelFloats<T>(T[] data)
+        {
+            var floats = new float[data.Length];
+            for (int i = 0; i < data.Length; i++)
+                floats[i] = PixelToFloat(data[i]);
+            return floats;
+        }
+
+        private static float PixelToFloat<T>(T value)
+        {
+            if (typeof(T) == typeof(byte)) return (byte)(object)value;
+            if (typeof(T) == typeof(float)) return (float)(object)value;
+            if (typeof(T) == typeof(double)) return (float)(double)(object)value;
+            if (typeof(T) == typeof(short)) return (short)(object)value;
+            if (typeof(T) == typeof(ushort)) return (ushort)(object)value;
+            if (typeof(T) == typeof(int)) return (int)(object)value;
+            return 0f;
         }
 
         // ── Image conversion ─────────────────────────────────────────────────────
@@ -162,8 +199,8 @@ namespace VisionNet.Controls
 
         private static byte DefaultToGray<T>(T value)
         {
-            if (typeof(T) == typeof(byte))   return (byte)(object)value;
-            if (typeof(T) == typeof(float))  { float  f = (float)(object)value;  return (byte)Math.Max(0, Math.Min(255, (int)(f * 255))); }
+            if (typeof(T) == typeof(byte)) return (byte)(object)value;
+            if (typeof(T) == typeof(float)) { float f = (float)(object)value; return (byte)Math.Max(0, Math.Min(255, (int)(f * 255))); }
             if (typeof(T) == typeof(double)) { double d = (double)(object)value; return (byte)Math.Max(0, Math.Min(255, (int)(d * 255))); }
             if (typeof(T) == typeof(short))
             {

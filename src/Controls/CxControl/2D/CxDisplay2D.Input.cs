@@ -18,7 +18,10 @@ namespace VisionNet.Controls
         private void OnPlotMouseMove(object sender, MouseEventArgs e)
         {
             var plotCoord = GetPlotCoordinate(e.X, e.Y);
-            CoordinatesChanged?.Invoke(plotCoord);
+
+            // Broadcast world coordinates (scale/offset applied; default = pixel coords)
+            var (wx, wy, _) = PlotToWorld(plotCoord);
+            CoordinatesChanged?.Invoke(new CxPoint2D(wx, wy));
 
             if (_isDragging && _selectedItem != null)
             {
@@ -51,16 +54,24 @@ namespace VisionNet.Controls
                 item.OnMouseDown(plotCoord);
                 _isDragging  = true;
                 _lastDragPos = plotCoord;
+                _formsPlot.UserInputProcessor.Disable();
                 SelectionChanged?.Invoke(item);
                 RefreshDisplay();
                 return;
             }
+
+            // No active item hit: show world-coordinate annotation at click position
+            var (wx, wy, wz) = PlotToWorld(plotCoord);
+            ShowCoordAnnotation(plotCoord, wx, wy, wz);
+            RefreshDisplay();
         }
 
         private void OnPlotMouseUp(object sender, MouseEventArgs e)
         {
+            HideCoordAnnotation();
             if (!_isDragging) return;
             _isDragging = false;
+            _formsPlot.UserInputProcessor.Enable();
             _selectedItem?.OnMouseUp();
         }
 

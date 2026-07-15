@@ -7,6 +7,7 @@ using System.ComponentModel;
 using System.Data;
 using System.Drawing;
 using System.Drawing.Drawing2D;
+using System.Drawing.Imaging;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices.ComTypes;
@@ -27,6 +28,7 @@ namespace DemoFrom
         public DemoFrom()
         {
             InitializeComponent();
+            Build2DTab(tabPage2D);
             GocatorHandle.GocatorHandle.Instance.Connect("127.0.0.1", false);
             GocatorHandle.GocatorHandle.Instance.SetDataHandler(onData);
             //camera = new CxCamera(openGLControl1);
@@ -185,6 +187,8 @@ namespace DemoFrom
             GocatorHandle.GocatorHandle.Instance.DisConnect();
             cxDisplay1.Dispose();
             cxDisplay2.Dispose();
+            _cxDisplay2D?.Dispose();
+            _currentImage?.Dispose();
             VisionOperator.DestroyLib();
             //  Environment.Exit(0);
         }
@@ -479,6 +483,213 @@ namespace DemoFrom
                 _currentMesh = mesh;
                 cxDisplay2.ResetView();
                 cxDisplay2.SetMesh(mesh);
+            }
+        }
+
+        // ── 2D Tab ──────────────────────────────────────────────────────────────────
+
+        private CxDisplay2D    _cxDisplay2D;
+        private Label          _lbl2DPos;
+        private CxImage<Color> _currentImage;
+        private SplitContainer _split2D;
+        private bool           _split2DInit;
+
+        private void Build2DTab(TabPage page)
+        {
+            _split2D = new SplitContainer
+            {
+                Dock          = DockStyle.Fill,
+                FixedPanel    = FixedPanel.Panel2,
+                Panel2MinSize = 146,
+            };
+
+            // Set splitter position once the container has a valid size
+            _split2D.SizeChanged += (s, ev) =>
+            {
+                if (!_split2DInit && _split2D.Width > 200)
+                {
+                    _split2DInit = true;
+                    _split2D.SplitterDistance = Math.Max(_split2D.Width - 150, 100);
+                }
+            };
+
+            _cxDisplay2D = new CxDisplay2D { Dock = DockStyle.Fill };
+            _cxDisplay2D.CoordinatesChanged += pos =>
+            {
+                var text = $"X:{pos.X:F1}  Y:{pos.Y:F1}";
+                if (_lbl2DPos.InvokeRequired)
+                    _lbl2DPos.Invoke(new Action(() => _lbl2DPos.Text = text));
+                else
+                    _lbl2DPos.Text = text;
+            };
+            _split2D.Panel1.Controls.Add(_cxDisplay2D);
+
+            // Button panel (built entirely in code)
+            var btnPanel = new Panel { Dock = DockStyle.Fill };
+            int y = 10;
+            Button MakeBtn(string text, EventHandler click)
+            {
+                var b = new Button { Text = text, Location = new Point(7, y), Size = new Size(132, 26) };
+                b.Click += click;
+                btnPanel.Controls.Add(b);
+                y += 33;
+                return b;
+            }
+
+            MakeBtn("Load Image",     btn2D_loadImage_Click);
+            MakeBtn("Static Segs",    btn2D_staticSeg_Click);
+            MakeBtn("Drag Segs",      btn2D_dragSeg_Click);
+            MakeBtn("Static Circles", btn2D_staticCircle_Click);
+            MakeBtn("Drag Circles",   btn2D_dragCircle_Click);
+            MakeBtn("Clear Overlays", btn2D_clearOverlays_Click);
+            MakeBtn("Clear All",      btn2D_clearAll_Click);
+
+            _lbl2DPos = new Label
+            {
+                Font     = new Font("Consolas", 8F),
+                Location = new Point(5, y + 8),
+                Size     = new Size(140, 48),
+                Text     = "X: ---  Y: ---",
+            };
+            btnPanel.Controls.Add(_lbl2DPos);
+            _split2D.Panel2.Controls.Add(btnPanel);
+            page.Controls.Add(_split2D);
+        }
+
+        // ── 2D Button Handlers ───────────────────────────────────────────────────────
+
+        private void btn2D_loadImage_Click(object sender, EventArgs e)
+        {
+            using (var dlg = new OpenFileDialog
+            {
+                Filter = "Image files|*.png;*.jpg;*.jpeg;*.bmp;*.tif;*.tiff|All files|*.*"
+            })
+            {
+                if (dlg.ShowDialog() != DialogResult.OK) return;
+                var img = LoadColorImage(dlg.FileName);
+                if (img == null) return;
+                _currentImage?.Dispose();
+                _currentImage = img;
+                _cxDisplay2D.ClearOverlays();
+                _cxDisplay2D.SetImage(img, c => c);
+            }
+        }
+
+        private void btn2D_staticSeg_Click(object sender, EventArgs e)
+        {
+            float w  = _cxDisplay2D.ImageWidth  > 0 ? _cxDisplay2D.ImageWidth  : 400f;
+            float h  = _cxDisplay2D.ImageHeight > 0 ? _cxDisplay2D.ImageHeight : 400f;
+
+            var segs = new[]
+            {
+                new CxSegment2D(new CxPoint2D(w * 0.2f, 0),    new CxPoint2D(w * 0.2f, h)),
+                new CxSegment2D(new CxPoint2D(w * 0.8f, 0),    new CxPoint2D(w * 0.8f, h)),
+                new CxSegment2D(new CxPoint2D(0,         h * 0.5f), new CxPoint2D(w, h * 0.5f)),
+            };
+            _cxDisplay2D.SetSegment(segs, Color.LimeGreen, 1.5f);
+        }
+
+        private void btn2D_dragSeg_Click(object sender, EventArgs e)
+        {
+            float cx  = _cxDisplay2D.ImageWidth  > 0 ? _cxDisplay2D.ImageWidth  / 2f : 200f;
+            float cy  = _cxDisplay2D.ImageHeight > 0 ? _cxDisplay2D.ImageHeight / 2f : 200f;
+            float len = Math.Max(_cxDisplay2D.ImageWidth > 0 ? _cxDisplay2D.ImageWidth : 400,
+                                  _cxDisplay2D.ImageHeight > 0 ? _cxDisplay2D.ImageHeight : 400) * 0.15f;
+            if (len < 20) len = 60f;
+
+            var segs = new[] { new CxSegment2D(new CxPoint2D(cx - len, cy), new CxPoint2D(cx + len, cy)) };
+            var item = _cxDisplay2D.SetSegment(segs, Color.Yellow, 2f);
+            item.IsActiveObj = true;
+            item.OnChanged += i =>
+            {
+                var seg  = ((CxSegment2DItem)i).Segments[0];
+                var text = $"S:({seg.Start.X:F0},{seg.Start.Y:F0})\nE:({seg.End.X:F0},{seg.End.Y:F0})";
+                if (_lbl2DPos.InvokeRequired)
+                    _lbl2DPos.Invoke(new Action(() => _lbl2DPos.Text = text));
+                else
+                    _lbl2DPos.Text = text;
+            };
+        }
+
+        private void btn2D_staticCircle_Click(object sender, EventArgs e)
+        {
+            float cx     = _cxDisplay2D.ImageWidth  > 0 ? _cxDisplay2D.ImageWidth  / 2f : 200f;
+            float cy     = _cxDisplay2D.ImageHeight > 0 ? _cxDisplay2D.ImageHeight / 2f : 200f;
+            float minDim = Math.Min(_cxDisplay2D.ImageWidth  > 0 ? _cxDisplay2D.ImageWidth  : 400,
+                                     _cxDisplay2D.ImageHeight > 0 ? _cxDisplay2D.ImageHeight : 400);
+
+            var circles = new[]
+            {
+                new CxCircle2D(new CxPoint2D(cx, cy), minDim * 0.08f),
+                new CxCircle2D(new CxPoint2D(cx, cy), minDim * 0.18f),
+            };
+            _cxDisplay2D.SetCircle(circles, Color.LightBlue, 1.5f);
+        }
+
+        private void btn2D_dragCircle_Click(object sender, EventArgs e)
+        {
+            float cx = _cxDisplay2D.ImageWidth  > 0 ? _cxDisplay2D.ImageWidth  * 0.35f : 150f;
+            float cy = _cxDisplay2D.ImageHeight > 0 ? _cxDisplay2D.ImageHeight * 0.35f : 150f;
+            float r  = Math.Min(_cxDisplay2D.ImageWidth  > 0 ? _cxDisplay2D.ImageWidth  : 400,
+                                  _cxDisplay2D.ImageHeight > 0 ? _cxDisplay2D.ImageHeight : 400) * 0.1f;
+            if (r < 10) r = 40f;
+
+            var circles = new[] { new CxCircle2D(new CxPoint2D(cx, cy), r) };
+            var item = _cxDisplay2D.SetCircle(circles, Color.Cyan, 2f);
+            item.IsActiveObj = true;
+            item.OnChanged += i =>
+            {
+                var c    = ((CxCircle2DItem)i).Circles[0];
+                var text = $"C:({c.Center.X:F0},{c.Center.Y:F0})\nR:{c.Radius:F1}";
+                if (_lbl2DPos.InvokeRequired)
+                    _lbl2DPos.Invoke(new Action(() => _lbl2DPos.Text = text));
+                else
+                    _lbl2DPos.Text = text;
+            };
+        }
+
+        private void btn2D_clearOverlays_Click(object sender, EventArgs e) =>
+            _cxDisplay2D.ClearOverlays();
+
+        private void btn2D_clearAll_Click(object sender, EventArgs e)
+        {
+            _cxDisplay2D.ClearOverlays();
+            _cxDisplay2D.ClearImage();
+            _currentImage?.Dispose();
+            _currentImage = null;
+            _lbl2DPos.Text = "X: ---  Y: ---";
+        }
+
+        // ── Image Loading Helper ─────────────────────────────────────────────────────
+
+        private unsafe CxImage<Color> LoadColorImage(string path)
+        {
+            try
+            {
+                using (var bmp = new Bitmap(path))
+                {
+                    var img      = new CxImage<Color>(bmp.Width, bmp.Height);
+                    var lockRect = new Rectangle(0, 0, bmp.Width, bmp.Height);
+                    var bd       = bmp.LockBits(lockRect, ImageLockMode.ReadOnly, PixelFormat.Format32bppArgb);
+                    byte* ptr    = (byte*)bd.Scan0.ToPointer();
+
+                    for (int i = 0; i < bmp.Width * bmp.Height; i++)
+                    {
+                        img.Data[i] = Color.FromArgb(
+                            ptr[i * 4 + 3],   // A
+                            ptr[i * 4 + 2],   // R
+                            ptr[i * 4 + 1],   // G
+                            ptr[i * 4 + 0]);  // B
+                    }
+
+                    bmp.UnlockBits(bd);
+                    return img;
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"图片加载失败: {ex.Message}", "Load Image");
+                return null;
             }
         }
     }

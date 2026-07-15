@@ -1,5 +1,6 @@
 using System;
 using ScottPlot;
+using VisionNet.DataType;
 
 namespace VisionNet.Controls
 {
@@ -29,6 +30,37 @@ namespace VisionNet.Controls
                 top:    -margin);
 
             RefreshDisplay();
+        }
+
+        /// <summary>
+        /// Displays a world-coordinate annotation at the given plot position.
+        /// Recreates the plottable on each call so it is always rendered on top.
+        /// </summary>
+        internal void ShowCoordAnnotation(CxPoint2D plotPos, float wx, float wy, float? wz)
+        {
+            if (_coordAnnotation != null)
+                _formsPlot.Plot.PlottableList.Remove(_coordAnnotation);
+
+            string text = wz.HasValue
+                ? $"X: {wx:F3}\nY: {wy:F3}\nZ: {wz.Value:F3}"
+                : $"X: {wx:F3}\nY: {wy:F3}";
+
+            _coordAnnotation = _formsPlot.Plot.Add.Text(text, plotPos.X, plotPos.Y);
+            _coordAnnotation.LabelStyle.ForeColor  = new ScottPlot.Color(255, 255, 50, 230);
+            _coordAnnotation.LabelStyle.Bold        = true;
+            _coordAnnotation.LabelStyle.FontSize    = 11;
+            _coordAnnotation.LabelBackgroundColor   = new ScottPlot.Color(0, 0, 0, 160);
+        }
+
+        /// <summary>Removes the world-coordinate annotation from the plot.</summary>
+        internal void HideCoordAnnotation()
+        {
+            if (_coordAnnotation != null)
+            {
+                _formsPlot.Plot.PlottableList.Remove(_coordAnnotation);
+                _coordAnnotation = null;
+                RefreshDisplay();
+            }
         }
 
         /// <summary>Forces an immediate redraw of the plot.</summary>

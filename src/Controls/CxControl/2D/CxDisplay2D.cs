@@ -17,6 +17,17 @@ namespace VisionNet.Controls
     /// </remarks>
     public partial class CxDisplay2D : UserControl
     {
+        // ── Coordinate scale and offset (default: identity transform) ────────────
+        public float XScale  { get; set; } = 1f;
+        public float YScale  { get; set; } = 1f;
+        public float ZScale  { get; set; } = 1f;
+        public float XOffset { get; set; } = 0f;
+        public float YOffset { get; set; } = 0f;
+        public float ZOffset { get; set; } = 0f;
+
+        // ── Click-position world-coordinate annotation (lazy init) ────────────────
+        private ScottPlot.Plottables.Text _coordAnnotation;
+
         // ── Core rendering widget ─────────────────────────────────────────────────
         internal readonly FormsPlot _formsPlot;
 
