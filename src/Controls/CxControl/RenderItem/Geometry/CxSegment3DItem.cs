@@ -6,18 +6,18 @@ using VisionNet.DataType;
 namespace VisionNet.Controls
 {
     /// <summary>
-    /// Renders an array of <see cref="Segment3D"/> values as GL_LINES with a configurable line width.
+    /// Renders an array of <see cref="CxSegment3D"/> values as GL_LINES with a configurable line width.
     /// </summary>
     public class CxSegment3DItem : AbstractRenderItem
     {
         /// <summary>Gets the line segments to be rendered.</summary>
-        public Segment3D[] Segment3Ds { get; private set; }
+        public CxSegment3D[] Segment3Ds { get; private set; }
 
         /// <summary>Initializes the item with the given segments, colour, and line width.</summary>
         /// <param name="segments">World-space line segments.</param>
         /// <param name="color">Line colour.</param>
         /// <param name="size">Line width in pixels.</param>
-        public CxSegment3DItem(Segment3D[] segments, Color color, float size = 1.0f) : base(color, size)
+        public CxSegment3DItem(CxSegment3D[] segments, Color color, float size = 1.0f) : base(color, size)
         {
             Segment3Ds = segments;
         }
@@ -67,7 +67,7 @@ namespace VisionNet.Controls
 
         private void TranslateSeg(int idx, double dx, double dy, double dz)
         {
-            Segment3Ds[idx] = new Segment3D(
+            Segment3Ds[idx] = new CxSegment3D(
                 new CxPoint3D((float)(Segment3Ds[idx].Start.X + dx),
                               (float)(Segment3Ds[idx].Start.Y + dy),
                               (float)(Segment3Ds[idx].Start.Z + dz)),
@@ -80,10 +80,10 @@ namespace VisionNet.Controls
         {
             var seg = Segment3Ds[idx];
             Segment3Ds[idx] = endpoint == 0
-                ? new Segment3D(new CxPoint3D((float)(seg.Start.X + dx),
+                ? new CxSegment3D(new CxPoint3D((float)(seg.Start.X + dx),
                                               (float)(seg.Start.Y + dy),
                                               (float)(seg.Start.Z + dz)), seg.End)
-                : new Segment3D(seg.Start,
+                : new CxSegment3D(seg.Start,
                                 new CxPoint3D((float)(seg.End.X + dx),
                                               (float)(seg.End.Y + dy),
                                               (float)(seg.End.Z + dz)));

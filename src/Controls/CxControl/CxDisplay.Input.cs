@@ -225,7 +225,7 @@ namespace VisionNet.Controls
             var mi = (ToolStripMenuItem)sender;
             mi.Checked = !mi.Checked;
             _camera.Enable2DView = mi.Checked;
-            Box3D? combined;
+            CxBox3D? combined;
             lock (_resourceLock) combined = GetCombinedBoundingBox();
             _camera?.FitView(combined);
         }
@@ -237,7 +237,7 @@ namespace VisionNet.Controls
             var mi = (ToolStripMenuItem)sender;
             mi.Checked = true;
             _camera.ViewMode = (ViewMode)Enum.Parse(typeof(ViewMode), mi.Text);
-            Box3D? combined;
+            CxBox3D? combined;
             lock (_resourceLock) combined = GetCombinedBoundingBox();
             _camera?.FitView(combined);
         }

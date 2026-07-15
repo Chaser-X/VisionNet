@@ -49,7 +49,7 @@ namespace VisionNet.Controls
         /// Applies the current <see cref="ViewMode"/> rotation preset.
         /// </summary>
         /// <param name="viewBox">The bounding box to fit, or <c>null</c> to reset to the default view.</param>
-        void FitView(Box3D? viewBox);
+        void FitView(CxBox3D? viewBox);
 
         /// <summary>
         /// Sets the OpenGL projection and modelview matrices for the current frame.

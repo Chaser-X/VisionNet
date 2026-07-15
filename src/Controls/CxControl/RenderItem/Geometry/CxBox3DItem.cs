@@ -6,20 +6,20 @@ using VisionNet.DataType;
 namespace VisionNet.Controls
 {
     /// <summary>
-    /// Renders an array of <see cref="Box3D"/> values as semi-transparent filled faces
+    /// Renders an array of <see cref="CxBox3D"/> values as semi-transparent filled faces
     /// with an opaque wireframe outline.
     /// </summary>
     public class CxBox3DItem : AbstractRenderItem
     {
         /// <summary>Gets the bounding boxes to be rendered.</summary>
-        public Box3D[] Box3Ds { get; private set; }
+        public CxBox3D[] Box3Ds { get; private set; }
 
         /// <summary>Initializes the item with the given boxes, colour, and wireframe line width.</summary>
         /// <param name="box3Ds">Boxes to render. Must not be <c>null</c> or empty.</param>
         /// <param name="color">Fill and wireframe colour.</param>
         /// <param name="size">Wireframe line width in pixels.</param>
         /// <exception cref="ArgumentNullException">Thrown when <paramref name="box3Ds"/> is null or empty.</exception>
-        public CxBox3DItem(Box3D[] box3Ds, Color color, float size = 1f) : base(color, size)
+        public CxBox3DItem(CxBox3D[] box3Ds, Color color, float size = 1f) : base(color, size)
         {
             if (box3Ds == null || box3Ds.Length == 0)
                 throw new ArgumentNullException(nameof(box3Ds));
@@ -77,7 +77,7 @@ namespace VisionNet.Controls
 
         private void TranslateBox(int idx, double dx, double dy, double dz)
         {
-            Box3Ds[idx] = new Box3D(
+            Box3Ds[idx] = new CxBox3D(
                 new CxPoint3D((float)(Box3Ds[idx].Center.X + dx),
                               (float)(Box3Ds[idx].Center.Y + dy),
                               (float)(Box3Ds[idx].Center.Z + dz)),
@@ -114,14 +114,14 @@ namespace VisionNet.Controls
             float ny = dragged.Y + (float)(cur.Y - prev.Y);
             float nz = dragged.Z + (float)(cur.Z - prev.Z);
 
-            Box3Ds[boxIdx] = new Box3D(
+            Box3Ds[boxIdx] = new CxBox3D(
                 new CxPoint3D((nx + opposite.X) / 2, (ny + opposite.Y) / 2, (nz + opposite.Z) / 2),
                 new CxSize3D(Math.Max(0.01f, Math.Abs(nx - opposite.X)),
                              Math.Max(0.01f, Math.Abs(ny - opposite.Y)),
                              Math.Max(0.01f, Math.Abs(nz - opposite.Z))));
         }
 
-        private static CxPoint3D[] GetVertices(Box3D box)
+        private static CxPoint3D[] GetVertices(CxBox3D box)
         {
             float hx = box.Size.Width / 2, hy = box.Size.Height / 2, hz = box.Size.Depth / 2;
             float cx = box.Center.X,       cy = box.Center.Y,        cz = box.Center.Z;

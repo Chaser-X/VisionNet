@@ -30,7 +30,7 @@ namespace VisionNet
         /// <see cref="Parallel.ForEach"/> for large arrays.
         /// Returns <c>null</c> if <paramref name="points"/> is empty.
         /// </summary>
-        public static Box3D? CalculateBoundingBox(CxPoint3D[] points)
+        public static CxBox3D? CalculateBoundingBox(CxPoint3D[] points)
         {
             if (points == null || points.Length == 0) return null;
 
@@ -61,7 +61,7 @@ namespace VisionNet
                     }
                 });
 
-            return new Box3D(
+            return new CxBox3D(
                 new CxPoint3D((minX + maxX) / 2, (minY + maxY) / 2, (minZ + maxZ) / 2),
                 new CxSize3D(maxX - minX, maxY - minY, maxZ - minZ));
         }
@@ -71,7 +71,7 @@ namespace VisionNet
         /// <see cref="Vector3.Min"/> / <see cref="Vector3.Max"/> SIMD instructions.
         /// Returns <c>null</c> if <paramref name="points"/> is empty.
         /// </summary>
-        public static Box3D? CalculateBoundingBoxSIMD(CxPoint3D[] points)
+        public static CxBox3D? CalculateBoundingBoxSIMD(CxPoint3D[] points)
         {
             if (points == null || points.Length == 0) return null;
 
@@ -85,7 +85,7 @@ namespace VisionNet
                 max = Vector3.Max(max, v);
             }
 
-            return new Box3D(
+            return new CxBox3D(
                 new CxPoint3D((min.X + max.X) / 2, (min.Y + max.Y) / 2, (min.Z + max.Z) / 2),
                 new CxSize3D(max.X - min.X, max.Y - min.Y, max.Z - min.Z));
         }

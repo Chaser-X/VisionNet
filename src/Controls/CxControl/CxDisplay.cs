@@ -159,7 +159,7 @@ namespace VisionNet.Controls
         /// Returns <c>null</c> when no items are loaded or none have a valid bounding box.
         /// Caller must hold <see cref="_resourceLock"/>.
         /// </summary>
-        private Box3D? GetCombinedBoundingBox()
+        private CxBox3D? GetCombinedBoundingBox()
         {
             float minX = float.MaxValue, minY = float.MaxValue, minZ = float.MaxValue;
             float maxX = float.MinValue, maxY = float.MinValue, maxZ = float.MinValue;
@@ -180,7 +180,7 @@ namespace VisionNet.Controls
             }
 
             if (minX == float.MaxValue) return null;
-            return new Box3D(
+            return new CxBox3D(
                 new CxPoint3D((minX + maxX) / 2, (minY + maxY) / 2, (minZ + maxZ) / 2),
                 new CxSize3D(maxX - minX, maxY - minY, maxZ - minZ));
         }

@@ -29,7 +29,7 @@ namespace VisionNet.Controls
         float ZMax { get; set; }
 
         /// <summary>Gets the bounding box enclosing all geometry data.</summary>
-        Box3D? BoundingBox { get; }
+        CxBox3D? BoundingBox { get; }
 
         /// <summary>Gets or sets the color rendering mode.</summary>
         SurfaceColorMode SurfaceColorMode { get; set; }

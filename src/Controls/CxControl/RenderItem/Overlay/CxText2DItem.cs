@@ -6,21 +6,21 @@ using VisionNet.DataType;
 namespace VisionNet.Controls
 {
     /// <summary>
-    /// Renders an array of <see cref="Text2D"/> values as screen-space text overlays
+    /// Renders an array of <see cref="CxText2D"/> values as screen-space text overlays
     /// using an orthographic 2D projection. Y coordinates are measured from the top of the window
     /// (matching conventional UI coordinates).
     /// </summary>
     public class CxText2DItem : AbstractRenderItem
     {
         /// <summary>Gets the text items to be rendered.</summary>
-        public Text2D[] TextItems { get; private set; }
+        public CxText2D[] TextItems { get; private set; }
 
         /// <summary>Initializes the item with the given text items, colour, and font size scale.</summary>
         /// <param name="textItems">Text items to render. Must not be <c>null</c> or empty.</param>
         /// <param name="color">Text colour.</param>
         /// <param name="size">Font size scale factor (passed directly to <c>gl.DrawText</c>).</param>
         /// <exception cref="ArgumentNullException">Thrown when <paramref name="textItems"/> is null or empty.</exception>
-        public CxText2DItem(Text2D[] textItems, Color color, float size = 1f) : base(color, size)
+        public CxText2DItem(CxText2D[] textItems, Color color, float size = 1f) : base(color, size)
         {
             if (textItems == null || textItems.Length == 0)
                 throw new ArgumentNullException(nameof(textItems));

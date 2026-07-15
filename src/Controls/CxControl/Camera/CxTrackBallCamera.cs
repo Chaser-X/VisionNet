@@ -159,7 +159,7 @@ namespace VisionNet.Controls
         #region ICamera implementation
 
         /// <inheritdoc/>
-        public void FitView(Box3D? viewBox)
+        public void FitView(CxBox3D? viewBox)
         {
             if (ViewMode == ViewMode.None && !_firstFitView) return;
             _firstFitView = false;

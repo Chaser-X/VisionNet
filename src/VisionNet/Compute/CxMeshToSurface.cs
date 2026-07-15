@@ -102,7 +102,7 @@ namespace VisionNet.Compute
         /// Transforms the mesh bounding-box corners by the given matrix on CPU
         /// and returns the axis-aligned bounds of the transformed corners.
         /// </summary>
-        public Box3D? ComputeTransformedBounds(CxMatrix4X4 matrix)
+        public CxBox3D? ComputeTransformedBounds(CxMatrix4X4 matrix)
         {
             if (_vertexCount == 0) return null;
 
@@ -129,7 +129,7 @@ namespace VisionNet.Compute
                 if (tz < minZ) minZ = tz; if (tz > maxZ) maxZ = tz;
             }
 
-            return new Box3D(
+            return new CxBox3D(
                 new CxPoint3D((minX + maxX) / 2, (minY + maxY) / 2, (minZ + maxZ) / 2),
                 new CxSize3D(maxX - minX, maxY - minY, maxZ - minZ));
         }

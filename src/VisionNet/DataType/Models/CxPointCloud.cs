@@ -72,7 +72,7 @@ namespace VisionNet.DataType
         public float ZScale { get; set; }
 
         /// <summary>Gets or sets the bounding box of all valid points.</summary>
-        public Box3D? BoundingBox { get; set; }
+        public CxBox3D? BoundingBox { get; set; }
 
         /// <summary>
         /// Copies point data from an unmanaged memory block into <see cref="Data"/>.

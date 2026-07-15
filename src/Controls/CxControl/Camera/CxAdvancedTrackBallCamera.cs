@@ -345,7 +345,7 @@ namespace VisionNet.Controls
         /// are ignored to avoid resetting a user-adjusted view.
         /// </summary>
         /// <param name="viewBox">Bounding box to fit, or <c>null</c> to leave the view unchanged.</param>
-        public void FitView(Box3D? viewBox)
+        public void FitView(CxBox3D? viewBox)
         {
             if (ViewMode == ViewMode.None && !_firstFitView) return;
             _firstFitView = false;
