@@ -490,7 +490,7 @@ namespace DemoFrom
 
         private CxDisplay2D _cxDisplay2D;
         private Label _lbl2DPos;
-        private CxImage<Color> _currentImage;
+        private CxImage _currentImage;
         private SplitContainer _split2D;
         private bool _split2DInit;
 
@@ -571,7 +571,7 @@ namespace DemoFrom
                 _currentImage?.Dispose();
                 _currentImage = img;
                 _cxDisplay2D.ClearOverlays();
-                _cxDisplay2D.SetImage(img, c => c);
+                _cxDisplay2D.SetImage(img);
             }
         }
 
@@ -666,27 +666,18 @@ namespace DemoFrom
 
         // ── Image Loading Helper ─────────────────────────────────────────────────────
 
-        private unsafe CxImage<Color> LoadColorImage(string path)
+        private CxImage LoadColorImage(string path)
         {
             try
             {
                 _cxDisplay2D.SetCoordinateScale(0.1f, 0.2f);
                 using (var bmp = new Bitmap(path))
                 {
-                    var img = new CxImage<Color>(bmp.Width, bmp.Height);
+                    // 4-channel BGRA (matches Format32bppArgb memory layout)
                     var lockRect = new Rectangle(0, 0, bmp.Width, bmp.Height);
                     var bd = bmp.LockBits(lockRect, ImageLockMode.ReadOnly, PixelFormat.Format32bppArgb);
-                    byte* ptr = (byte*)bd.Scan0.ToPointer();
-
-                    for (int i = 0; i < bmp.Width * bmp.Height; i++)
-                    {
-                        img.Data[i] = Color.FromArgb(
-                            ptr[i * 4 + 3],   // A
-                            ptr[i * 4 + 2],   // R
-                            ptr[i * 4 + 1],   // G
-                            ptr[i * 4 + 0]);  // B
-                    }
-
+                    var img = new CxImage();
+                    img.SetData(bmp.Width, bmp.Height, bd.Scan0, PlainType.Byte, 1);
                     bmp.UnlockBits(bd);
                     return img;
                 }

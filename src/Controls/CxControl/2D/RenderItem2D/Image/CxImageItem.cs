@@ -1,17 +1,16 @@
 using System;
-using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.IO;
 using ScottPlot;
+using SkiaSharp;
 using VisionNet.DataType;
 using Color = System.Drawing.Color;
 
 namespace VisionNet.Controls
 {
     /// <summary>
-    /// Renders a <see cref="CxImage{T}"/> as a ScottPlot <c>ImageRect</c> plottable.
-    /// Supports byte, float, short, and ushort pixel types with optional per-pixel colour mapping.
+    /// Renders a <see cref="CxImage"/> as a ScottPlot <c>ImageRect</c> plottable.
     /// This item is non-interactive; it always occupies the background layer (index 0).
     /// </summary>
     public class CxImageItem : I2DRenderItem
@@ -22,58 +21,47 @@ namespace VisionNet.Controls
         private int _width;
         private int _height;
 
+        // Cached single-channel float values for Z-coordinate query
         private float[] _pixelFloats;
         private int _queryWidth;
         private int _queryHeight;
 
         Color I2DRenderItem.Color { get => Color.White; set { } }
-        float I2DRenderItem.Size { get => 1f; set { } }
+        float I2DRenderItem.Size  { get => 1f;          set { } }
 
         /// <summary>Gets the image width in pixels.</summary>
-        public int Width => _width;
+        public int Width  => _width;
 
         /// <summary>Gets the image height in pixels.</summary>
         public int Height => _height;
 
-        /// <summary>
-        /// Replaces the displayed image with a new <see cref="CxImage{T}"/>.
-        /// </summary>
-        /// <typeparam name="T">Pixel element type (byte, float, short, ushort).</typeparam>
-        /// <param name="image">Source image.</param>
-        /// <param name="colorMap">
-        /// Optional per-pixel colour mapping. When <c>null</c>, the pixel is rendered as grayscale
-        /// using built-in normalisation (byte: direct; float/double: [0,1]→[0,255]; short/ushort: full-range).
-        /// </param>
-        public void SetImage<T>(CxImage<T> image, Func<T, Color> colorMap = null)
+        // ── I2DRenderItem ─────────────────────────────────────────────────────────
+
+        /// <summary>Sets the image to render.</summary>
+        public void SetImage(CxImage image)
         {
             if (image == null || image.Data == null) return;
 
-            _width = image.Width;
+            _width  = image.Width;
             _height = image.Height;
 
-            // Build float array for Z-coordinate query (raw pixel values, no normalisation)
-            _queryWidth = image.Width;
+            _queryWidth  = image.Width;
             _queryHeight = image.Height;
-            _pixelFloats = BuildPixelFloats(image.Data);
+            _pixelFloats = image.Channel == 1 ? BuildPixelFloats(image) : null;
 
-            var scottImage = BuildScottImage(image, colorMap);
+            var scottImage = BuildScottImage(image);
 
             if (_plot != null)
             {
-                // Replace existing plottable
-                if (_plottable != null)
-                    _plot.PlottableList.Remove(_plottable);
-
-                _plottable = _plot.Add.ImageRect(scottImage,
-                    new CoordinateRect(0, _width, 0, _height));
+                if (_plottable != null) _plot.PlottableList.Remove(_plottable);
+                _plottable = _plot.Add.ImageRect(scottImage, new CoordinateRect(0, _width, 0, _height));
                 _plot.PlottableList.Remove(_plottable);
                 _plot.PlottableList.Insert(0, _plottable);
             }
             else
             {
-                // Deferred: stored until AddToPlot is called
                 _pendingImage = scottImage;
-                _plottable = null;
+                _plottable    = null;
             }
         }
 
@@ -83,14 +71,10 @@ namespace VisionNet.Controls
         public void AddToPlot(Plot plot)
         {
             _plot = plot;
-
             if (_pendingImage != null)
             {
-                _plottable = plot.Add.ImageRect(_pendingImage,
-                    new CoordinateRect(0, _width, 0, _height));
+                _plottable = plot.Add.ImageRect(_pendingImage, new CoordinateRect(0, _width, 0, _height));
                 _pendingImage = null;
-
-                // Ensure image stays at index 0 (background)
                 plot.PlottableList.Remove(_plottable);
                 plot.PlottableList.Insert(0, _plottable);
             }
@@ -99,11 +83,7 @@ namespace VisionNet.Controls
         /// <inheritdoc/>
         public void RemoveFromPlot(Plot plot)
         {
-            if (_plottable != null)
-            {
-                plot.PlottableList.Remove(_plottable);
-                _plottable = null;
-            }
+            if (_plottable != null) { plot.PlottableList.Remove(_plottable); _plottable = null; }
             _plot = null;
         }
 
@@ -114,15 +94,12 @@ namespace VisionNet.Controls
         public void Dispose()
         {
             _pendingImage = null;
-            _plottable = null;
-            _plot = null;
-            _pixelFloats = null;
+            _plottable    = null;
+            _plot         = null;
+            _pixelFloats  = null;
         }
 
-        /// <summary>
-        /// Moves the image to the position described by <paramref name="rect"/> in world-space coordinates.
-        /// Must be called after the plottable has been created via <see cref="AddToPlot"/> and <see cref="SetImage{T}"/>.
-        /// </summary>
+        /// <summary>Repositions the image plottable to the given world-space rectangle.</summary>
         public void UpdateWorldRect(CxBox2D rect)
         {
             if (_plottable != null)
@@ -137,59 +114,90 @@ namespace VisionNet.Controls
             return _pixelFloats[y * _queryWidth + x];
         }
 
-        private static float[] BuildPixelFloats<T>(T[] data)
-        {
-            var floats = new float[data.Length];
-            for (int i = 0; i < data.Length; i++)
-                floats[i] = PixelToFloat(data[i]);
-            return floats;
-        }
+        // ── Image conversion (no BitConverter — direct typed array casts) ─────────
 
-        private static float PixelToFloat<T>(T value)
+        private static unsafe ScottPlot.Image BuildScottImage(CxImage image)
         {
-            if (typeof(T) == typeof(byte)) return (byte)(object)value;
-            if (typeof(T) == typeof(float)) return (float)(object)value;
-            if (typeof(T) == typeof(double)) return (float)(double)(object)value;
-            if (typeof(T) == typeof(short)) return (short)(object)value;
-            if (typeof(T) == typeof(ushort)) return (ushort)(object)value;
-            if (typeof(T) == typeof(int)) return (int)(object)value;
-            return 0f;
-        }
-
-        // ── Image conversion ─────────────────────────────────────────────────────
-
-        private static unsafe ScottPlot.Image BuildScottImage<T>(CxImage<T> image, Func<T, Color> colorMap)
-        {
-            int w = image.Width;
-            int h = image.Height;
+            int w  = image.Width;
+            int h  = image.Height;
+            int ch = image.Channel;
 
             Bitmap bmp = new Bitmap(w, h, PixelFormat.Format32bppArgb);
             try
             {
-                var lockRect = new Rectangle(0, 0, w, h);
-                var bd = bmp.LockBits(lockRect, ImageLockMode.WriteOnly, PixelFormat.Format32bppArgb);
+                var bd  = bmp.LockBits(new Rectangle(0, 0, w, h), ImageLockMode.WriteOnly, PixelFormat.Format32bppArgb);
                 byte* ptr = (byte*)bd.Scan0.ToPointer();
 
-                if (colorMap != null)
+                switch (image.Type)
                 {
-                    for (int i = 0; i < w * h; i++)
+                    case PlainType.Byte:
                     {
-                        Color c = colorMap(image.Data[i]);
-                        ptr[i * 4 + 0] = c.B;
-                        ptr[i * 4 + 1] = c.G;
-                        ptr[i * 4 + 2] = c.R;
-                        ptr[i * 4 + 3] = c.A;
+                        var data = (byte[])image.Data;
+                        if (ch == 4)
+                        {
+                            // BGRA — direct copy, zero conversion
+                            for (int i = 0; i < w * h; i++)
+                            {
+                                ptr[i*4]   = data[i*4];
+                                ptr[i*4+1] = data[i*4+1];
+                                ptr[i*4+2] = data[i*4+2];
+                                ptr[i*4+3] = data[i*4+3];
+                            }
+                        }
+                        else if (ch == 3)
+                        {
+                            for (int i = 0; i < w * h; i++)
+                            {
+                                ptr[i*4]   = data[i*3];      // B
+                                ptr[i*4+1] = data[i*3+1];    // G
+                                ptr[i*4+2] = data[i*3+2];    // R
+                                ptr[i*4+3] = 255;
+                            }
+                        }
+                        else
+                        {
+                            for (int i = 0; i < w * h; i++)
+                            {
+                                byte g = data[i * ch];
+                                ptr[i*4] = ptr[i*4+1] = ptr[i*4+2] = g;
+                                ptr[i*4+3] = 255;
+                            }
+                        }
+                        break;
                     }
-                }
-                else
-                {
-                    for (int i = 0; i < w * h; i++)
+                    case PlainType.Short:
+                    case PlainType.Int16:
                     {
-                        byte g = DefaultToGray(image.Data[i]);
-                        ptr[i * 4 + 0] = g;
-                        ptr[i * 4 + 1] = g;
-                        ptr[i * 4 + 2] = g;
-                        ptr[i * 4 + 3] = 255;
+                        var data = (short[])image.Data;
+                        for (int i = 0; i < w * h; i++)
+                        {
+                            byte g = NormalizeShort(data[i * ch]);
+                            ptr[i*4] = ptr[i*4+1] = ptr[i*4+2] = g;
+                            ptr[i*4+3] = 255;
+                        }
+                        break;
+                    }
+                    case PlainType.UShort:
+                    {
+                        var data = (ushort[])image.Data;
+                        for (int i = 0; i < w * h; i++)
+                        {
+                            byte g = NormalizeUShort(data[i * ch]);
+                            ptr[i*4] = ptr[i*4+1] = ptr[i*4+2] = g;
+                            ptr[i*4+3] = 255;
+                        }
+                        break;
+                    }
+                    case PlainType.Real:
+                    {
+                        var data = (float[])image.Data;
+                        for (int i = 0; i < w * h; i++)
+                        {
+                            byte g = NormalizeFloat(data[i * ch]);
+                            ptr[i*4] = ptr[i*4+1] = ptr[i*4+2] = g;
+                            ptr[i*4+3] = 255;
+                        }
+                        break;
                     }
                 }
 
@@ -207,27 +215,40 @@ namespace VisionNet.Controls
             }
         }
 
-        private static byte DefaultToGray<T>(T value)
+        private static float[] BuildPixelFloats(CxImage image)
         {
-            if (typeof(T) == typeof(byte)) return (byte)(object)value;
-            if (typeof(T) == typeof(float)) { float f = (float)(object)value; return (byte)Math.Max(0, Math.Min(255, (int)(f * 255))); }
-            if (typeof(T) == typeof(double)) { double d = (double)(object)value; return (byte)Math.Max(0, Math.Min(255, (int)(d * 255))); }
-            if (typeof(T) == typeof(short))
+            int n = image.Width * image.Height;
+            var floats = new float[n];
+
+            switch (image.Type)
             {
-                short s = (short)(object)value;
-                return (byte)((s - (long)short.MinValue) * 255L / (short.MaxValue - (long)short.MinValue));
+                case PlainType.Byte:
+                { var d = (byte[])image.Data;   for (int i = 0; i < n; i++) floats[i] = d[i]; break; }
+                case PlainType.Short:
+                case PlainType.Int16:
+                { var d = (short[])image.Data;  for (int i = 0; i < n; i++) floats[i] = d[i]; break; }
+                case PlainType.UShort:
+                { var d = (ushort[])image.Data; for (int i = 0; i < n; i++) floats[i] = d[i]; break; }
+                case PlainType.Real:
+                { var d = (float[])image.Data;  for (int i = 0; i < n; i++) floats[i] = d[i]; break; }
             }
-            if (typeof(T) == typeof(ushort))
-            {
-                ushort us = (ushort)(object)value;
-                return (byte)(us * 255 / ushort.MaxValue);
-            }
-            if (typeof(T) == typeof(int))
-            {
-                int ii = (int)(object)value;
-                return (byte)(((long)ii - int.MinValue) * 255L / ((long)int.MaxValue - int.MinValue));
-            }
-            return 128;
+
+            return floats;
+        }
+
+        private static byte NormalizeShort(short v)
+        {
+            return (byte)((v - (long)short.MinValue) * 255L / (short.MaxValue - (long)short.MinValue));
+        }
+
+        private static byte NormalizeUShort(ushort v)
+        {
+            return (byte)(v * 255 / ushort.MaxValue);
+        }
+
+        private static byte NormalizeFloat(float v)
+        {
+            return (byte)Math.Max(0, Math.Min(255, (int)(v * 255)));
         }
     }
 }

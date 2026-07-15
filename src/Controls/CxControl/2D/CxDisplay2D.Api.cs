@@ -66,19 +66,13 @@ namespace VisionNet.Controls
         // ── Image management ──────────────────────────────────────────────────────
 
         /// <summary>
-        /// Replaces the displayed image with a new <see cref="CxImage{T}"/>.
+        /// Replaces the displayed image with a new <see cref="CxImage"/>.
         /// The view is automatically fitted to the image after loading.
+        /// Rendering is automatic based on <see cref="CxImage.Type"/> and <see cref="CxImage.Channel"/>:
+        /// 1-channel → grayscale; 3-channel → RGB; 4-channel → BGRA.
         /// </summary>
-        /// <typeparam name="T">
-        /// Pixel element type. Supported types: <see cref="byte"/> (direct),
-        /// <see cref="float"/>/<see cref="double"/> ([0,1]→[0,255]),
-        /// <see cref="short"/>/<see cref="ushort"/> (full-range normalisation).
-        /// </typeparam>
         /// <param name="image">Source image. Pass <c>null</c> to clear.</param>
-        /// <param name="colorMap">
-        /// Optional per-pixel colour mapping function. When <c>null</c>, renders as grayscale.
-        /// </param>
-        public void SetImage<T>(CxImage<T> image, Func<T, Color> colorMap = null)
+        public void SetImage(CxImage image)
         {
             if (_imageItem == null)
             {
@@ -92,7 +86,7 @@ namespace VisionNet.Controls
                 return;
             }
 
-            _imageItem.SetImage(image, colorMap);
+            _imageItem.SetImage(image);
             _imageWidth  = image.Width;
             _imageHeight = image.Height;
 
