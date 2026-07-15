@@ -59,6 +59,8 @@
     <Compile Include="DataType\Geometry3D\CxPolygon3D.cs" />
     <Compile Include="DataType\Geometry3D\CxCoordination3D.cs" />
     <Compile Include="DataType\Geometry3D\CxTextInfo.cs" />
+    <Compile Include="DataType\Geometry2D\CxCoordination2D.cs" />
+    <Compile Include="DataType\Geometry2D\CxMatrix3X3.cs" />
     <Compile Include="DataType\Geometry2D\CxPoint2D.cs" />
     <Compile Include="DataType\Geometry2D\CxSegment2D.cs" />
     <Compile Include="DataType\Geometry2D\CxPolygon2D.cs" />
