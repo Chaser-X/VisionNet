@@ -65,6 +65,8 @@
     <Compile Include="DataType\Geometry2D\CxSegment2D.cs" />
     <Compile Include="DataType\Geometry2D\CxPolygon2D.cs" />
     <Compile Include="DataType\Geometry2D\CxCircle2D.cs" />
+    <Compile Include="DataType\Geometry2D\CxSize2D.cs" />
+    <Compile Include="DataType\Geometry2D\CxBox2D.cs" />
     <Compile Include="DataType\Geometry2D\CxText2D.cs" />
     <Compile Include="DataType\Models\CxSurface.cs" />
     <Compile Include="DataType\Models\CxPointCloud.cs" />

@@ -119,6 +119,16 @@ namespace VisionNet.Controls
             _pixelFloats = null;
         }
 
+        /// <summary>
+        /// Moves the image to the position described by <paramref name="rect"/> in world-space coordinates.
+        /// Must be called after the plottable has been created via <see cref="AddToPlot"/> and <see cref="SetImage{T}"/>.
+        /// </summary>
+        public void UpdateWorldRect(CxBox2D rect)
+        {
+            if (_plottable != null)
+                _plottable.Rect = new ScottPlot.CoordinateRect(rect.Left, rect.Right, rect.Bottom, rect.Top);
+        }
+
         /// <summary>Returns the raw pixel value at image coordinate (x, y) as float, or null if out of range.</summary>
         public float? GetPixelFloat(int x, int y)
         {

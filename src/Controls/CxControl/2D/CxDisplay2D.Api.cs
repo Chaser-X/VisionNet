@@ -19,6 +19,8 @@ namespace VisionNet.Controls
             XScale = xScale;
             YScale = yScale;
             ZScale = zScale;
+            if (_imageItem != null) _imageItem.UpdateWorldRect(GetImageWorldRect());
+            FitToImage();
         }
 
         /// <summary>
@@ -30,22 +32,35 @@ namespace VisionNet.Controls
             XOffset = xOffset;
             YOffset = yOffset;
             ZOffset = zOffset;
+            if (_imageItem != null) _imageItem.UpdateWorldRect(GetImageWorldRect());
+            FitToImage();
         }
 
         /// <summary>
-        /// Converts a plot-space pixel coordinate to world (X, Y, Z) using the current
-        /// scale and offset. Z is derived from the image pixel value at the given position;
-        /// returns null when no image is loaded or the coordinate is outside image bounds.
+        /// Converts a plot-space coordinate (already in world units) to (X, Y, Z).
+        /// Z is derived from the image pixel value at the corresponding pixel position.
         /// </summary>
         internal (float X, float Y, float? Z) PlotToWorld(CxPoint2D plotCoord)
         {
-            float wx = plotCoord.X * XScale + XOffset;
-            float wy = plotCoord.Y * YScale + YOffset;
-            int   px = (int)Math.Round(plotCoord.X);
-            int   py = (int)Math.Round(plotCoord.Y);
+            // The plot coordinate system IS world coordinates; no scale/offset conversion needed.
+            float wx = plotCoord.X;
+            float wy = plotCoord.Y;
+            // Reverse-map world → pixel for image data lookup
+            int px = XScale != 0f ? (int)Math.Round((plotCoord.X - XOffset) / XScale) : 0;
+            int py = YScale != 0f ? (int)Math.Round((plotCoord.Y - YOffset) / YScale) : 0;
             float? rawZ = _imageItem?.GetPixelFloat(px, py);
             float? wz   = rawZ.HasValue ? rawZ.Value * ZScale + ZOffset : (float?)null;
             return (wx, wy, wz);
+        }
+
+        /// <summary>Returns the image bounding rectangle in world coordinates (Y-inverted for image convention).</summary>
+        public CxBox2D GetImageWorldRect()
+        {
+            float w = _imageWidth  * XScale;
+            float h = _imageHeight * YScale;
+            return new CxBox2D(
+                new CxPoint2D(XOffset + w / 2f, YOffset + h / 2f),
+                new CxSize2D(w, h));
         }
 
         // ── Image management ──────────────────────────────────────────────────────
@@ -81,6 +96,8 @@ namespace VisionNet.Controls
             _imageWidth  = image.Width;
             _imageHeight = image.Height;
 
+            // Move image to world-coordinate rect so axes show world values
+            _imageItem.UpdateWorldRect(GetImageWorldRect());
             FitToImage();
         }
 

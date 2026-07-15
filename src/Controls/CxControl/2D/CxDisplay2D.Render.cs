@@ -22,12 +22,15 @@ namespace VisionNet.Controls
         {
             if (_imageWidth <= 0 || _imageHeight <= 0) return;
 
-            double margin = Math.Max(_imageWidth, _imageHeight) * 0.02;
+            var box    = GetImageWorldRect();
+            double margin = Math.Max(Math.Abs(box.Size.Width), Math.Abs(box.Size.Height)) * 0.02;
+
+            // Y limits are inverted (bottom > top) to match image convention: Y=0 at screen top.
             _formsPlot.Plot.Axes.SetLimits(
-                left:   -margin,
-                right:  _imageWidth  + margin,
-                bottom: _imageHeight + margin,
-                top:    -margin);
+                left:   box.Left   - margin,
+                right:  box.Right  + margin,
+                bottom: box.Bottom + margin,
+                top:    box.Top    - margin);
 
             RefreshDisplay();
         }

@@ -41,7 +41,7 @@ namespace DemoFrom
                 return;
             }
             VisionOperator.InitialLib();
-           // cxDisplay1.SetViewUpDirection(new CxVector3D(0, 1, 0));
+            // cxDisplay1.SetViewUpDirection(new CxVector3D(0, 1, 0));
             cxDisplay1.SetCoordinateSystemLeftHanded(true);
             cxDisplay1.Camera.Enable2DView = false;
         }
@@ -268,7 +268,7 @@ namespace DemoFrom
             // 2. 放置可拖动 MARK 点（位于平面中心 5,5,0）
             var mark = cxDisplay2.SetPoint(
                 new[] { new CxPoint3D(5.0f, 5.0f, 0f) }, Color.Red, 1f, PointShape.Sphere);
-            mark.IsActiveObj  = true;
+            mark.IsActiveObj = true;
             mark.HitThreshold = 2f;
 
             // 3. 订阅 OnChanged，实时更新坐标标签
@@ -294,7 +294,7 @@ namespace DemoFrom
             // 2. 放置可拖拽 Box（位于平面中央）
             var initBox = new CxBox3D(new CxPoint3D(6.0f, 6.0f, 0.5f), new CxSize3D(4.0f, 3.0f, 1.0f));
             var box = cxDisplay2.SetBox(new[] { initBox }, Color.FromArgb(80, Color.Cyan));
-            box.IsActiveObj  = true;
+            box.IsActiveObj = true;
             box.HitThreshold = 1f;
 
             // 3. 实时显示 Box 的 Center 和 Size
@@ -323,7 +323,7 @@ namespace DemoFrom
                 new CxSegment3D(new CxPoint3D(2f, 4f, 0f), new CxPoint3D(8f, 4f, 0f)),
                 new CxSegment3D(new CxPoint3D(3f, 7f, 0f), new CxPoint3D(9f, 9f, 0f)),
             }, Color.Lime, 2f);
-            seg.IsActiveObj  = true;
+            seg.IsActiveObj = true;
             seg.HitThreshold = 0.3f;
 
             seg.OnChanged += item =>
@@ -357,7 +357,7 @@ namespace DemoFrom
             }, isClosed: false);
 
             var poly = cxDisplay2.SetPolygon(new[] { rect, open }, Color.Cyan, 2f);
-            poly.IsActiveObj  = true;
+            poly.IsActiveObj = true;
             poly.HitThreshold = 0.3f;
 
             poly.OnChanged += item =>
@@ -488,18 +488,18 @@ namespace DemoFrom
 
         // ── 2D Tab ──────────────────────────────────────────────────────────────────
 
-        private CxDisplay2D    _cxDisplay2D;
-        private Label          _lbl2DPos;
+        private CxDisplay2D _cxDisplay2D;
+        private Label _lbl2DPos;
         private CxImage<Color> _currentImage;
         private SplitContainer _split2D;
-        private bool           _split2DInit;
+        private bool _split2DInit;
 
         private void Build2DTab(TabPage page)
         {
             _split2D = new SplitContainer
             {
-                Dock          = DockStyle.Fill,
-                FixedPanel    = FixedPanel.Panel2,
+                Dock = DockStyle.Fill,
+                FixedPanel = FixedPanel.Panel2,
                 Panel2MinSize = 146,
             };
 
@@ -536,20 +536,20 @@ namespace DemoFrom
                 return b;
             }
 
-            MakeBtn("Load Image",     btn2D_loadImage_Click);
-            MakeBtn("Static Segs",    btn2D_staticSeg_Click);
-            MakeBtn("Drag Segs",      btn2D_dragSeg_Click);
+            MakeBtn("Load Image", btn2D_loadImage_Click);
+            MakeBtn("Static Segs", btn2D_staticSeg_Click);
+            MakeBtn("Drag Segs", btn2D_dragSeg_Click);
             MakeBtn("Static Circles", btn2D_staticCircle_Click);
-            MakeBtn("Drag Circles",   btn2D_dragCircle_Click);
+            MakeBtn("Drag Circles", btn2D_dragCircle_Click);
             MakeBtn("Clear Overlays", btn2D_clearOverlays_Click);
-            MakeBtn("Clear All",      btn2D_clearAll_Click);
+            MakeBtn("Clear All", btn2D_clearAll_Click);
 
             _lbl2DPos = new Label
             {
-                Font     = new Font("Consolas", 8F),
+                Font = new Font("Consolas", 8F),
                 Location = new Point(5, y + 8),
-                Size     = new Size(140, 48),
-                Text     = "X: ---  Y: ---",
+                Size = new Size(140, 48),
+                Text = "X: ---  Y: ---",
             };
             btnPanel.Controls.Add(_lbl2DPos);
             _split2D.Panel2.Controls.Add(btnPanel);
@@ -577,8 +577,9 @@ namespace DemoFrom
 
         private void btn2D_staticSeg_Click(object sender, EventArgs e)
         {
-            float w  = _cxDisplay2D.ImageWidth  > 0 ? _cxDisplay2D.ImageWidth  : 400f;
-            float h  = _cxDisplay2D.ImageHeight > 0 ? _cxDisplay2D.ImageHeight : 400f;
+            var box = _cxDisplay2D.GetImageWorldRect();
+            float w = box.Size.Width > 0 ? box.Size.Width : 400f;
+            float h = box.Size.Height > 0 ? box.Size.Height : 400f;
 
             var segs = new[]
             {
@@ -591,10 +592,11 @@ namespace DemoFrom
 
         private void btn2D_dragSeg_Click(object sender, EventArgs e)
         {
-            float cx  = _cxDisplay2D.ImageWidth  > 0 ? _cxDisplay2D.ImageWidth  / 2f : 200f;
-            float cy  = _cxDisplay2D.ImageHeight > 0 ? _cxDisplay2D.ImageHeight / 2f : 200f;
-            float len = Math.Max(_cxDisplay2D.ImageWidth > 0 ? _cxDisplay2D.ImageWidth : 400,
-                                  _cxDisplay2D.ImageHeight > 0 ? _cxDisplay2D.ImageHeight : 400) * 0.15f;
+            var box = _cxDisplay2D.GetImageWorldRect();
+            float cx = box.Size.Width > 0 ? box.Center.X : 200f;
+            float cy = box.Size.Height > 0 ? box.Center.Y : 200f;
+            float len = Math.Max(box.Size.Width > 0 ? box.Size.Width : 400,
+                                  box.Size.Height > 0 ? box.Size.Height : 400) * 0.15f;
             if (len < 20) len = 60f;
 
             var segs = new[] { new CxSegment2D(new CxPoint2D(cx - len, cy), new CxPoint2D(cx + len, cy)) };
@@ -602,7 +604,7 @@ namespace DemoFrom
             item.IsActiveObj = true;
             item.OnChanged += i =>
             {
-                var seg  = ((CxSegment2DItem)i).Segments[0];
+                var seg = ((CxSegment2DItem)i).Segments[0];
                 var text = $"S:({seg.Start.X:F0},{seg.Start.Y:F0})\nE:({seg.End.X:F0},{seg.End.Y:F0})";
                 if (_lbl2DPos.InvokeRequired)
                     _lbl2DPos.Invoke(new Action(() => _lbl2DPos.Text = text));
@@ -613,10 +615,11 @@ namespace DemoFrom
 
         private void btn2D_staticCircle_Click(object sender, EventArgs e)
         {
-            float cx     = _cxDisplay2D.ImageWidth  > 0 ? _cxDisplay2D.ImageWidth  / 2f : 200f;
-            float cy     = _cxDisplay2D.ImageHeight > 0 ? _cxDisplay2D.ImageHeight / 2f : 200f;
-            float minDim = Math.Min(_cxDisplay2D.ImageWidth  > 0 ? _cxDisplay2D.ImageWidth  : 400,
-                                     _cxDisplay2D.ImageHeight > 0 ? _cxDisplay2D.ImageHeight : 400);
+            var box = _cxDisplay2D.GetImageWorldRect();
+            float cx = box.Size.Width > 0 ? box.Center.X : 100;
+            float cy = box.Size.Height > 0 ? box.Center.Y : 100;
+            float minDim = Math.Min(box.Size.Width > 0 ? box.Size.Width : 400,
+                                     box.Size.Height > 0 ? box.Size.Height : 400);
 
             var circles = new[]
             {
@@ -628,10 +631,11 @@ namespace DemoFrom
 
         private void btn2D_dragCircle_Click(object sender, EventArgs e)
         {
-            float cx = _cxDisplay2D.ImageWidth  > 0 ? _cxDisplay2D.ImageWidth  * 0.35f : 150f;
-            float cy = _cxDisplay2D.ImageHeight > 0 ? _cxDisplay2D.ImageHeight * 0.35f : 150f;
-            float r  = Math.Min(_cxDisplay2D.ImageWidth  > 0 ? _cxDisplay2D.ImageWidth  : 400,
-                                  _cxDisplay2D.ImageHeight > 0 ? _cxDisplay2D.ImageHeight : 400) * 0.1f;
+            var box = _cxDisplay2D.GetImageWorldRect();
+            float cx = box.Size.Width > 0 ? box.Center.X : 100;
+            float cy = box.Size.Height > 0 ? box.Center.Y : 100;
+            float r = Math.Min(box.Size.Width > 0 ? box.Size.Width : 400,
+                                     box.Size.Height > 0 ? box.Size.Height : 400) * 0.1f;
             if (r < 10) r = 40f;
 
             var circles = new[] { new CxCircle2D(new CxPoint2D(cx, cy), r) };
@@ -639,7 +643,7 @@ namespace DemoFrom
             item.IsActiveObj = true;
             item.OnChanged += i =>
             {
-                var c    = ((CxCircle2DItem)i).Circles[0];
+                var c = ((CxCircle2DItem)i).Circles[0];
                 var text = $"C:({c.Center.X:F0},{c.Center.Y:F0})\nR:{c.Radius:F1}";
                 if (_lbl2DPos.InvokeRequired)
                     _lbl2DPos.Invoke(new Action(() => _lbl2DPos.Text = text));
@@ -666,12 +670,13 @@ namespace DemoFrom
         {
             try
             {
+                _cxDisplay2D.SetCoordinateScale(0.1f, 0.2f);
                 using (var bmp = new Bitmap(path))
                 {
-                    var img      = new CxImage<Color>(bmp.Width, bmp.Height);
+                    var img = new CxImage<Color>(bmp.Width, bmp.Height);
                     var lockRect = new Rectangle(0, 0, bmp.Width, bmp.Height);
-                    var bd       = bmp.LockBits(lockRect, ImageLockMode.ReadOnly, PixelFormat.Format32bppArgb);
-                    byte* ptr    = (byte*)bd.Scan0.ToPointer();
+                    var bd = bmp.LockBits(lockRect, ImageLockMode.ReadOnly, PixelFormat.Format32bppArgb);
+                    byte* ptr = (byte*)bd.Scan0.ToPointer();
 
                     for (int i = 0; i < bmp.Width * bmp.Height; i++)
                     {
