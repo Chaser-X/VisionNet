@@ -166,18 +166,18 @@ namespace DemoFrom
             }
 
             ////添加平面 Plane3D
-            //var plane = new Plane3D(new CxPoint3D(0, 0, 0), new CxVector3D(1, 1, 1));
+            //var plane = new CxPlane3D(new CxPoint3D(0, 0, 0), new CxVector3D(1, 1, 1));
             //cxDisplay1.SetPlane(plane, Color.FromArgb(100, Color.Blue));
 
             //添加Box3D
-            var box = new Box3D(new CxPoint3D(0, 0, 0), new CxSize3D(10, 10, 10));
-            //cxDisplay1.SetBox(new Box3D[] { box }, Color.FromArgb(100, Color.Yellow), 1);
+            var box = new CxBox3D(new CxPoint3D(0, 0, 0), new CxSize3D(10, 10, 10));
+            //cxDisplay1.SetBox(new CxBox3D[] { box }, Color.FromArgb(100, Color.Yellow), 1);
 
             //cxDisplay1.SetPoint(new CxPoint3D[] { new CxPoint3D(2, 3, 1), new CxPoint3D(5, 1, 1) }, Color.Green, 10f, PointShape.Sphere);
 
             //添加Box3D
             cxDisplay2.ResetView();
-            cxDisplay2.SetBox(new Box3D[] { box }, Color.Yellow, 10);
+            cxDisplay2.SetBox(new CxBox3D[] { box }, Color.Yellow, 10);
         }
 
         private void DemoFrom_FormClosing(object sender, FormClosingEventArgs e)
@@ -211,8 +211,8 @@ namespace DemoFrom
             cxDisplay2.ResetView();
 
             //添加Segment3D线段
-            cxDisplay2.SetSegment(new Segment3D[] { new Segment3D(new CxPoint3D(0, 0, 0), new CxPoint3D(1, 1, 1)) }, Color.Red);
-            cxDisplay2.SetSegment(new Segment3D[] { new Segment3D(new CxPoint3D(0, 0, 0), new CxPoint3D(0, 1, 1)) }, Color.Yellow);
+            cxDisplay2.SetSegment(new CxSegment3D[] { new CxSegment3D(new CxPoint3D(0, 0, 0), new CxPoint3D(1, 1, 1)) }, Color.Red);
+            cxDisplay2.SetSegment(new CxSegment3D[] { new CxSegment3D(new CxPoint3D(0, 0, 0), new CxPoint3D(0, 1, 1)) }, Color.Yellow);
 
             cxDisplay2.SetPoint(new CxPoint3D[] { new CxPoint3D(2, 3, 1), new CxPoint3D(5, 1, 1) }, Color.Green, 1f, PointShape.Sphere);
             cxDisplay2.SetCoordinate3DSystem(new CxCoordination3D()
@@ -228,24 +228,24 @@ namespace DemoFrom
             pts.Add(new CxPoint3D(1, 0, 0));
             pts.Add(new CxPoint3D(1, 1, 0));
             pts.Add(new CxPoint3D(1, 1, 1));
-            var polygon = new Polygon3D(pts.ToArray(), false);
-            cxDisplay2.SetPolygon(new Polygon3D[] { polygon }, Color.Blue);
+            var polygon = new CxPolygon3D(pts.ToArray(), false);
+            cxDisplay2.SetPolygon(new CxPolygon3D[] { polygon }, Color.Blue);
 
             //添加平面 Plane3D
-            var plane = new Plane3D(new CxPoint3D(0, 0, 0), new CxVector3D(1, 1, 1));
-            cxDisplay2.SetPlane(new Plane3D[] { plane }, Color.FromArgb(100, Color.Red));
+            var plane = new CxPlane3D(new CxPoint3D(0, 0, 0), new CxVector3D(1, 1, 1));
+            cxDisplay2.SetPlane(new CxPlane3D[] { plane }, Color.FromArgb(100, Color.Red));
 
             //添加Box3D
-            var box = new Box3D(new CxPoint3D(0, 0, 0), new CxSize3D(10, 10, 10));
-            cxDisplay2.SetBox(new Box3D[] { box }, Color.FromArgb(100, Color.Yellow));
+            var box = new CxBox3D(new CxPoint3D(0, 0, 0), new CxSize3D(10, 10, 10));
+            cxDisplay2.SetBox(new CxBox3D[] { box }, Color.FromArgb(100, Color.Yellow));
 
             //添加TextInfo
-            var text = new TextInfo(new CxPoint3D(0, 0, 0), "this is a test中文!", 50);
-            cxDisplay2.SetTextInfo(new TextInfo[] { text }, Color.Yellow);
+            var text = new CxTextInfo(new CxPoint3D(0, 0, 0), "this is a test中文!", 50);
+            cxDisplay2.SetTextInfo(new CxTextInfo[] { text }, Color.Yellow);
 
             //添加Text2D
-            var text2d = new Text2D(new CxPoint2D(10, 50), "2D Labels", 10);
-            cxDisplay2.SetText2D(new Text2D[] { text2d }, Color.Green);
+            var text2d = new CxText2D(new CxPoint2D(10, 50), "2D Labels", 10);
+            cxDisplay2.SetText2D(new CxText2D[] { text2d }, Color.Green);
         }
 
         private void button1_Click(object sender, EventArgs e)
@@ -288,7 +288,7 @@ namespace DemoFrom
             if (_currentMesh == null) return;
 
             var matrix = CxMatrix4X4.RotationY((float)Math.PI / 4);
-            var result = VisionOperator.MeshToSurface(_currentMesh, matrix, new Box3D(new CxPoint3D(2, 4, 1.2f), new CxSize3D(15, 25, 2)), 0.01f, 0.01f);
+            var result = VisionOperator.MeshToSurface(_currentMesh, matrix, new CxBox3D(new CxPoint3D(2, 4, 1.2f), new CxSize3D(15, 25, 2)), 0.01f, 0.01f);
             if (result == null) return;
 
             cxDisplay1.ResetView();

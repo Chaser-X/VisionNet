@@ -5,19 +5,19 @@ using VisionNet.DataType;
 namespace VisionNet.Controls
 {
     /// <summary>
-    /// Renders an array of <see cref="Polygon3D"/> values as smooth polylines or closed loops,
-    /// depending on <see cref="Polygon3D.IsClosed"/>.
+    /// Renders an array of <see cref="CxPolygon3D"/> values as smooth polylines or closed loops,
+    /// depending on <see cref="CxPolygon3D.IsClosed"/>.
     /// </summary>
     public class CxPolygon3DItem : AbstractRenderItem
     {
         /// <summary>Gets the polygons to be rendered.</summary>
-        public Polygon3D[] Polygon3Ds { get; private set; }
+        public CxPolygon3D[] Polygon3Ds { get; private set; }
 
         /// <summary>Initializes the item with the given polygons, colour, and line width.</summary>
         /// <param name="polygons">World-space polygons.</param>
         /// <param name="color">Line colour.</param>
         /// <param name="size">Line width in pixels.</param>
-        public CxPolygon3DItem(Polygon3D[] polygons, Color color, float size) : base(color, size)
+        public CxPolygon3DItem(CxPolygon3D[] polygons, Color color, float size) : base(color, size)
         {
             Polygon3Ds = polygons;
         }

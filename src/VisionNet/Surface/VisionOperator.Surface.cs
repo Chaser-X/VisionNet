@@ -34,7 +34,7 @@ namespace VisionNet
         /// Projects a triangle mesh onto a uniform XY height map within a specified bounding box.
         /// </summary>
         public static CxSurface MeshToSurface(CxMesh mesh, CxMatrix4X4 matrix,
-            Box3D bounds,
+            CxBox3D bounds,
             float xScale = 0.01f, float yScale = 0.01f,
             ProjectionMode mode = ProjectionMode.Max)
         {

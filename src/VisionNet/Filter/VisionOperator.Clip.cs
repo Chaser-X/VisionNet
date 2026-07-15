@@ -5,7 +5,7 @@ using VisionNet.DataType;
 namespace VisionNet
 {
     /// <summary>
-    /// Spatial clipping operations — retains only the data inside a given <see cref="Box3D"/> ROI.
+    /// Spatial clipping operations — retains only the data inside a given <see cref="CxBox3D"/> ROI.
     /// </summary>
     public static partial class VisionOperator
     {
@@ -15,7 +15,7 @@ namespace VisionNet
         /// UV coordinates, per-vertex intensity, and texture dimensions are preserved.
         /// </summary>
         /// <returns>Clipped mesh, or <c>null</c> if the input is invalid or no triangles survive.</returns>
-        public static CxMesh ClipMesh(CxMesh mesh, Box3D roi)
+        public static CxMesh ClipMesh(CxMesh mesh, CxBox3D roi)
         {
             if (mesh == null || mesh.Vertices == null || mesh.Vertices.Length == 0
                 || mesh.Indices == null || mesh.Indices.Length < 3)
@@ -115,7 +115,7 @@ namespace VisionNet
         /// Points outside <paramref name="roi"/> are replaced with the invalid marker (<c>-32768</c>).
         /// </summary>
         /// <returns>Clipped point cloud, or <c>null</c> if the input is invalid.</returns>
-        public static CxPointCloud ClipPointCloud(CxPointCloud cloud, Box3D roi)
+        public static CxPointCloud ClipPointCloud(CxPointCloud cloud, CxBox3D roi)
         {
             if (cloud == null || cloud.Data == null
                 || cloud.Data.Length < cloud.Width * cloud.Length * 3)
@@ -167,7 +167,7 @@ namespace VisionNet
         /// Cropped surface with updated <c>Width</c>, <c>Length</c>, <c>XOffset</c>, and
         /// <c>YOffset</c>; or <c>null</c> if the input is invalid or there is no XY overlap.
         /// </returns>
-        public static CxSurface ClipSurface(CxSurface surface, Box3D roi)
+        public static CxSurface ClipSurface(CxSurface surface, CxBox3D roi)
         {
             if (surface == null || surface.Data == null
                 || surface.Data.Length < surface.Width * surface.Length)

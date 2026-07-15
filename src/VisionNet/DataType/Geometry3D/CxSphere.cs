@@ -1,7 +1,7 @@
 namespace VisionNet.DataType
 {
     /// <summary>Represents a 3D sphere defined by its centre point and radius.</summary>
-    public struct Sphere
+    public struct CxSphere
     {
         /// <summary>World-space centre of the sphere.</summary>
         public CxPoint3D Center;
@@ -10,6 +10,6 @@ namespace VisionNet.DataType
         public float Radius;
 
         /// <summary>Initializes a sphere with the given centre and radius.</summary>
-        public Sphere(CxPoint3D center, float radius) { Center = center; Radius = radius; }
+        public CxSphere(CxPoint3D center, float radius) { Center = center; Radius = radius; }
     }
 }

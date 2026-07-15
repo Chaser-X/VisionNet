@@ -19,7 +19,7 @@ namespace VisionNet.Controls
         public bool IsDisposed { get; private set; } = false;
         public float ZMin { get; set; }
         public float ZMax { get; set; }
-        public Box3D? BoundingBox { get; private set; }
+        public CxBox3D? BoundingBox { get; private set; }
         public int MaxPointCount { get; set; } = int.MaxValue;
 
         /// <summary>

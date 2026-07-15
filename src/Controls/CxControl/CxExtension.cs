@@ -19,10 +19,10 @@ namespace VisionNet.Controls
         /// </summary>
         /// <param name="points">Input points. May be <c>null</c> or empty.</param>
         /// <returns>
-        /// A <see cref="Box3D"/> whose centre and size enclose all valid points,
+        /// A <see cref="CxBox3D"/> whose centre and size enclose all valid points,
         /// or <c>null</c> if no valid point exists.
         /// </returns>
-        public static Box3D? CalculateBoundingBox(IEnumerable<CxPoint3D> points)
+        public static CxBox3D? CalculateBoundingBox(IEnumerable<CxPoint3D> points)
         {
             if (points == null) return null;
 
@@ -44,7 +44,7 @@ namespace VisionNet.Controls
             }
 
             if (!hasValidPoint) return null;
-            return new Box3D(
+            return new CxBox3D(
                 new CxPoint3D((minX + maxX) / 2, (minY + maxY) / 2, (minZ + maxZ) / 2),
                 new CxSize3D(maxX - minX, maxY - minY, maxZ - minZ));
         }

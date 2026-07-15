@@ -47,7 +47,7 @@ namespace VisionNet.Controls
         /// </summary>
         private void AppendSurfaceItem(ICxObjRenderItem newItem)
         {
-            Box3D? combined;
+            CxBox3D? combined;
             lock (_resourceLock)
             {
                 _surfaceItems.Add(newItem);
@@ -294,7 +294,7 @@ namespace VisionNet.Controls
         // ── Geometric overlays (always append) ──────────────────────────────────
 
         /// <summary>Appends a set of 3D line segments to the overlay layer.</summary>
-        public void SetSegment(Segment3D[] segment, Color color, float size = 1.0f)
+        public void SetSegment(CxSegment3D[] segment, Color color, float size = 1.0f)
         { _renderItems.Add(new CxSegment3DItem(segment, color, size)); Invalidate(); }
 
         /// <summary>Appends a set of 3D points to the overlay layer.</summary>
@@ -303,23 +303,23 @@ namespace VisionNet.Controls
         { _renderItems.Add(new CxPoint3DItem(point, color, size, shape)); Invalidate(); }
 
         /// <summary>Appends a set of 3D polygons to the overlay layer.</summary>
-        public void SetPolygon(Polygon3D[] polygon, Color color, float size = 1.0f)
+        public void SetPolygon(CxPolygon3D[] polygon, Color color, float size = 1.0f)
         { _renderItems.Add(new CxPolygon3DItem(polygon, color, size)); Invalidate(); }
 
         /// <summary>Appends a set of 3D planes to the overlay layer.</summary>
-        public void SetPlane(Plane3D[] plane, Color color, float size = 100.0f)
+        public void SetPlane(CxPlane3D[] plane, Color color, float size = 100.0f)
         { _renderItems.Add(new CxPlane3DItem(plane, color, size)); Invalidate(); }
 
         /// <summary>Appends a set of axis-aligned bounding boxes to the overlay layer.</summary>
-        public void SetBox(Box3D[] box, Color color, float size = 1.0f)
+        public void SetBox(CxBox3D[] box, Color color, float size = 1.0f)
         { _renderItems.Add(new CxBox3DItem(box, color, size)); Invalidate(); }
 
         /// <summary>Appends world-anchored text labels to the overlay layer.</summary>
-        public void SetTextInfo(TextInfo[] textInfo, Color color)
+        public void SetTextInfo(CxTextInfo[] textInfo, Color color)
         { _renderItems.Add(new CxTextInfoItem(textInfo, color, 1)); Invalidate(); }
 
         /// <summary>Appends screen-space 2D text overlays.</summary>
-        public void SetText2D(Text2D[] text2Ds, Color color)
+        public void SetText2D(CxText2D[] text2Ds, Color color)
         { _renderItems.Add(new CxText2DItem(text2Ds, color, 1)); Invalidate(); }
 
         // ── Coordinate system ────────────────────────────────────────────────────

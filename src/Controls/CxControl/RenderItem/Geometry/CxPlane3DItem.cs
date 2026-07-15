@@ -6,20 +6,20 @@ using VisionNet.DataType;
 namespace VisionNet.Controls
 {
     /// <summary>
-    /// Renders an array of <see cref="Plane3D"/> values as filled quadrilaterals centred on
-    /// <see cref="Plane3D.Point"/>, whose half-extent equals <see cref="AbstractRenderItem.Size"/>.
+    /// Renders an array of <see cref="CxPlane3D"/> values as filled quadrilaterals centred on
+    /// <see cref="CxPlane3D.Point"/>, whose half-extent equals <see cref="AbstractRenderItem.Size"/>.
     /// Two orthogonal tangent vectors are computed from the plane normal to form the quad corners.
     /// </summary>
     public class CxPlane3DItem : AbstractRenderItem
     {
         /// <summary>Gets the planes to be rendered.</summary>
-        public Plane3D[] Planes { get; private set; }
+        public CxPlane3D[] Planes { get; private set; }
 
         /// <summary>Initializes the item with the given planes, colour, and half-extent size.</summary>
         /// <param name="planes">Planes to render.</param>
         /// <param name="color">Fill colour (alpha channel is respected).</param>
         /// <param name="size">Half-extent of the rendered quad in world units.</param>
-        public CxPlane3DItem(Plane3D[] planes, Color color, float size = 100.0f) : base(color, size)
+        public CxPlane3DItem(CxPlane3D[] planes, Color color, float size = 100.0f) : base(color, size)
         {
             Planes = planes;
         }

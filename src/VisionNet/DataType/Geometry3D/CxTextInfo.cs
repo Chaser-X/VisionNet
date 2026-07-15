@@ -4,7 +4,7 @@ namespace VisionNet.DataType
     /// Associates a text string with a world-space anchor point and a display size.
     /// Used to render labels that follow a 3D location.
     /// </summary>
-    public struct TextInfo
+    public struct CxTextInfo
     {
         /// <summary>World-space anchor position of the label.</summary>
         public CxPoint3D Location;
@@ -19,7 +19,7 @@ namespace VisionNet.DataType
         /// <param name="location">World-space anchor point.</param>
         /// <param name="text">Label text.</param>
         /// <param name="size">Font size (default 15).</param>
-        public TextInfo(CxPoint3D location, string text, float size = 15f)
+        public CxTextInfo(CxPoint3D location, string text, float size = 15f)
         {
             Location = location;
             Text     = text;

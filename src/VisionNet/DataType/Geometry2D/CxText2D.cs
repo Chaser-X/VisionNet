@@ -4,7 +4,7 @@ namespace VisionNet.DataType
     /// Associates a text string with a 2D screen-space position and a font size.
     /// Used to render fixed screen-space labels via <c>CxText2DItem</c>.
     /// </summary>
-    public struct Text2D
+    public struct CxText2D
     {
         /// <summary>
         /// Screen-space anchor position of the label, in pixels.
@@ -22,7 +22,7 @@ namespace VisionNet.DataType
         /// <param name="location">Screen-space position (top-left origin).</param>
         /// <param name="text">Label text.</param>
         /// <param name="fontSize">Font size in points (default 12).</param>
-        public Text2D(CxPoint2D location, string text, int fontSize = 12)
+        public CxText2D(CxPoint2D location, string text, int fontSize = 12)
         {
             Location = location;
             Text     = text;

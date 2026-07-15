@@ -6,18 +6,18 @@ using VisionNet.DataType;
 namespace VisionNet.Controls
 {
     /// <summary>
-    /// Renders an array of <see cref="Segment3D"/> values as GL_LINES with a configurable line width.
+    /// Renders an array of <see cref="CxSegment3D"/> values as GL_LINES with a configurable line width.
     /// </summary>
     public class CxSegment3DItem : AbstractRenderItem
     {
         /// <summary>Gets the line segments to be rendered.</summary>
-        public Segment3D[] Segment3Ds { get; private set; }
+        public CxSegment3D[] Segment3Ds { get; private set; }
 
         /// <summary>Initializes the item with the given segments, colour, and line width.</summary>
         /// <param name="segments">World-space line segments.</param>
         /// <param name="color">Line colour.</param>
         /// <param name="size">Line width in pixels.</param>
-        public CxSegment3DItem(Segment3D[] segments, Color color, float size = 1.0f) : base(color, size)
+        public CxSegment3DItem(CxSegment3D[] segments, Color color, float size = 1.0f) : base(color, size)
         {
             Segment3Ds = segments;
         }

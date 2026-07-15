@@ -6,20 +6,20 @@ using VisionNet.DataType;
 namespace VisionNet.Controls
 {
     /// <summary>
-    /// Renders an array of <see cref="TextInfo"/> values as world-anchored 2D text labels.
+    /// Renders an array of <see cref="CxTextInfo"/> values as world-anchored 2D text labels.
     /// Each label is projected from 3D world coordinates to screen space and skipped if
     /// it falls outside the viewport or behind the camera.
     /// </summary>
     public class CxTextInfoItem : AbstractRenderItem
     {
         /// <summary>Gets the text labels to be rendered.</summary>
-        public TextInfo[] TextInfos { get; private set; }
+        public CxTextInfo[] TextInfos { get; private set; }
 
         /// <summary>Initializes the item with the given text labels, colour, and size.</summary>
         /// <param name="textInfos">World-anchored text labels.</param>
         /// <param name="color">Text colour.</param>
         /// <param name="size">Font size scale (passed to <c>gl.DrawText</c>).</param>
-        public CxTextInfoItem(TextInfo[] textInfos, Color color, float size = 1.0f) : base(color, size)
+        public CxTextInfoItem(CxTextInfo[] textInfos, Color color, float size = 1.0f) : base(color, size)
         {
             TextInfos = textInfos;
         }
