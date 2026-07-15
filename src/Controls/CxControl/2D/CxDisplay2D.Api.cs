@@ -20,7 +20,7 @@ namespace VisionNet.Controls
             YScale = yScale;
             ZScale = zScale;
             if (_imageItem != null) _imageItem.UpdateWorldRect(GetImageWorldRect());
-            FitToImage();
+            FitImage1to1();
         }
 
         /// <summary>
@@ -33,7 +33,7 @@ namespace VisionNet.Controls
             YOffset = yOffset;
             ZOffset = zOffset;
             if (_imageItem != null) _imageItem.UpdateWorldRect(GetImageWorldRect());
-            FitToImage();
+            FitImage1to1();
         }
 
         /// <summary>
@@ -92,7 +92,7 @@ namespace VisionNet.Controls
 
             // Move image to world-coordinate rect so axes show world values
             _imageItem.UpdateWorldRect(GetImageWorldRect());
-            FitToImage();
+            FitImage1to1();
         }
 
         /// <summary>Removes the currently displayed image.</summary>
@@ -207,28 +207,22 @@ namespace VisionNet.Controls
 
         // ── View management ───────────────────────────────────────────────────────
 
-        /// <summary>Resets the view to fit the currently loaded image, or autoscales if no image.</summary>
+        /// <summary>Clears all overlays and the displayed image, returning the control to an empty state.</summary>
         public void ResetView()
         {
-            if (_imageWidth > 0 && _imageHeight > 0)
-                FitToImage();
-            else
-            {
-                _formsPlot.Plot.Axes.AutoScale();
-                RefreshDisplay();
-            }
+            ClearOverlays();
+            ClearImage();
         }
 
         /// <summary>
-        /// Fits the current view to the image with an equal aspect ratio (1:1 pixel scale).
-        /// Useful when displaying circles that must appear as true circles.
+        /// Enforces or releases a 1:1 X/Y aspect ratio (equal world units per pixel on both axes).
+        /// When <paramref name="locked"/> is <c>true</c>, the image is also fitted to the current view.
         /// </summary>
         public void SetAspectLock(bool locked)
         {
-            if (_imageWidth > 0 && _imageHeight > 0)
-                FitToImage();
-            else
-                RefreshDisplay();
+            _formsPlot.Plot.Axes.SquareUnits(locked);
+            if (locked) FitToImage();
+            else RefreshDisplay();
         }
 
         // ── Selection management ──────────────────────────────────────────────────

@@ -1,5 +1,7 @@
 using System;
+using System.Windows.Forms;
 using ScottPlot;
+using ScottPlot.WinForms;
 using VisionNet.DataType;
 
 namespace VisionNet.Controls
@@ -12,6 +14,42 @@ namespace VisionNet.Controls
             var plot = _formsPlot.Plot;
             plot.Legend.IsVisible = false;
             plot.Grid.IsVisible   = false;
+
+            // Restore ScottPlot defaults (includes "Open in New Window"), then customise.
+            //_formsPlot.Menu.Reset();
+            _formsPlot.Menu = new CxDisplay2DMenu(this, _formsPlot);
+
+            // Default: enforce 1:1 aspect ratio
+            _formsPlot.Plot.Axes.SquareUnits();
+
+            //var strip = _formsPlot.ContextMenuStrip;
+            //if (strip != null && strip.Items.Count >= 2)
+            //{
+            //    // Remove "Copy Image" (index 1) first to avoid index shift, then "Save Image" (index 0).
+            //    strip.Items.RemoveAt(1);
+            //    strip.Items.RemoveAt(0);
+
+            //    var fitItem = new ToolStripMenuItem("Fit Image");
+            //    fitItem.Click += (s, e) => FitImage1to1();
+            //    strip.Items.Insert(0, fitItem);
+            //}
+            //else
+            //{
+            //    // Fallback: IPlotMenu API only.
+            //    //menu.Clear();
+            //    //menu.Add("Fit Image", _ => FitImage1to1());
+            //    //menu.Add("")
+            //}
+        }
+
+        /// <summary>
+        /// Fits the image to the window and enforces a 1:1 X/Y aspect ratio so image pixels appear as squares.
+        /// </summary>
+        internal void FitImage1to1()
+        {
+            FitToImage();
+            _formsPlot.Plot.Axes.SquareUnits();
+            RefreshDisplay();
         }
 
         /// <summary>
@@ -73,6 +111,56 @@ namespace VisionNet.Controls
                 _formsPlot.Invoke(new Action(_formsPlot.Refresh));
             else
                 _formsPlot.Refresh();
+        }
+    }
+    /// <summary>
+    /// 替换 ScottPlot 默认右键菜单。
+    /// </summary>
+    sealed class CxDisplay2DMenu : ScottPlot.IPlotMenu
+    {
+        private readonly ScottPlot.WinForms.FormsPlot _fp;
+        private readonly CxDisplay2D _form;
+        public CxDisplay2DMenu(CxDisplay2D parent, ScottPlot.WinForms.FormsPlot fp)
+        {
+            _form = parent;
+            _fp = fp;
+        }
+
+        // 接口的其余成员（不需要额外实现，留空即可）
+        public void Reset() { }
+        public void Clear() { }
+        public void Add(string label, System.Action<ScottPlot.Plot> action) { }
+        public void AddSeparator() { }
+
+        public void ShowContextMenu(ScottPlot.Pixel position)
+        {
+            var menu = new System.Windows.Forms.ContextMenuStrip();
+            // 1:1 自适应
+            var itemFit = new System.Windows.Forms.ToolStripMenuItem("Autoscale");
+            itemFit.Click += (s, e) => { _form.FitImage1to1(); _fp.Refresh(); };
+            menu.Items.Add(itemFit);
+            menu.Items.Add(new System.Windows.Forms.ToolStripSeparator());
+            // 保存图像
+            var itemSave = new System.Windows.Forms.ToolStripMenuItem("Save Image");
+            itemSave.Click += (s, e) =>
+            {
+                using (var dlg = new System.Windows.Forms.SaveFileDialog())
+                {
+                    dlg.Filter = "PNG 图像|*.png";
+                    dlg.FileName = "image.png";
+                    if (dlg.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+                        _fp.Plot.SavePng(dlg.FileName, _fp.Width, _fp.Height);
+                }
+            };
+            menu.Items.Add(itemSave);
+            //open in new window
+            var itemOpen = new System.Windows.Forms.ToolStripMenuItem("Open in New Window");
+            itemOpen.Click += (s, e) =>
+            {
+                FormsPlotViewer.Launch(_fp.Plot, _form.Name);
+            };
+            menu.Items.Add(itemOpen);
+            menu.Show(_fp, new System.Drawing.Point((int)position.X, (int)position.Y));
         }
     }
 }

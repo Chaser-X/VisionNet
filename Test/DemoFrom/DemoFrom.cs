@@ -670,14 +670,15 @@ namespace DemoFrom
         {
             try
             {
-                _cxDisplay2D.SetCoordinateScale(0.1f, 0.2f);
+                _cxDisplay2D.ResetView();
+                _cxDisplay2D.SetCoordinateScale(0.1f, 0.1f);
                 using (var bmp = new Bitmap(path))
                 {
                     // 4-channel BGRA (matches Format32bppArgb memory layout)
                     var lockRect = new Rectangle(0, 0, bmp.Width, bmp.Height);
                     var bd = bmp.LockBits(lockRect, ImageLockMode.ReadOnly, PixelFormat.Format32bppArgb);
                     var img = new CxImage();
-                    img.SetData(bmp.Width, bmp.Height, bd.Scan0, PlainType.Byte, 1);
+                    img.SetData(bmp.Width, bmp.Height, bd.Scan0, PlainType.Byte, 4);
                     bmp.UnlockBits(bd);
                     return img;
                 }
