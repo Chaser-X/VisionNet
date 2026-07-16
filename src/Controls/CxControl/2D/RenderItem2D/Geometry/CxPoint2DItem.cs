@@ -10,11 +10,15 @@ namespace VisionNet.Controls
 {
     /// <summary>
     /// Renders an array of <see cref="CxPoint2D"/> values as scatter markers.
+    /// All points share a single <see cref="Scatter"/> plottable.
+    /// Only the point that was hit by <see cref="HitTest"/> is moved during drag;
+    /// colour always follows <see cref="Abstract2DRenderItem.DrawColor"/>.
     /// </summary>
     public class CxPoint2DItem : Abstract2DRenderItem
     {
         private Scatter _plottable;
         private Plot    _plot;
+        private int     _activeIndex = -1;
 
         /// <summary>Gets the point data being rendered.</summary>
         public CxPoint2D[] Points { get; private set; }
@@ -66,20 +70,48 @@ namespace VisionNet.Controls
         /// <inheritdoc/>
         public override bool HitTest(CxPoint2D plotPos)
         {
-            foreach (var p in Points)
+            float t2 = HitThreshold * HitThreshold;
+            for (int pi = 0; pi < Points.Length; pi++)
             {
-                float dx = p.X - plotPos.X;
-                float dy = p.Y - plotPos.Y;
-                if (dx * dx + dy * dy <= HitThreshold * HitThreshold) return true;
+                float dx = Points[pi].X - plotPos.X;
+                float dy = Points[pi].Y - plotPos.Y;
+                if (dx * dx + dy * dy <= t2)
+                {
+                    _activeIndex = pi;
+                    return true;
+                }
             }
             return false;
         }
 
         /// <inheritdoc/>
+        public override void OnMouseDown(CxPoint2D plotPos)
+        {
+            if (_activeIndex < 0) { UpdatePlottable(); return; }
+            IsSelected = true;
+            UpdatePlottable();
+        }
+
+        /// <inheritdoc/>
+        public override void OnMouseUp()
+        {
+        }
+
+        /// <inheritdoc/>
+        public override void OnDeselected()
+        {
+            _activeIndex = -1;
+            IsSelected = false;
+            UpdatePlottable();
+        }
+
+        /// <inheritdoc/>
         public override void Translate(float dx, float dy)
         {
-            for (int i = 0; i < Points.Length; i++)
-                Points[i] = new CxPoint2D(Points[i].X + dx, Points[i].Y + dy);
+            if (_activeIndex >= 0 && _activeIndex < Points.Length)
+                Points[_activeIndex] = new CxPoint2D(
+                    Points[_activeIndex].X + dx,
+                    Points[_activeIndex].Y + dy);
         }
 
         /// <inheritdoc/>

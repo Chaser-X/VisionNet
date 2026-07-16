@@ -12,6 +12,9 @@ namespace VisionNet.Controls
     /// Renders an array of <see cref="CxLine2D"/> values as infinite lines
     /// (drawn as finite segments spanning a large range in both directions).
     /// Each line is rendered as a separate <see cref="Scatter"/> plottable.
+    ///
+    /// Only the line that was hit by <see cref="HitTest"/> is drawn in <see cref="Abstract2DRenderItem.SelectedColor"/>;
+    /// all others use <see cref="Abstract2DRenderItem.Color"/>.
     /// </summary>
     public class CxLine2DItem : Abstract2DRenderItem
     {
@@ -19,6 +22,7 @@ namespace VisionNet.Controls
 
         private readonly List<Scatter> _plottables = new List<Scatter>();
         private Plot _plot;
+        private int _activeIndex = -1;
 
         /// <summary>Gets the line data being rendered.</summary>
         public CxLine2D[] Lines { get; private set; }
@@ -57,9 +61,11 @@ namespace VisionNet.Controls
 
         private void BuildPlottables()
         {
-            var spColor = ToSPColor(DrawColor);
-            foreach (var line in Lines)
+            for (int li = 0; li < Lines.Length; li++)
             {
+                var line = Lines[li];
+                var spColor = li == _activeIndex ? ToSPColor(SelectedColor) : ToSPColor(Color);
+
                 float sx = line.Point.X - line.Direction.X * RenderRange;
                 float sy = line.Point.Y - line.Direction.Y * RenderRange;
                 float ex = line.Point.X + line.Direction.X * RenderRange;
@@ -79,9 +85,34 @@ namespace VisionNet.Controls
         public override bool HitTest(CxPoint2D plotPos)
         {
             float t2 = HitThreshold * HitThreshold;
-            foreach (var line in Lines)
-                if (DistSqToInfiniteLine(plotPos, line) <= t2) return true;
+            for (int li = 0; li < Lines.Length; li++)
+            {
+                if (DistSqToInfiniteLine(plotPos, Lines[li]) <= t2)
+                {
+                    _activeIndex = li;
+                    return true;
+                }
+            }
             return false;
+        }
+
+        /// <inheritdoc/>
+        public override void OnDeselected()
+        {
+            _activeIndex = -1;
+            base.OnDeselected();
+        }
+
+        /// <inheritdoc/>
+        public override void Translate(float dx, float dy)
+        {
+            if (_activeIndex >= 0)
+            {
+                var l = Lines[_activeIndex];
+                Lines[_activeIndex] = new CxLine2D(
+                    new CxPoint2D(l.Point.X + dx, l.Point.Y + dy),
+                    l.Direction);
+            }
         }
 
         private static float DistSqToInfiniteLine(CxPoint2D p, CxLine2D line)
@@ -97,15 +128,6 @@ namespace VisionNet.Controls
             }
             float cx = (p.X - line.Point.X) * dy - (p.Y - line.Point.Y) * dx;
             return (cx * cx) / lenSq;
-        }
-
-        /// <inheritdoc/>
-        public override void Translate(float dx, float dy)
-        {
-            for (int i = 0; i < Lines.Length; i++)
-                Lines[i] = new CxLine2D(
-                    new CxPoint2D(Lines[i].Point.X + dx, Lines[i].Point.Y + dy),
-                    Lines[i].Direction);
         }
 
         /// <inheritdoc/>

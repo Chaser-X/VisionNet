@@ -541,10 +541,12 @@ namespace DemoFrom
             MakeBtn("Drag Segs", btn2D_dragSeg_Click);
             MakeBtn("Static Circles", btn2D_staticCircle_Click);
             MakeBtn("Drag Circles", btn2D_dragCircle_Click);
+            MakeBtn("Drag 2 Circs", btn2D_drag2Circles_Click);
             MakeBtn("Static Lines", btn2D_staticLine_Click);
             MakeBtn("Drag Lines",   btn2D_dragLine_Click);
             MakeBtn("Static Boxes", btn2D_staticBox_Click);
             MakeBtn("Drag Box",     btn2D_dragBox_Click);
+            MakeBtn("Drag Polygon", btn2D_dragPolygon_Click);
             MakeBtn("Clear Overlays", btn2D_clearOverlays_Click);
             MakeBtn("Clear All", btn2D_clearAll_Click);
 
@@ -656,6 +658,33 @@ namespace DemoFrom
             };
         }
 
+        private void btn2D_drag2Circles_Click(object sender, EventArgs e)
+        {
+            var box = _cxDisplay2D.GetImageWorldRect();
+            float cx = box.Size.Width > 0 ? box.Center.X : 200f;
+            float cy = box.Size.Height > 0 ? box.Center.Y : 200f;
+            float r = Math.Min(box.Size.Width > 0 ? box.Size.Width : 400,
+                                box.Size.Height > 0 ? box.Size.Height : 400) * 0.08f;
+            if (r < 10) r = 40f;
+
+            var circles = new[]
+            {
+                new CxCircle2D(new CxPoint2D(cx - r * 2, cy), r),
+                new CxCircle2D(new CxPoint2D(cx + r * 2, cy), r),
+            };
+            var item = _cxDisplay2D.SetCircle(circles, Color.Orange, 2f, filled: true);
+            item.IsActiveObj = true;
+            item.OnChanged += i =>
+            {
+                var cs = ((CxCircle2DItem)i).Circles;
+                var text = $"C1:({cs[0].Center.X:F0},{cs[0].Center.Y:F0})R:{cs[0].Radius:F1}\nC2:({cs[1].Center.X:F0},{cs[1].Center.Y:F0})R:{cs[1].Radius:F1}";
+                if (_lbl2DPos.InvokeRequired)
+                    _lbl2DPos.Invoke(new Action(() => _lbl2DPos.Text = text));
+                else
+                    _lbl2DPos.Text = text;
+            };
+        }
+
         private void btn2D_staticLine_Click(object sender, EventArgs e)
         {
             var box = _cxDisplay2D.GetImageWorldRect();
@@ -717,12 +746,50 @@ namespace DemoFrom
             if (s < 20) s = 80f;
 
             var boxes = new[] { new CxBox2D(new CxPoint2D(cx, cy), new CxSize2D(s, s)) };
-            var item = _cxDisplay2D.SetBox(boxes, Color.Gold, 2f, filled: true);
+            var item = _cxDisplay2D.SetBox(boxes, Color.Gold, 2f, filled: false);
             item.IsActiveObj = true;
             item.OnChanged += i =>
             {
                 var b = ((CxBox2DItem)i).Boxes[0];
                 var text = $"C:({b.Center.X:F0},{b.Center.Y:F0})\nS:({b.Size.Width:F0}×{b.Size.Height:F0})";
+                if (_lbl2DPos.InvokeRequired)
+                    _lbl2DPos.Invoke(new Action(() => _lbl2DPos.Text = text));
+                else
+                    _lbl2DPos.Text = text;
+            };
+        }
+
+        private void btn2D_dragPolygon_Click(object sender, EventArgs e)
+        {
+            var box = _cxDisplay2D.GetImageWorldRect();
+            float cx = box.Size.Width > 0 ? box.Center.X : 200f;
+            float cy = box.Size.Height > 0 ? box.Center.Y : 200f;
+            float s = Math.Min(box.Size.Width > 0 ? box.Size.Width : 400,
+                                box.Size.Height > 0 ? box.Size.Height : 400) * 0.12f;
+            if (s < 20) s = 80f;
+
+            var tri = new CxPolygon2D(new[]
+            {
+                new CxPoint2D(cx, cy - s),
+                new CxPoint2D(cx - s * 0.866f, cy + s * 0.5f),
+                new CxPoint2D(cx + s * 0.866f, cy + s * 0.5f),
+            }, isClosed: true);
+
+            var open = new CxPolygon2D(new[]
+            {
+                new CxPoint2D(cx - s * 1.8f, cy),
+                new CxPoint2D(cx, cy - s * 0.8f),
+                new CxPoint2D(cx + s * 1.8f, cy),
+            }, isClosed: false);
+
+            var item = _cxDisplay2D.SetPolygon(new[] { tri, open }, Color.DeepSkyBlue, 2f, filled: true);
+            item.IsActiveObj = true;
+            item.OnChanged += i =>
+            {
+                var pts = ((CxPolygon2DItem)i).Polygons[0].Points;
+                var text = pts.Length > 0
+                    ? $"V0:({pts[0].X:F0},{pts[0].Y:F0})\nV1:({pts[1].X:F0},{pts[1].Y:F0})"
+                    : "--";
                 if (_lbl2DPos.InvokeRequired)
                     _lbl2DPos.Invoke(new Action(() => _lbl2DPos.Text = text));
                 else

@@ -12,11 +12,25 @@ namespace VisionNet.Controls
     /// Renders an array of <see cref="CxPolygon2D"/> values.
     /// Closed polygons use <see cref="Polygon"/> plottables with optional fill;
     /// open polylines use <see cref="Scatter"/> plottables (no fill).
+    ///
+    /// Drag interaction:
+    /// <list type="bullet">
+    ///   <item>Click near a vertex → drag to reshape (that vertex follows the mouse).</item>
+    ///   <item>Click near an edge or inside a filled polygon → drag to translate.</item>
+    /// </list>
+    /// Only the polygon that was hit by <see cref="HitTest"/> is drawn in <see cref="Abstract2DRenderItem.SelectedColor"/>;
+    /// all others use <see cref="Abstract2DRenderItem.Color"/>.
     /// </summary>
     public class CxPolygon2DItem : Abstract2DRenderItem
     {
+        private enum DragMode { None, Translate, DragVertex }
+
         private readonly List<IPlottable> _plottables = new List<IPlottable>();
         private Plot _plot;
+
+        private DragMode _dragMode;
+        private int      _activePolygonIndex = -1;
+        private int      _vertexIndex;
 
         /// <summary>Gets the polygon data being rendered.</summary>
         public CxPolygon2D[] Polygons { get; private set; }
@@ -59,11 +73,12 @@ namespace VisionNet.Controls
 
         private void BuildPlottables()
         {
-            var spColor = ToSPColor(DrawColor);
-
-            foreach (var poly in Polygons)
+            for (int pi = 0; pi < Polygons.Length; pi++)
             {
+                var poly = Polygons[pi];
                 if (poly.Points == null || poly.Points.Length == 0) continue;
+
+                var spColor = pi == _activePolygonIndex ? ToSPColor(SelectedColor) : ToSPColor(Color);
 
                 if (poly.IsClosed)
                 {
@@ -96,31 +111,118 @@ namespace VisionNet.Controls
         /// <inheritdoc/>
         public override bool HitTest(CxPoint2D plotPos)
         {
-            float t2 = HitThreshold * HitThreshold;
-            foreach (var poly in Polygons)
+            for (int pi = 0; pi < Polygons.Length; pi++)
             {
+                var poly = Polygons[pi];
                 if (poly.Points == null || poly.Points.Length == 0) continue;
 
                 // Interior hit for filled closed polygons
                 if (Filled && poly.IsClosed)
                 {
-                    if (PointInPolygon(plotPos, poly.Points)) return true;
+                    if (PointInPolygon(plotPos, poly.Points))
+                    {
+                        _activePolygonIndex = pi;
+                        return true;
+                    }
                 }
 
                 // Edge hit for all polygon types
+                float t2 = HitThreshold * HitThreshold;
                 for (int i = 0; i < poly.Points.Length - 1; i++)
                 {
                     if (DistSqToSegment(plotPos, poly.Points[i], poly.Points[i + 1]) <= t2)
+                    {
+                        _activePolygonIndex = pi;
                         return true;
+                    }
                 }
                 if (poly.IsClosed)
                 {
                     int last = poly.Points.Length - 1;
                     if (DistSqToSegment(plotPos, poly.Points[last], poly.Points[0]) <= t2)
+                    {
+                        _activePolygonIndex = pi;
                         return true;
+                    }
                 }
             }
             return false;
+        }
+
+        /// <inheritdoc/>
+        public override void OnMouseDown(CxPoint2D plotPos)
+        {
+            if (_activePolygonIndex < 0) { UpdatePlottable(); return; }
+
+            var poly = Polygons[_activePolygonIndex];
+            if (poly.Points == null || poly.Points.Length == 0)
+            {
+                _dragMode = DragMode.None;
+                UpdatePlottable();
+                return;
+            }
+
+            float t2 = HitThreshold * HitThreshold * 4f;
+            _dragMode = DragMode.Translate;
+            for (int i = 0; i < poly.Points.Length; i++)
+            {
+                float dx = plotPos.X - poly.Points[i].X;
+                float dy = plotPos.Y - poly.Points[i].Y;
+                if (dx * dx + dy * dy <= t2)
+                {
+                    _vertexIndex = i;
+                    _dragMode = DragMode.DragVertex;
+                    break;
+                }
+            }
+
+            UpdatePlottable();
+        }
+
+        /// <inheritdoc/>
+        public override void OnMouseMove(CxPoint2D plotPos, CxPoint2D prevPlotPos)
+        {
+            if (_activePolygonIndex < 0) return;
+
+            if (_dragMode == DragMode.DragVertex)
+            {
+                var pts = Polygons[_activePolygonIndex].Points;
+                if (pts != null && _vertexIndex >= 0 && _vertexIndex < pts.Length)
+                {
+                    pts[_vertexIndex] = new CxPoint2D((float)plotPos.X, (float)plotPos.Y);
+                    UpdatePlottable();
+                    RaiseOnChanged();
+                }
+            }
+            else
+            {
+                base.OnMouseMove(plotPos, prevPlotPos);
+            }
+        }
+
+        /// <inheritdoc/>
+        public override void OnMouseUp()
+        {
+            _dragMode = DragMode.None;
+        }
+
+        /// <inheritdoc/>
+        public override void OnDeselected()
+        {
+            _activePolygonIndex = -1;
+            _dragMode = DragMode.None;
+            UpdatePlottable();
+        }
+
+        /// <inheritdoc/>
+        public override void Translate(float dx, float dy)
+        {
+            if (_activePolygonIndex >= 0 && Polygons[_activePolygonIndex].Points != null)
+            {
+                var pts = Polygons[_activePolygonIndex].Points;
+                for (int j = 0; j < pts.Length; j++)
+                    pts[j] = new CxPoint2D(pts[j].X + dx, pts[j].Y + dy);
+            }
         }
 
         private static bool PointInPolygon(CxPoint2D p, CxPoint2D[] pts)
@@ -145,18 +247,6 @@ namespace VisionNet.Controls
             float cx = a.X + t * dx - p.X;
             float cy = a.Y + t * dy - p.Y;
             return cx * cx + cy * cy;
-        }
-
-        /// <inheritdoc/>
-        public override void Translate(float dx, float dy)
-        {
-            for (int i = 0; i < Polygons.Length; i++)
-            {
-                if (Polygons[i].Points == null) continue;
-                var pts = Polygons[i].Points;
-                for (int j = 0; j < pts.Length; j++)
-                    pts[j] = new CxPoint2D(pts[j].X + dx, pts[j].Y + dy);
-            }
         }
 
         /// <inheritdoc/>
