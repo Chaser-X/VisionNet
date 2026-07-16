@@ -61,6 +61,8 @@ namespace VisionNet.Controls
             ScottPlot.Fonts.Default = "Microsoft YaHei";
 
             _formsPlot = new FormsPlot { Dock = DockStyle.Fill };
+            _formsPlot.BackColor = Color.Black;
+            _formsPlot.Plot.DataBackground.Color = ScottPlot.Colors.Black;
             Controls.Add(_formsPlot);
             _formsPlot.BringToFront();
 

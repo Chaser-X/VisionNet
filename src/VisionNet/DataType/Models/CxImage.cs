@@ -5,7 +5,7 @@ namespace VisionNet.DataType
 {
     /// <summary>
     /// A 2D image container. Pixel data is stored as a native typed array
-    /// (byte[], short[], ushort[], or float[]) corresponding to <see cref="Type"/>.
+    /// (byte[], short[], int[], or float[]) corresponding to <see cref="Type"/>.
     /// </summary>
     /// <remarks>
     /// <para><b>Memory layout (row-major, interleaved channels):</b><br/>
@@ -26,9 +26,9 @@ namespace VisionNet.DataType
         /// <summary>Initializes an image with the given dimensions and allocates an empty data array.</summary>
         /// <param name="width">Image width in pixels.</param>
         /// <param name="height">Image height in pixels.</param>
-        /// <param name="type">Pixel element data type (default: <see cref="PlainType.Byte"/>).</param>
+        /// <param name="type">Pixel element data type (default: <see cref="PlainType.UInt8"/>).</param>
         /// <param name="channel">Number of channels per pixel (default: 1).</param>
-        public CxImage(int width, int height, PlainType type = PlainType.Byte, int channel = 1)
+        public CxImage(int width, int height, PlainType type = PlainType.UInt8, int channel = 1)
         {
             Width   = width;
             Height  = height;
@@ -37,33 +37,23 @@ namespace VisionNet.DataType
             _data   = AllocateArray(type, width * height * channel);
         }
 
-        /// <summary>Initializes an image from an existing <see cref="byte"/> array. Type is set to <see cref="PlainType.Byte"/>.</summary>
+        /// <summary>Initializes an image from an existing <see cref="byte"/> array. Type is set to <see cref="PlainType.UInt8"/>.</summary>
         public CxImage(int width, int height, byte[] data, int channel = 1)
         {
             Width   = width;
             Height  = height;
             Channel = channel;
-            Type    = PlainType.Byte;
+            Type    = PlainType.UInt8;
             _data   = data;
         }
 
-        /// <summary>Initializes an image from an existing <see cref="short"/> array. Type is set to <see cref="PlainType.Short"/>.</summary>
+        /// <summary>Initializes an image from an existing <see cref="short"/> array. Type is set to <see cref="PlainType.Int16"/>.</summary>
         public CxImage(int width, int height, short[] data, int channel = 1)
         {
             Width   = width;
             Height  = height;
             Channel = channel;
-            Type    = PlainType.Short;
-            _data   = data;
-        }
-
-        /// <summary>Initializes an image from an existing <see cref="ushort"/> array. Type is set to <see cref="PlainType.UShort"/>.</summary>
-        public CxImage(int width, int height, ushort[] data, int channel = 1)
-        {
-            Width   = width;
-            Height  = height;
-            Channel = channel;
-            Type    = PlainType.UShort;
+            Type    = PlainType.Int16;
             _data   = data;
         }
 
@@ -89,7 +79,7 @@ namespace VisionNet.DataType
         public int Channel { get; set; } = 1;
 
         /// <summary>Gets the pixel element data type. Set automatically by constructors and <see cref="SetData"/> overloads.</summary>
-        public PlainType Type { get; private set; } = PlainType.Byte;
+        public PlainType Type { get; private set; } = PlainType.UInt8;
 
         /// <summary>
         /// Gets the pixel data as a read-only array reference.
@@ -100,27 +90,19 @@ namespace VisionNet.DataType
 
         // ── SetData overloads ─────────────────────────────────────────────────────
 
-        /// <summary>Assigns a <see cref="byte"/> array and updates all image properties. Type is set to <see cref="PlainType.Byte"/>.</summary>
+        /// <summary>Assigns a <see cref="byte"/> array and updates all image properties. Type is set to <see cref="PlainType.UInt8"/>.</summary>
         public void SetData(int width, int height, byte[] data, int channel = 1)
         {
             Width = width; Height = height; Channel = channel;
-            Type  = PlainType.Byte;
+            Type  = PlainType.UInt8;
             _data = data;
         }
 
-        /// <summary>Assigns a <see cref="short"/> array and updates all image properties. Type is set to <see cref="PlainType.Short"/>.</summary>
+        /// <summary>Assigns a <see cref="short"/> array and updates all image properties. Type is set to <see cref="PlainType.Int16"/>.</summary>
         public void SetData(int width, int height, short[] data, int channel = 1)
         {
             Width = width; Height = height; Channel = channel;
-            Type  = PlainType.Short;
-            _data = data;
-        }
-
-        /// <summary>Assigns a <see cref="ushort"/> array and updates all image properties. Type is set to <see cref="PlainType.UShort"/>.</summary>
-        public void SetData(int width, int height, ushort[] data, int channel = 1)
-        {
-            Width = width; Height = height; Channel = channel;
-            Type  = PlainType.UShort;
+            Type  = PlainType.Int16;
             _data = data;
         }
 
@@ -150,7 +132,7 @@ namespace VisionNet.DataType
 
             switch (type)
             {
-                case PlainType.Byte:
+                case PlainType.UInt8:
                 {
                     var arr = new byte[n];
                     Marshal.Copy(ptr, arr, 0, n);
@@ -158,21 +140,16 @@ namespace VisionNet.DataType
                     break;
                 }
                 case PlainType.Int16:
-                case PlainType.Short:
                 {
                     var arr = new short[n];
                     Marshal.Copy(ptr, arr, 0, n);
                     _data = arr;
                     break;
                 }
-                case PlainType.UShort:
+                case PlainType.Int32:
                 {
-                    // Marshal.Copy has no ushort[] overload; copy via byte[] + Buffer.BlockCopy
-                    int byteCount = n * 2;
-                    var tmp = new byte[byteCount];
-                    Marshal.Copy(ptr, tmp, 0, byteCount);
-                    var arr = new ushort[n];
-                    Buffer.BlockCopy(tmp, 0, arr, 0, byteCount);
+                    var arr = new int[n];
+                    Marshal.Copy(ptr, arr, 0, n);
                     _data = arr;
                     break;
                 }
@@ -200,10 +177,9 @@ namespace VisionNet.DataType
         {
             switch (type)
             {
-                case PlainType.Byte:   return 1;
-                case PlainType.Int16:
-                case PlainType.Short:  return 2;
-                case PlainType.UShort: return 2;
+                case PlainType.UInt8:  return 1;
+                case PlainType.Int16:  return 2;
+                case PlainType.Int32:  return 4;
                 case PlainType.Real:   return 4;
                 default:               return 1;
             }
@@ -213,10 +189,9 @@ namespace VisionNet.DataType
         {
             switch (type)
             {
-                case PlainType.Byte:   return new byte[elementCount];
-                case PlainType.Int16:
-                case PlainType.Short:  return new short[elementCount];
-                case PlainType.UShort: return new ushort[elementCount];
+                case PlainType.UInt8:  return new byte[elementCount];
+                case PlainType.Int16:  return new short[elementCount];
+                case PlainType.Int32:  return new int[elementCount];
                 case PlainType.Real:   return new float[elementCount];
                 default:               return new byte[elementCount];
             }

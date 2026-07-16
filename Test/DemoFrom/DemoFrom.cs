@@ -823,7 +823,7 @@ namespace DemoFrom
                     var lockRect = new Rectangle(0, 0, bmp.Width, bmp.Height);
                     var bd = bmp.LockBits(lockRect, ImageLockMode.ReadOnly, PixelFormat.Format32bppArgb);
                     var img = new CxImage();
-                    img.SetData(bmp.Width, bmp.Height, bd.Scan0, PlainType.Byte, 4);
+                    img.SetData(bmp.Width, bmp.Height, bd.Scan0, PlainType.UInt8, 4);
                     bmp.UnlockBits(bd);
                     return img;
                 }

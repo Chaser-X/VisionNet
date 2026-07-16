@@ -16,7 +16,7 @@ namespace VisionNet.Controls
         /// </summary>
         public void SetScaleAndOffset(CxPoint3D scale, CxPoint3D offset)
         {
-            Scale  = scale;
+            Scale = scale;
             Offset = offset;
             if (_imageItem != null) _imageItem.UpdateWorldRect(GetImageWorldRect());
             FitImage1to1();
@@ -25,7 +25,7 @@ namespace VisionNet.Controls
         /// <summary>Returns the image bounding rectangle expressed in world coordinates.</summary>
         public CxBox2D GetImageWorldRect()
         {
-            float w = _imageWidth  * Scale.X;
+            float w = _imageWidth * Scale.X;
             float h = _imageHeight * Scale.Y;
             return new CxBox2D(
                 new CxPoint2D(Offset.X + w / 2f, Offset.Y + h / 2f),
@@ -40,7 +40,9 @@ namespace VisionNet.Controls
         public void ShowAxes(bool visible)
         {
             _formsPlot.Plot.Axes.Bottom.IsVisible = visible;
-            _formsPlot.Plot.Axes.Left.IsVisible   = visible;
+            _formsPlot.Plot.Axes.Left.IsVisible = visible;
+            _formsPlot.Plot.Axes.Right.IsVisible = visible;
+            _formsPlot.Plot.Axes.Top.IsVisible = visible;
             RefreshDisplay();
         }
 
@@ -55,6 +57,12 @@ namespace VisionNet.Controls
             else RefreshDisplay();
         }
 
+        public void SetBackgroundColor(Color color)
+        {
+            _formsPlot.BackColor = color;
+            _formsPlot.Plot.DataBackground.Color = ScottPlot.Color.FromColor(color);
+            RefreshDisplay();
+        }
         #endregion
 
         #region Image management
@@ -80,7 +88,7 @@ namespace VisionNet.Controls
             }
 
             _imageItem.SetImage(image);
-            _imageWidth  = image.Width;
+            _imageWidth = image.Width;
             _imageHeight = image.Height;
 
             _imageItem.UpdateWorldRect(GetImageWorldRect());
@@ -94,8 +102,8 @@ namespace VisionNet.Controls
             {
                 _imageItem.RemoveFromPlot(_formsPlot.Plot);
                 _imageItem.Dispose();
-                _imageItem   = null;
-                _imageWidth  = 0;
+                _imageItem = null;
+                _imageWidth = 0;
                 _imageHeight = 0;
             }
             HideCoordAnnotation();
@@ -219,7 +227,7 @@ namespace VisionNet.Controls
             int px = Scale.X != 0f ? (int)Math.Round((plotCoord.X - Offset.X) / Scale.X) : 0;
             int py = Scale.Y != 0f ? (int)Math.Round((plotCoord.Y - Offset.Y) / Scale.Y) : 0;
             float? rawZ = _imageItem?.GetPixelFloat(px, py);
-            float? wz   = rawZ.HasValue ? rawZ.Value * Scale.Z + Offset.Z : (float?)null;
+            float? wz = rawZ.HasValue ? rawZ.Value * Scale.Z + Offset.Z : (float?)null;
             return (wx, wy, wz);
         }
 

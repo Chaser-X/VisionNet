@@ -30,18 +30,15 @@ namespace VisionNet.DataType
     public enum PlainType
     {
         /// <summary>Unsigned 8-bit integer — 1 byte per element.</summary>
-        Byte   = 0,
+        UInt8 = 0,
 
         /// <summary>Signed 16-bit integer — 2 bytes per element.</summary>
-        Int16  = 1,
+        Int16 = 1,
 
-        /// <summary>Signed 16-bit integer — 2 bytes per element (alias for Int16).</summary>
-        Short  = 2,
-
-        /// <summary>Unsigned 16-bit integer — 2 bytes per element.</summary>
-        UShort = 3,
+        /// <summary>Signed 32-bit integer — 4 bytes per element.</summary>
+        Int32 = 2,
 
         /// <summary>Single-precision floating-point — 4 bytes per element.</summary>
-        Real   = 4,
+        Real  = 3,
     }
 }

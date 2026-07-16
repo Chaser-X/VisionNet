@@ -130,7 +130,7 @@ namespace VisionNet.Controls
 
                 switch (image.Type)
                 {
-                    case PlainType.Byte:
+                    case PlainType.UInt8:
                     {
                         var data = (byte[])image.Data;
                         if (ch == 4)
@@ -165,7 +165,6 @@ namespace VisionNet.Controls
                         }
                         break;
                     }
-                    case PlainType.Short:
                     case PlainType.Int16:
                     {
                         var data = (short[])image.Data;
@@ -177,12 +176,12 @@ namespace VisionNet.Controls
                         }
                         break;
                     }
-                    case PlainType.UShort:
+                    case PlainType.Int32:
                     {
-                        var data = (ushort[])image.Data;
+                        var data = (int[])image.Data;
                         for (int i = 0; i < w * h; i++)
                         {
-                            byte g = NormalizeUShort(data[i * ch]);
+                            byte g = NormalizeInt32(data[i * ch]);
                             ptr[i*4] = ptr[i*4+1] = ptr[i*4+2] = g;
                             ptr[i*4+3] = 255;
                         }
@@ -222,13 +221,12 @@ namespace VisionNet.Controls
 
             switch (image.Type)
             {
-                case PlainType.Byte:
+                case PlainType.UInt8:
                 { var d = (byte[])image.Data;   for (int i = 0; i < n; i++) floats[i] = d[i]; break; }
-                case PlainType.Short:
                 case PlainType.Int16:
                 { var d = (short[])image.Data;  for (int i = 0; i < n; i++) floats[i] = d[i]; break; }
-                case PlainType.UShort:
-                { var d = (ushort[])image.Data; for (int i = 0; i < n; i++) floats[i] = d[i]; break; }
+                case PlainType.Int32:
+                { var d = (int[])image.Data;    for (int i = 0; i < n; i++) floats[i] = d[i]; break; }
                 case PlainType.Real:
                 { var d = (float[])image.Data;  for (int i = 0; i < n; i++) floats[i] = d[i]; break; }
             }
@@ -241,9 +239,9 @@ namespace VisionNet.Controls
             return (byte)((v - (long)short.MinValue) * 255L / (short.MaxValue - (long)short.MinValue));
         }
 
-        private static byte NormalizeUShort(ushort v)
+        private static byte NormalizeInt32(int v)
         {
-            return (byte)(v * 255 / ushort.MaxValue);
+            return (byte)(((long)v - int.MinValue) * 255L / (uint.MaxValue));
         }
 
         private static byte NormalizeFloat(float v)
