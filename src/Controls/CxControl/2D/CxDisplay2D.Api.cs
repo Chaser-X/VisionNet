@@ -126,6 +126,10 @@ namespace VisionNet.Controls
         public CxLine2DItem SetLine(CxLine2D[] lines, Color color, float size = 1f)
             => AppendOverlay(new CxLine2DItem(lines, color, size));
 
+        /// <summary>Adds a set of 2D axis-aligned boxes (rectangles). Returns the created item for later manipulation.</summary>
+        public CxBox2DItem SetBox(CxBox2D[] boxes, Color color, float size = 1f, bool filled = false)
+            => AppendOverlay(new CxBox2DItem(boxes, color, size, filled));
+
         /// <summary>Adds a set of 2D text labels. Returns the created item for later manipulation.</summary>
         public CxText2DPlotItem SetText2D(CxText2D[] texts, Color color)
             => AppendOverlay(new CxText2DPlotItem(texts, color));

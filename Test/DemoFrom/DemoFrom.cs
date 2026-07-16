@@ -543,6 +543,8 @@ namespace DemoFrom
             MakeBtn("Drag Circles", btn2D_dragCircle_Click);
             MakeBtn("Static Lines", btn2D_staticLine_Click);
             MakeBtn("Drag Lines",   btn2D_dragLine_Click);
+            MakeBtn("Static Boxes", btn2D_staticBox_Click);
+            MakeBtn("Drag Box",     btn2D_dragBox_Click);
             MakeBtn("Clear Overlays", btn2D_clearOverlays_Click);
             MakeBtn("Clear All", btn2D_clearAll_Click);
 
@@ -682,6 +684,45 @@ namespace DemoFrom
             {
                 var line = ((CxLine2DItem)i).Lines[0];
                 var text = $"P:({line.Point.X:F0},{line.Point.Y:F0})\nD:({line.Direction.X:F2},{line.Direction.Y:F2})";
+                if (_lbl2DPos.InvokeRequired)
+                    _lbl2DPos.Invoke(new Action(() => _lbl2DPos.Text = text));
+                else
+                    _lbl2DPos.Text = text;
+            };
+        }
+
+        private void btn2D_staticBox_Click(object sender, EventArgs e)
+        {
+            var box = _cxDisplay2D.GetImageWorldRect();
+            float cx = box.Size.Width > 0 ? box.Center.X : 200f;
+            float cy = box.Size.Height > 0 ? box.Center.Y : 200f;
+            float minDim = Math.Min(box.Size.Width > 0 ? box.Size.Width : 400,
+                                     box.Size.Height > 0 ? box.Size.Height : 400);
+
+            var boxes = new[]
+            {
+                new CxBox2D(new CxPoint2D(cx, cy), new CxSize2D(minDim * 0.6f, minDim * 0.4f)),
+                new CxBox2D(new CxPoint2D(cx, cy), new CxSize2D(minDim * 0.3f, minDim * 0.3f)),
+            };
+            _cxDisplay2D.SetBox(boxes, Color.YellowGreen, 1.5f);
+        }
+
+        private void btn2D_dragBox_Click(object sender, EventArgs e)
+        {
+            var box = _cxDisplay2D.GetImageWorldRect();
+            float cx = box.Size.Width > 0 ? box.Center.X : 200f;
+            float cy = box.Size.Height > 0 ? box.Center.Y : 200f;
+            float s = Math.Min(box.Size.Width > 0 ? box.Size.Width : 400,
+                                box.Size.Height > 0 ? box.Size.Height : 400) * 0.2f;
+            if (s < 20) s = 80f;
+
+            var boxes = new[] { new CxBox2D(new CxPoint2D(cx, cy), new CxSize2D(s, s)) };
+            var item = _cxDisplay2D.SetBox(boxes, Color.Gold, 2f, filled: true);
+            item.IsActiveObj = true;
+            item.OnChanged += i =>
+            {
+                var b = ((CxBox2DItem)i).Boxes[0];
+                var text = $"C:({b.Center.X:F0},{b.Center.Y:F0})\nS:({b.Size.Width:F0}×{b.Size.Height:F0})";
                 if (_lbl2DPos.InvokeRequired)
                     _lbl2DPos.Invoke(new Action(() => _lbl2DPos.Text = text));
                 else
