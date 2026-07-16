@@ -115,12 +115,12 @@ namespace VisionNet.Controls
             => AppendOverlay(new CxSegment2DItem(segments, color, size));
 
         /// <summary>Adds a set of 2D polygons (open or closed). Returns the created item for later manipulation.</summary>
-        public CxPolygon2DItem SetPolygon(CxPolygon2D[] polygons, Color color, float size = 1f)
-            => AppendOverlay(new CxPolygon2DItem(polygons, color, size));
+        public CxPolygon2DItem SetPolygon(CxPolygon2D[] polygons, Color color, float size = 1f, bool filled = false)
+            => AppendOverlay(new CxPolygon2DItem(polygons, color, size, filled));
 
         /// <summary>Adds a set of 2D circles. Returns the created item for later manipulation.</summary>
-        public CxCircle2DItem SetCircle(CxCircle2D[] circles, Color color, float size = 1f)
-            => AppendOverlay(new CxCircle2DItem(circles, color, size));
+        public CxCircle2DItem SetCircle(CxCircle2D[] circles, Color color, float size = 1f, bool filled = false)
+            => AppendOverlay(new CxCircle2DItem(circles, color, size, filled));
 
         /// <summary>Adds a set of 2D infinite lines. Returns the created item for later manipulation.</summary>
         public CxLine2DItem SetLine(CxLine2D[] lines, Color color, float size = 1f)

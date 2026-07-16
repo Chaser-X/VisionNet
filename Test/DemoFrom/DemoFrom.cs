@@ -641,7 +641,7 @@ namespace DemoFrom
             if (r < 10) r = 40f;
 
             var circles = new[] { new CxCircle2D(new CxPoint2D(cx, cy), r) };
-            var item = _cxDisplay2D.SetCircle(circles, Color.Cyan, 2f);
+            var item = _cxDisplay2D.SetCircle(circles, Color.Cyan, 2f,true);
             item.IsActiveObj = true;
             item.OnChanged += i =>
             {

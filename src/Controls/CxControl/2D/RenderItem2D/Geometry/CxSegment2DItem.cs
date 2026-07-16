@@ -10,12 +10,12 @@ namespace VisionNet.Controls
 {
     /// <summary>
     /// Renders an array of <see cref="CxSegment2D"/> values as disconnected line segments.
-    /// Segments are batched into a single scatter with NaN separators for efficiency.
+    /// Each segment is rendered as a separate <see cref="Scatter"/> plottable.
     /// </summary>
     public class CxSegment2DItem : Abstract2DRenderItem
     {
-        private Scatter   _plottable;
-        private Plot      _plot;
+        private readonly List<Scatter> _plottables = new List<Scatter>();
+        private Plot _plot;
 
         /// <summary>Gets the segment data being rendered.</summary>
         public CxSegment2D[] Segments { get; private set; }
@@ -32,13 +32,14 @@ namespace VisionNet.Controls
         public override void AddToPlot(Plot plot)
         {
             _plot = plot;
-            BuildPlottable();
+            BuildPlottables();
         }
 
         /// <inheritdoc/>
         public override void RemoveFromPlot(Plot plot)
         {
-            if (_plottable != null) { plot.PlottableList.Remove(_plottable); _plottable = null; }
+            foreach (var s in _plottables) plot.PlottableList.Remove(s);
+            _plottables.Clear();
             _plot = null;
         }
 
@@ -46,31 +47,24 @@ namespace VisionNet.Controls
         public override void UpdatePlottable()
         {
             if (_plot == null) return;
-            if (_plottable != null) _plot.PlottableList.Remove(_plottable);
-            BuildPlottable();
+            foreach (var s in _plottables) _plot.PlottableList.Remove(s);
+            _plottables.Clear();
+            BuildPlottables();
         }
 
-        private void BuildPlottable()
+        private void BuildPlottables()
         {
-            if (Segments.Length == 0) return;
-
-            // Each segment: start → end → NaN (3 entries per segment)
-            double[] xs = new double[Segments.Length * 3];
-            double[] ys = new double[Segments.Length * 3];
-            for (int i = 0; i < Segments.Length; i++)
+            var spColor = ToSPColor(DrawColor);
+            foreach (var seg in Segments)
             {
-                xs[i * 3]     = Segments[i].Start.X;
-                ys[i * 3]     = Segments[i].Start.Y;
-                xs[i * 3 + 1] = Segments[i].End.X;
-                ys[i * 3 + 1] = Segments[i].End.Y;
-                xs[i * 3 + 2] = double.NaN;
-                ys[i * 3 + 2] = double.NaN;
+                double[] xs = { seg.Start.X, seg.End.X };
+                double[] ys = { seg.Start.Y, seg.End.Y };
+                var s = _plot.Add.Scatter(xs, ys);
+                s.MarkerStyle.IsVisible = false;
+                s.LineStyle.Width       = Size;
+                s.Color                 = spColor;
+                _plottables.Add(s);
             }
-
-            _plottable = _plot.Add.Scatter(xs, ys);
-            _plottable.MarkerStyle.IsVisible = false;
-            _plottable.LineStyle.Width       = Size;
-            _plottable.Color                 = ToSPColor(DrawColor);
         }
 
         /// <inheritdoc/>
@@ -106,8 +100,8 @@ namespace VisionNet.Controls
         /// <inheritdoc/>
         protected override void Dispose(bool disposing)
         {
-            if (disposing && _plot != null && _plottable != null)
-                _plot.PlottableList.Remove(_plottable);
+            if (disposing && _plot != null)
+                foreach (var s in _plottables) _plot.PlottableList.Remove(s);
         }
     }
 }

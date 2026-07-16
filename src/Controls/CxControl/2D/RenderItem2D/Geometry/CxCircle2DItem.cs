@@ -9,39 +9,42 @@ using Color = System.Drawing.Color;
 namespace VisionNet.Controls
 {
     /// <summary>
-    /// Renders an array of <see cref="CxCircle2D"/> values as polygon-approximated circles.
-    /// All circles are batched into a single scatter with NaN separators.
+    /// Renders an array of <see cref="CxCircle2D"/> values as circles with optional fill.
+    /// Each circle is a separate <see cref="Ellipse"/> plottable.
     /// For circles to appear as true circles, use <see cref="CxDisplay2D.SetAspectLock"/>.
     /// </summary>
     public class CxCircle2DItem : Abstract2DRenderItem
     {
-        private const int ApproxSegments = 64;
-
-        private Scatter _plottable;
-        private Plot    _plot;
+        private readonly List<Ellipse> _plottables = new List<Ellipse>();
+        private Plot _plot;
 
         /// <summary>Gets the circle data being rendered.</summary>
         public CxCircle2D[] Circles { get; private set; }
 
-        /// <summary>Initializes the item with the given circles, colour, and line width.</summary>
-        public CxCircle2DItem(CxCircle2D[] circles, Color color, float size = 1f)
+        /// <summary>Gets or sets whether circles are filled with their colour.</summary>
+        public bool Filled { get; set; } = false;
+
+        /// <summary>Initializes the item with the given circles, colour, line width, and optional fill.</summary>
+        public CxCircle2DItem(CxCircle2D[] circles, Color color, float size = 1f, bool filled = false)
         {
             Circles = circles ?? Array.Empty<CxCircle2D>();
             Color   = color;
             Size    = size;
+            Filled  = filled;
         }
 
         /// <inheritdoc/>
         public override void AddToPlot(Plot plot)
         {
             _plot = plot;
-            BuildPlottable();
+            BuildPlottables();
         }
 
         /// <inheritdoc/>
         public override void RemoveFromPlot(Plot plot)
         {
-            if (_plottable != null) { plot.PlottableList.Remove(_plottable); _plottable = null; }
+            foreach (var e in _plottables) plot.PlottableList.Remove(e);
+            _plottables.Clear();
             _plot = null;
         }
 
@@ -49,33 +52,23 @@ namespace VisionNet.Controls
         public override void UpdatePlottable()
         {
             if (_plot == null) return;
-            if (_plottable != null) _plot.PlottableList.Remove(_plottable);
-            BuildPlottable();
+            foreach (var e in _plottables) _plot.PlottableList.Remove(e);
+            _plottables.Clear();
+            BuildPlottables();
         }
 
-        private void BuildPlottable()
+        private void BuildPlottables()
         {
-            if (Circles.Length == 0) return;
-
-            var xs = new List<double>();
-            var ys = new List<double>();
-
+            var spColor = ToSPColor(DrawColor);
             foreach (var circle in Circles)
             {
-                for (int i = 0; i <= ApproxSegments; i++)
-                {
-                    double angle = 2.0 * Math.PI * i / ApproxSegments;
-                    xs.Add(circle.Center.X + circle.Radius * Math.Cos(angle));
-                    ys.Add(circle.Center.Y + circle.Radius * Math.Sin(angle));
-                }
-                xs.Add(double.NaN);
-                ys.Add(double.NaN);
+                var ellipse = _plot.Add.Circle(circle.Center.X, circle.Center.Y, circle.Radius);
+                ellipse.LineStyle.Width     = Size;
+                ellipse.LineStyle.Color     = spColor;
+                ellipse.FillStyle.Color     = spColor;
+                ellipse.FillStyle.IsVisible = Filled;
+                _plottables.Add(ellipse);
             }
-
-            _plottable = _plot.Add.Scatter(xs.ToArray(), ys.ToArray());
-            _plottable.MarkerStyle.IsVisible = false;
-            _plottable.LineStyle.Width       = Size;
-            _plottable.Color                 = ToSPColor(DrawColor);
         }
 
         /// <inheritdoc/>
@@ -83,10 +76,17 @@ namespace VisionNet.Controls
         {
             foreach (var c in Circles)
             {
-                float dx   = plotPos.X - c.Center.X;
-                float dy   = plotPos.Y - c.Center.Y;
+                float dx = plotPos.X - c.Center.X;
+                float dy = plotPos.Y - c.Center.Y;
                 float dist = (float)Math.Sqrt(dx * dx + dy * dy);
-                if (Math.Abs(dist - c.Radius) <= HitThreshold) return true;
+                if (Filled)
+                {
+                    if (dist <= c.Radius + HitThreshold) return true;
+                }
+                else
+                {
+                    if (Math.Abs(dist - c.Radius) <= HitThreshold) return true;
+                }
             }
             return false;
         }
@@ -103,8 +103,8 @@ namespace VisionNet.Controls
         /// <inheritdoc/>
         protected override void Dispose(bool disposing)
         {
-            if (disposing && _plot != null && _plottable != null)
-                _plot.PlottableList.Remove(_plottable);
+            if (disposing && _plot != null)
+                foreach (var e in _plottables) _plot.PlottableList.Remove(e);
         }
     }
 }

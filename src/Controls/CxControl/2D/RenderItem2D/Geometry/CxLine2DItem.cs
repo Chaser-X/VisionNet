@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Drawing;
 using ScottPlot;
 using ScottPlot.Plottables;
@@ -10,14 +11,14 @@ namespace VisionNet.Controls
     /// <summary>
     /// Renders an array of <see cref="CxLine2D"/> values as infinite lines
     /// (drawn as finite segments spanning a large range in both directions).
-    /// All lines are batched into a single scatter with NaN separators for efficiency.
+    /// Each line is rendered as a separate <see cref="Scatter"/> plottable.
     /// </summary>
     public class CxLine2DItem : Abstract2DRenderItem
     {
         private const float RenderRange = 1e4f;
 
-        private Scatter _plottable;
-        private Plot    _plot;
+        private readonly List<Scatter> _plottables = new List<Scatter>();
+        private Plot _plot;
 
         /// <summary>Gets the line data being rendered.</summary>
         public CxLine2D[] Lines { get; private set; }
@@ -34,13 +35,14 @@ namespace VisionNet.Controls
         public override void AddToPlot(Plot plot)
         {
             _plot = plot;
-            BuildPlottable();
+            BuildPlottables();
         }
 
         /// <inheritdoc/>
         public override void RemoveFromPlot(Plot plot)
         {
-            if (_plottable != null) { plot.PlottableList.Remove(_plottable); _plottable = null; }
+            foreach (var s in _plottables) plot.PlottableList.Remove(s);
+            _plottables.Clear();
             _plot = null;
         }
 
@@ -48,37 +50,29 @@ namespace VisionNet.Controls
         public override void UpdatePlottable()
         {
             if (_plot == null) return;
-            if (_plottable != null) _plot.PlottableList.Remove(_plottable);
-            BuildPlottable();
+            foreach (var s in _plottables) _plot.PlottableList.Remove(s);
+            _plottables.Clear();
+            BuildPlottables();
         }
 
-        private void BuildPlottable()
+        private void BuildPlottables()
         {
-            if (Lines.Length == 0) return;
-
-            // Each line: Point - D*R → Point + D*R → NaN (3 entries per line)
-            double[] xs = new double[Lines.Length * 3];
-            double[] ys = new double[Lines.Length * 3];
-            for (int i = 0; i < Lines.Length; i++)
+            var spColor = ToSPColor(DrawColor);
+            foreach (var line in Lines)
             {
-                var line = Lines[i];
                 float sx = line.Point.X - line.Direction.X * RenderRange;
                 float sy = line.Point.Y - line.Direction.Y * RenderRange;
                 float ex = line.Point.X + line.Direction.X * RenderRange;
                 float ey = line.Point.Y + line.Direction.Y * RenderRange;
 
-                xs[i * 3]     = sx;
-                ys[i * 3]     = sy;
-                xs[i * 3 + 1] = ex;
-                ys[i * 3 + 1] = ey;
-                xs[i * 3 + 2] = double.NaN;
-                ys[i * 3 + 2] = double.NaN;
+                double[] xs = { sx, ex };
+                double[] ys = { sy, ey };
+                var s = _plot.Add.Scatter(xs, ys);
+                s.MarkerStyle.IsVisible = false;
+                s.LineStyle.Width       = Size;
+                s.Color                 = spColor;
+                _plottables.Add(s);
             }
-
-            _plottable = _plot.Add.Scatter(xs, ys);
-            _plottable.MarkerStyle.IsVisible = false;
-            _plottable.LineStyle.Width       = Size;
-            _plottable.Color                 = ToSPColor(DrawColor);
         }
 
         /// <inheritdoc/>
@@ -101,7 +95,6 @@ namespace VisionNet.Controls
                 float ey = p.Y - line.Point.Y;
                 return ex * ex + ey * ey;
             }
-            // Cross product magnitude squared / lenSq
             float cx = (p.X - line.Point.X) * dy - (p.Y - line.Point.Y) * dx;
             return (cx * cx) / lenSq;
         }
@@ -118,8 +111,8 @@ namespace VisionNet.Controls
         /// <inheritdoc/>
         protected override void Dispose(bool disposing)
         {
-            if (disposing && _plot != null && _plottable != null)
-                _plot.PlottableList.Remove(_plottable);
+            if (disposing && _plot != null)
+                foreach (var s in _plottables) _plot.PlottableList.Remove(s);
         }
     }
 }
