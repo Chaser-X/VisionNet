@@ -21,6 +21,9 @@ namespace VisionNet.Controls
         public new CxPoint3D Scale  { get; set; } = new CxPoint3D(1f, 1f, 1f);
         public CxPoint3D Offset { get; set; } = new CxPoint3D(0f, 0f, 0f);
 
+        // ── Persistent 1:1 aspect-ratio rule (preserves Y inversion) ────────────────
+        private SquareWithInvertedY _squareRule;
+
         // ── Click-position world-coordinate annotation (lazy init) ────────────────
         private ScottPlot.Plottables.Text _coordAnnotation;
 

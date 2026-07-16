@@ -45,6 +45,19 @@ namespace VisionNet.Controls
             Color    = color;
             Size     = size;
             Filled   = filled;
+            if (Polygons.Length > 0 && Polygons[0].Points != null && Polygons[0].Points.Length > 0)
+            {
+                float minX = float.MaxValue, minY = float.MaxValue, maxX = float.MinValue, maxY = float.MinValue;
+                foreach (var pt in Polygons[0].Points)
+                {
+                    if (pt.X < minX) minX = pt.X;
+                    if (pt.X > maxX) maxX = pt.X;
+                    if (pt.Y < minY) minY = pt.Y;
+                    if (pt.Y > maxY) maxY = pt.Y;
+                }
+                float dx = maxX - minX, dy = maxY - minY;
+                HitThreshold = Math.Max(1f, (float)Math.Sqrt(dx * dx + dy * dy) * 0.02f);
+            }
         }
 
         /// <inheritdoc/>

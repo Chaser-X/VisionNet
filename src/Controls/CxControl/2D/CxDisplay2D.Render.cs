@@ -15,40 +15,43 @@ namespace VisionNet.Controls
             plot.Legend.IsVisible = false;
             plot.Grid.IsVisible   = false;
 
-            // Restore ScottPlot defaults (includes "Open in New Window"), then customise.
-            //_formsPlot.Menu.Reset();
             _formsPlot.Menu = new CxDisplay2DMenu(this, _formsPlot);
 
-            // Default: enforce 1:1 aspect ratio
-            _formsPlot.Plot.Axes.SquareUnits();
-
-            //var strip = _formsPlot.ContextMenuStrip;
-            //if (strip != null && strip.Items.Count >= 2)
-            //{
-            //    // Remove "Copy Image" (index 1) first to avoid index shift, then "Save Image" (index 0).
-            //    strip.Items.RemoveAt(1);
-            //    strip.Items.RemoveAt(0);
-
-            //    var fitItem = new ToolStripMenuItem("Fit Image");
-            //    fitItem.Click += (s, e) => FitImage1to1();
-            //    strip.Items.Insert(0, fitItem);
-            //}
-            //else
-            //{
-            //    // Fallback: IPlotMenu API only.
-            //    //menu.Clear();
-            //    //menu.Add("Fit Image", _ => FitImage1to1());
-            //    //menu.Add("")
-            //}
+            // Create and register the 1:1+inverted-Y rule by default.
+            _squareRule = new SquareWithInvertedY(plot.Axes.Bottom, plot.Axes.Left);
+            plot.Axes.Rules.Add(_squareRule);
         }
 
         /// <summary>
-        /// Fits the image to the window and enforces a 1:1 X/Y aspect ratio so image pixels appear as squares.
+        /// Fits the image to the window with a 1:1 X/Y aspect ratio and Y=0 at the screen top.
+        /// Only sets the initial axis limits; the persistent <see cref="SquareWithInvertedY"/> rule
+        /// maintains the 1:1 ratio on subsequent pan/zoom operations.
         /// </summary>
         internal void FitImage1to1()
         {
-            FitToImage();
-            _formsPlot.Plot.Axes.SquareUnits();
+            if (_imageWidth <= 0 || _imageHeight <= 0) { FitToImage(); return; }
+
+            var box    = GetImageWorldRect();
+            double imgW   = Math.Abs(box.Size.Width);
+            double imgH   = Math.Abs(box.Size.Height);
+            double margin = Math.Max(imgW, imgH) * 0.02;
+
+            int pxW = _formsPlot.Width  > 0 ? _formsPlot.Width  : 800;
+            int pxH = _formsPlot.Height > 0 ? _formsPlot.Height : 600;
+
+            double scale = Math.Max((imgW + 2 * margin) / pxW, (imgH + 2 * margin) / pxH);
+            double halfX = scale * pxW / 2;
+            double halfY = scale * pxH / 2;
+            double cx    = box.Center.X;
+            double cy    = box.Center.Y;
+
+            // Inverted Y (bottom > top) keeps Y=0 at the screen top (image pixel convention).
+            _formsPlot.Plot.Axes.SetLimits(
+                left:   cx - halfX,
+                right:  cx + halfX,
+                bottom: cy + halfY,   // larger Y value → screen bottom
+                top:    cy - halfY);  // smaller Y value → screen top
+
             RefreshDisplay();
         }
 
@@ -63,7 +66,6 @@ namespace VisionNet.Controls
             var box    = GetImageWorldRect();
             double margin = Math.Max(Math.Abs(box.Size.Width), Math.Abs(box.Size.Height)) * 0.02;
 
-            // Y limits are inverted (bottom > top) to match image convention: Y=0 at screen top.
             _formsPlot.Plot.Axes.SetLimits(
                 left:   box.Left   - margin,
                 right:  box.Right  + margin,
@@ -113,9 +115,59 @@ namespace VisionNet.Controls
                 _formsPlot.Refresh();
         }
     }
+
     /// <summary>
-    /// 替换 ScottPlot 默认右键菜单。
+    /// Axis rule that enforces a 1:1 X/Y scale while preserving Y-axis inversion
+    /// (Range.Min &gt; Range.Max → Y=0 at screen top, image pixel convention).
+    /// Unlike ScottPlot's built-in SquareZoomOut, this rule does not normalise the Y range direction.
     /// </summary>
+    sealed class SquareWithInvertedY : ScottPlot.IAxisRule
+    {
+        private readonly ScottPlot.IXAxis _x;
+        private readonly ScottPlot.IYAxis _y;
+
+        public SquareWithInvertedY(ScottPlot.IXAxis x, ScottPlot.IYAxis y)
+        {
+            _x = x; _y = y;
+        }
+
+        public void Apply(ScottPlot.RenderPack rp, bool beforeLayout)
+        {
+            double pxW = rp.DataRect.Width;
+            double pxH = rp.DataRect.Height;
+            if (pxW <= 0 || pxH <= 0) return;
+
+            double xMin = _x.Min; double xMax = _x.Max;
+            double yMin = _y.Min; double yMax = _y.Max;   // may be yMin > yMax (inverted Y)
+
+            double xSpan = Math.Abs(xMax - xMin);
+            double ySpan = Math.Abs(yMax - yMin);
+            if (xSpan == 0 || ySpan == 0) return;
+
+            double xScale = xSpan / pxW;
+            double yScale = ySpan / pxH;
+
+            // Already 1:1 within 0.01% tolerance — skip to avoid jitter.
+            if (Math.Abs(xScale - yScale) / Math.Max(xScale, yScale) < 0.0001) return;
+
+            // Zoom-out approach: expand the narrow axis to match the wider scale.
+            double s  = Math.Max(xScale, yScale);
+            double cx = (xMin + xMax) / 2;
+            double cy = (yMin + yMax) / 2;
+            double hx = s * pxW / 2;
+            double hy = s * pxH / 2;
+
+            _x.Range.Set(cx - hx, cx + hx);
+
+            // Preserve Y inversion: if stored as Min > Max (inverted), keep it that way.
+            if (yMin > yMax)
+                _y.Range.Set(cy + hy, cy - hy);   // Min > Max → Y=0 stays at screen top
+            else
+                _y.Range.Set(cy - hy, cy + hy);
+        }
+    }
+
+    /// <summary>Custom context menu replacing ScottPlot's default.</summary>
     sealed class CxDisplay2DMenu : ScottPlot.IPlotMenu
     {
         private readonly ScottPlot.WinForms.FormsPlot _fp;
@@ -126,7 +178,6 @@ namespace VisionNet.Controls
             _fp = fp;
         }
 
-        // 接口的其余成员（不需要额外实现，留空即可）
         public void Reset() { }
         public void Clear() { }
         public void Add(string label, System.Action<ScottPlot.Plot> action) { }
@@ -135,12 +186,12 @@ namespace VisionNet.Controls
         public void ShowContextMenu(ScottPlot.Pixel position)
         {
             var menu = new System.Windows.Forms.ContextMenuStrip();
-            // 1:1 自适应
+
             var itemFit = new System.Windows.Forms.ToolStripMenuItem("Autoscale");
             itemFit.Click += (s, e) => { _form.FitImage1to1(); _fp.Refresh(); };
             menu.Items.Add(itemFit);
             menu.Items.Add(new System.Windows.Forms.ToolStripSeparator());
-            // 保存图像
+
             var itemSave = new System.Windows.Forms.ToolStripMenuItem("Save Image");
             itemSave.Click += (s, e) =>
             {
@@ -153,13 +204,11 @@ namespace VisionNet.Controls
                 }
             };
             menu.Items.Add(itemSave);
-            //open in new window
+
             var itemOpen = new System.Windows.Forms.ToolStripMenuItem("Open in New Window");
-            itemOpen.Click += (s, e) =>
-            {
-                FormsPlotViewer.Launch(_fp.Plot, _form.Name);
-            };
+            itemOpen.Click += (s, e) => FormsPlotViewer.Launch(_fp.Plot, _form.Name);
             menu.Items.Add(itemOpen);
+
             menu.Show(_fp, new System.Drawing.Point((int)position.X, (int)position.Y));
         }
     }

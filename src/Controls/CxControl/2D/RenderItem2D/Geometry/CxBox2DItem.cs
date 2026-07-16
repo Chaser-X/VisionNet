@@ -45,6 +45,8 @@ namespace VisionNet.Controls
             Color  = color;
             Size   = size;
             Filled = filled;
+            if (Boxes.Length > 0)
+                HitThreshold = Math.Max(1f, (float)Math.Sqrt(Boxes[0].Size.Width * Boxes[0].Size.Width + Boxes[0].Size.Height * Boxes[0].Size.Height) * 0.02f);
         }
 
         /// <inheritdoc/>

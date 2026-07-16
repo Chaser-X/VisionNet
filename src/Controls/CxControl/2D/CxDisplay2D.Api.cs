@@ -50,11 +50,23 @@ namespace VisionNet.Controls
         /// Enforces or releases a 1:1 X/Y aspect ratio (equal world units per pixel on both axes).
         /// When <paramref name="locked"/> is <c>true</c>, the image is also fitted to the current view.
         /// </summary>
+        /// <summary>
+        /// Enables or disables the 1:1 aspect ratio constraint.
+        /// When enabled, every pan/zoom operation maintains equal X/Y scale.
+        /// </summary>
         public void SetAspectLock(bool locked)
         {
-            _formsPlot.Plot.Axes.SquareUnits(locked);
-            if (locked) FitToImage();
-            else RefreshDisplay();
+            if (locked)
+            {
+                if (!_formsPlot.Plot.Axes.Rules.Contains(_squareRule))
+                    _formsPlot.Plot.Axes.Rules.Add(_squareRule);
+                FitImage1to1();
+            }
+            else
+            {
+                _formsPlot.Plot.Axes.Rules.Remove(_squareRule);
+                RefreshDisplay();
+            }
         }
 
         public void SetBackgroundColor(Color color)

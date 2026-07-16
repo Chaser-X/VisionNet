@@ -57,6 +57,16 @@ namespace VisionNet.DataType
             _data   = data;
         }
 
+        /// <summary>Initializes an image from an existing <see cref="int"/> array. Type is set to <see cref="PlainType.Int32"/>.</summary>
+        public CxImage(int width, int height, int[] data, int channel = 1)
+        {
+            Width   = width;
+            Height  = height;
+            Channel = channel;
+            Type    = PlainType.Int32;
+            _data   = data;
+        }
+
         /// <summary>Initializes an image from an existing <see cref="float"/> array. Type is set to <see cref="PlainType.Real"/>.</summary>
         public CxImage(int width, int height, float[] data, int channel = 1)
         {

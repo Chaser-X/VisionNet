@@ -665,7 +665,7 @@ namespace DemoFrom
             float cy = box.Size.Height > 0 ? box.Center.Y : 200f;
             float r = Math.Min(box.Size.Width > 0 ? box.Size.Width : 400,
                                 box.Size.Height > 0 ? box.Size.Height : 400) * 0.08f;
-            if (r < 10) r = 40f;
+           // if (r < 10) r = 40f;
 
             var circles = new[]
             {
@@ -816,7 +816,10 @@ namespace DemoFrom
             try
             {
                 _cxDisplay2D.ResetView();
-                _cxDisplay2D.SetScaleAndOffset(new CxPoint3D(0.1f, 0.1f, 1f), new CxPoint3D());
+                 _cxDisplay2D.SetScaleAndOffset(new CxPoint3D(0.02f, 0.02f, 1f), new CxPoint3D(-40f,-80f,0));
+                _cxDisplay2D.ShowAxes(true);
+                _cxDisplay2D.SetBackgroundColor(Color.White);
+                _cxDisplay2D.SetAspectLock(false);
                 using (var bmp = new Bitmap(path))
                 {
                     // 4-channel BGRA (matches Format32bppArgb memory layout)

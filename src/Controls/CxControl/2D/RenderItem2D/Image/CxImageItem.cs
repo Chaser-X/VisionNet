@@ -27,10 +27,10 @@ namespace VisionNet.Controls
         private int _queryHeight;
 
         Color I2DRenderItem.Color { get => Color.White; set { } }
-        float I2DRenderItem.Size  { get => 1f;          set { } }
+        float I2DRenderItem.Size { get => 1f; set { } }
 
         /// <summary>Gets the image width in pixels.</summary>
-        public int Width  => _width;
+        public int Width => _width;
 
         /// <summary>Gets the image height in pixels.</summary>
         public int Height => _height;
@@ -42,26 +42,30 @@ namespace VisionNet.Controls
         {
             if (image == null || image.Data == null) return;
 
-            _width  = image.Width;
+            _width = image.Width;
             _height = image.Height;
 
-            _queryWidth  = image.Width;
+            _queryWidth = image.Width;
             _queryHeight = image.Height;
             _pixelFloats = image.Channel == 1 ? BuildPixelFloats(image) : null;
 
-            var scottImage = BuildScottImage(image);
+            var displayImage = image;
+            if (displayImage.Width > 2048 || displayImage.Height > 2048)
+                displayImage = VisionOperator.ResizeImage(displayImage, 2048, 2048);
+
+            var scottImage = BuildScottImage(displayImage);
 
             if (_plot != null)
             {
                 if (_plottable != null) _plot.PlottableList.Remove(_plottable);
-                _plottable = _plot.Add.ImageRect(scottImage, new CoordinateRect(0, _width, 0, _height));
+                _plottable = _plot.Add.ImageRect(scottImage, new CoordinateRect(0, _width, _height, 0));
                 _plot.PlottableList.Remove(_plottable);
                 _plot.PlottableList.Insert(0, _plottable);
             }
             else
             {
                 _pendingImage = scottImage;
-                _plottable    = null;
+                _plottable = null;
             }
         }
 
@@ -73,7 +77,7 @@ namespace VisionNet.Controls
             _plot = plot;
             if (_pendingImage != null)
             {
-                _plottable = plot.Add.ImageRect(_pendingImage, new CoordinateRect(0, _width, 0, _height));
+                _plottable = plot.Add.ImageRect(_pendingImage, new CoordinateRect(0, _width, _height, 0));
                 _pendingImage = null;
                 plot.PlottableList.Remove(_plottable);
                 plot.PlottableList.Insert(0, _plottable);
@@ -94,9 +98,9 @@ namespace VisionNet.Controls
         public void Dispose()
         {
             _pendingImage = null;
-            _plottable    = null;
-            _plot         = null;
-            _pixelFloats  = null;
+            _plottable = null;
+            _plot = null;
+            _pixelFloats = null;
         }
 
         /// <summary>Repositions the image plottable to the given world-space rectangle.</summary>
@@ -118,86 +122,86 @@ namespace VisionNet.Controls
 
         private static unsafe ScottPlot.Image BuildScottImage(CxImage image)
         {
-            int w  = image.Width;
-            int h  = image.Height;
+            int w = image.Width;
+            int h = image.Height;
             int ch = image.Channel;
 
             Bitmap bmp = new Bitmap(w, h, PixelFormat.Format32bppArgb);
             try
             {
-                var bd  = bmp.LockBits(new Rectangle(0, 0, w, h), ImageLockMode.WriteOnly, PixelFormat.Format32bppArgb);
+                var bd = bmp.LockBits(new Rectangle(0, 0, w, h), ImageLockMode.WriteOnly, PixelFormat.Format32bppArgb);
                 byte* ptr = (byte*)bd.Scan0.ToPointer();
 
                 switch (image.Type)
                 {
                     case PlainType.UInt8:
-                    {
-                        var data = (byte[])image.Data;
-                        if (ch == 4)
                         {
-                            // BGRA — direct copy, zero conversion
-                            for (int i = 0; i < w * h; i++)
+                            var data = (byte[])image.Data;
+                            if (ch == 4)
                             {
-                                ptr[i*4]   = data[i*4];
-                                ptr[i*4+1] = data[i*4+1];
-                                ptr[i*4+2] = data[i*4+2];
-                                ptr[i*4+3] = data[i*4+3];
+                                // BGRA — direct copy, zero conversion
+                                for (int i = 0; i < w * h; i++)
+                                {
+                                    ptr[i * 4] = data[i * 4];
+                                    ptr[i * 4 + 1] = data[i * 4 + 1];
+                                    ptr[i * 4 + 2] = data[i * 4 + 2];
+                                    ptr[i * 4 + 3] = data[i * 4 + 3];
+                                }
                             }
-                        }
-                        else if (ch == 3)
-                        {
-                            for (int i = 0; i < w * h; i++)
+                            else if (ch == 3)
                             {
-                                ptr[i*4]   = data[i*3];      // B
-                                ptr[i*4+1] = data[i*3+1];    // G
-                                ptr[i*4+2] = data[i*3+2];    // R
-                                ptr[i*4+3] = 255;
+                                for (int i = 0; i < w * h; i++)
+                                {
+                                    ptr[i * 4] = data[i * 3];      // B
+                                    ptr[i * 4 + 1] = data[i * 3 + 1];    // G
+                                    ptr[i * 4 + 2] = data[i * 3 + 2];    // R
+                                    ptr[i * 4 + 3] = 255;
+                                }
                             }
-                        }
-                        else
-                        {
-                            for (int i = 0; i < w * h; i++)
+                            else
                             {
-                                byte g = data[i * ch];
-                                ptr[i*4] = ptr[i*4+1] = ptr[i*4+2] = g;
-                                ptr[i*4+3] = 255;
+                                for (int i = 0; i < w * h; i++)
+                                {
+                                    byte g = data[i * ch];
+                                    ptr[i * 4] = ptr[i * 4 + 1] = ptr[i * 4 + 2] = g;
+                                    ptr[i * 4 + 3] = 255;
+                                }
                             }
+                            break;
                         }
-                        break;
-                    }
                     case PlainType.Int16:
-                    {
-                        var data = (short[])image.Data;
-                        for (int i = 0; i < w * h; i++)
                         {
-                            byte g = NormalizeShort(data[i * ch]);
-                            ptr[i*4] = ptr[i*4+1] = ptr[i*4+2] = g;
-                            ptr[i*4+3] = 255;
+                            var data = (short[])image.Data;
+                            for (int i = 0; i < w * h; i++)
+                            {
+                                byte g = NormalizeShort(data[i * ch]);
+                                ptr[i * 4] = ptr[i * 4 + 1] = ptr[i * 4 + 2] = g;
+                                ptr[i * 4 + 3] = 255;
+                            }
+                            break;
                         }
-                        break;
-                    }
                     case PlainType.Int32:
-                    {
-                        var data = (int[])image.Data;
-                        for (int i = 0; i < w * h; i++)
                         {
-                            byte g = NormalizeInt32(data[i * ch]);
-                            ptr[i*4] = ptr[i*4+1] = ptr[i*4+2] = g;
-                            ptr[i*4+3] = 255;
+                            var data = (int[])image.Data;
+                            for (int i = 0; i < w * h; i++)
+                            {
+                                byte g = NormalizeInt32(data[i * ch]);
+                                ptr[i * 4] = ptr[i * 4 + 1] = ptr[i * 4 + 2] = g;
+                                ptr[i * 4 + 3] = 255;
+                            }
+                            break;
                         }
-                        break;
-                    }
                     case PlainType.Real:
-                    {
-                        var data = (float[])image.Data;
-                        for (int i = 0; i < w * h; i++)
                         {
-                            byte g = NormalizeFloat(data[i * ch]);
-                            ptr[i*4] = ptr[i*4+1] = ptr[i*4+2] = g;
-                            ptr[i*4+3] = 255;
+                            var data = (float[])image.Data;
+                            for (int i = 0; i < w * h; i++)
+                            {
+                                byte g = NormalizeFloat(data[i * ch]);
+                                ptr[i * 4] = ptr[i * 4 + 1] = ptr[i * 4 + 2] = g;
+                                ptr[i * 4 + 3] = 255;
+                            }
+                            break;
                         }
-                        break;
-                    }
                 }
 
                 bmp.UnlockBits(bd);
@@ -222,13 +226,13 @@ namespace VisionNet.Controls
             switch (image.Type)
             {
                 case PlainType.UInt8:
-                { var d = (byte[])image.Data;   for (int i = 0; i < n; i++) floats[i] = d[i]; break; }
+                    { var d = (byte[])image.Data; for (int i = 0; i < n; i++) floats[i] = d[i]; break; }
                 case PlainType.Int16:
-                { var d = (short[])image.Data;  for (int i = 0; i < n; i++) floats[i] = d[i]; break; }
+                    { var d = (short[])image.Data; for (int i = 0; i < n; i++) floats[i] = d[i]; break; }
                 case PlainType.Int32:
-                { var d = (int[])image.Data;    for (int i = 0; i < n; i++) floats[i] = d[i]; break; }
+                    { var d = (int[])image.Data; for (int i = 0; i < n; i++) floats[i] = d[i]; break; }
                 case PlainType.Real:
-                { var d = (float[])image.Data;  for (int i = 0; i < n; i++) floats[i] = d[i]; break; }
+                    { var d = (float[])image.Data; for (int i = 0; i < n; i++) floats[i] = d[i]; break; }
             }
 
             return floats;

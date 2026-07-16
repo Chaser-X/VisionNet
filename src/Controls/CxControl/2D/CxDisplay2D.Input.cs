@@ -13,6 +13,8 @@ namespace VisionNet.Controls
             _formsPlot.MouseMove += OnPlotMouseMove;
             _formsPlot.MouseDown += OnPlotMouseDown;
             _formsPlot.MouseUp   += OnPlotMouseUp;
+            // Re-apply 1:1 inverted limits when the window is resized.
+            _formsPlot.Resize += (s, e) => { if (_imageWidth > 0) FitImage1to1(); };
         }
 
         private void OnPlotMouseMove(object sender, MouseEventArgs e)

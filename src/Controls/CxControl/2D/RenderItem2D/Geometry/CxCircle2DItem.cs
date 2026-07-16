@@ -45,6 +45,8 @@ namespace VisionNet.Controls
             Color   = color;
             Size    = size;
             Filled  = filled;
+            if (Circles.Length > 0)
+                HitThreshold = Math.Max(1f, Circles[0].Radius * 0.05f);
         }
 
         /// <inheritdoc/>

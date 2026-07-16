@@ -40,6 +40,12 @@ namespace VisionNet.Controls
             Segments = segments ?? Array.Empty<CxSegment2D>();
             Color    = color;
             Size     = size;
+            if (Segments.Length > 0)
+            {
+                float dx = Segments[0].End.X - Segments[0].Start.X;
+                float dy = Segments[0].End.Y - Segments[0].Start.Y;
+                HitThreshold = Math.Max(1f, (float)Math.Sqrt(dx * dx + dy * dy) * 0.02f);
+            }
         }
 
         /// <inheritdoc/>

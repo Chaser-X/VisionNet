@@ -29,6 +29,8 @@ namespace VisionNet.Controls
             Points = points ?? Array.Empty<CxPoint2D>();
             Color  = color;
             Size   = size;
+            if (Points.Length > 0)
+                HitThreshold = Math.Max(1f, Size * 0.6f);
         }
 
         /// <inheritdoc/>

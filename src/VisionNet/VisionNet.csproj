@@ -37,6 +37,9 @@
     <Reference Include="OpenCL.Net">
       <HintPath>..\..\3rd\OpenCL.Net.dll</HintPath>
     </Reference>
+    <Reference Include="OpenCvSharp">
+      <HintPath>..\..\3rd\OpenCvSharp.dll</HintPath>
+    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Numerics" />
@@ -94,6 +97,7 @@
     <Compile Include="Segmentation\VisionOperator.Segmentation.cs" />
     <Compile Include="Detection\VisionOperator.Detection.cs" />
     <Compile Include="IO\VisionOperator.IO.cs" />
+    <Compile Include="Image\VisionOperator.Image.cs" />
     <Compile Include="VisionOperator.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
