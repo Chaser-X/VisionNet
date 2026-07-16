@@ -5,70 +5,63 @@ using Color = System.Drawing.Color;
 
 namespace VisionNet.Controls
 {
-    /// <summary>Public API surface: image data, geometric overlays, and view management.</summary>
+    /// <summary>Public API surface for <see cref="CxDisplay2D"/>.</summary>
     public partial class CxDisplay2D
     {
-        // ── Coordinate system ─────────────────────────────────────────────────────
+        #region Coordinate system
 
         /// <summary>
-        /// Sets the scale factors for converting image pixel coordinates to world coordinates.
-        /// Default: (1, 1, 1) — no scaling applied.
+        /// Sets the scale and offset for converting image pixel coordinates to world coordinates.
+        /// Default scale: (1, 1, 1) — no scaling. Default offset: (0, 0, 0) — no offset.
         /// </summary>
-        public void SetCoordinateScale(float xScale, float yScale, float zScale = 1f)
+        public void SetScaleAndOffset(CxPoint3D scale, CxPoint3D offset)
         {
-            XScale = xScale;
-            YScale = yScale;
-            ZScale = zScale;
+            Scale  = scale;
+            Offset = offset;
             if (_imageItem != null) _imageItem.UpdateWorldRect(GetImageWorldRect());
             FitImage1to1();
         }
 
-        /// <summary>
-        /// Sets the offsets applied after scaling to produce world (X, Y, Z) values.
-        /// Default: (0, 0, 0) — no offset applied.
-        /// </summary>
-        public void SetCoordinateOffset(float xOffset, float yOffset, float zOffset = 0f)
-        {
-            XOffset = xOffset;
-            YOffset = yOffset;
-            ZOffset = zOffset;
-            if (_imageItem != null) _imageItem.UpdateWorldRect(GetImageWorldRect());
-            FitImage1to1();
-        }
-
-        /// <summary>
-        /// Converts a plot-space coordinate (already in world units) to (X, Y, Z).
-        /// Z is derived from the image pixel value at the corresponding pixel position.
-        /// </summary>
-        internal (float X, float Y, float? Z) PlotToWorld(CxPoint2D plotCoord)
-        {
-            // The plot coordinate system IS world coordinates; no scale/offset conversion needed.
-            float wx = plotCoord.X;
-            float wy = plotCoord.Y;
-            // Reverse-map world → pixel for image data lookup
-            int px = XScale != 0f ? (int)Math.Round((plotCoord.X - XOffset) / XScale) : 0;
-            int py = YScale != 0f ? (int)Math.Round((plotCoord.Y - YOffset) / YScale) : 0;
-            float? rawZ = _imageItem?.GetPixelFloat(px, py);
-            float? wz   = rawZ.HasValue ? rawZ.Value * ZScale + ZOffset : (float?)null;
-            return (wx, wy, wz);
-        }
-
-        /// <summary>Returns the image bounding rectangle in world coordinates (Y-inverted for image convention).</summary>
+        /// <summary>Returns the image bounding rectangle expressed in world coordinates.</summary>
         public CxBox2D GetImageWorldRect()
         {
-            float w = _imageWidth  * XScale;
-            float h = _imageHeight * YScale;
+            float w = _imageWidth  * Scale.X;
+            float h = _imageHeight * Scale.Y;
             return new CxBox2D(
-                new CxPoint2D(XOffset + w / 2f, YOffset + h / 2f),
+                new CxPoint2D(Offset.X + w / 2f, Offset.Y + h / 2f),
                 new CxSize2D(w, h));
         }
 
-        // ── Image management ──────────────────────────────────────────────────────
+        #endregion
+
+        #region Display settings
+
+        /// <summary>Shows or hides the X/Y coordinate axes (tick labels and axis lines). Default: <c>true</c>.</summary>
+        public void ShowAxes(bool visible)
+        {
+            _formsPlot.Plot.Axes.Bottom.IsVisible = visible;
+            _formsPlot.Plot.Axes.Left.IsVisible   = visible;
+            RefreshDisplay();
+        }
+
+        /// <summary>
+        /// Enforces or releases a 1:1 X/Y aspect ratio (equal world units per pixel on both axes).
+        /// When <paramref name="locked"/> is <c>true</c>, the image is also fitted to the current view.
+        /// </summary>
+        public void SetAspectLock(bool locked)
+        {
+            _formsPlot.Plot.Axes.SquareUnits(locked);
+            if (locked) FitToImage();
+            else RefreshDisplay();
+        }
+
+        #endregion
+
+        #region Image management
 
         /// <summary>
         /// Replaces the displayed image with a new <see cref="CxImage"/>.
-        /// The view is automatically fitted to the image after loading.
-        /// Rendering is automatic based on <see cref="CxImage.Type"/> and <see cref="CxImage.Channel"/>:
+        /// Rendering adapts to <see cref="CxImage.Type"/> and <see cref="CxImage.Channel"/>:
         /// 1-channel → grayscale; 3-channel → RGB; 4-channel → BGRA.
         /// </summary>
         /// <param name="image">Source image. Pass <c>null</c> to clear.</param>
@@ -90,7 +83,6 @@ namespace VisionNet.Controls
             _imageWidth  = image.Width;
             _imageHeight = image.Height;
 
-            // Move image to world-coordinate rect so axes show world values
             _imageItem.UpdateWorldRect(GetImageWorldRect());
             FitImage1to1();
         }
@@ -110,72 +102,33 @@ namespace VisionNet.Controls
             RefreshDisplay();
         }
 
-        // ── Overlay management ────────────────────────────────────────────────────
+        #endregion
 
-        /// <summary>
-        /// Adds a set of 2D point markers to the display.
-        /// Each call appends a new item; use the returned handle to remove or modify it.
-        /// </summary>
-        /// <param name="points">Point coordinates in image pixel space.</param>
-        /// <param name="color">Marker colour.</param>
-        /// <param name="size">Marker size in pixels (default 5).</param>
-        /// <returns>The created <see cref="CxPoint2DItem"/>.</returns>
+        #region Overlay management
+
+        /// <summary>Adds a set of 2D point markers. Returns the created item for later manipulation.</summary>
         public CxPoint2DItem SetPoint(CxPoint2D[] points, Color color, float size = 5f)
-        {
-            var item = new CxPoint2DItem(points, color, size);
-            return AppendOverlay(item);
-        }
+            => AppendOverlay(new CxPoint2DItem(points, color, size));
 
-        /// <summary>
-        /// Adds a set of 2D line segments to the display.
-        /// </summary>
-        /// <param name="segments">Segment data in image pixel space.</param>
-        /// <param name="color">Line colour.</param>
-        /// <param name="size">Line width in pixels (default 1).</param>
-        /// <returns>The created <see cref="CxSegment2DItem"/>.</returns>
+        /// <summary>Adds a set of 2D line segments. Returns the created item for later manipulation.</summary>
         public CxSegment2DItem SetSegment(CxSegment2D[] segments, Color color, float size = 1f)
-        {
-            var item = new CxSegment2DItem(segments, color, size);
-            return AppendOverlay(item);
-        }
+            => AppendOverlay(new CxSegment2DItem(segments, color, size));
 
-        /// <summary>
-        /// Adds a set of 2D polygons (open or closed) to the display.
-        /// </summary>
-        /// <param name="polygons">Polygon data in image pixel space.</param>
-        /// <param name="color">Line colour.</param>
-        /// <param name="size">Line width in pixels (default 1).</param>
-        /// <returns>The created <see cref="CxPolygon2DItem"/>.</returns>
+        /// <summary>Adds a set of 2D polygons (open or closed). Returns the created item for later manipulation.</summary>
         public CxPolygon2DItem SetPolygon(CxPolygon2D[] polygons, Color color, float size = 1f)
-        {
-            var item = new CxPolygon2DItem(polygons, color, size);
-            return AppendOverlay(item);
-        }
+            => AppendOverlay(new CxPolygon2DItem(polygons, color, size));
 
-        /// <summary>
-        /// Adds a set of 2D circles to the display.
-        /// </summary>
-        /// <param name="circles">Circle data in image pixel space.</param>
-        /// <param name="color">Outline colour.</param>
-        /// <param name="size">Line width in pixels (default 1).</param>
-        /// <returns>The created <see cref="CxCircle2DItem"/>.</returns>
+        /// <summary>Adds a set of 2D circles. Returns the created item for later manipulation.</summary>
         public CxCircle2DItem SetCircle(CxCircle2D[] circles, Color color, float size = 1f)
-        {
-            var item = new CxCircle2DItem(circles, color, size);
-            return AppendOverlay(item);
-        }
+            => AppendOverlay(new CxCircle2DItem(circles, color, size));
 
-        /// <summary>
-        /// Adds a set of 2D text labels to the display.
-        /// </summary>
-        /// <param name="texts">Text entries in image pixel space.</param>
-        /// <param name="color">Text colour.</param>
-        /// <returns>The created <see cref="CxText2DPlotItem"/>.</returns>
+        /// <summary>Adds a set of 2D infinite lines. Returns the created item for later manipulation.</summary>
+        public CxLine2DItem SetLine(CxLine2D[] lines, Color color, float size = 1f)
+            => AppendOverlay(new CxLine2DItem(lines, color, size));
+
+        /// <summary>Adds a set of 2D text labels. Returns the created item for later manipulation.</summary>
         public CxText2DPlotItem SetText2D(CxText2D[] texts, Color color)
-        {
-            var item = new CxText2DPlotItem(texts, color);
-            return AppendOverlay(item);
-        }
+            => AppendOverlay(new CxText2DPlotItem(texts, color));
 
         /// <summary>Removes all overlay items from the display.</summary>
         public void ClearOverlays()
@@ -205,7 +158,9 @@ namespace VisionNet.Controls
             RefreshDisplay();
         }
 
-        // ── View management ───────────────────────────────────────────────────────
+        #endregion
+
+        #region View management
 
         /// <summary>Clears all overlays and the displayed image, returning the control to an empty state.</summary>
         public void ResetView()
@@ -214,20 +169,11 @@ namespace VisionNet.Controls
             ClearImage();
         }
 
-        /// <summary>
-        /// Enforces or releases a 1:1 X/Y aspect ratio (equal world units per pixel on both axes).
-        /// When <paramref name="locked"/> is <c>true</c>, the image is also fitted to the current view.
-        /// </summary>
-        public void SetAspectLock(bool locked)
-        {
-            _formsPlot.Plot.Axes.SquareUnits(locked);
-            if (locked) FitToImage();
-            else RefreshDisplay();
-        }
+        #endregion
 
-        // ── Selection management ──────────────────────────────────────────────────
+        #region Selection management
 
-        /// <summary>Deselects the currently selected item, if any.</summary>
+        /// <summary>Deselects the currently selected overlay item, if any.</summary>
         public void ClearSelection()
         {
             if (_selectedItem == null) return;
@@ -249,7 +195,9 @@ namespace VisionNet.Controls
             foreach (var item in _overlayItems) item.IsActiveObj = false;
         }
 
-        // ── Internal helpers ──────────────────────────────────────────────────────
+        #endregion
+
+        #region Internal helpers
 
         private T AppendOverlay<T>(T item) where T : Abstract2DRenderItem
         {
@@ -258,5 +206,19 @@ namespace VisionNet.Controls
             RefreshDisplay();
             return item;
         }
+
+        /// <summary>Converts a plot-space (world-unit) coordinate to (X, Y, Z). Z comes from the image pixel value.</summary>
+        internal (float X, float Y, float? Z) PlotToWorld(CxPoint2D plotCoord)
+        {
+            float wx = plotCoord.X;
+            float wy = plotCoord.Y;
+            int px = Scale.X != 0f ? (int)Math.Round((plotCoord.X - Offset.X) / Scale.X) : 0;
+            int py = Scale.Y != 0f ? (int)Math.Round((plotCoord.Y - Offset.Y) / Scale.Y) : 0;
+            float? rawZ = _imageItem?.GetPixelFloat(px, py);
+            float? wz   = rawZ.HasValue ? rawZ.Value * Scale.Z + Offset.Z : (float?)null;
+            return (wx, wy, wz);
+        }
+
+        #endregion
     }
 }

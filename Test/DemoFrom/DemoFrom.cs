@@ -541,6 +541,8 @@ namespace DemoFrom
             MakeBtn("Drag Segs", btn2D_dragSeg_Click);
             MakeBtn("Static Circles", btn2D_staticCircle_Click);
             MakeBtn("Drag Circles", btn2D_dragCircle_Click);
+            MakeBtn("Static Lines", btn2D_staticLine_Click);
+            MakeBtn("Drag Lines",   btn2D_dragLine_Click);
             MakeBtn("Clear Overlays", btn2D_clearOverlays_Click);
             MakeBtn("Clear All", btn2D_clearAll_Click);
 
@@ -652,6 +654,41 @@ namespace DemoFrom
             };
         }
 
+        private void btn2D_staticLine_Click(object sender, EventArgs e)
+        {
+            var box = _cxDisplay2D.GetImageWorldRect();
+            float cx = box.Size.Width > 0 ? box.Center.X : 200f;
+            float cy = box.Size.Height > 0 ? box.Center.Y : 200f;
+
+            var lines = new[]
+            {
+                new CxLine2D(new CxPoint2D(cx, cy), new CxVector2D(1, 0)),
+                new CxLine2D(new CxPoint2D(cx, cy), new CxVector2D(0, 1)),
+                new CxLine2D(new CxPoint2D(cx, cy), new CxVector2D(1, 1)),
+            };
+            _cxDisplay2D.SetLine(lines, Color.OrangeRed, 1.5f);
+        }
+
+        private void btn2D_dragLine_Click(object sender, EventArgs e)
+        {
+            var box = _cxDisplay2D.GetImageWorldRect();
+            float cx = box.Size.Width > 0 ? box.Center.X : 200f;
+            float cy = box.Size.Height > 0 ? box.Center.Y : 200f;
+
+            var lines = new[] { new CxLine2D(new CxPoint2D(cx, cy), new CxVector2D(1, 0.3f)) };
+            var item = _cxDisplay2D.SetLine(lines, Color.Magenta, 2f);
+            item.IsActiveObj = true;
+            item.OnChanged += i =>
+            {
+                var line = ((CxLine2DItem)i).Lines[0];
+                var text = $"P:({line.Point.X:F0},{line.Point.Y:F0})\nD:({line.Direction.X:F2},{line.Direction.Y:F2})";
+                if (_lbl2DPos.InvokeRequired)
+                    _lbl2DPos.Invoke(new Action(() => _lbl2DPos.Text = text));
+                else
+                    _lbl2DPos.Text = text;
+            };
+        }
+
         private void btn2D_clearOverlays_Click(object sender, EventArgs e) =>
             _cxDisplay2D.ClearOverlays();
 
@@ -671,7 +708,7 @@ namespace DemoFrom
             try
             {
                 _cxDisplay2D.ResetView();
-                _cxDisplay2D.SetCoordinateScale(0.1f, 0.1f);
+                _cxDisplay2D.SetScaleAndOffset(new CxPoint3D(0.1f, 0.1f, 1f), new CxPoint3D());
                 using (var bmp = new Bitmap(path))
                 {
                     // 4-channel BGRA (matches Format32bppArgb memory layout)
