@@ -25,6 +25,10 @@ namespace VisionNet.Controls
         private enum DragMode { None, Translate, DragVertex }
 
         private readonly List<Scatter> _plottables = new List<Scatter>();
+        private readonly List<IPlottable> _handlePlottables = new List<IPlottable>();
+
+        private const float HandlePixelSize = 8f;
+        private const float ArrowPixelLen = 16f;
 
         private DragMode _dragMode;
         private int      _activeIndex = -1;
@@ -53,6 +57,7 @@ namespace VisionNet.Controls
         public override void RemoveFromPlot(Plot plot)
         {
             foreach (var s in _plottables) plot.PlottableList.Remove(s);
+            RemoveHandlePlottables(plot);
             _plottables.Clear();
             _plot = null;
         }
@@ -62,6 +67,7 @@ namespace VisionNet.Controls
         {
             if (_plot == null) return;
             foreach (var s in _plottables) _plot.PlottableList.Remove(s);
+            RemoveHandlePlottables(_plot);
             _plottables.Clear();
             BuildPlottables();
         }
@@ -80,6 +86,34 @@ namespace VisionNet.Controls
                 s.LineStyle.Width       = Size;
                 s.Color                 = spColor;
                 _plottables.Add(s);
+            }
+
+            if (_activeIndex >= 0)
+            {
+                var seg = Segments[_activeIndex];
+                var hColor = ToSPColor(Color.Lime);
+
+                var startMarker = _plot.Add.Marker(seg.Start.X, seg.Start.Y);
+                startMarker.MarkerStyle.Shape = ScottPlot.MarkerShape.FilledCircle;
+                startMarker.MarkerStyle.Size = HandlePixelSize;
+                startMarker.MarkerStyle.FillColor = hColor;
+                startMarker.MarkerStyle.LineColor = hColor;
+                startMarker.MarkerStyle.LineWidth = 1;
+                _handlePlottables.Add(startMarker);
+
+                float wp = WorldPerPixel();
+                float dx = seg.End.X - seg.Start.X;
+                float dy = seg.End.Y - seg.Start.Y;
+                float len = (float)Math.Sqrt(dx * dx + dy * dy);
+                if (len > 0) { dx /= len; dy /= len; }
+                float arrowLen = ArrowPixelLen * wp;
+                var endArrow = _plot.Add.Arrow(
+                    seg.End.X - dx * arrowLen, seg.End.Y - dy * arrowLen,
+                    seg.End.X, seg.End.Y);
+                endArrow.ArrowLineColor = hColor;
+                endArrow.ArrowFillColor = hColor;
+                endArrow.ArrowLineWidth = Size;
+                _handlePlottables.Add(endArrow);
             }
         }
 
@@ -178,6 +212,12 @@ namespace VisionNet.Controls
             }
         }
 
+        private void RemoveHandlePlottables(Plot plot)
+        {
+            foreach (var h in _handlePlottables) plot.PlottableList.Remove(h);
+            _handlePlottables.Clear();
+        }
+
         private static float DistSqToSegment(CxPoint2D p, CxSegment2D seg)
         {
             float dx = seg.End.X - seg.Start.X;
@@ -194,7 +234,10 @@ namespace VisionNet.Controls
         protected override void Dispose(bool disposing)
         {
             if (disposing && _plot != null)
+            {
                 foreach (var s in _plottables) _plot.PlottableList.Remove(s);
+                RemoveHandlePlottables(_plot);
+            }
         }
     }
 }

@@ -25,6 +25,9 @@ namespace VisionNet.Controls
         private enum DragMode { None, Translate, ResizeVertex }
 
         private readonly List<Polygon> _plottables = new List<Polygon>();
+        private readonly List<IPlottable> _handlePlottables = new List<IPlottable>();
+
+        private const float HandlePixelSize = 8f;
 
         private DragMode  _dragMode;
         private int       _activeBoxIndex = -1;
@@ -58,6 +61,7 @@ namespace VisionNet.Controls
         public override void RemoveFromPlot(Plot plot)
         {
             foreach (var p in _plottables) plot.PlottableList.Remove(p);
+            RemoveHandlePlottables(plot);
             _plottables.Clear();
             _plot = null;
         }
@@ -67,6 +71,7 @@ namespace VisionNet.Controls
         {
             if (_plot == null) return;
             foreach (var p in _plottables) _plot.PlottableList.Remove(p);
+            RemoveHandlePlottables(_plot);
             _plottables.Clear();
             BuildPlottables();
         }
@@ -90,6 +95,31 @@ namespace VisionNet.Controls
                 polygon.FillStyle.IsVisible   = Filled;
                 polygon.MarkerStyle.IsVisible = false;
                 _plottables.Add(polygon);
+            }
+
+            if (_activeBoxIndex >= 0)
+            {
+                var box = Boxes[_activeBoxIndex];
+                var hColor = ToSPColor(Color.Lime);
+
+                var pts = new[]
+                {
+                    new CxPoint2D(box.Left,  box.Top),
+                    new CxPoint2D(box.Right, box.Top),
+                    new CxPoint2D(box.Right, box.Bottom),
+                    new CxPoint2D(box.Left,  box.Bottom),
+                };
+
+                for (int j = 0; j < 4; j++)
+                {
+                    var v = _plot.Add.Marker(pts[j].X, pts[j].Y);
+                    v.MarkerStyle.Shape = ScottPlot.MarkerShape.FilledSquare;
+                    v.MarkerStyle.Size = HandlePixelSize;
+                    v.MarkerStyle.FillColor = hColor;
+                    v.MarkerStyle.LineColor = hColor;
+                    v.MarkerStyle.LineWidth = 1;
+                    _handlePlottables.Add(v);
+                }
             }
         }
 
@@ -242,10 +272,19 @@ namespace VisionNet.Controls
         }
 
         /// <inheritdoc/>
+        private void RemoveHandlePlottables(Plot plot)
+        {
+            foreach (var h in _handlePlottables) plot.PlottableList.Remove(h);
+            _handlePlottables.Clear();
+        }
+
         protected override void Dispose(bool disposing)
         {
             if (disposing && _plot != null)
+            {
                 foreach (var p in _plottables) _plot.PlottableList.Remove(p);
+                RemoveHandlePlottables(_plot);
+            }
         }
     }
 }

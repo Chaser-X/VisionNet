@@ -26,6 +26,9 @@ namespace VisionNet.Controls
         private enum DragMode { None, Translate, DragVertex }
 
         private readonly List<IPlottable> _plottables = new List<IPlottable>();
+        private readonly List<IPlottable> _handlePlottables = new List<IPlottable>();
+
+        private const float HandlePixelSize = 8f;
 
         private DragMode _dragMode;
         private int      _activePolygonIndex = -1;
@@ -58,6 +61,7 @@ namespace VisionNet.Controls
         public override void RemoveFromPlot(Plot plot)
         {
             foreach (var p in _plottables) plot.PlottableList.Remove(p);
+            RemoveHandlePlottables(plot);
             _plottables.Clear();
             _plot = null;
         }
@@ -67,6 +71,7 @@ namespace VisionNet.Controls
         {
             if (_plot == null) return;
             foreach (var p in _plottables) _plot.PlottableList.Remove(p);
+            RemoveHandlePlottables(_plot);
             _plottables.Clear();
             BuildPlottables();
         }
@@ -104,6 +109,24 @@ namespace VisionNet.Controls
                     scatter.LineStyle.Width       = Size;
                     scatter.Color                 = spColor;
                     _plottables.Add(scatter);
+                }
+            }
+
+            if (_activePolygonIndex >= 0)
+            {
+                var poly = Polygons[_activePolygonIndex];
+                if (poly.Points == null) return;
+                var hColor = ToSPColor(Color.Lime);
+
+                for (int j = 0; j < poly.Points.Length; j++)
+                {
+                    var v = _plot.Add.Marker(poly.Points[j].X, poly.Points[j].Y);
+                    v.MarkerStyle.Shape = ScottPlot.MarkerShape.FilledCircle;
+                    v.MarkerStyle.Size = HandlePixelSize;
+                    v.MarkerStyle.FillColor = hColor;
+                    v.MarkerStyle.LineColor = hColor;
+                    v.MarkerStyle.LineWidth = 1;
+                    _handlePlottables.Add(v);
                 }
             }
         }
@@ -252,10 +275,19 @@ namespace VisionNet.Controls
         }
 
         /// <inheritdoc/>
+        private void RemoveHandlePlottables(Plot plot)
+        {
+            foreach (var h in _handlePlottables) plot.PlottableList.Remove(h);
+            _handlePlottables.Clear();
+        }
+
         protected override void Dispose(bool disposing)
         {
             if (disposing && _plot != null)
+            {
                 foreach (var p in _plottables) _plot.PlottableList.Remove(p);
+                RemoveHandlePlottables(_plot);
+            }
         }
     }
 }

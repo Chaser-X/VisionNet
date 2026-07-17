@@ -25,8 +25,6 @@ namespace VisionNet.Controls
         private float _rotateStartAngle;
         private float _rotateStartRectAngle;
 
-        private const float HandleRadius = 5f;
-
         public CxRectangle2D[] Rectangles { get; private set; }
         public bool Filled { get; set; } = false;
 
@@ -92,15 +90,28 @@ namespace VisionNet.Controls
             if (_activeIndex >= 0)
             {
                 var rect = Rectangles[_activeIndex];
-                var handlePos = GetHandlePos(rect);
+                var hColor = ToSPColor(Color.Lime);
 
-                var marker = _plot.Add.Marker(handlePos.X, handlePos.Y);
-                marker.MarkerStyle.Shape = ScottPlot.MarkerShape.FilledCircle;
-                marker.MarkerStyle.Size = HandlePixelSize;
-                marker.MarkerStyle.FillColor = ToSPColor(Color.Lime);
-                marker.MarkerStyle.LineColor = ToSPColor(Color.Lime);
-                marker.MarkerStyle.LineWidth = 1;
-                _handlePlottables.Add(marker);
+                var corners = GetCorners(rect);
+                for (int j = 0; j < 4; j++)
+                {
+                    var v = _plot.Add.Marker(corners[j].X, corners[j].Y);
+                    v.MarkerStyle.Shape = ScottPlot.MarkerShape.FilledSquare;
+                    v.MarkerStyle.Size = HandlePixelSize;
+                    v.MarkerStyle.FillColor = hColor;
+                    v.MarkerStyle.LineColor = hColor;
+                    v.MarkerStyle.LineWidth = 1;
+                    _handlePlottables.Add(v);
+                }
+
+                var handlePos = GetHandlePos(rect);
+                var m = _plot.Add.Marker(handlePos.X, handlePos.Y);
+                m.MarkerStyle.Shape = ScottPlot.MarkerShape.FilledCircle;
+                m.MarkerStyle.Size = HandlePixelSize;
+                m.MarkerStyle.FillColor = hColor;
+                m.MarkerStyle.LineColor = hColor;
+                m.MarkerStyle.LineWidth = 1;
+                _handlePlottables.Add(m);
             }
         }
 
