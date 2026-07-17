@@ -14,7 +14,8 @@ namespace VisionNet.Controls
 
         private readonly List<Polygon> _plottables = new List<Polygon>();
         private readonly List<IPlottable> _handlePlottables = new List<IPlottable>();
-        private Plot _plot;
+
+        private const float HandlePixelSize = 8f;
 
         private DragMode _dragMode;
         private int _activeIndex = -1;
@@ -35,13 +36,7 @@ namespace VisionNet.Controls
             Color = color;
             Size = size;
             Filled = filled;
-            if (Rectangles.Length > 0)
-            {
-                float diag = (float)Math.Sqrt(
-                    Rectangles[0].Size.Width * Rectangles[0].Size.Width +
-                    Rectangles[0].Size.Height * Rectangles[0].Size.Height);
-                HitThreshold = Math.Max(1f, diag * 0.02f);
-            }
+
         }
 
         public override void AddToPlot(Plot plot)
@@ -99,18 +94,20 @@ namespace VisionNet.Controls
                 var rect = Rectangles[_activeIndex];
                 var handlePos = GetHandlePos(rect);
 
-                var circle = _plot.Add.Circle(handlePos.X, handlePos.Y, HandleRadius);
-                circle.FillStyle.Color = ToSPColor(Color.Lime);
-                circle.FillStyle.IsVisible = true;
-                circle.LineStyle.Color = ToSPColor(Color.Lime);
-                circle.LineStyle.Width = 1;
-                _handlePlottables.Add(circle);
+                var marker = _plot.Add.Marker(handlePos.X, handlePos.Y);
+                marker.MarkerStyle.Shape = ScottPlot.MarkerShape.FilledCircle;
+                marker.MarkerStyle.Size = HandlePixelSize;
+                marker.MarkerStyle.FillColor = ToSPColor(Color.Lime);
+                marker.MarkerStyle.LineColor = ToSPColor(Color.Lime);
+                marker.MarkerStyle.LineWidth = 1;
+                _handlePlottables.Add(marker);
             }
         }
 
         public override bool HitTest(CxPoint2D plotPos)
         {
-            float t2 = HitThreshold * HitThreshold;
+            float hitW = HitThreshold * WorldPerPixel();
+            float t2 = hitW * hitW;
             float t2v = t2 * 4f;
 
             for (int i = 0; i < Rectangles.Length; i++)
@@ -128,7 +125,8 @@ namespace VisionNet.Controls
                 var hPos = GetHandlePos(rect);
                 float hdx = plotPos.X - hPos.X;
                 float hdy = plotPos.Y - hPos.Y;
-                float hT2 = HandleRadius * HandleRadius * 4f;
+                float handleW = HandlePixelSize * WorldPerPixel();
+                float hT2 = handleW * handleW * 4f;
                 if (hdx * hdx + hdy * hdy <= hT2) { _activeIndex = i; return true; }
 
                 for (int j = 0; j < 4; j++)
@@ -171,12 +169,14 @@ namespace VisionNet.Controls
 
             var rect = Rectangles[_activeIndex];
             var corners = GetCorners(rect);
-            float t2 = HitThreshold * HitThreshold * 4f;
+            float hitW = HitThreshold * WorldPerPixel();
+            float t2 = hitW * hitW * 4f;
 
             var hPos = GetHandlePos(rect);
             float hdx = plotPos.X - hPos.X;
             float hdy = plotPos.Y - hPos.Y;
-            float hT2 = HandleRadius * HandleRadius * 4f;
+            float handleW = HandlePixelSize * WorldPerPixel();
+            float hT2 = handleW * handleW * 4f;
             if (hdx * hdx + hdy * hdy <= hT2)
             {
                 _dragMode = DragMode.Rotate;

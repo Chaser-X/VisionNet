@@ -25,7 +25,6 @@ namespace VisionNet.Controls
         private enum DragMode { None, Translate, DragVertex }
 
         private readonly List<Scatter> _plottables = new List<Scatter>();
-        private Plot _plot;
 
         private DragMode _dragMode;
         private int      _activeIndex = -1;
@@ -40,12 +39,7 @@ namespace VisionNet.Controls
             Segments = segments ?? Array.Empty<CxSegment2D>();
             Color    = color;
             Size     = size;
-            if (Segments.Length > 0)
-            {
-                float dx = Segments[0].End.X - Segments[0].Start.X;
-                float dy = Segments[0].End.Y - Segments[0].Start.Y;
-                HitThreshold = Math.Max(1f, (float)Math.Sqrt(dx * dx + dy * dy) * 0.02f);
-            }
+
         }
 
         /// <inheritdoc/>
@@ -92,7 +86,8 @@ namespace VisionNet.Controls
         /// <inheritdoc/>
         public override bool HitTest(CxPoint2D plotPos)
         {
-            float t2 = HitThreshold * HitThreshold;
+            float hitW = HitThreshold * WorldPerPixel();
+            float t2 = hitW * hitW;
             for (int si = 0; si < Segments.Length; si++)
             {
                 if (DistSqToSegment(plotPos, Segments[si]) <= t2)
@@ -110,7 +105,8 @@ namespace VisionNet.Controls
             if (_activeIndex < 0) { UpdatePlottable(); return; }
 
             var seg = Segments[_activeIndex];
-            float t2 = HitThreshold * HitThreshold * 4f;
+            float hitW = HitThreshold * WorldPerPixel();
+            float t2 = hitW * hitW * 4f;
 
             _dragMode = DragMode.Translate;
 

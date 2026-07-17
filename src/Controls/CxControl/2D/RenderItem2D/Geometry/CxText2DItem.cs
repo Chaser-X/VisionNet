@@ -16,7 +16,6 @@ namespace VisionNet.Controls
     public class CxText2DPlotItem : Abstract2DRenderItem
     {
         private readonly List<ScottPlot.Plottables.Text> _plottables = new List<ScottPlot.Plottables.Text>();
-        private Plot _plot;
 
         /// <summary>Gets the text data being rendered.</summary>
         public CxText2D[] Texts { get; private set; }

@@ -17,7 +17,6 @@ namespace VisionNet.Controls
     public class CxPoint2DItem : Abstract2DRenderItem
     {
         private Scatter _plottable;
-        private Plot    _plot;
         private int     _activeIndex = -1;
 
         /// <summary>Gets the point data being rendered.</summary>
@@ -29,8 +28,7 @@ namespace VisionNet.Controls
             Points = points ?? Array.Empty<CxPoint2D>();
             Color  = color;
             Size   = size;
-            if (Points.Length > 0)
-                HitThreshold = Math.Max(1f, Size * 0.6f);
+
         }
 
         /// <inheritdoc/>
@@ -72,7 +70,8 @@ namespace VisionNet.Controls
         /// <inheritdoc/>
         public override bool HitTest(CxPoint2D plotPos)
         {
-            float t2 = HitThreshold * HitThreshold;
+            float hitW = HitThreshold * WorldPerPixel();
+            float t2 = hitW * hitW;
             for (int pi = 0; pi < Points.Length; pi++)
             {
                 float dx = Points[pi].X - plotPos.X;

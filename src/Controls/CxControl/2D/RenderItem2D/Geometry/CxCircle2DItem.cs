@@ -26,7 +26,6 @@ namespace VisionNet.Controls
         private enum DragMode { None, Translate, Resize }
 
         private readonly List<Ellipse> _plottables = new List<Ellipse>();
-        private Plot _plot;
 
         private DragMode  _dragMode;
         private int       _activeCircleIndex = -1;
@@ -45,8 +44,7 @@ namespace VisionNet.Controls
             Color   = color;
             Size    = size;
             Filled  = filled;
-            if (Circles.Length > 0)
-                HitThreshold = Math.Max(1f, Circles[0].Radius * 0.05f);
+
         }
 
         /// <inheritdoc/>
@@ -91,6 +89,7 @@ namespace VisionNet.Controls
         /// <inheritdoc/>
         public override bool HitTest(CxPoint2D plotPos)
         {
+            float hitW = HitThreshold * WorldPerPixel();
             for (int i = 0; i < Circles.Length; i++)
             {
                 var c = Circles[i];
@@ -98,8 +97,8 @@ namespace VisionNet.Controls
                 float dy = plotPos.Y - c.Center.Y;
                 float dist = (float)Math.Sqrt(dx * dx + dy * dy);
                 bool hit = Filled
-                    ? dist <= c.Radius + HitThreshold
-                    : Math.Abs(dist - c.Radius) <= HitThreshold;
+                    ? dist <= c.Radius + hitW
+                    : Math.Abs(dist - c.Radius) <= hitW;
                 if (!hit) continue;
                 _activeCircleIndex = i;
                 return true;
@@ -117,7 +116,8 @@ namespace VisionNet.Controls
                 float dy = plotPos.Y - c.Center.Y;
                 float dist = (float)Math.Sqrt(dx * dx + dy * dy);
                 _dragCenter = c.Center;
-                _dragMode = Math.Abs(dist - c.Radius) <= HitThreshold * 2f
+                float hitW = HitThreshold * WorldPerPixel();
+                _dragMode = Math.Abs(dist - c.Radius) <= hitW * 2f
                     ? DragMode.Resize : DragMode.Translate;
             }
             UpdatePlottable();

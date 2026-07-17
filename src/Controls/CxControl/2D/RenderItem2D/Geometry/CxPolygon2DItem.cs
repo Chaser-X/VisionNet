@@ -26,7 +26,6 @@ namespace VisionNet.Controls
         private enum DragMode { None, Translate, DragVertex }
 
         private readonly List<IPlottable> _plottables = new List<IPlottable>();
-        private Plot _plot;
 
         private DragMode _dragMode;
         private int      _activePolygonIndex = -1;
@@ -45,19 +44,7 @@ namespace VisionNet.Controls
             Color    = color;
             Size     = size;
             Filled   = filled;
-            if (Polygons.Length > 0 && Polygons[0].Points != null && Polygons[0].Points.Length > 0)
-            {
-                float minX = float.MaxValue, minY = float.MaxValue, maxX = float.MinValue, maxY = float.MinValue;
-                foreach (var pt in Polygons[0].Points)
-                {
-                    if (pt.X < minX) minX = pt.X;
-                    if (pt.X > maxX) maxX = pt.X;
-                    if (pt.Y < minY) minY = pt.Y;
-                    if (pt.Y > maxY) maxY = pt.Y;
-                }
-                float dx = maxX - minX, dy = maxY - minY;
-                HitThreshold = Math.Max(1f, (float)Math.Sqrt(dx * dx + dy * dy) * 0.02f);
-            }
+
         }
 
         /// <inheritdoc/>
@@ -140,7 +127,8 @@ namespace VisionNet.Controls
                 }
 
                 // Edge hit for all polygon types
-                float t2 = HitThreshold * HitThreshold;
+                float hitW = HitThreshold * WorldPerPixel();
+                float t2 = hitW * hitW;
                 for (int i = 0; i < poly.Points.Length - 1; i++)
                 {
                     if (DistSqToSegment(plotPos, poly.Points[i], poly.Points[i + 1]) <= t2)
@@ -175,7 +163,8 @@ namespace VisionNet.Controls
                 return;
             }
 
-            float t2 = HitThreshold * HitThreshold * 4f;
+            float hitW = HitThreshold * WorldPerPixel();
+            float t2 = hitW * hitW * 4f;
             _dragMode = DragMode.Translate;
             for (int i = 0; i < poly.Points.Length; i++)
             {

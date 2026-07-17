@@ -35,6 +35,9 @@ namespace VisionNet.Controls
         /// <summary>The effective colour: <see cref="SelectedColor"/> when selected, otherwise <see cref="Color"/>.</summary>
         protected Color DrawColor => IsSelected ? SelectedColor : Color;
 
+        /// <summary>The ScottPlot <see cref="Plot"/> this item was added to. Set by <see cref="AddToPlot"/>.</summary>
+        protected Plot _plot;
+
         // ── Active-object interaction ────────────────────────────────────────────
 
         /// <summary>
@@ -46,8 +49,22 @@ namespace VisionNet.Controls
         /// <summary>Gets or sets whether this item is currently selected.</summary>
         public bool IsSelected { get; set; } = false;
 
-        /// <summary>Plot-coordinate proximity threshold used by <see cref="HitTest"/>.</summary>
-        public float HitThreshold { get; set; } = 5f;
+        /// <summary>Pixel-space click tolerance for <see cref="HitTest"/>. Default: 6 pixels.</summary>
+        public float HitThreshold { get; set; } = 6f;
+
+        /// <summary>
+        /// Returns the current world‑unit per pixel ratio for the X axis.
+        /// Under 1:1 aspect lock this is equivalent to the Y axis ratio.
+        /// Returns 1 if <see cref="_plot"/> is null or not yet rendered.
+        /// </summary>
+        protected float WorldPerPixel()
+        {
+            if (_plot == null) return 1f;
+            var p0 = _plot.GetPixel(new Coordinates(0, 0));
+            var p1 = _plot.GetPixel(new Coordinates(1, 0));
+            float dx = (float)(p1.X - p0.X);
+            return dx != 0 ? Math.Abs(1f / dx) : 1f;
+        }
 
         /// <summary>
         /// Returns <c>true</c> if <paramref name="plotPos"/> is within <see cref="HitThreshold"/>

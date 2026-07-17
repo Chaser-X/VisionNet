@@ -25,7 +25,6 @@ namespace VisionNet.Controls
         private enum DragMode { None, Translate, ResizeVertex }
 
         private readonly List<Polygon> _plottables = new List<Polygon>();
-        private Plot _plot;
 
         private DragMode  _dragMode;
         private int       _activeBoxIndex = -1;
@@ -45,8 +44,7 @@ namespace VisionNet.Controls
             Color  = color;
             Size   = size;
             Filled = filled;
-            if (Boxes.Length > 0)
-                HitThreshold = Math.Max(1f, (float)Math.Sqrt(Boxes[0].Size.Width * Boxes[0].Size.Width + Boxes[0].Size.Height * Boxes[0].Size.Height) * 0.02f);
+
         }
 
         /// <inheritdoc/>
@@ -98,16 +96,19 @@ namespace VisionNet.Controls
         /// <inheritdoc/>
         public override bool HitTest(CxPoint2D plotPos)
         {
+            float hitW = HitThreshold * WorldPerPixel();
+            float t2   = hitW * hitW;
+
             for (int bi = 0; bi < Boxes.Length; bi++)
             {
                 var box = Boxes[bi];
 
                 // Interior hit (filled)
                 if (Filled &&
-                    plotPos.X >= box.Left  - HitThreshold &&
-                    plotPos.X <= box.Right + HitThreshold &&
-                    plotPos.Y >= box.Top   - HitThreshold &&
-                    plotPos.Y <= box.Bottom + HitThreshold)
+                    plotPos.X >= box.Left  - hitW &&
+                    plotPos.X <= box.Right + hitW &&
+                    plotPos.Y >= box.Top   - hitW &&
+                    plotPos.Y <= box.Bottom + hitW)
                 {
                     _activeBoxIndex = bi;
                     return true;
@@ -121,8 +122,6 @@ namespace VisionNet.Controls
                     new CxPoint2D(box.Right, box.Bottom),
                     new CxPoint2D(box.Left,  box.Bottom),
                 };
-
-                float t2 = HitThreshold * HitThreshold;
                 for (int i = 0; i < 4; i++)
                 {
                     var a = pts[i];
@@ -168,7 +167,8 @@ namespace VisionNet.Controls
                 new CxPoint2D(box.Left,  box.Bottom),
             };
 
-            float t2 = HitThreshold * HitThreshold * 4f;
+            float hitW = HitThreshold * WorldPerPixel();
+            float t2 = hitW * hitW * 4f;
             _dragMode = DragMode.Translate;
             for (int i = 0; i < 4; i++)
             {

@@ -14,7 +14,9 @@ namespace VisionNet.Controls
 
         private readonly List<IPlottable> _plottables = new List<IPlottable>();
         private readonly List<IPlottable> _controlPoints = new List<IPlottable>();
-        private Plot _plot;
+
+        private const float CpPixelSize = 8f;
+        private const float ArrowPixelLen = 18f;
 
         private DragMode _dragMode;
         private int _activeIndex = -1;
@@ -28,8 +30,7 @@ namespace VisionNet.Controls
             Arcs = arcs ?? Array.Empty<CxArc2D>();
             Color = color;
             Size = size;
-            if (Arcs.Length > 0)
-                HitThreshold = Math.Max(1f, Arcs[0].Radius * 0.05f);
+
         }
 
         public override void AddToPlot(Plot plot)
@@ -74,24 +75,14 @@ namespace VisionNet.Controls
             if (_activeIndex >= 0)
             {
                 var arc = Arcs[_activeIndex];
-                float cpRadius = Math.Max(3f, Size + 1f);
                 var spColor = ToSPColor(Color.Lime);
+                float wp = WorldPerPixel();
 
                 var sp = GetPointOnArc(arc, arc.StartAngle);
-                var cp = _plot.Add.Circle(sp.X, sp.Y, cpRadius);
-                cp.FillStyle.Color = spColor;
-                cp.FillStyle.IsVisible = true;
-                cp.LineStyle.Color = spColor;
-                cp.LineStyle.Width = 1;
-                _controlPoints.Add(cp);
+                _controlPoints.Add(AddHandleMarker(sp, spColor));
 
                 var ep = GetPointOnArc(arc, arc.StartAngle + arc.SweepAngle);
-                cp = _plot.Add.Circle(ep.X, ep.Y, cpRadius);
-                cp.FillStyle.Color = spColor;
-                cp.FillStyle.IsVisible = true;
-                cp.LineStyle.Color = spColor;
-                cp.LineStyle.Width = 1;
-                _controlPoints.Add(cp);
+                _controlPoints.Add(AddHandleMarker(ep, spColor));
 
                 float midAngle = arc.StartAngle + arc.SweepAngle * 0.5f;
                 var mp = GetPointOnArc(arc, midAngle);
@@ -100,7 +91,7 @@ namespace VisionNet.Controls
                 if (sign == 0f) sign = 1f;
                 float tx = -(float)Math.Sin(midRad) * sign;
                 float ty = (float)Math.Cos(midRad) * sign;
-                float arrowLen = Math.Max(10f, cpRadius * 3f);
+                float arrowLen = ArrowPixelLen * wp;
                 var arrowBase = new CxPoint2D(mp.X - tx * (arrowLen / 2f), mp.Y - ty * (arrowLen / 2f));
                 var arrowTip  = new CxPoint2D(mp.X + tx * (arrowLen / 2f), mp.Y + ty * (arrowLen / 2f));
                 var arrow = _plot.Add.Arrow(arrowBase.X, arrowBase.Y, arrowTip.X, arrowTip.Y);
@@ -113,7 +104,8 @@ namespace VisionNet.Controls
 
         public override bool HitTest(CxPoint2D plotPos)
         {
-            float t2 = HitThreshold * HitThreshold;
+            float hitW = HitThreshold * WorldPerPixel();
+            float t2 = hitW * hitW;
             float t2Cp = t2 * 4f;
 
             for (int i = 0; i < Arcs.Length; i++)
@@ -143,7 +135,8 @@ namespace VisionNet.Controls
             if (_activeIndex < 0) { UpdatePlottable(); return; }
 
             var arc = Arcs[_activeIndex];
-            float t2 = HitThreshold * HitThreshold * 4f;
+            float hitW = HitThreshold * WorldPerPixel();
+            float t2 = hitW * hitW * 4f;
 
             _dragMode = DragMode.Translate;
 
@@ -290,6 +283,17 @@ namespace VisionNet.Controls
                 foreach (var p in _plottables) _plot.PlottableList.Remove(p);
                 foreach (var c in _controlPoints) _plot.PlottableList.Remove(c);
             }
+        }
+
+        private IPlottable AddHandleMarker(CxPoint2D pt, ScottPlot.Color color)
+        {
+            var m = _plot.Add.Marker(pt.X, pt.Y);
+            m.MarkerStyle.Shape = ScottPlot.MarkerShape.FilledCircle;
+            m.MarkerStyle.Size = CpPixelSize;
+            m.MarkerStyle.FillColor = color;
+            m.MarkerStyle.LineColor = color;
+            m.MarkerStyle.LineWidth = 1;
+            return m;
         }
 
         private static bool ProjectCenterOntoBisector(
