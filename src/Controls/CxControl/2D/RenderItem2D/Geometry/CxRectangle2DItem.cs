@@ -24,7 +24,6 @@ namespace VisionNet.Controls
         private float _rotateStartAngle;
         private float _rotateStartRectAngle;
 
-        private const float HandleOffset = 20f;
         private const float HandleRadius = 5f;
 
         public CxRectangle2D[] Rectangles { get; private set; }
@@ -98,18 +97,12 @@ namespace VisionNet.Controls
             if (_activeIndex >= 0)
             {
                 var rect = Rectangles[_activeIndex];
-                var edgePos = GetHandleEdgePos(rect);
                 var handlePos = GetHandlePos(rect);
 
-                var line = _plot.Add.Line(edgePos.X, edgePos.Y, handlePos.X, handlePos.Y);
-                line.LineStyle.Color = ToSPColor(Color.White);
-                line.LineStyle.Width = 1;
-                _handlePlottables.Add(line);
-
                 var circle = _plot.Add.Circle(handlePos.X, handlePos.Y, HandleRadius);
-                circle.FillStyle.Color = ToSPColor(Color.White);
+                circle.FillStyle.Color = ToSPColor(Color.Lime);
                 circle.FillStyle.IsVisible = true;
-                circle.LineStyle.Color = ToSPColor(Color.White);
+                circle.LineStyle.Color = ToSPColor(Color.Lime);
                 circle.LineStyle.Width = 1;
                 _handlePlottables.Add(circle);
             }
@@ -132,14 +125,11 @@ namespace VisionNet.Controls
                     if (dx * dx + dy * dy <= t2v) { _activeIndex = i; return true; }
                 }
 
-                if (i == _activeIndex)
-                {
-                    var hPos = GetHandlePos(rect);
-                    float dx = plotPos.X - hPos.X;
-                    float dy = plotPos.Y - hPos.Y;
-                    float hT2 = HandleRadius * HandleRadius * 4f;
-                    if (dx * dx + dy * dy <= hT2) { _activeIndex = i; return true; }
-                }
+                var hPos = GetHandlePos(rect);
+                float hdx = plotPos.X - hPos.X;
+                float hdy = plotPos.Y - hPos.Y;
+                float hT2 = HandleRadius * HandleRadius * 4f;
+                if (hdx * hdx + hdy * hdy <= hT2) { _activeIndex = i; return true; }
 
                 for (int j = 0; j < 4; j++)
                 {
@@ -257,7 +247,10 @@ namespace VisionNet.Controls
                 case DragMode.Rotate:
                 {
                     float currentAngle = (float)Math.Atan2(plotPos.Y - rect.Center.Y, plotPos.X - rect.Center.X);
-                    float deltaDeg = (float)((currentAngle - _rotateStartAngle) * 180 / Math.PI);
+                    float deltaRad = currentAngle - _rotateStartAngle;
+                    while (deltaRad > Math.PI) deltaRad -= 2f * (float)Math.PI;
+                    while (deltaRad < -Math.PI) deltaRad += 2f * (float)Math.PI;
+                    float deltaDeg = deltaRad * 180f / (float)Math.PI;
                     Rectangles[_activeIndex] = new CxRectangle2D(
                         rect.Center, rect.Size, _rotateStartRectAngle + deltaDeg);
                     UpdatePlottable();
@@ -323,19 +316,6 @@ namespace VisionNet.Controls
         }
 
         private static CxPoint2D GetHandlePos(CxRectangle2D rect)
-        {
-            float hh = rect.Size.Height / 2f;
-            float rad = rect.Angle * (float)Math.PI / 180f;
-            float cos = (float)Math.Cos(rad);
-            float sin = (float)Math.Sin(rad);
-
-            float ly = -hh - HandleOffset;
-            return new CxPoint2D(
-                rect.Center.X - ly * sin,
-                rect.Center.Y + ly * cos);
-        }
-
-        private static CxPoint2D GetHandleEdgePos(CxRectangle2D rect)
         {
             float hh = rect.Size.Height / 2f;
             float rad = rect.Angle * (float)Math.PI / 180f;
