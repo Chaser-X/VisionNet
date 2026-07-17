@@ -150,6 +150,14 @@ namespace VisionNet.Controls
         public CxBox2DItem SetBox(CxBox2D[] boxes, Color color, float size = 1f, bool filled = false)
             => AppendOverlay(new CxBox2DItem(boxes, color, size, filled));
 
+        /// <summary>Adds a set of 2D oriented rectangles (rotatable). Returns the created item for later manipulation.</summary>
+        public CxRectangle2DItem SetRectangle(CxRectangle2D[] rects, Color color, float size = 1f, bool filled = false)
+            => AppendOverlay(new CxRectangle2DItem(rects, color, size, filled));
+
+        /// <summary>Adds a set of 2D arcs. Returns the created item for later manipulation.</summary>
+        public CxArc2DItem SetArc(CxArc2D[] arcs, Color color, float size = 1f)
+            => AppendOverlay(new CxArc2DItem(arcs, color, size));
+
         /// <summary>Adds a set of 2D text labels. Returns the created item for later manipulation.</summary>
         public CxText2DPlotItem SetText2D(CxText2D[] texts, Color color)
             => AppendOverlay(new CxText2DPlotItem(texts, color));

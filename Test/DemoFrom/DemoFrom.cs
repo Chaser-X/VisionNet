@@ -547,6 +547,10 @@ namespace DemoFrom
             MakeBtn("Static Boxes", btn2D_staticBox_Click);
             MakeBtn("Drag Box",     btn2D_dragBox_Click);
             MakeBtn("Drag Polygon", btn2D_dragPolygon_Click);
+            MakeBtn("Static Rect", btn2D_staticRect_Click);
+            MakeBtn("Drag Rect",   btn2D_dragRect_Click);
+            MakeBtn("Arc Demo",    btn2D_arcDemo_Click);
+            MakeBtn("Drag Arc",    btn2D_dragArc_Click);
             MakeBtn("Clear Overlays", btn2D_clearOverlays_Click);
             MakeBtn("Clear All", btn2D_clearAll_Click);
 
@@ -790,6 +794,72 @@ namespace DemoFrom
                 var text = pts.Length > 0
                     ? $"V0:({pts[0].X:F0},{pts[0].Y:F0})\nV1:({pts[1].X:F0},{pts[1].Y:F0})"
                     : "--";
+                if (_lbl2DPos.InvokeRequired)
+                    _lbl2DPos.Invoke(new Action(() => _lbl2DPos.Text = text));
+                else
+                    _lbl2DPos.Text = text;
+            };
+        }
+
+        private void btn2D_staticRect_Click(object sender, EventArgs e)
+        {
+            _cxDisplay2D.ClearOverlays();
+            var rects = new[]
+            {
+                new CxRectangle2D(new CxPoint2D(200, 200), new CxSize2D(120, 80), 0f),
+                new CxRectangle2D(new CxPoint2D(400, 300), new CxSize2D(100, 60), 30f),
+                new CxRectangle2D(new CxPoint2D(600, 200), new CxSize2D(140, 90), -45f),
+            };
+            _cxDisplay2D.SetRectangle(rects, Color.Coral, 2f, filled: false);
+            _cxDisplay2D.DeactivateAllItems();
+        }
+
+        private void btn2D_dragRect_Click(object sender, EventArgs e)
+        {
+            _cxDisplay2D.ClearOverlays();
+            var initRect = new CxRectangle2D(new CxPoint2D(400, 300), new CxSize2D(200, 120), 15f);
+            var item = _cxDisplay2D.SetRectangle(new[] { initRect }, Color.Gold, 2f, filled: false);
+            item.IsActiveObj = true;
+            item.OnChanged += i =>
+            {
+                var r = ((CxRectangle2DItem)i).Rectangles[0];
+                var text = $"C:({r.Center.X:F0},{r.Center.Y:F0}) A:{r.Angle:F1}";
+                if (_lbl2DPos.InvokeRequired)
+                    _lbl2DPos.Invoke(new Action(() => _lbl2DPos.Text = text));
+                else
+                    _lbl2DPos.Text = text;
+            };
+        }
+
+        private void btn2D_arcDemo_Click(object sender, EventArgs e)
+        {
+            _cxDisplay2D.ClearOverlays();
+            var arcs = new[]
+            {
+                new CxArc2D(new CxPoint2D(200, 200), 80, 0f, 90f),
+                new CxArc2D(new CxPoint2D(400, 200), 60, 45f, 180f),
+                new CxArc2D(new CxPoint2D(600, 200), 100, -30f, 270f),
+            };
+            _cxDisplay2D.SetArc(arcs, Color.Cyan, 2f);
+            _cxDisplay2D.DeactivateAllItems();
+        }
+
+        private void btn2D_dragArc_Click(object sender, EventArgs e)
+        {
+            _cxDisplay2D.ClearOverlays();
+            var box = _cxDisplay2D.GetImageWorldRect();
+            float cx = box.Size.Width > 0 ? box.Center.X : 200f;
+            float cy = box.Size.Height > 0 ? box.Center.Y : 200f;
+            float r = Math.Max(box.Size.Width > 0 ? box.Size.Width : 400,
+                                box.Size.Height > 0 ? box.Size.Height : 400) * 0.15f;
+            if (r < 20) r = 80f;
+            var initArc = new CxArc2D(new CxPoint2D(cx, cy), r, 0f, 90f);
+            var item = _cxDisplay2D.SetArc(new[] { initArc }, Color.Orange, 2f);
+            item.IsActiveObj = true;
+            item.OnChanged += i =>
+            {
+                var a = ((CxArc2DItem)i).Arcs[0];
+                var text = $"R:{a.Radius:F0} S:{a.StartAngle:F0} W:{a.SweepAngle:F0}";
                 if (_lbl2DPos.InvokeRequired)
                     _lbl2DPos.Invoke(new Action(() => _lbl2DPos.Text = text));
                 else
