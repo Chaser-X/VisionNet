@@ -174,6 +174,10 @@ namespace VisionNet.Controls
         public CxPolygon2DFittingFieldItem SetPolygonFittingField(CxPolygon2DFittingField[] fields, Color color, float size = 1f)
             => AppendOverlay(new CxPolygon2DFittingFieldItem(fields, color, size));
 
+        /// <summary>Adds a set of 2D circle edge-finding ROI fields. Returns the created item for later manipulation.</summary>
+        public CxCircle2DFittingFieldItem SetCircleFittingField(CxCircle2DFittingField[] fields, Color color, float size = 1f)
+            => AppendOverlay(new CxCircle2DFittingFieldItem(fields, color, size));
+
         /// <summary>Removes all overlay items from the display.</summary>
         public void ClearOverlays()
         {

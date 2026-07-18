@@ -514,6 +514,9 @@ namespace DemoFrom
             };
 
             _cxDisplay2D = new CxDisplay2D { Dock = DockStyle.Fill };
+            _cxDisplay2D.ShowAxes(true);
+            _cxDisplay2D.SetBackgroundColor(Color.White);
+            _cxDisplay2D.SetAspectLock(false);
             _cxDisplay2D.CoordinatesChanged += pos =>
             {
                 var text = $"X:{pos.X:F1}  Y:{pos.Y:F1}";
@@ -554,6 +557,7 @@ namespace DemoFrom
             MakeBtn("Drag Fitting", btn2D_dragFitting_Click);
             MakeBtn("Drag ArcFit", btn2D_dragArcFitting_Click);
             MakeBtn("Drag PolyFit", btn2D_dragPolyFitting_Click);
+            MakeBtn("Drag CircleFit", btn2D_dragCircleFitting_Click);
             MakeBtn("Clear Overlays", btn2D_clearOverlays_Click);
             MakeBtn("Clear All", btn2D_clearAll_Click);
 
@@ -945,6 +949,31 @@ namespace DemoFrom
             {
                 var f = ((CxPolygon2DFittingFieldItem)i).Fields[0];
                 var text = $"N:{f.Axis.Points?.Length ?? 0} W:{f.Width:F0}";
+                if (_lbl2DPos.InvokeRequired)
+                    _lbl2DPos.Invoke(new Action(() => _lbl2DPos.Text = text));
+                else
+                    _lbl2DPos.Text = text;
+            };
+        }
+
+        private void btn2D_dragCircleFitting_Click(object sender, EventArgs e)
+        {
+            _cxDisplay2D.ClearOverlays();
+            var box = _cxDisplay2D.GetImageWorldRect();
+            float cx = box.Size.Width > 0 ? box.Center.X : 200f;
+            float cy = box.Size.Height > 0 ? box.Center.Y : 200f;
+            float r = Math.Max(box.Size.Width > 0 ? box.Size.Width : 400,
+                               box.Size.Height > 0 ? box.Size.Height : 400) * 0.1f;
+            if (r < 30) r = 50f;
+
+            var field = new CxCircle2DFittingField(new CxCircle2D(new CxPoint2D(cx, cy), r), 30f);
+            var item = _cxDisplay2D.SetCircleFittingField(new[] { field }, Color.Yellow, 2f);
+            item.IsActiveObj = true;
+            item.OnChanged += i =>
+            {
+                var f = ((CxCircle2DFittingFieldItem)i).Fields[0];
+                var c = f.Axis;
+                var text = $"C:({c.Center.X:F0},{c.Center.Y:F0}) R:{c.Radius:F0} W:{f.Width:F0}";
                 if (_lbl2DPos.InvokeRequired)
                     _lbl2DPos.Invoke(new Action(() => _lbl2DPos.Text = text));
                 else
