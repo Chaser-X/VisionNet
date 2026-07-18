@@ -553,6 +553,7 @@ namespace DemoFrom
             MakeBtn("Drag Arc",    btn2D_dragArc_Click);
             MakeBtn("Drag Fitting", btn2D_dragFitting_Click);
             MakeBtn("Drag ArcFit", btn2D_dragArcFitting_Click);
+            MakeBtn("Drag PolyFit", btn2D_dragPolyFitting_Click);
             MakeBtn("Clear Overlays", btn2D_clearOverlays_Click);
             MakeBtn("Clear All", btn2D_clearAll_Click);
 
@@ -914,6 +915,36 @@ namespace DemoFrom
                 var f = ((CxArc2DFittingFieldItem)i).Fields[0];
                 var a = f.Axis;
                 var text = $"C:({a.Center.X:F0},{a.Center.Y:F0}) R:{a.Radius:F0} S:{a.StartAngle:F0} W:{a.SweepAngle:F0} BW:{f.Width:F0}";
+                if (_lbl2DPos.InvokeRequired)
+                    _lbl2DPos.Invoke(new Action(() => _lbl2DPos.Text = text));
+                else
+                    _lbl2DPos.Text = text;
+            };
+        }
+
+        private void btn2D_dragPolyFitting_Click(object sender, EventArgs e)
+        {
+            _cxDisplay2D.ClearOverlays();
+            var box = _cxDisplay2D.GetImageWorldRect();
+            float cx = box.Size.Width > 0 ? box.Center.X : 200f;
+            float cy = box.Size.Height > 0 ? box.Center.Y : 200f;
+            float r = Math.Max(box.Size.Width > 0 ? box.Size.Width : 400,
+                               box.Size.Height > 0 ? box.Size.Height : 400) * 0.15f;
+            if (r < 30) r = 60f;
+
+            var line = new CxPoint2D[]
+            {
+                new CxPoint2D(cx - r, cy - r * 0.3f),
+                new CxPoint2D(cx,     cy + r * 0.4f),
+                new CxPoint2D(cx + r, cy - r * 0.3f),
+            };
+            var field = new CxPolygon2DFittingField(new CxPolygon2D(line, false), 30f);
+            var item = _cxDisplay2D.SetPolygonFittingField(new[] { field }, Color.Yellow, 2f);
+            item.IsActiveObj = true;
+            item.OnChanged += i =>
+            {
+                var f = ((CxPolygon2DFittingFieldItem)i).Fields[0];
+                var text = $"N:{f.Axis.Points?.Length ?? 0} W:{f.Width:F0}";
                 if (_lbl2DPos.InvokeRequired)
                     _lbl2DPos.Invoke(new Action(() => _lbl2DPos.Text = text));
                 else
