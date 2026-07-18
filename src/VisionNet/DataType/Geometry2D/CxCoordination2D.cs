@@ -7,14 +7,19 @@ namespace VisionNet.DataType
     {
         /// <summary>Origin of the coordinate frame in 2D space.</summary>
         public CxPoint2D Origin;
-
+        /// <summary>
+        /// Scale factor for the coordinate frame. This can be used to scale the coordinates in the frame.
+        /// </summary>
+        public CxPoint2D Scale;
         /// <summary>Rotation angle in degrees.</summary>
         public float Angle;
 
+
         /// <summary>Initializes a coordinate frame with the given origin and angle.</summary>
-        public CxCoordination2D(CxPoint2D origin, float angleDeg)
+        public CxCoordination2D(CxPoint2D origin, CxPoint2D scale, float angleDeg = 0)
         {
             Origin = origin;
+            Scale = scale;
             Angle  = angleDeg;
         }
     }
