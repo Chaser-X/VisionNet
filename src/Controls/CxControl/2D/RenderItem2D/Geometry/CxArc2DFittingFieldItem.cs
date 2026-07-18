@@ -305,14 +305,21 @@ namespace VisionNet.Controls
                     float crossNow = (pe.X - ps.X) * (plotPos.Y - ps.Y) - (pe.Y - ps.Y) * (plotPos.X - ps.X);
                     float sideNow = Math.Sign(crossNow);
 
+                    float chordDx = pe.X - ps.X, chordDy = pe.Y - ps.Y;
+                    float chordLen = (float)Math.Sqrt(chordDx * chordDx + chordDy * chordDy);
+                    float perpDist = chordLen > 0 ? Math.Abs(crossNow) / chordLen : float.MaxValue;
+                    float wp = WorldPerPixel();
+                    float freezeDist = 3f * wp;
+                    float unfreezeDist = 6f * wp;
+
                     if (_dragFrozen)
                     {
-                        if (sideNow == _dragInitialSide && Math.Abs(crossNow) > 1f)
+                        if (sideNow == _dragInitialSide && perpDist > unfreezeDist)
                             _dragFrozen = false;
                         else { UpdatePlottable(); break; }
                     }
 
-                    if (sideNow != 0 && sideNow * _dragInitialSide < 0)
+                    if ((sideNow != 0 && sideNow * _dragInitialSide < 0) || perpDist < freezeDist)
                     { _dragFrozen = true; UpdatePlottable(); break; }
 
                     if (!CircumCircle(ps.X, ps.Y, pe.X, pe.Y, plotPos.X, plotPos.Y,
