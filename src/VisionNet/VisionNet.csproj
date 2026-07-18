@@ -76,6 +76,8 @@
     <Compile Include="DataType\Geometry2D\CxLine2D.cs" />
     <Compile Include="DataType\Geometry2D\CxArc2D.cs" />
     <Compile Include="DataType\Geometry2D\CxRectangle2D.cs" />
+    <Compile Include="DataType\Geometry2D\CxSegment2DFittingField.cs" />
+    <Compile Include="DataType\Geometry2D\CxArc2DFittingField.cs" />
     <Compile Include="DataType\Models\CxSurface.cs" />
     <Compile Include="DataType\Models\CxPointCloud.cs" />
     <Compile Include="DataType\Models\CxMesh.cs" />

@@ -171,6 +171,8 @@
     <Compile Include="2D\RenderItem2D\Geometry\CxArc2DItem.cs" />
     <Compile Include="2D\RenderItem2D\Geometry\CxRectangle2DItem.cs" />
     <Compile Include="2D\RenderItem2D\Geometry\CxText2DItem.cs" />
+    <Compile Include="2D\RenderItem2D\Geometry\CxSegment2DFittingFieldItem.cs" />
+    <Compile Include="2D\RenderItem2D\Geometry\CxArc2DFittingFieldItem.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Service Include="{94E38DFF-614B-4cbd-B67C-F211BB35CE8B}" />
   </ItemGroup>

@@ -162,6 +162,14 @@ namespace VisionNet.Controls
         public CxText2DPlotItem SetText2D(CxText2D[] texts, Color color)
             => AppendOverlay(new CxText2DPlotItem(texts, color));
 
+        /// <summary>Adds a set of 2D edge-finding ROI fields. Returns the created item for later manipulation.</summary>
+        public CxSegment2DFittingFieldItem SetSegmentFittingField(CxSegment2DFittingField[] fields, Color color, float size = 1f)
+            => AppendOverlay(new CxSegment2DFittingFieldItem(fields, color, size));
+
+        /// <summary>Adds a set of 2D arc edge-finding ROI fields. Returns the created item for later manipulation.</summary>
+        public CxArc2DFittingFieldItem SetArcFittingField(CxArc2DFittingField[] fields, Color color, float size = 1f)
+            => AppendOverlay(new CxArc2DFittingFieldItem(fields, color, size));
+
         /// <summary>Removes all overlay items from the display.</summary>
         public void ClearOverlays()
         {
