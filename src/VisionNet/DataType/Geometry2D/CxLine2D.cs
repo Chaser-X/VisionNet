@@ -1,3 +1,5 @@
+using System;
+
 namespace VisionNet.DataType
 {
     /// <summary>Represents an infinite 2D line defined by a point and a direction vector.</summary>
@@ -28,5 +30,18 @@ namespace VisionNet.DataType
         /// <summary>Creates a line from a point and a slope: y - y₀ = slope * (x - x₀).</summary>
         public static CxLine2D FromPointSlope(CxPoint2D point, float slope) =>
             new CxLine2D(point, new CxVector2D(1f, slope));
+
+        /// <summary>Creates a line from the general form: A·x + B·y + C = 0.</summary>
+        public static CxLine2D FromGeneralForm(float a, float b, float c)
+        {
+            if (Math.Abs(a) < float.Epsilon && Math.Abs(b) < float.Epsilon)
+                throw new ArgumentException("Coefficients A and B cannot both be zero.");
+
+            var point = Math.Abs(a) > float.Epsilon
+                ? new CxPoint2D(-c / a, 0)
+                : new CxPoint2D(0, -c / b);
+
+            return new CxLine2D(point, new CxVector2D(-b, a));
+        }
     }
 }
