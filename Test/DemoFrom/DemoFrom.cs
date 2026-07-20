@@ -558,6 +558,7 @@ namespace DemoFrom
             MakeBtn("Drag ArcFit", btn2D_dragArcFitting_Click);
             MakeBtn("Drag PolyFit", btn2D_dragPolyFitting_Click);
             MakeBtn("Drag CircleFit", btn2D_dragCircleFitting_Click);
+            MakeBtn("Show Coord", btn2D_showCoord_Click);
             MakeBtn("Clear Overlays", btn2D_clearOverlays_Click);
             MakeBtn("Clear All", btn2D_clearAll_Click);
 
@@ -979,6 +980,24 @@ namespace DemoFrom
                 else
                     _lbl2DPos.Text = text;
             };
+        }
+
+        private void btn2D_showCoord_Click(object sender, EventArgs e)
+        {
+            _cxDisplay2D.ClearOverlays();
+            var box = _cxDisplay2D.GetImageWorldRect();
+            float cx = box.Size.Width > 0 ? box.Center.X : 200f;
+            float cy = box.Size.Height > 0 ? box.Center.Y : 200f;
+            float r = Math.Max(box.Size.Width > 0 ? box.Size.Width : 400,
+                               box.Size.Height > 0 ? box.Size.Height : 400) * 0.12f;
+            if (r < 40) r = 60f;
+
+            var frames = new[]
+            {
+                new CxCoordination2D(new CxPoint2D(cx, cy), new CxPoint2D(r, r * 0.65f), 0f),
+                new CxCoordination2D(new CxPoint2D(cx + r * 0.9f, cy + r * 0.4f), new CxPoint2D(r * 0.65f, r * 0.4f), -30f),
+            };
+            _cxDisplay2D.SetCoordination(frames, Color.Yellow, 0.01f);
         }
 
         private void btn2D_clearOverlays_Click(object sender, EventArgs e) =>
