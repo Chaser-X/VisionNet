@@ -99,6 +99,7 @@
     <Compile Include="Filter\VisionOperator.Clip.cs" />
     <Compile Include="Transform\VisionOperator.Transform.cs" />
     <Compile Include="Transform\VisionOperator.Transform.2D.cs" />
+    <Compile Include="Transform\VisionOperator.Transform.3D.cs" />
     <Compile Include="Surface\VisionOperator.Surface.cs" />
     <Compile Include="Analysis\VisionOperator.Analysis.cs" />
     <Compile Include="Geometry\VisionOperator.Geometry.cs" />
