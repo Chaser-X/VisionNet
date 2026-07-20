@@ -19,7 +19,10 @@ namespace VisionNet.Controls
             Scale = scale;
             Offset = offset;
             if (_imageItem != null) _imageItem.UpdateWorldRect(GetImageWorldRect());
-            FitImage1to1();
+            if (_displayMode != DisplayMode.None)
+                FitImage1to1();
+            else
+                RefreshDisplay();
         }
 
         /// <summary>Returns the image bounding rectangle expressed in world coordinates.</summary>
@@ -104,7 +107,10 @@ namespace VisionNet.Controls
             _imageHeight = image.Height;
 
             _imageItem.UpdateWorldRect(GetImageWorldRect());
-            FitImage1to1();
+            if (_displayMode != DisplayMode.None)
+                FitImage1to1();
+            else
+                RefreshDisplay();
         }
 
         /// <summary>Removes the currently displayed image.</summary>

@@ -17,12 +17,29 @@ namespace VisionNet.Controls
     /// </remarks>
     public partial class CxDisplay2D : UserControl
     {
+        /// <summary>Controls whether <see cref="SetImage(CxImage)"/> auto-fits the view.</summary>
+        public enum DisplayMode { Normal, None }
+
         // ── Coordinate scale and offset (default: identity transform) ────────────
         public new CxPoint3D Scale  { get; set; } = new CxPoint3D(1f, 1f, 1f);
         public CxPoint3D Offset { get; set; } = new CxPoint3D(0f, 0f, 0f);
 
         // ── Persistent 1:1 aspect-ratio rule (preserves Y inversion) ────────────────
         private SquareWithInvertedY _squareRule;
+
+        // ── Display mode ──────────────────────────────────────────────────────────
+        private DisplayMode _displayMode = DisplayMode.Normal;
+
+        /// <summary>
+        /// Gets or sets the display mode. In <see cref="DisplayMode.None"/> mode,
+        /// <see cref="SetImage(CxImage)"/> does NOT reset the view position or zoom.
+        /// Default: <see cref="DisplayMode.Normal"/> (auto-fit on <c>SetImage</c>).
+        /// </summary>
+        public DisplayMode Mode
+        {
+            get => _displayMode;
+            set => _displayMode = value;
+        }
 
         // ── Click-position world-coordinate annotation (lazy init) ────────────────
         private ScottPlot.Plottables.Text _coordAnnotation;

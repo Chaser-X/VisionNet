@@ -192,6 +192,15 @@ namespace VisionNet.Controls
             menu.Items.Add(itemFit);
             menu.Items.Add(new System.Windows.Forms.ToolStripSeparator());
 
+            var modeItem = new System.Windows.Forms.ToolStripMenuItem("自动适配") { Checked = _form.Mode == CxDisplay2D.DisplayMode.Normal };
+            modeItem.Click += (s, e) =>
+            {
+                _form.Mode = _form.Mode == CxDisplay2D.DisplayMode.Normal
+                    ? CxDisplay2D.DisplayMode.None
+                    : CxDisplay2D.DisplayMode.Normal;
+            };
+            menu.Items.Add(modeItem);
+
             var itemSave = new System.Windows.Forms.ToolStripMenuItem("Save Image");
             itemSave.Click += (s, e) =>
             {
