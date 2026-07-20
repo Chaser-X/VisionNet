@@ -1,8 +1,11 @@
 using System;
+using System.Drawing;
 using System.Runtime.InteropServices;
 
 namespace VisionNet.DataType
 {
+    using VisionNet;
+
     /// <summary>
     /// A 2D image container. Pixel data is stored as a native typed array
     /// (byte[], short[], int[], or float[]) corresponding to <see cref="Type"/>.
@@ -205,6 +208,26 @@ namespace VisionNet.DataType
                 case PlainType.Real:   return new float[elementCount];
                 default:               return new byte[elementCount];
             }
+        }
+
+        /// <summary>
+        /// Creates a thumbnail that fits within the specified dimensions while preserving the aspect ratio.
+        /// If the image is already within the bounds, returns the current instance.
+        /// </summary>
+        /// <param name="maxWidth">Maximum width of the thumbnail in pixels.</param>
+        /// <param name="maxHeight">Maximum height of the thumbnail in pixels.</param>
+        /// <returns>A new <see cref="CxImage"/> instance, or the current instance if no resize is needed.</returns>
+        public CxImage GetThumbnail(int maxWidth, int maxHeight)
+        {
+            return VisionOperator.ResizeImage(this, maxWidth, maxHeight);
+        }
+
+        /// <summary>
+        /// Converts this image to a <see cref="Bitmap"/> with <see cref="PixelFormat.Format32bppArgb"/>.
+        /// </summary>
+        public Bitmap ToBitmap()
+        {
+            return VisionOperator.ToBitmap(this);
         }
 
         /// <summary>Releases the pixel data and resets the dimensions to zero.</summary>

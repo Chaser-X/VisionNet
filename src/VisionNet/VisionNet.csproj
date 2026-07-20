@@ -32,6 +32,7 @@
     <DefineConstants>TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="OpenCL.Net">
@@ -40,6 +41,7 @@
     <Reference Include="OpenCvSharp">
       <HintPath>..\..\3rd\OpenCvSharp.dll</HintPath>
     </Reference>
+    <Reference Include="System.Drawing" />
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Numerics" />
@@ -96,6 +98,7 @@
     <Compile Include="Filter\VisionOperator.Filter.cs" />
     <Compile Include="Filter\VisionOperator.Clip.cs" />
     <Compile Include="Transform\VisionOperator.Transform.cs" />
+    <Compile Include="Transform\VisionOperator.Transform.2D.cs" />
     <Compile Include="Surface\VisionOperator.Surface.cs" />
     <Compile Include="Analysis\VisionOperator.Analysis.cs" />
     <Compile Include="Geometry\VisionOperator.Geometry.cs" />
