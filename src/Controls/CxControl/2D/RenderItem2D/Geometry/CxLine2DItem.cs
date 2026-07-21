@@ -78,7 +78,7 @@ namespace VisionNet.Controls
         }
 
         private static (CxPoint2D start, CxPoint2D end) ComputeViewportSegment(
-            CxLine2D line, AxisLimits limits, double marginRatio = 0.1)
+            CxLine2D line, AxisLimits limits, double marginRatio = 100)
         {
             double px = line.Point.X, py = line.Point.Y;
             double dx = line.Direction.X, dy = line.Direction.Y;

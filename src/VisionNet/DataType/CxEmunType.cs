@@ -41,4 +41,13 @@ namespace VisionNet.DataType
         /// <summary>Single-precision floating-point — 4 bytes per element.</summary>
         Real  = 3,
     }
+
+    /// <summary>Angle range mode for orientation queries.</summary>
+    public enum AngleMode
+    {
+        /// <summary>Angle in the range (−180, 180] degrees.</summary>
+        Signed180 = 0,
+        /// <summary>Angle in the range [0, 360) degrees.</summary>
+        Unsigned360 = 1,
+    }
 }
