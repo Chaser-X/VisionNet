@@ -58,7 +58,7 @@ namespace VisionNet.Controls
 
         private void BuildPlottables()
         {
-            var limits = _plot.Axes.GetLimits();
+            var limits = _plot.Axes.GetDataLimits();// GetLimits();
 
             for (int li = 0; li < Lines.Length; li++)
             {
