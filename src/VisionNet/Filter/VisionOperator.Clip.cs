@@ -1,5 +1,8 @@
 using System;
+using System.Linq;
+using System.Runtime.InteropServices;
 using System.Threading.Tasks;
+using OpenCvSharp;
 using VisionNet.DataType;
 
 namespace VisionNet
@@ -229,6 +232,139 @@ namespace VisionNet
             return new CxSurface(newW, newH, outData, outIntensity,
                 newXOffset, newYOffset, surface.ZOffset,
                 surface.XScale, surface.YScale, surface.ZScale);
+        }
+
+        /// <summary>
+        /// Clips a <see cref="CxImage"/> using a closed 2D polygon as ROI.
+        /// Pixels outside the polygon are set to zero.
+        /// </summary>
+        /// <param name="image">Source image.</param>
+        /// <param name="polygon">Closed polygon in pixel coordinates.</param>
+        /// <returns>A new <see cref="CxImage"/> with the same dimensions, type, and channel count.</returns>
+        public static CxImage ClipImage(CxImage image, CxPolygon2D polygon)
+        {
+            if (image == null || image.Data == null) return null;
+            if (polygon.Points == null || polygon.Points.Length < 3 || !polygon.IsClosed) return null;
+
+            int w = image.Width, h = image.Height, ch = image.Channel;
+            int total = w * h * ch;
+
+            var pts = polygon.Points.Select(p => new OpenCvSharp.Point((int)p.X, (int)p.Y)).ToArray();
+
+            var mask = new Mat(h, w, MatType.CV_8UC1, Scalar.All(0));
+            Cv2.FillPoly(mask, new[] { pts }, new Scalar(255));
+
+            var mt = GetMatType(image.Type, ch);
+            var handle = GCHandle.Alloc(image.Data, GCHandleType.Pinned);
+            try
+            {
+                using (var src = new Mat(h, w, mt, handle.AddrOfPinnedObject()))
+                using (var dst = new Mat(h, w, mt, Scalar.All(0)))
+                {
+                    src.CopyTo(dst, mask);
+
+                    if (image.Type == PlainType.UInt8)
+                    {
+                        var arr = new byte[total];
+                        Marshal.Copy(dst.Data, arr, 0, total);
+                        return new CxImage(w, h, arr, ch);
+                    }
+                    if (image.Type == PlainType.Int16)
+                    {
+                        var arr = new short[total];
+                        Marshal.Copy(dst.Data, arr, 0, total);
+                        return new CxImage(w, h, arr, ch);
+                    }
+                    if (image.Type == PlainType.Int32)
+                    {
+                        var arr = new int[total];
+                        Marshal.Copy(dst.Data, arr, 0, total);
+                        return new CxImage(w, h, arr, ch);
+                    }
+                    var farr = new float[total];
+                    Marshal.Copy(dst.Data, farr, 0, total);
+                    return new CxImage(w, h, farr, ch);
+                }
+            }
+            finally { handle.Free(); }
+        }
+
+        /// <summary>
+        /// Clips a <see cref="CxSurface"/> using a closed 2D polygon as ROI (XY only, Z ignored).
+        /// Cells outside the polygon are marked invalid (<see cref="short.MinValue"/>).
+        /// </summary>
+        /// <param name="surface">Source surface.</param>
+        /// <param name="polygon">Closed polygon in world coordinates.</param>
+        /// <returns>A new <see cref="CxSurface"/> with the same grid dimensions and offsets.</returns>
+        public static CxSurface ClipSurface(CxSurface surface, CxPolygon2D polygon)
+        {
+            if (surface == null || surface.Data == null) return null;
+            if (polygon.Points == null || polygon.Points.Length < 3 || !polygon.IsClosed) return null;
+            if (surface.XScale == 0 || surface.YScale == 0) return null;
+
+            int W = surface.Width, H = surface.Length;
+            int total = W * H;
+
+            var gridPts = polygon.Points.Select(p => new OpenCvSharp.Point(
+                (int)Math.Round((p.X - surface.XOffset) / surface.XScale),
+                (int)Math.Round((p.Y - surface.YOffset) / surface.YScale))).ToArray();
+
+            var mask = new Mat(H, W, MatType.CV_8UC1, Scalar.All(0));
+            Cv2.FillPoly(mask, new[] { gridPts }, new Scalar(255));
+
+            short invalid = short.MinValue;
+            var outData = new short[total];
+
+            var srcHandle = GCHandle.Alloc(surface.Data, GCHandleType.Pinned);
+            try
+            {
+                using (var src = new Mat(H, W, MatType.CV_16SC1, srcHandle.AddrOfPinnedObject()))
+                using (var dst = new Mat(H, W, MatType.CV_16SC1, new Scalar(invalid)))
+                {
+                    src.CopyTo(dst, mask);
+                    Marshal.Copy(dst.Data, outData, 0, total);
+                }
+            }
+            finally { srcHandle.Free(); }
+
+            byte[] outIntensity = null;
+            if (surface.Intensity != null && surface.Intensity.Length >= total)
+            {
+                outIntensity = new byte[total];
+                var intHandle = GCHandle.Alloc(surface.Intensity, GCHandleType.Pinned);
+                try
+                {
+                    using (var srcI = new Mat(H, W, MatType.CV_8UC1, intHandle.AddrOfPinnedObject()))
+                    using (var dstI = new Mat(H, W, MatType.CV_8UC1, Scalar.All(0)))
+                    {
+                        srcI.CopyTo(dstI, mask);
+                        Marshal.Copy(dstI.Data, outIntensity, 0, total);
+                    }
+                }
+                finally { intHandle.Free(); }
+            }
+
+            return new CxSurface(W, H, outData, outIntensity,
+                surface.XOffset, surface.YOffset, surface.ZOffset,
+                surface.XScale,   surface.YScale,   surface.ZScale);
+        }
+
+        private static MatType GetMatType(PlainType type, int channels)
+        {
+            if (channels == 1)
+                return type == PlainType.UInt8 ? MatType.CV_8UC1
+                     : type == PlainType.Int16 ? MatType.CV_16SC1
+                     : type == PlainType.Int32 ? MatType.CV_32SC1
+                     : MatType.CV_32FC1;
+            if (channels == 3)
+                return type == PlainType.UInt8 ? MatType.CV_8UC3
+                     : type == PlainType.Int16 ? MatType.CV_16SC3
+                     : type == PlainType.Int32 ? MatType.CV_32SC3
+                     : MatType.CV_32FC3;
+            return type == PlainType.UInt8 ? MatType.CV_8UC4
+                 : type == PlainType.Int16 ? MatType.CV_16SC4
+                 : type == PlainType.Int32 ? MatType.CV_32SC4
+                 : MatType.CV_32FC4;
         }
 
         private static bool InsideBox(float x, float y, float z,

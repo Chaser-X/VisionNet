@@ -153,6 +153,8 @@ namespace VisionNet
             dist = (float)Math.Sqrt(cx * cx + cy * cy);
         }
 
+        
+
         // ── 3D ──────────────────────────────────────────────────────────────────
 
         /// <summary>Creates a plane from three points. Returns false if the points are collinear.</summary>

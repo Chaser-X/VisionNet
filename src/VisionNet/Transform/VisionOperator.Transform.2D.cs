@@ -191,5 +191,36 @@ namespace VisionNet
                 AlignCircle2D(field.Axis, coord, forward),
                 forward ? field.Width / s : field.Width * s);
         }
+
+        // ── Resize（原点缩放） ──────────────────────────────────────────────
+
+        /// <summary>Scales a polygon's vertices by <paramref name="scaleX"/> / <paramref name="scaleY"/> around the origin.</summary>
+        public static void ResizePolygon2D(CxPolygon2D polygon, float scaleX, float scaleY, out CxPolygon2D result)
+        {
+            int n = polygon.Points.Length;
+            var pts = new CxPoint2D[n];
+            for (int i = 0; i < n; i++)
+                pts[i] = new CxPoint2D(
+                    polygon.Points[i].X * scaleX,
+                    polygon.Points[i].Y * scaleY);
+            result = new CxPolygon2D(pts, polygon.IsClosed);
+        }
+
+        /// <summary>Scales an axis-aligned box by <paramref name="scaleX"/> / <paramref name="scaleY"/> around the origin.</summary>
+        public static void ResizeBox2D(CxBox2D box, float scaleX, float scaleY, out CxBox2D result)
+        {
+            result = new CxBox2D(
+                new CxPoint2D(box.Center.X * scaleX, box.Center.Y * scaleY),
+                new CxSize2D(box.Size.Width * scaleX, box.Size.Height * scaleY));
+        }
+
+        /// <summary>Scales a rotated rectangle by <paramref name="scaleX"/> / <paramref name="scaleY"/> around the origin.</summary>
+        public static void ResizeRectangle2D(CxRectangle2D rect, float scaleX, float scaleY, out CxRectangle2D result)
+        {
+            result = new CxRectangle2D(
+                new CxPoint2D(rect.Center.X * scaleX, rect.Center.Y * scaleY),
+                new CxSize2D(rect.Size.Width * scaleX, rect.Size.Height * scaleY),
+                rect.Angle);
+        }
     }
 }

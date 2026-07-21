@@ -273,5 +273,45 @@ namespace VisionNet
                 (float)Math.Sqrt(radiusSq));
             return true;
         }
+
+        /// <summary>Extracts all valid points from a surface as a flat array. Invalid cells (<c>short.MinValue</c>) are skipped.</summary>
+        public static void SurfaceToPoint3DArray(CxSurface surface, out CxPoint3D[] points)
+        {
+            if (surface == null || surface.Data == null)
+            {
+                points = null;
+                return;
+            }
+
+            int w = surface.Width, h = surface.Length;
+            int total = w * h;
+            var data = surface.Data;
+            float xo = surface.XOffset, xs = surface.XScale;
+            float yo = surface.YOffset, ys = surface.YScale;
+            float zo = surface.ZOffset, zs = surface.ZScale;
+
+            var temp = new CxPoint3D[total];
+            int count = 0;
+
+            for (int row = 0; row < h; row++)
+            {
+                float wy = yo + row * ys;
+                for (int col = 0; col < w; col++)
+                {
+                    short raw = data[row * w + col];
+                    if (raw == short.MinValue) continue;
+                    temp[count++] = new CxPoint3D(
+                        xo + col * xs, wy, zo + raw * zs);
+                }
+            }
+
+            if (count == total)
+                points = temp;
+            else
+            {
+                points = new CxPoint3D[count];
+                Array.Copy(temp, points, count);
+            }
+        }
     }
 }
