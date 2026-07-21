@@ -997,7 +997,7 @@ namespace DemoFrom
                 new CxCoordination2D(new CxPoint2D(cx, cy), new CxPoint2D(r, r * 0.65f), 0f),
                 new CxCoordination2D(new CxPoint2D(cx + r * 0.9f, cy + r * 0.4f), new CxPoint2D(r * 0.65f, r * 0.4f), -30f),
             };
-            _cxDisplay2D.SetCoordination(frames, Color.Yellow, 0.01f);
+            _cxDisplay2D.SetCoordination(frames,10,10, 2f);
         }
 
         private void btn2D_clearOverlays_Click(object sender, EventArgs e) =>

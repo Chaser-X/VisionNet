@@ -185,8 +185,8 @@ namespace VisionNet.Controls
             => AppendOverlay(new CxCircle2DFittingFieldItem(fields, color, size));
 
         /// <summary>Adds a set of 2D coordinate frames. Returns the created item.</summary>
-        public CxCoordination2DItem SetCoordination(CxCoordination2D[] frames, Color color, float size = 1f)
-            => AppendOverlay(new CxCoordination2DItem(frames, color, size));
+        public CxCoordination2DItem SetCoordination(CxCoordination2D[] frames, float xLength, float yLength, float size = 1f)
+            => AppendOverlay(new CxCoordination2DItem(frames, xLength, yLength, size));
 
         /// <summary>Removes all overlay items from the display.</summary>
         public void ClearOverlays()

@@ -11,13 +11,16 @@ namespace VisionNet.Controls
     public class CxCoordination2DItem : Abstract2DRenderItem
     {
         private readonly List<IPlottable> _plottables = new List<IPlottable>();
+        private readonly float _xLength;
+        private readonly float _yLength;
 
         public CxCoordination2D[] Frames { get; private set; }
 
-        public CxCoordination2DItem(CxCoordination2D[] frames, Color color, float size = 1f)
+        public CxCoordination2DItem(CxCoordination2D[] frames, float xLength, float yLength, float size = 1f)
         {
             Frames = frames ?? Array.Empty<CxCoordination2D>();
-            Color = color;
+            _xLength = xLength;
+            _yLength = yLength;
             Size = size;
         }
 
@@ -46,17 +49,16 @@ namespace VisionNet.Controls
         {
             foreach (var frame in Frames)
             {
-                var fColor = ToSPColor(Color);
                 var xColor = ToSPColor(Color.Red);
                 var yColor = ToSPColor(Color.Lime);
                 float rad = frame.Angle * (float)Math.PI / 180f;
                 float cos = (float)Math.Cos(rad);
                 float sin = (float)Math.Sin(rad);
 
-                float xTipX = frame.Origin.X + frame.Scale.X * cos;
-                float xTipY = frame.Origin.Y + frame.Scale.X * sin;
-                float yTipX = frame.Origin.X - frame.Scale.Y * sin;
-                float yTipY = frame.Origin.Y + frame.Scale.Y * cos;
+                float xTipX = frame.Origin.X + _xLength * cos;
+                float xTipY = frame.Origin.Y + _xLength * sin;
+                float yTipX = frame.Origin.X - _yLength * sin;
+                float yTipY = frame.Origin.Y + _yLength * cos;
 
                 var xArrow = _plot.Add.Arrow(frame.Origin.X, frame.Origin.Y, xTipX, xTipY);
                 xArrow.ArrowLineColor = xColor;
@@ -70,6 +72,7 @@ namespace VisionNet.Controls
                 yArrow.ArrowLineWidth = Size;
                 _plottables.Add(yArrow);
 
+                var fColor = ToSPColor(Color.White);
                 var marker = _plot.Add.Marker(frame.Origin.X, frame.Origin.Y);
                 marker.MarkerStyle.Shape = ScottPlot.MarkerShape.FilledCircle;
                 marker.MarkerStyle.Size = 6f;
