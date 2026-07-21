@@ -17,6 +17,8 @@ namespace VisionNet.Controls
 
             _formsPlot.Menu = new CxDisplay2DMenu(this, _formsPlot);
 
+            _formsPlot.UserInputProcessor.DoubleLeftClickBenchmark(false);
+
             // Create and register the 1:1+inverted-Y rule by default.
             _squareRule = new SquareWithInvertedY(plot.Axes.Bottom, plot.Axes.Left);
             plot.Axes.Rules.Add(_squareRule);
