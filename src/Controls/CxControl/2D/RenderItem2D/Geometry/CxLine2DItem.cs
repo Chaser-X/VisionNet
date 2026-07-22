@@ -18,7 +18,7 @@ namespace VisionNet.Controls
     /// </summary>
     public class CxLine2DItem : Abstract2DRenderItem
     {
-        private readonly List<Scatter> _plottables = new List<Scatter>();
+        private readonly List<IPlottable> _plottables = new List<IPlottable>();
         private int _activeIndex = -1;
 
         /// <summary>Gets the line data being rendered.</summary>
@@ -58,67 +58,21 @@ namespace VisionNet.Controls
 
         private void BuildPlottables()
         {
-            var limits = _plot.Axes.GetDataLimits();// GetLimits();
-
             for (int li = 0; li < Lines.Length; li++)
             {
                 var line = Lines[li];
                 var spColor = li == _activeIndex ? ToSPColor(SelectedColor) : ToSPColor(Color);
 
-                var (start, end) = ComputeViewportSegment(line, limits);
+                float sx = line.Point.X - line.Direction.X * 1e4f;
+                float sy = line.Point.Y - line.Direction.Y * 1e4f;
+                float ex = line.Point.X + line.Direction.X * 1e4f;
+                float ey = line.Point.Y + line.Direction.Y * 1e4f;
 
-                double[] xs = { start.X, end.X };
-                double[] ys = { start.Y, end.Y };
-                var s = _plot.Add.Scatter(xs, ys);
-                s.MarkerStyle.IsVisible = false;
-                s.LineStyle.Width       = Size;
-                s.Color                 = spColor;
+                var s = _plot.Add.Line(sx, sy, ex, ey);
+                s.LineWidth = Size;
+                s.Color     = spColor;
                 _plottables.Add(s);
             }
-        }
-
-        private static (CxPoint2D start, CxPoint2D end) ComputeViewportSegment(
-            CxLine2D line, AxisLimits limits, double marginRatio = 100)
-        {
-            double px = line.Point.X, py = line.Point.Y;
-            double dx = line.Direction.X, dy = line.Direction.Y;
-            double len = Math.Sqrt(dx * dx + dy * dy);
-
-            double tMin = double.NegativeInfinity, tMax = double.PositiveInfinity;
-
-            if (Math.Abs(dx) > double.Epsilon)
-            {
-                double tL = (limits.Left  - px) / dx;
-                double tR = (limits.Right - px) / dx;
-                tMin = Math.Max(tMin, Math.Min(tL, tR));
-                tMax = Math.Min(tMax, Math.Max(tL, tR));
-            }
-
-            if (Math.Abs(dy) > double.Epsilon)
-            {
-                double tB = (limits.Bottom - py) / dy;
-                double tT = (limits.Top    - py) / dy;
-                tMin = Math.Max(tMin, Math.Min(tB, tT));
-                tMax = Math.Min(tMax, Math.Max(tB, tT));
-            }
-
-            if (tMin > tMax || double.IsInfinity(tMin) || double.IsInfinity(tMax))
-            {
-                tMin = -1e4;
-                tMax =  1e4;
-            }
-            else
-            {
-                double margin = marginRatio * Math.Max(limits.Right - limits.Left,
-                                                        limits.Top   - limits.Bottom);
-                if (len > double.Epsilon) margin /= len;
-                tMin -= margin;
-                tMax += margin;
-            }
-
-            return (
-                new CxPoint2D((float)(px + tMin * dx), (float)(py + tMin * dy)),
-                new CxPoint2D((float)(px + tMax * dx), (float)(py + tMax * dy)));
         }
 
         /// <inheritdoc/>

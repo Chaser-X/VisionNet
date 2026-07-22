@@ -526,7 +526,6 @@ namespace DemoFrom
                     _lbl2DPos.Text = text;
             };
             _split2D.Panel1.Controls.Add(_cxDisplay2D);
-
             // Button panel (built entirely in code)
             var btnPanel = new Panel { Dock = DockStyle.Fill };
             int y = 10;
@@ -573,6 +572,7 @@ namespace DemoFrom
             _split2D.Panel2.Controls.Add(btnPanel);
             page.Controls.Add(_split2D);
         }
+
 
         // ── 2D Button Handlers ───────────────────────────────────────────────────────
 

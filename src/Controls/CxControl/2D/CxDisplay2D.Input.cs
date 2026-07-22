@@ -13,7 +13,7 @@ namespace VisionNet.Controls
             _formsPlot.MouseMove += OnPlotMouseMove;
             _formsPlot.MouseDown += OnPlotMouseDown;
             _formsPlot.MouseUp   += OnPlotMouseUp;
-            _formsPlot.MouseDoubleClick += OnPlotDoubleClick;
+            _formsPlot.DoubleClick += OnPlotDoubleClick;
             // Re-apply 1:1 inverted limits when the window is resized.
             _formsPlot.Resize += (s, e) => { if (_imageWidth > 0) FitImage1to1(); };
         }
@@ -85,25 +85,24 @@ namespace VisionNet.Controls
             return new CxPoint2D((float)coord.X, (float)coord.Y);
         }
 
-        private void OnPlotDoubleClick(object sender, MouseEventArgs e)
+        private void OnPlotDoubleClick(object sender, EventArgs e)
         {
-            if (e.Button != MouseButtons.Left) return;
+            //var localPos = _formsPlot.PointToClient(Control.MousePosition);
+            //var plotCoord = GetPlotCoordinate(localPos.X, localPos.Y);
+            //double xMin = _formsPlot.Plot.Axes.Bottom.Min;
+            //double xMax = _formsPlot.Plot.Axes.Bottom.Max;
+            //double yMin = _formsPlot.Plot.Axes.Left.Min;
+            //double yMax = _formsPlot.Plot.Axes.Left.Max;
+            //double spanX = Math.Abs(xMax - xMin);
+            //double spanY = Math.Abs(yMax - yMin);
 
-            var plotCoord = GetPlotCoordinate(e.X, e.Y);
-            double xMin = _formsPlot.Plot.Axes.Bottom.Min;
-            double xMax = _formsPlot.Plot.Axes.Bottom.Max;
-            double yMin = _formsPlot.Plot.Axes.Left.Min;
-            double yMax = _formsPlot.Plot.Axes.Left.Max;
-            double spanX = Math.Abs(xMax - xMin);
-            double spanY = Math.Abs(yMax - yMin);
+            //_formsPlot.Plot.Axes.SetLimits(
+            //    left:   plotCoord.X - spanX / 2,
+            //    right:  plotCoord.X + spanX / 2,
+            //    bottom: plotCoord.Y + spanY / 2,
+            //    top:    plotCoord.Y - spanY / 2);
 
-            _formsPlot.Plot.Axes.SetLimits(
-                left:   plotCoord.X - spanX / 2,
-                right:  plotCoord.X + spanX / 2,
-                bottom: plotCoord.Y + spanY / 2,
-                top:    plotCoord.Y - spanY / 2);
-
-            RefreshDisplay();
+            //RefreshDisplay();
         }
     }
 }

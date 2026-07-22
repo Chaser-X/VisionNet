@@ -109,7 +109,7 @@ namespace VisionNet.Controls
         }
 
         /// <summary>Forces an immediate redraw of the plot.</summary>
-        internal void RefreshDisplay()
+        public void RefreshDisplay()
         {
             if (_formsPlot.InvokeRequired)
                 _formsPlot.Invoke(new Action(_formsPlot.Refresh));
