@@ -142,7 +142,7 @@ namespace VisionNet.Controls
                 // Interior hit for filled closed polygons
                 if (Filled && poly.IsClosed)
                 {
-                    if (PointInPolygon(plotPos, poly.Points))
+                    if (VisionOperator.IsPointInPolygon2D(plotPos, Polygons[pi]))
                     {
                         _activePolygonIndex = pi;
                         return true;
@@ -154,7 +154,8 @@ namespace VisionNet.Controls
                 float t2 = hitW * hitW;
                 for (int i = 0; i < poly.Points.Length - 1; i++)
                 {
-                    if (DistSqToSegment(plotPos, poly.Points[i], poly.Points[i + 1]) <= t2)
+                    VisionOperator.DistancePointToSegment2D(plotPos, new CxSegment2D(poly.Points[i], poly.Points[i + 1]), out float d);
+                    if (d * d <= t2)
                     {
                         _activePolygonIndex = pi;
                         return true;
@@ -163,7 +164,8 @@ namespace VisionNet.Controls
                 if (poly.IsClosed)
                 {
                     int last = poly.Points.Length - 1;
-                    if (DistSqToSegment(plotPos, poly.Points[last], poly.Points[0]) <= t2)
+                    VisionOperator.DistancePointToSegment2D(plotPos, new CxSegment2D(poly.Points[last], poly.Points[0]), out float d);
+                    if (d * d <= t2)
                     {
                         _activePolygonIndex = pi;
                         return true;
@@ -248,30 +250,6 @@ namespace VisionNet.Controls
                 for (int j = 0; j < pts.Length; j++)
                     pts[j] = new CxPoint2D(pts[j].X + dx, pts[j].Y + dy);
             }
-        }
-
-        private static bool PointInPolygon(CxPoint2D p, CxPoint2D[] pts)
-        {
-            bool inside = false;
-            for (int i = 0, j = pts.Length - 1; i < pts.Length; j = i++)
-            {
-                if ((pts[i].Y > p.Y) != (pts[j].Y > p.Y) &&
-                    p.X < (pts[j].X - pts[i].X) * (p.Y - pts[i].Y) / (pts[j].Y - pts[i].Y) + pts[i].X)
-                    inside = !inside;
-            }
-            return inside;
-        }
-
-        private static float DistSqToSegment(CxPoint2D p, CxPoint2D a, CxPoint2D b)
-        {
-            float dx = b.X - a.X;
-            float dy = b.Y - a.Y;
-            float lenSq = dx * dx + dy * dy;
-            if (lenSq == 0f) { float ex = p.X - a.X; float ey = p.Y - a.Y; return ex * ex + ey * ey; }
-            float t = Math.Max(0, Math.Min(1, ((p.X - a.X) * dx + (p.Y - a.Y) * dy) / lenSq));
-            float cx = a.X + t * dx - p.X;
-            float cy = a.Y + t * dy - p.Y;
-            return cx * cx + cy * cy;
         }
 
         /// <inheritdoc/>

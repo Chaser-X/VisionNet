@@ -164,7 +164,7 @@ namespace VisionNet.Controls
                     if (d <= t2) { _activeIndex = i; return true; }
                 }
 
-                if (Filled && PointInConvexPolygon(plotPos, corners))
+                if (Filled && VisionOperator.IsPointInRectangle2D(plotPos, Rectangles[i]))
                 {
                     _activeIndex = i;
                     return true;
@@ -337,24 +337,6 @@ namespace VisionNet.Controls
             return new CxPoint2D(
                 rect.Center.X - ly * sin,
                 rect.Center.Y + ly * cos);
-        }
-
-        private static bool PointInConvexPolygon(CxPoint2D p, CxPoint2D[] corners)
-        {
-            bool? sign = null;
-            for (int i = 0; i < corners.Length; i++)
-            {
-                var a = corners[i];
-                var b = corners[(i + 1) % corners.Length];
-                float cross = (b.X - a.X) * (p.Y - a.Y) - (b.Y - a.Y) * (p.X - a.X);
-                if (cross != 0)
-                {
-                    bool currentSign = cross > 0;
-                    if (sign == null) sign = currentSign;
-                    else if (sign != currentSign) return false;
-                }
-            }
-            return true;
-        }
     }
+}
 }

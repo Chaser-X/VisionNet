@@ -124,7 +124,8 @@ namespace VisionNet.Controls
             float t2 = hitW * hitW;
             for (int si = 0; si < Segments.Length; si++)
             {
-                if (DistSqToSegment(plotPos, Segments[si]) <= t2)
+                VisionOperator.DistancePointToSegment2D(plotPos, Segments[si], out float d);
+                if (d * d <= t2)
                 {
                     _activeIndex = si;
                     return true;
@@ -216,18 +217,6 @@ namespace VisionNet.Controls
         {
             foreach (var h in _handlePlottables) plot.PlottableList.Remove(h);
             _handlePlottables.Clear();
-        }
-
-        private static float DistSqToSegment(CxPoint2D p, CxSegment2D seg)
-        {
-            float dx = seg.End.X - seg.Start.X;
-            float dy = seg.End.Y - seg.Start.Y;
-            float lenSq = dx * dx + dy * dy;
-            if (lenSq == 0f) { float ex = p.X - seg.Start.X; float ey = p.Y - seg.Start.Y; return ex * ex + ey * ey; }
-            float t = Math.Max(0, Math.Min(1, ((p.X - seg.Start.X) * dx + (p.Y - seg.Start.Y) * dy) / lenSq));
-            float cx = seg.Start.X + t * dx - p.X;
-            float cy = seg.Start.Y + t * dy - p.Y;
-            return cx * cx + cy * cy;
         }
 
         /// <inheritdoc/>

@@ -11,7 +11,7 @@ namespace VisionNet
     {
         private const float Eps = 1e-10f;
 
-        // ── 2D ──────────────────────────────────────────────────────────────────
+        // ── 2D: Construction ─────────────────────────────────────────────────────
 
         /// <summary>Creates a line from two points.</summary>
         public static void CreateLine2D(CxPoint2D p1, CxPoint2D p2, out CxLine2D line)
@@ -24,6 +24,8 @@ namespace VisionNet
         {
             line = new CxLine2D(point, direction);
         }
+
+        // ── 2D: Properties (Angles & Lengths) ────────────────────────────────────
 
         /// <summary>Returns the orientation angle of a line in degrees.</summary>
         public static void LineOrientation(CxLine2D line, AngleMode mode, out float angle)
@@ -56,6 +58,8 @@ namespace VisionNet
                 (segment.Start.X + segment.End.X) * 0.5f,
                 (segment.Start.Y + segment.End.Y) * 0.5f);
         }
+
+        // ── 2D: Intersection ─────────────────────────────────────────────────────
 
         /// <summary>Computes the intersection point of two infinite lines. Returns false if parallel.</summary>
         public static bool IntersectLineLine(CxLine2D line1, CxLine2D line2, out CxPoint2D pt)
@@ -111,6 +115,8 @@ namespace VisionNet
             return true;
         }
 
+        // ── 2D: Projection & Distance ────────────────────────────────────────────
+
         /// <summary>Projects a point onto an infinite line.</summary>
         public static void ProjectPointToLine(CxPoint2D point, CxLine2D line, out CxPoint2D pt)
         {
@@ -153,7 +159,125 @@ namespace VisionNet
             dist = (float)Math.Sqrt(cx * cx + cy * cy);
         }
 
-        
+        /// <summary>Returns the Euclidean distance between two points.</summary>
+        public static void DistancePointToPoint2D(CxPoint2D a, CxPoint2D b, out float dist)
+        {
+            float dx = a.X - b.X;
+            float dy = a.Y - b.Y;
+            dist = (float)Math.Sqrt(dx * dx + dy * dy);
+        }
+
+        /// <summary>Returns the shortest distance from a point to a rotated rectangle (0 if inside).</summary>
+        public static void DistancePointToRectangle2D(CxPoint2D p, CxRectangle2D rect, out float dist)
+        {
+            float rad = -rect.Angle * (float)Math.PI / 180f;
+            float cos = (float)Math.Cos(rad), sin = (float)Math.Sin(rad);
+            float dx = p.X - rect.Center.X, dy = p.Y - rect.Center.Y;
+            float lx = dx * cos - dy * sin;
+            float ly = dx * sin + dy * cos;
+            float hw = rect.Size.Width / 2f, hh = rect.Size.Height / 2f;
+            float ddx = Math.Max(0f, Math.Abs(lx) - hw);
+            float ddy = Math.Max(0f, Math.Abs(ly) - hh);
+            dist = (float)Math.Sqrt(ddx * ddx + ddy * ddy);
+        }
+
+        /// <summary>Returns the shortest distance from a point to an axis-aligned box (0 if inside).</summary>
+        public static void DistancePointToBox2D(CxPoint2D p, CxBox2D box, out float dist)
+        {
+            float hw = box.Size.Width / 2f, hh = box.Size.Height / 2f;
+            float dx = p.X - box.Center.X, dy = p.Y - box.Center.Y;
+            float ddx = Math.Max(0f, Math.Abs(dx) - hw);
+            float ddy = Math.Max(0f, Math.Abs(dy) - hh);
+            dist = (float)Math.Sqrt(ddx * ddx + ddy * ddy);
+        }
+
+        /// <summary>Returns the shortest distance from a point to the edges of a polygon (open or closed).</summary>
+        public static void DistancePointToPolygon2D(CxPoint2D p, CxPolygon2D polygon, out float dist)
+        {
+            var pts = polygon.Points;
+            if (pts == null || pts.Length < 2) { dist = float.MaxValue; return; }
+            float best = float.MaxValue;
+            for (int i = 0; i < pts.Length - 1; i++)
+            {
+                DistancePointToSegment2D(p, new CxSegment2D(pts[i], pts[i + 1]), out float d);
+                if (d < best) best = d;
+            }
+            if (polygon.IsClosed)
+            {
+                int last = pts.Length - 1;
+                DistancePointToSegment2D(p, new CxSegment2D(pts[last], pts[0]), out float d);
+                if (d < best) best = d;
+            }
+            dist = best;
+        }
+
+        /// <summary>Returns the shortest distance from a point to an arc (32-sample approximation).</summary>
+        public static void DistancePointToArc2D(CxPoint2D p, CxArc2D arc, out float dist)
+        {
+            float rad = arc.StartAngle * (float)Math.PI / 180f;
+            float best = float.MaxValue;
+            int numSamples = 32;
+            for (int i = 0; i <= numSamples; i++)
+            {
+                float t = (float)i / numSamples;
+                float a = rad + arc.SweepAngle * t * (float)Math.PI / 180f;
+                float px = arc.Center.X + arc.Radius * (float)Math.Cos(a);
+                float py = arc.Center.Y + arc.Radius * (float)Math.Sin(a);
+                float dx = p.X - px, dy = p.Y - py;
+                float d = dx * dx + dy * dy;
+                if (d < best) best = d;
+            }
+            dist = (float)Math.Sqrt(best);
+        }
+
+        // ── 2D: Containment Tests ────────────────────────────────────────────────
+
+        /// <summary>Tests whether a point lies inside a rotated rectangle.</summary>
+        public static bool IsPointInRectangle2D(CxPoint2D p, CxRectangle2D rect)
+        {
+            float rad = -rect.Angle * (float)Math.PI / 180f;
+            float cos = (float)Math.Cos(rad), sin = (float)Math.Sin(rad);
+            float dx = p.X - rect.Center.X, dy = p.Y - rect.Center.Y;
+            float lx = dx * cos - dy * sin;
+            float ly = dx * sin + dy * cos;
+            return Math.Abs(lx) <= rect.Size.Width / 2f && Math.Abs(ly) <= rect.Size.Height / 2f;
+        }
+
+        /// <summary>Ray-casting point-in-polygon test for arbitrary (possibly concave) polygons.</summary>
+        public static bool IsPointInPolygon2D(CxPoint2D p, CxPolygon2D polygon)
+        {
+            var pts = polygon.Points;
+            if (pts == null || pts.Length < 3) return false;
+            bool inside = false;
+            for (int i = 0, j = pts.Length - 1; i < pts.Length; j = i++)
+            {
+                if ((pts[i].Y > p.Y) != (pts[j].Y > p.Y) &&
+                    p.X < (pts[j].X - pts[i].X) * (p.Y - pts[i].Y) / (pts[j].Y - pts[i].Y) + pts[i].X)
+                    inside = !inside;
+            }
+            return inside;
+        }
+
+        /// <summary>Tests whether a point lies inside an annular sector (radial band + angular sweep).</summary>
+        public static bool IsPointInAnnularSector2D(CxPoint2D p, CxArc2D arc, float width)
+        {
+            float dx = p.X - arc.Center.X;
+            float dy = p.Y - arc.Center.Y;
+            float dist = (float)Math.Sqrt(dx * dx + dy * dy);
+
+            float outerR = arc.Radius + width / 2f;
+            float innerR = Math.Max(1f, arc.Radius - width / 2f);
+            if (dist < innerR || dist > outerR) return false;
+
+            float angle = (float)(Math.Atan2(dy, dx) * 180 / Math.PI);
+            float delta = angle - arc.StartAngle;
+            while (delta < 0) delta += 360f;
+            while (delta >= 360f) delta -= 360f;
+
+            return arc.SweepAngle > 0
+                ? delta <= arc.SweepAngle
+                : delta >= 360f + arc.SweepAngle;
+        }
 
         // ── 3D ──────────────────────────────────────────────────────────────────
 

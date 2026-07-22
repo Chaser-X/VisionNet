@@ -5,40 +5,30 @@ using ScottPlot;
 using ScottPlot.Plottables;
 using VisionNet.DataType;
 using Color = System.Drawing.Color;
-
 namespace VisionNet.Controls
 {
     public class CxPolygon2DFittingFieldItem : Abstract2DRenderItem
     {
         private enum DragMode { None, Translate, DragVertex, DragWidth }
-
         private readonly List<IPlottable> _plottables = new List<IPlottable>();
         private readonly List<IPlottable> _handlePlottables = new List<IPlottable>();
-
         private const float HandlePixelSize = 8f;
         private const float ArrowPixelLen = 16f;
-
         private DragMode _dragMode;
         private int _activeIndex = -1;
         private int _vertexIndex;
-
-
-
         public CxPolygon2DFittingField[] Fields { get; private set; }
-
         public CxPolygon2DFittingFieldItem(CxPolygon2DFittingField[] fields, Color color, float size = 1f)
         {
             Fields = fields ?? Array.Empty<CxPolygon2DFittingField>();
             Color = color;
             Size = size;
         }
-
         public override void AddToPlot(Plot plot)
         {
             _plot = plot;
             BuildPlottables();
         }
-
         public override void RemoveFromPlot(Plot plot)
         {
             foreach (var p in _plottables) plot.PlottableList.Remove(p);
@@ -46,7 +36,6 @@ namespace VisionNet.Controls
             _plottables.Clear();
             _plot = null;
         }
-
         public override void UpdatePlottable()
         {
             if (_plot == null) return;
@@ -55,7 +44,6 @@ namespace VisionNet.Controls
             _plottables.Clear();
             BuildPlottables();
         }
-
         private void BuildPlottables()
         {
             for (int fi = 0; fi < Fields.Length; fi++)
@@ -63,10 +51,8 @@ namespace VisionNet.Controls
                 var field = Fields[fi];
                 var pts = field.Axis.Points;
                 if (pts == null || pts.Length < 2) continue;
-
                 var fColor = fi == _activeIndex ? ToSPColor(SelectedColor) : ToSPColor(Color);
                 float hw = field.Width / 2f;
-
                 var bandVerts = ComputeBandVertices(pts, hw, field.Axis.IsClosed);
                 if (bandVerts != null && bandVerts.Length >= 3)
                 {
@@ -81,7 +67,6 @@ namespace VisionNet.Controls
                     band.MarkerStyle.IsVisible = false;
                     _plottables.Add(band);
                 }
-
                 if (field.Axis.IsClosed)
                 {
                     var aCoords = new Coordinates[pts.Length];
@@ -107,15 +92,12 @@ namespace VisionNet.Controls
                     _plottables.Add(as_);
                 }
             }
-
             if (_activeIndex >= 0)
             {
                 var field = Fields[_activeIndex];
                 var pts = field.Axis.Points;
                 if (pts == null || pts.Length < 2) return;
-
                 var hColor = ToSPColor(Color.Lime);
-
                 for (int j = 0; j < pts.Length; j++)
                 {
                     var v = _plot.Add.Marker(pts[j].X, pts[j].Y);
@@ -126,7 +108,6 @@ namespace VisionNet.Controls
                     v.MarkerStyle.LineWidth = 1;
                     _handlePlottables.Add(v);
                 }
-
                 int last = pts.Length - 1;
                 CxPoint2D endPt = pts[last];
                 CxPoint2D endDir = last > 0
@@ -134,7 +115,6 @@ namespace VisionNet.Controls
                     : new CxPoint2D(0, 0);
                 float eLen = (float)Math.Sqrt(endDir.X * endDir.X + endDir.Y * endDir.Y);
                 if (eLen > 0) { endDir = new CxPoint2D(endDir.X / eLen, endDir.Y / eLen); }
-
                 float wp = WorldPerPixel();
                 if (eLen > 0)
                 {
@@ -147,38 +127,34 @@ namespace VisionNet.Controls
                     endArrow.ArrowLineWidth = Size;
                     _handlePlottables.Add(endArrow);
                 }
-
-
             }
         }
-
         public override bool HitTest(CxPoint2D plotPos)
         {
             float hitW = HitThreshold * WorldPerPixel();
             float t2 = hitW * hitW;
             float hw = HandlePixelSize * WorldPerPixel();
             float hT2 = hw * hw * 4f;
-
             for (int fi = 0; fi < Fields.Length; fi++)
             {
                 var field = Fields[fi];
                 var pts = field.Axis.Points;
                 if (pts == null || pts.Length < 2) continue;
-
                 var band = ComputeBandVertices(pts, field.Width / 2f, field.Axis.IsClosed);
                 if (band != null && band.Length >= 2)
                 {
                     int npts2 = pts.Length;
                     for (int e = 0; e < npts2 - 1; e++)
                     {
-                        if (DistSqToSegment(plotPos, band[e], band[e + 1]) <= t2) { _activeIndex = fi; return true; }
+                        VisionOperator.DistancePointToSegment2D(plotPos, new CxSegment2D(band[e], band[e + 1]), out float d2);
+                        if (d2 * d2 <= t2) { _activeIndex = fi; return true; }
                     }
                     for (int e = npts2; e < 2 * npts2 - 1; e++)
                     {
-                        if (DistSqToSegment(plotPos, band[e], band[e + 1]) <= t2) { _activeIndex = fi; return true; }
+                        VisionOperator.DistancePointToSegment2D(plotPos, new CxSegment2D(band[e], band[e + 1]), out float d2);
+                        if (d2 * d2 <= t2) { _activeIndex = fi; return true; }
                     }
                 }
-
                 bool hitVtx = false;
                 for (int j = 0; j < pts.Length; j++)
                 {
@@ -187,57 +163,51 @@ namespace VisionNet.Controls
                     if (dx * dx + dy * dy <= t2 * 4f) { hitVtx = true; break; }
                 }
                 if (hitVtx) { _activeIndex = fi; return true; }
-
-                if (band != null && band.Length >= 3 && PointInConvexPolygon(plotPos, band))
+                if (band != null && band.Length >= 3 && VisionOperator.IsPointInPolygon2D(plotPos, new CxPolygon2D(band, true)))
                 { _activeIndex = fi; return true; }
-
                 for (int j = 0; j < pts.Length - 1; j++)
                 {
-                    float d2 = DistSqToSegment(plotPos, pts[j], pts[j + 1]);
-                    if (d2 <= t2) { _activeIndex = fi; return true; }
+                    VisionOperator.DistancePointToSegment2D(plotPos, new CxSegment2D(pts[j], pts[j + 1]), out float d2);
+                    if (d2 * d2 <= t2) { _activeIndex = fi; return true; }
                 }
                 if (field.Axis.IsClosed)
                 {
                     int last = pts.Length - 1;
-                    float d2 = DistSqToSegment(plotPos, pts[last], pts[0]);
-                    if (d2 <= t2) { _activeIndex = fi; return true; }
+                    VisionOperator.DistancePointToSegment2D(plotPos, new CxSegment2D(pts[last], pts[0]), out float d2);
+                    if (d2 * d2 <= t2) { _activeIndex = fi; return true; }
                 }
             }
-
             return false;
         }
-
         public override void OnMouseDown(CxPoint2D plotPos)
         {
             if (_activeIndex < 0) { UpdatePlottable(); return; }
-
             var field = Fields[_activeIndex];
             var pts = field.Axis.Points;
             if (pts == null || pts.Length == 0) { UpdatePlottable(); return; }
-
             float hitW = HitThreshold * WorldPerPixel();
             float t2 = hitW * hitW * 4f;
             _dragMode = DragMode.Translate;
-
             var band = ComputeBandVertices(pts, field.Width / 2f, field.Axis.IsClosed);
             if (band != null && band.Length >= 2)
             {
                 int npts2 = pts.Length;
                 for (int e = 0; e < npts2 - 1; e++)
                 {
-                    if (DistSqToSegment(plotPos, band[e], band[e + 1]) <= t2 * 4f)
+                    VisionOperator.DistancePointToSegment2D(plotPos, new CxSegment2D(band[e], band[e + 1]), out float d2);
+                    if (d2 * d2 <= t2 * 4f)
                     { _dragMode = DragMode.DragWidth; break; }
                 }
                 if (_dragMode != DragMode.DragWidth)
                 {
                     for (int e = npts2; e < 2 * npts2 - 1; e++)
                     {
-                        if (DistSqToSegment(plotPos, band[e], band[e + 1]) <= t2 * 4f)
+                        VisionOperator.DistancePointToSegment2D(plotPos, new CxSegment2D(band[e], band[e + 1]), out float d2);
+                        if (d2 * d2 <= t2 * 4f)
                         { _dragMode = DragMode.DragWidth; break; }
                     }
                 }
             }
-
             if (_dragMode == DragMode.DragWidth) { UpdatePlottable(); return; }
             for (int i = 0; i < pts.Length; i++)
             {
@@ -250,16 +220,12 @@ namespace VisionNet.Controls
                     break;
                 }
             }
-
             UpdatePlottable();
         }
-
         public override void OnMouseMove(CxPoint2D plotPos, CxPoint2D prevPlotPos)
         {
             if (_activeIndex < 0) return;
-
             var field = Fields[_activeIndex];
-
             switch (_dragMode)
             {
                 case DragMode.DragVertex:
@@ -279,14 +245,15 @@ namespace VisionNet.Controls
                     float minDist2 = float.MaxValue;
                     for (int i = 0; i < pts.Length - 1; i++)
                     {
-                        float d2 = DistSqToSegment(plotPos, pts[i], pts[i + 1]);
-                        if (d2 < minDist2) minDist2 = d2;
+                        VisionOperator.DistancePointToSegment2D(plotPos, new CxSegment2D(pts[i], pts[i + 1]), out float d2);
+                        if (d2 * d2 < minDist2) minDist2 = d2 * d2;
                     }
                     if (field.Axis.IsClosed)
                     {
                         int last = pts.Length - 1;
-                        float d2 = DistSqToSegment(plotPos, pts[last], pts[0]);
-                        if (d2 < minDist2) minDist2 = d2;
+                        VisionOperator.DistancePointToSegment2D(plotPos, new CxSegment2D(pts[last], pts[0]), out float d2);
+                        float d2Sq = d2 * d2;
+                        if (d2Sq < minDist2) minDist2 = d2Sq;
                     }
                     float newW = Math.Max(1f, 2f * (float)Math.Sqrt(minDist2));
                     Fields[_activeIndex] = new CxPolygon2DFittingField(field.Axis, newW);
@@ -299,19 +266,16 @@ namespace VisionNet.Controls
                     break;
             }
         }
-
         public override void OnMouseUp()
         {
             _dragMode = DragMode.None;
         }
-
         public override void OnDeselected()
         {
             _activeIndex = -1;
             _dragMode = DragMode.None;
             UpdatePlottable();
         }
-
         public override void Translate(float dx, float dy)
         {
             if (_activeIndex >= 0)
@@ -322,7 +286,6 @@ namespace VisionNet.Controls
                     pts[j] = new CxPoint2D(pts[j].X + dx, pts[j].Y + dy);
             }
         }
-
         protected override void Dispose(bool disposing)
         {
             if (disposing && _plot != null)
@@ -331,51 +294,47 @@ namespace VisionNet.Controls
                 RemoveHandlePlottables(_plot);
             }
         }
-
         private void RemoveHandlePlottables(Plot plot)
         {
             foreach (var h in _handlePlottables) plot.PlottableList.Remove(h);
             _handlePlottables.Clear();
         }
-
         private static CxPoint2D[] ComputeBandVertices(CxPoint2D[] pts, float halfW, bool closed)
         {
             int n = pts.Length;
             if (n < 2) return null;
-
             const float mitreLimit = 4f;
-
             var outer = new CxPoint2D[n];
             var inner = new CxPoint2D[n];
-
             for (int i = 0; i < n; i++)
             {
                 CxPoint2D tIn, tOut;
                 if (closed)
                 {
-                    tIn  = Subtract(pts[i], pts[(i - 1 + n) % n]);
-                    tOut = Subtract(pts[(i + 1) % n], pts[i]);
+                    tIn  = new CxPoint2D(pts[i].X - pts[(i - 1 + n) % n].X, pts[i].Y - pts[(i - 1 + n) % n].Y);
+                    tOut = new CxPoint2D(pts[(i + 1) % n].X - pts[i].X, pts[(i + 1) % n].Y - pts[i].Y);
                 }
                 else
                 {
-                    tIn  = i > 0 ? Subtract(pts[i], pts[i - 1]) : Subtract(pts[1], pts[0]);
-                    tOut = i < n - 1 ? Subtract(pts[i + 1], pts[i]) : Subtract(pts[n - 1], pts[n - 2]);
+                    tIn  = i > 0
+                        ? new CxPoint2D(pts[i].X - pts[i - 1].X, pts[i].Y - pts[i - 1].Y)
+                        : new CxPoint2D(pts[1].X - pts[0].X, pts[1].Y - pts[0].Y);
+                    tOut = i < n - 1
+                        ? new CxPoint2D(pts[i + 1].X - pts[i].X, pts[i + 1].Y - pts[i].Y)
+                        : new CxPoint2D(pts[n - 1].X - pts[n - 2].X, pts[n - 1].Y - pts[n - 2].Y);
                 }
-
                 float inLen  = (float)Math.Sqrt(tIn.X  * tIn.X  + tIn.Y  * tIn.Y);
                 float outLen = (float)Math.Sqrt(tOut.X * tOut.X + tOut.Y * tOut.Y);
                 if (inLen  > 0) { tIn  = new CxPoint2D(tIn.X  / inLen,  tIn.Y  / inLen); }
                 else { tIn  = new CxPoint2D(1, 0); }
                 if (outLen > 0) { tOut = new CxPoint2D(tOut.X / outLen, tOut.Y / outLen); }
                 else { tOut = new CxPoint2D(1, 0); }
-
                 float dot = tIn.X * tOut.X + tIn.Y * tOut.Y;
                 if (dot > 1f) dot = 1f; else if (dot < -1f) dot = -1f;
                 float cosHalf = (float)Math.Sqrt((1f + dot) / 2f);
                 if (cosHalf < 1e-4f) cosHalf = 1e-4f;
                 float mitreLen = halfW / cosHalf;
                 if (mitreLen > mitreLimit * halfW) mitreLen = mitreLimit * halfW;
-
                 float perpInX  = -tIn.Y,  perpInY  = tIn.X;
                 float perpOutX = -tOut.Y, perpOutY = tOut.X;
                 float bx = perpInX + perpOutX;
@@ -383,49 +342,14 @@ namespace VisionNet.Controls
                 float bLen = (float)Math.Sqrt(bx * bx + by * by);
                 if (bLen > 0) { bx /= bLen; by /= bLen; }
                 else { bx = perpInX; by = perpInY; }
-
                 outer[i] = new CxPoint2D(pts[i].X + bx * mitreLen, pts[i].Y + by * mitreLen);
                 inner[i] = new CxPoint2D(pts[i].X - bx * mitreLen, pts[i].Y - by * mitreLen);
             }
-
             int total = 2 * n;
             var band = new CxPoint2D[total];
             for (int i = 0; i < n; i++) band[i] = outer[i];
             for (int i = 0; i < n; i++) band[n + i] = inner[n - 1 - i];
             return band;
-        }
-
-        private static CxPoint2D Subtract(CxPoint2D a, CxPoint2D b)
-            => new CxPoint2D(a.X - b.X, a.Y - b.Y);
-
-        private static bool PointInConvexPolygon(CxPoint2D p, CxPoint2D[] corners)
-        {
-            bool? sign = null;
-            for (int i = 0; i < corners.Length; i++)
-            {
-                var a = corners[i];
-                var b = corners[(i + 1) % corners.Length];
-                float cross = (b.X - a.X) * (p.Y - a.Y) - (b.Y - a.Y) * (p.X - a.X);
-                if (cross != 0)
-                {
-                    bool cs = cross > 0;
-                    if (sign == null) sign = cs;
-                    else if (sign != cs) return false;
-                }
-            }
-            return true;
-        }
-
-        private static float DistSqToSegment(CxPoint2D p, CxPoint2D a, CxPoint2D b)
-        {
-            float dx = b.X - a.X;
-            float dy = b.Y - a.Y;
-            float lenSq = dx * dx + dy * dy;
-            if (lenSq == 0f) { float ex = p.X - a.X; float ey = p.Y - a.Y; return ex * ex + ey * ey; }
-            float t = Math.Max(0, Math.Min(1, ((p.X - a.X) * dx + (p.Y - a.Y) * dy) / lenSq));
-            float cx = a.X + t * dx - p.X;
-            float cy = a.Y + t * dy - p.Y;
-            return cx * cx + cy * cy;
         }
     }
 }

@@ -193,9 +193,10 @@ namespace VisionNet.Controls
                 dx = plotPos.X - ep.X; dy = plotPos.Y - ep.Y;
                 if (dx * dx + dy * dy <= t2Cp) { _activeIndex = fi; return true; }
 
-                if (HitTestAnnulus(plotPos, arc, field.Width)) { _activeIndex = fi; return true; }
+                if (VisionOperator.IsPointInAnnularSector2D(plotPos, arc, field.Width)) { _activeIndex = fi; return true; }
 
-                if (DistSqToArc(plotPos, arc) <= t2) { _activeIndex = fi; return true; }
+                VisionOperator.DistancePointToArc2D(plotPos, arc, out float dArc);
+                if (dArc * dArc <= t2) { _activeIndex = fi; return true; }
             }
 
             return false;
@@ -395,26 +396,6 @@ namespace VisionNet.Controls
             _handlePlottables.Clear();
         }
 
-        private static bool HitTestAnnulus(CxPoint2D p, CxArc2D arc, float width)
-        {
-            float dx = p.X - arc.Center.X;
-            float dy = p.Y - arc.Center.Y;
-            float dist = (float)Math.Sqrt(dx * dx + dy * dy);
-
-            float outerR = arc.Radius + width / 2f;
-            float innerR = Math.Max(1f, arc.Radius - width / 2f);
-            if (dist < innerR || dist > outerR) return false;
-
-            float angle = (float)(Math.Atan2(dy, dx) * 180 / Math.PI);
-            float delta = angle - arc.StartAngle;
-            while (delta < 0) delta += 360f;
-            while (delta >= 360f) delta -= 360f;
-
-            return arc.SweepAngle > 0
-                ? delta <= arc.SweepAngle
-                : delta >= 360f + arc.SweepAngle;
-        }
-
         private static (CxPoint2D w1, CxPoint2D w2) GetWidthHandlePos(CxArc2DFittingField field)
         {
             var arc = field.Axis;
@@ -439,21 +420,6 @@ namespace VisionNet.Controls
                 arc.Center.Y + arc.Radius * (float)Math.Sin(rad));
         }
 
-        private static float DistSqToArc(CxPoint2D p, CxArc2D arc)
-        {
-            float best = float.MaxValue;
-            int numSamples = 32;
-            for (int i = 0; i <= numSamples; i++)
-            {
-                float t = (float)i / numSamples;
-                var pt = GetPointOnArc(arc, arc.StartAngle + arc.SweepAngle * t);
-                float dx = p.X - pt.X, dy = p.Y - pt.Y;
-                float d = dx * dx + dy * dy;
-                if (d < best) best = d;
-            }
-            return best;
-        }
-
         private static bool ProjectCenterOntoBisector(
             float px, float py, float qx, float qy, float ox, float oy,
             out float ux, out float uy)
@@ -461,7 +427,6 @@ namespace VisionNet.Controls
             float segDx = qx - px, segDy = qy - py;
             float segSq = segDx * segDx + segDy * segDy;
             if (segSq < 1e-3f) { ux = uy = 0f; return false; }
-
             float mx = (px + qx) * 0.5f, my = (py + qy) * 0.5f;
             float nx = -segDy, ny = segDx;
             float vx = mx - ox, vy = my - oy;

@@ -124,7 +124,8 @@ namespace VisionNet.Controls
                 dx = plotPos.X - mp.X; dy = plotPos.Y - mp.Y;
                 if (dx * dx + dy * dy <= t2Cp) { _activeIndex = i; return true; }
 
-                if (DistSqToArc(plotPos, arc) <= t2) { _activeIndex = i; return true; }
+                VisionOperator.DistancePointToArc2D(plotPos, arc, out float d);
+                if (d * d <= t2) { _activeIndex = i; return true; }
             }
 
             return false;
@@ -344,19 +345,5 @@ namespace VisionNet.Controls
                 arc.Center.Y + arc.Radius * (float)Math.Sin(rad));
         }
 
-        private static float DistSqToArc(CxPoint2D p, CxArc2D arc)
-        {
-            float best = float.MaxValue;
-            int numSamples = 32;
-            for (int i = 0; i <= numSamples; i++)
-            {
-                float t = (float)i / numSamples;
-                var pt = GetPointOnArc(arc, arc.StartAngle + arc.SweepAngle * t);
-                float dx = p.X - pt.X, dy = p.Y - pt.Y;
-                float d = dx * dx + dy * dy;
-                if (d < best) best = d;
-            }
-            return best;
-        }
     }
 }
