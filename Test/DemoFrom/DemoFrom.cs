@@ -556,6 +556,7 @@ namespace DemoFrom
             MakeBtn("Drag Fitting", btn2D_dragFitting_Click);
             MakeBtn("Drag ArcFit", btn2D_dragArcFitting_Click);
             MakeBtn("Drag PolyFit", btn2D_dragPolyFitting_Click);
+            MakeBtn("Region Demo", btn2D_regionDemo_Click);
             MakeBtn("Drag CircleFit", btn2D_dragCircleFitting_Click);
             MakeBtn("Show Coord", btn2D_showCoord_Click);
             MakeBtn("Clear Overlays", btn2D_clearOverlays_Click);
@@ -982,6 +983,47 @@ namespace DemoFrom
             };
         }
 
+        private void btn2D_regionDemo_Click(object sender, EventArgs e)
+        {
+            _cxDisplay2D.ClearOverlays();
+
+            var pts = new CxPoint2D[]
+            {
+                new CxPoint2D(100, 20),
+                new CxPoint2D(180, 60),
+                new CxPoint2D(180, 140),
+                new CxPoint2D(100, 180),
+                new CxPoint2D(20, 140),
+                new CxPoint2D(20, 60),
+            };
+            var poly = new CxPolygon2D(pts, true);
+            VisionOperator.PolygonToRegion2D(poly, 200, 200, out var region);
+
+            // Also create a second region via union with a smaller shifted shape
+            var pts2 = new CxPoint2D[]
+            {
+                new CxPoint2D(70, 70),
+                new CxPoint2D(130, 70),
+                new CxPoint2D(130, 130),
+                new CxPoint2D(70, 130),
+            };
+            var poly2 = new CxPolygon2D(pts2, true);
+            VisionOperator.PolygonToRegion2D(poly2, 200, 200, out var region2);
+            VisionOperator.SubtractRegion2D(region, region2, out var regionDiff);
+
+            var item = _cxDisplay2D.SetRegion(new[] { region, region2, regionDiff }, Color.Yellow, 2f);
+            item.IsActiveObj = true;
+            item.OnChanged += i =>
+            {
+                var r = ((CxRegion2DItem)i).Regions[0];
+                var text = $"Area:{r.Area} Runs:{r.Runs?.Length ?? 0}";
+                if (_lbl2DPos.InvokeRequired)
+                    _lbl2DPos.Invoke(new Action(() => _lbl2DPos.Text = text));
+                else
+                    _lbl2DPos.Text = text;
+            };
+        }
+
         private void btn2D_showCoord_Click(object sender, EventArgs e)
         {
             _cxDisplay2D.ClearOverlays();
@@ -1019,7 +1061,7 @@ namespace DemoFrom
             try
             {
                 _cxDisplay2D.ResetView();
-                 _cxDisplay2D.SetScaleAndOffset(new CxPoint3D(0.02f, 0.02f, 1f), new CxPoint3D(-40f,-80f,0));
+                 _cxDisplay2D.SetScaleAndOffset(new CxPoint3D(1f, 1f, 1f), new CxPoint3D(-40f,-80f,0));
                 _cxDisplay2D.ShowAxes(true);
                 _cxDisplay2D.SetBackgroundColor(Color.White);
                 _cxDisplay2D.SetAspectLock(false);

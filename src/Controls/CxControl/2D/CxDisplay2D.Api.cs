@@ -188,6 +188,10 @@ namespace VisionNet.Controls
         public CxCoordination2DItem SetCoordination(CxCoordination2D[] frames, float xLength, float yLength, float size = 1f)
             => AppendOverlay(new CxCoordination2DItem(frames, xLength, yLength, size));
 
+        /// <summary>Adds a set of 2D RLE regions. Returns the created item.</summary>
+        public CxRegion2DItem SetRegion(CxRegion2D[] regions, Color color, float size = 1f)
+            => AppendOverlay(new CxRegion2DItem(regions, color, size));
+
         /// <summary>Removes all overlay items from the display.</summary>
         public void ClearOverlays()
         {

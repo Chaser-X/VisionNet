@@ -175,6 +175,7 @@
     <Compile Include="2D\RenderItem2D\Geometry\CxArc2DFittingFieldItem.cs" />
     <Compile Include="2D\RenderItem2D\Geometry\CxPolygon2DFittingFieldItem.cs" />
     <Compile Include="2D\RenderItem2D\Geometry\CxCircle2DFittingFieldItem.cs" />
+    <Compile Include="2D\RenderItem2D\Geometry\CxRegion2DItem.cs" />
     <Compile Include="2D\RenderItem2D\Geometry\CxCoordination2DItem.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Service Include="{94E38DFF-614B-4cbd-B67C-F211BB35CE8B}" />

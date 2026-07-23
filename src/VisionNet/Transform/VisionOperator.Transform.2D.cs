@@ -222,5 +222,30 @@ namespace VisionNet
                 new CxSize2D(rect.Size.Width * scaleX, rect.Size.Height * scaleY),
                 rect.Angle);
         }
+
+        /// <summary>Scales a segment's endpoints by <paramref name="scaleX"/> / <paramref name="scaleY"/> around the origin.</summary>
+        public static void ResizeSegment2D(CxSegment2D seg, float scaleX, float scaleY, out CxSegment2D result)
+        {
+            result = new CxSegment2D(
+                new CxPoint2D(seg.Start.X * scaleX, seg.Start.Y * scaleY),
+                new CxPoint2D(seg.End.X   * scaleX, seg.End.Y   * scaleY));
+        }
+
+        /// <summary>Uniformly scales an arc by <paramref name="scale"/> around the origin.</summary>
+        public static void ResizeArc2D(CxArc2D arc, float scale, out CxArc2D result)
+        {
+            result = new CxArc2D(
+                new CxPoint2D(arc.Center.X * scale, arc.Center.Y * scale),
+                arc.Radius * scale,
+                arc.StartAngle, arc.SweepAngle);
+        }
+
+        /// <summary>Uniformly scales a circle by <paramref name="scale"/> around the origin.</summary>
+        public static void ResizeCircle2D(CxCircle2D circle, float scale, out CxCircle2D result)
+        {
+            result = new CxCircle2D(
+                new CxPoint2D(circle.Center.X * scale, circle.Center.Y * scale),
+                circle.Radius * scale);
+        }
     }
 }
