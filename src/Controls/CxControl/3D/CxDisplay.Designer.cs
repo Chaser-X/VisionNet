@@ -54,6 +54,7 @@ namespace VisionNet.Controls
 
         private void InitializeComponent()
         {
+            this.SetStyle(ControlStyles.ResizeRedraw, true);
             this.components = new System.ComponentModel.Container();
             this.menu_right = new System.Windows.Forms.ContextMenuStrip(this.components);
             this.d2DToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();

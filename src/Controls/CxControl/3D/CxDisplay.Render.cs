@@ -54,7 +54,11 @@ namespace VisionNet.Controls
         protected override void OnResize(EventArgs e)
         {
             base.OnResize(e);
-            _camera?.LookAtMatrix(OpenGL);
+            if (IsHandleCreated && !IsDisposed && Width > 0 && Height > 0)
+            {
+                _camera?.LookAtMatrix(OpenGL);
+                Invalidate();
+            }
         }
 
         /// <summary>Releases all GL resource handles waiting in the deferred-release queue.</summary>

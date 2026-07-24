@@ -986,6 +986,15 @@ namespace VisionNet
                 point.Z - t * nz);
         }
 
+        /// <summary>Projects a 2D point onto a 3D plane, returning the 3D point with the computed Z coordinate.</summary>
+        public static void ProjectPoint2DToPlane(CxPoint2D point, CxPlane3D plane, out CxPoint3D result)
+        {
+            float nx = plane.Normal.X, ny = plane.Normal.Y, nz = plane.Normal.Z;
+            float d = -(nx * plane.Point.X + ny * plane.Point.Y + nz * plane.Point.Z);
+            float z = -(nx * point.X + ny * point.Y + d) / nz;
+            result = new CxPoint3D(point.X, point.Y, z);
+        }
+
         /// <summary>Returns the shortest distance from a point to a plane.</summary>
         public static void DistancePoint3DToPlane(CxPoint3D point, CxPlane3D plane, out float dist)
         {
