@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Numerics;
 using System.Threading.Tasks;
+using OpenCvSharp;
 using VisionNet.DataType;
 
 namespace VisionNet
@@ -90,12 +91,330 @@ namespace VisionNet
                 new CxSize3D(max.X - min.X, max.Y - min.Y, max.Z - min.Z));
         }
 
-        // ── 预留扩展 ──────────────────────────────────────────────────────────
-        // FindCircle   圆拟合（RANSAC）
-        // FindEdges    边缘检测
-        // FitPlane     平面拟合
-        // FitSphere    球拟合
-        // MeasureVolume 体积计算
-        // MeasureArea   面积计算
+        // ── 2D Fitting ─────────────────────────────────────────────────────────
+
+        /// <summary>Fits a circle to 2D points using algebraic least squares. Returns false if fewer than 3 points or degenerate.</summary>
+        public static bool FitPointsToCircle2D(CxPoint2D[] points, out CxCircle2D circle)
+        {
+            circle = default;
+            if (points == null || points.Length < 3) return false;
+
+            int n = points.Length;
+
+            double sx = 0, sy = 0, sxx = 0, sxy = 0, syy = 0;
+            double sz = 0, sxz = 0, syz = 0;
+
+            for (int i = 0; i < n; i++)
+            {
+                double x = points[i].X, y = points[i].Y;
+                double r2 = x * x + y * y;
+                sx += x; sy += y;
+                sxx += x * x; sxy += x * y; syy += y * y;
+                sz += r2; sxz += x * r2; syz += y * r2;
+            }
+
+            var A = new Mat(3, 3, MatType.CV_32F);
+            var B = new Mat(3, 1, MatType.CV_32F);
+            A.Set(0, 0, (float)n);   A.Set(0, 1, (float)sx);   A.Set(0, 2, (float)sy);
+            A.Set(1, 0, (float)sx);  A.Set(1, 1, (float)sxx);  A.Set(1, 2, (float)sxy);
+            A.Set(2, 0, (float)sy);  A.Set(2, 1, (float)sxy);  A.Set(2, 2, (float)syy);
+            B.Set(0, 0, (float)sz);  B.Set(1, 0, (float)sxz);  B.Set(2, 0, (float)syz);
+
+            var X = new Mat();
+            if (!Cv2.Solve(A, B, X, DecompTypes.LU))
+            {
+                circle = default;
+                return false;
+            }
+
+            float a = X.At<float>(0, 0), bc = X.At<float>(1, 0), c = X.At<float>(2, 0);
+            float cx = -a * 0.5f, cy = -bc * 0.5f;
+            float radiusSq = cx * cx + cy * cy - c;
+
+            if (radiusSq < 0)
+            {
+                circle = default;
+                return false;
+            }
+
+            circle = new CxCircle2D(new CxPoint2D(cx, cy), (float)Math.Sqrt(radiusSq));
+            return true;
+        }
+
+        /// <summary>Fits a line to 2D points using OpenCV fitLine. Returns false if fewer than 2 points.</summary>
+        public static bool FitPointsToLine2D(CxPoint2D[] points, out CxLine2D line)
+        {
+            line = default;
+            if (points == null || points.Length < 2) return false;
+
+            var pts = new Mat(points.Length, 2, MatType.CV_32F);
+            for (int i = 0; i < points.Length; i++)
+            {
+                pts.Set(i, 0, points[i].X);
+                pts.Set(i, 1, points[i].Y);
+            }
+
+            var lineOut = new Mat(4, 1, MatType.CV_32F);
+            Cv2.FitLine(pts, lineOut, DistanceTypes.L2, 0, 0.01, 0.01);
+
+            line = new CxLine2D(
+                new CxPoint2D(lineOut.At<float>(2), lineOut.At<float>(3)),
+                new CxVector2D(lineOut.At<float>(0), lineOut.At<float>(1)));
+            return true;
+        }
+
+        // ── 3D Fitting ─────────────────────────────────────────────────────────
+
+        /// <summary>Fits a line to 3D points using OpenCV fitLine. Returns false if fewer than 2 points.</summary>
+        public static bool FitPointsToLine3D(CxPoint3D[] points, out CxLine3D line)
+        {
+            line = default;
+            if (points == null || points.Length < 2) return false;
+
+            var pts = new Mat(points.Length, 3, MatType.CV_32F);
+            for (int i = 0; i < points.Length; i++)
+            {
+                pts.Set(i, 0, points[i].X);
+                pts.Set(i, 1, points[i].Y);
+                pts.Set(i, 2, points[i].Z);
+            }
+
+            var lineOut = new Mat(6, 1, MatType.CV_32F);
+            Cv2.FitLine(pts, lineOut, DistanceTypes.L2, 0, 0.01, 0.01);
+
+            line = new CxLine3D(
+                new CxPoint3D(lineOut.At<float>(3), lineOut.At<float>(4), lineOut.At<float>(5)),
+                new CxVector3D(lineOut.At<float>(0), lineOut.At<float>(1), lineOut.At<float>(2)));
+            return true;
+        }
+
+        /// <summary>Fits a plane to 3D points using OpenCV PCA. Returns false if fewer than 3 points or degenerate.</summary>
+        public static bool FitPointsToPlane(CxPoint3D[] points, out CxPlane3D plane)
+        {
+            plane = default;
+            if (points == null || points.Length < 3) return false;
+
+            int n = points.Length;
+            var data = new Mat(n, 3, MatType.CV_32F);
+            for (int i = 0; i < n; i++)
+            {
+                data.Set(i, 0, points[i].X);
+                data.Set(i, 1, points[i].Y);
+                data.Set(i, 2, points[i].Z);
+            }
+
+            var mean = new Mat();
+            var eigenvectors = new Mat();
+            Cv2.PCACompute(data, mean, eigenvectors, 3);
+
+            float nx = eigenvectors.At<float>(2, 0);
+            float ny = eigenvectors.At<float>(2, 1);
+            float nz = eigenvectors.At<float>(2, 2);
+            float nLen = (float)Math.Sqrt(nx * nx + ny * ny + nz * nz);
+            if (nLen < 1e-10f) return false;
+
+            float inv = 1f / nLen;
+            plane = new CxPlane3D(
+                new CxPoint3D(mean.At<float>(0, 0), mean.At<float>(0, 1), mean.At<float>(0, 2)),
+                new CxVector3D(nx * inv, ny * inv, nz * inv));
+            return true;
+        }
+
+        /// <summary>Fits a plane to surface points within a polygon ROI using scanline sampling.</summary>
+        public static bool FitSurfaceToPlane(CxSurface surface, CxPolygon2D roi, out CxPlane3D plane)
+        {
+            plane = default;
+            if (surface == null || surface.Data == null || roi.Points == null || roi.Points.Length < 3 || !roi.IsClosed)
+                return false;
+
+            var pts = roi.Points;
+            int w = surface.Width, h = surface.Length;
+            var data = surface.Data;
+
+            // Bounding box in world coordinates, constrained to surface bounds
+            int yMin = int.MaxValue, yMax = int.MinValue;
+            for (int i = 0; i < pts.Length; i++)
+            {
+                int py = (int)Math.Round((pts[i].Y - surface.YOffset) / surface.YScale);
+                if (py < yMin) yMin = py;
+                if (py > yMax) yMax = py;
+            }
+            if (yMin < 0) yMin = 0;
+            if (yMax >= h) yMax = h - 1;
+            if (yMin > yMax) return false;
+
+            var pointList = new System.Collections.Generic.List<CxPoint3D>();
+
+            for (int row = yMin; row <= yMax; row++)
+            {
+                float wy = surface.YOffset + row * surface.YScale;
+
+                // Compute x-span of the polygon at this row (scanline)
+                var xHits = new System.Collections.Generic.List<float>();
+                for (int i = 0, j = pts.Length - 1; i < pts.Length; j = i++)
+                {
+                    float yi = pts[i].Y, yj = pts[j].Y;
+                    if ((yi > wy) != (yj > wy))
+                    {
+                        float xi = pts[i].X, xj = pts[j].X;
+                        xHits.Add((xj - xi) * (wy - yi) / (yj - yi) + xi);
+                    }
+                }
+                if (xHits.Count < 2) continue;
+                xHits.Sort();
+
+                for (int k = 0; k < xHits.Count - 1; k += 2)
+                {
+                    int cs = (int)Math.Round((xHits[k]     - surface.XOffset) / surface.XScale);
+                    int ce = (int)Math.Round((xHits[k + 1] - surface.XOffset) / surface.XScale);
+                    if (cs < 0) cs = 0;
+                    if (ce > w) ce = w;
+
+                    for (int col = cs; col < ce; col++)
+                    {
+                        short raw = data[row * w + col];
+                        if (raw == short.MinValue) continue;
+                        pointList.Add(new CxPoint3D(
+                            surface.XOffset + col * surface.XScale,
+                            wy,
+                            surface.ZOffset + raw * surface.ZScale));
+                    }
+                }
+            }
+
+            if (pointList.Count < 3) return false;
+            return FitPointsToPlane(pointList.ToArray(), out plane);
+        }
+
+        /// <summary>Fits a plane to surface points within an RLE region ROI.</summary>
+        public static bool FitSurfaceToPlane(CxSurface surface, CxRegion2D roi, out CxPlane3D plane)
+        {
+            plane = default;
+            if (surface == null || surface.Data == null || roi.IsEmpty)
+                return false;
+
+            int w = surface.Width, h = surface.Length;
+            var data = surface.Data;
+            var pointList = new System.Collections.Generic.List<CxPoint3D>();
+
+            for (int ri = 0; ri < roi.Runs.Length; ri++)
+            {
+                int row = roi.Runs[ri].Row;
+                if (row < 0 || row >= h) continue;
+                float wy = surface.YOffset + row * surface.YScale;
+
+                int cs = roi.Runs[ri].ColStart;
+                int ce = roi.Runs[ri].ColEnd;
+                if (cs < 0) cs = 0;
+                if (ce > w) ce = w;
+
+                for (int col = cs; col < ce; col++)
+                {
+                    short raw = data[row * w + col];
+                    if (raw == short.MinValue) continue;
+                    pointList.Add(new CxPoint3D(
+                        surface.XOffset + col * surface.XScale,
+                        wy,
+                        surface.ZOffset + raw * surface.ZScale));
+                }
+            }
+
+            if (pointList.Count < 3) return false;
+            return FitPointsToPlane(pointList.ToArray(), out plane);
+        }
+
+        /// <summary>Fits a sphere to 3D points using algebraic least squares. Returns false if fewer than 4 points or degenerate.</summary>
+        public static bool FitSphere(CxPoint3D[] points, out CxSphere sphere)
+        {
+            sphere = default;
+            if (points == null || points.Length < 4) return false;
+
+            int n = points.Length;
+
+            double sx = 0, sy = 0, sz = 0;
+            double sxx = 0, sxy = 0, sxz = 0, syy = 0, syz = 0, szz = 0;
+            double sr2 = 0, sr2x = 0, sr2y = 0, sr2z = 0;
+
+            for (int i = 0; i < n; i++)
+            {
+                double x = points[i].X, y = points[i].Y, z = points[i].Z;
+                double r2 = x * x + y * y + z * z;
+                sx += x; sy += y; sz += z;
+                sxx += x * x; sxy += x * y; sxz += x * z;
+                syy += y * y; syz += y * z; szz += z * z;
+                sr2 += r2; sr2x += x * r2; sr2y += y * r2; sr2z += z * r2;
+            }
+
+            var A = new Mat(4, 4, MatType.CV_32F);
+            var B = new Mat(4, 1, MatType.CV_32F);
+
+            A.Set(0, 0, (float)n);    A.Set(0, 1, (float)sx);   A.Set(0, 2, (float)sy);   A.Set(0, 3, (float)sz);
+            A.Set(1, 0, (float)sx);   A.Set(1, 1, (float)sxx);  A.Set(1, 2, (float)sxy);  A.Set(1, 3, (float)sxz);
+            A.Set(2, 0, (float)sy);   A.Set(2, 1, (float)sxy);  A.Set(2, 2, (float)syy);  A.Set(2, 3, (float)syz);
+            A.Set(3, 0, (float)sz);   A.Set(3, 1, (float)sxz);  A.Set(3, 2, (float)syz);  A.Set(3, 3, (float)szz);
+            B.Set(0, 0, (float)sr2);  B.Set(1, 0, (float)sr2x); B.Set(2, 0, (float)sr2y); B.Set(3, 0, (float)sr2z);
+
+            var X = new Mat();
+            if (!Cv2.Solve(A, B, X, DecompTypes.LU))
+            {
+                sphere = default;
+                return false;
+            }
+
+            float a = X.At<float>(0, 0), bc = X.At<float>(1, 0), cc = X.At<float>(2, 0), d = X.At<float>(3, 0);
+            float cx = -a * 0.5f, cy = -bc * 0.5f, cz = -cc * 0.5f;
+            float radiusSq = cx * cx + cy * cy + cz * cz - d;
+
+            if (radiusSq < 0)
+            {
+                sphere = default;
+                return false;
+            }
+
+            sphere = new CxSphere(
+                new CxPoint3D(cx, cy, cz),
+                (float)Math.Sqrt(radiusSq));
+            return true;
+        }
+
+        /// <summary>Extracts all valid points from a surface as a flat array. Invalid cells (<c>short.MinValue</c>) are skipped.</summary>
+        public static void SurfaceToPoint3DArray(CxSurface surface, out CxPoint3D[] points)
+        {
+            if (surface == null || surface.Data == null)
+            {
+                points = null;
+                return;
+            }
+
+            int w = surface.Width, h = surface.Length;
+            int total = w * h;
+            var data = surface.Data;
+            float xo = surface.XOffset, xs = surface.XScale;
+            float yo = surface.YOffset, ys = surface.YScale;
+            float zo = surface.ZOffset, zs = surface.ZScale;
+
+            var temp = new CxPoint3D[total];
+            int count = 0;
+
+            for (int row = 0; row < h; row++)
+            {
+                float wy = yo + row * ys;
+                for (int col = 0; col < w; col++)
+                {
+                    short raw = data[row * w + col];
+                    if (raw == short.MinValue) continue;
+                    temp[count++] = new CxPoint3D(
+                        xo + col * xs, wy, zo + raw * zs);
+                }
+            }
+
+            if (count == total)
+                points = temp;
+            else
+            {
+                points = new CxPoint3D[count];
+                Array.Copy(temp, points, count);
+            }
+        }
     }
 }

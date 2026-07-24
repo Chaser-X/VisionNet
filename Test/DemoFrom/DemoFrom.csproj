@@ -58,6 +58,30 @@
       <HintPath>..\..\3rd\SharpGL.dll</HintPath>
     </Reference>
     <Reference Include="SharpGL.WinForms, Version=3.1.1.0, Culture=neutral, PublicKeyToken=27fc851303210b27" />
+    <Reference Include="ScottPlot">
+      <HintPath>..\..\3rd\ScottPlot.dll</HintPath>
+    </Reference>
+    <Reference Include="ScottPlot.WinForms">
+      <HintPath>..\..\3rd\ScottPlot.WinForms.dll</HintPath>
+    </Reference>
+    <Reference Include="SkiaSharp">
+      <HintPath>..\..\3rd\SkiaSharp.dll</HintPath>
+    </Reference>
+    <Reference Include="SkiaSharp.Views.Desktop.Common">
+      <HintPath>..\..\3rd\SkiaSharp.Views.Desktop.Common.dll</HintPath>
+    </Reference>
+    <Reference Include="SkiaSharp.Views.WindowsForms">
+      <HintPath>..\..\3rd\SkiaSharp.Views.WindowsForms.dll</HintPath>
+    </Reference>
+    <Reference Include="HarfBuzzSharp">
+      <HintPath>..\..\3rd\HarfBuzzSharp.dll</HintPath>
+    </Reference>
+    <Reference Include="SkiaSharp.HarfBuzz">
+      <HintPath>..\..\3rd\SkiaSharp.HarfBuzz.dll</HintPath>
+    </Reference>
+    <Reference Include="OpenCvSharp">
+      <HintPath>..\..\3rd\OpenCvSharp.dll</HintPath>
+    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Numerics" />

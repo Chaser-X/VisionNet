@@ -286,9 +286,42 @@ namespace VisionNet
             return mesh;
         }
 
-        // ── 预留扩展 ──────────────────────────────────────────────────────────
-        // Poisson 曲面重建
-        // MarchingCubes 等值面提取
-        // 孔洞填充
+        /// <summary>
+        /// Creates a grayscale <see cref="CxImage"/> from a <see cref="CxSurface"/>.
+        /// </summary>
+        /// <param name="surface">Source surface data.</param>
+        /// <param name="pixelOffset">
+        /// <c>true</c> → output <see cref="PlainType.Real"/> with world-space Z values (ZOffset + Data×ZScale);<br/>
+        /// <c>false</c> → output <see cref="PlainType.Int16"/> with raw surface Data.
+        /// </param>
+        /// <param name="image">Output image, or <c>null</c> if <paramref name="surface"/> is null.</param>
+        public static void CreateImageFromSurface(CxSurface surface, bool pixelOffset, out CxImage image)
+        {
+            if (surface == null || surface.Data == null)
+            {
+                image = null;
+                return;
+            }
+
+            int w = surface.Width;
+            int h = surface.Length;
+            int n = w * h;
+
+            if (pixelOffset)
+            {
+                var pixels = new float[n];
+                for (int i = 0; i < n; i++)
+                    pixels[i] = surface.Data[i] == short.MinValue
+                        ? float.NaN
+                        : surface.ZOffset + surface.Data[i] * surface.ZScale;
+                image = new CxImage(w, h, pixels, 1);
+            }
+            else
+            {
+                var pixels = new short[n];
+                Array.Copy(surface.Data, pixels, n);
+                image = new CxImage(w, h, pixels, 1);
+            }
+        }
     }
 }

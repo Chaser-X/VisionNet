@@ -30,6 +30,7 @@
     <DefineConstants>TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>5</WarningLevel>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="SharpGL">
@@ -41,10 +42,35 @@
     <Reference Include="SharpGL.WinForms">
       <HintPath>..\..\..\3rd\SharpGL.WinForms.dll</HintPath>
     </Reference>
+    <Reference Include="ScottPlot">
+      <HintPath>..\..\..\3rd\ScottPlot.dll</HintPath>
+    </Reference>
+    <Reference Include="ScottPlot.WinForms">
+      <HintPath>..\..\..\3rd\ScottPlot.WinForms.dll</HintPath>
+    </Reference>
+    <Reference Include="SkiaSharp">
+      <HintPath>..\..\..\3rd\SkiaSharp.dll</HintPath>
+    </Reference>
+    <Reference Include="SkiaSharp.Views.Desktop.Common">
+      <HintPath>..\..\..\3rd\SkiaSharp.Views.Desktop.Common.dll</HintPath>
+    </Reference>
+    <Reference Include="SkiaSharp.Views.WindowsForms">
+      <HintPath>..\..\..\3rd\SkiaSharp.Views.WindowsForms.dll</HintPath>
+    </Reference>
+    <Reference Include="HarfBuzzSharp">
+      <HintPath>..\..\..\3rd\HarfBuzzSharp.dll</HintPath>
+    </Reference>
+    <Reference Include="SkiaSharp.HarfBuzz">
+      <HintPath>..\..\..\3rd\SkiaSharp.HarfBuzz.dll</HintPath>
+    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.DirectoryServices" />
     <Reference Include="System.Numerics" />
+    <Reference Include="System.Runtime.CompilerServices.Unsafe, Version=6.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\..\3rd\System.Runtime.CompilerServices.Unsafe.dll</HintPath>
+    </Reference>
     <Reference Include="System.Xml.Linq" />
     <Reference Include="System.Data.DataSetExtensions" />
     <Reference Include="Microsoft.CSharp" />
@@ -60,56 +86,97 @@
     <Reference Include="WindowsBase" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="CxDisplay.cs">
+    <!-- 3D display control -->
+    <Compile Include="3D\CxDisplay.cs">
       <SubType>UserControl</SubType>
     </Compile>
-    <Compile Include="CxDisplay.Api.cs">
+    <Compile Include="3D\CxDisplay.Api.cs">
       <DependentUpon>CxDisplay.cs</DependentUpon>
       <SubType>UserControl</SubType>
     </Compile>
-    <Compile Include="CxDisplay.Render.cs">
+    <Compile Include="3D\CxDisplay.Render.cs">
       <DependentUpon>CxDisplay.cs</DependentUpon>
       <SubType>UserControl</SubType>
     </Compile>
-    <Compile Include="CxDisplay.GLResources.cs">
+    <Compile Include="3D\CxDisplay.GLResources.cs">
       <DependentUpon>CxDisplay.cs</DependentUpon>
       <SubType>UserControl</SubType>
     </Compile>
-    <Compile Include="CxDisplay.Input.cs">
+    <Compile Include="3D\CxDisplay.Input.cs">
       <DependentUpon>CxDisplay.cs</DependentUpon>
       <SubType>UserControl</SubType>
     </Compile>
-    <Compile Include="CxDisplay.Designer.cs">
+    <Compile Include="3D\CxDisplay.Designer.cs">
       <DependentUpon>CxDisplay.cs</DependentUpon>
     </Compile>
-    <EmbeddedResource Include="CxDisplay.resx">
+    <EmbeddedResource Include="3D\CxDisplay.resx">
       <DependentUpon>CxDisplay.cs</DependentUpon>
     </EmbeddedResource>
-    <Compile Include="Camera\ICamera.cs" />
-    <Compile Include="Camera\CxAdvancedTrackBallCamera.cs" />
-    <Compile Include="Camera\CxTrackBallCamera.cs" />
-    <Compile Include="RenderItem\Enums.cs" />
-    <Compile Include="RenderItem\IRenderItem.cs" />
-    <Compile Include="RenderItem\ICxObjRenderItem.cs" />
-    <Compile Include="RenderItem\RenderData.cs" />
-    <Compile Include="RenderItem\GLResourceHandle.cs" />
-    <Compile Include="RenderItem\Surface\CxSurfaceItem.cs" />
-    <Compile Include="RenderItem\Surface\CxSurfaceAdvancedItem.cs" />
-    <Compile Include="RenderItem\PointCloud\CxPointCloudItem.cs" />
-    <Compile Include="RenderItem\PointCloud\CxPointCloudAdvancedItem.cs" />
-    <Compile Include="RenderItem\Mesh\CxMeshItem.cs" />
-    <Compile Include="RenderItem\Mesh\CxMeshAdvancedItem.cs" />
-    <Compile Include="RenderItem\Geometry\CxPoint3DItem.cs" />
-    <Compile Include="RenderItem\Geometry\CxSegment3DItem.cs" />
-    <Compile Include="RenderItem\Geometry\CxPolygon3DItem.cs" />
-    <Compile Include="RenderItem\Geometry\CxPlane3DItem.cs" />
-    <Compile Include="RenderItem\Geometry\CxBox3DItem.cs" />
-    <Compile Include="RenderItem\Overlay\CxColorBarItem.cs" />
-    <Compile Include="RenderItem\Overlay\CxCoordinateSystemItem.cs" />
-    <Compile Include="RenderItem\Overlay\CxCoordinationTagItem.cs" />
-    <Compile Include="RenderItem\Overlay\CxText2DItem.cs" />
-    <Compile Include="RenderItem\Overlay\CxTextInfoItem.cs" />
-    <Compile Include="CxExtension.cs" />
+    <Compile Include="3D\Camera\ICamera.cs" />
+    <Compile Include="3D\Camera\CxAdvancedTrackBallCamera.cs" />
+    <Compile Include="3D\Camera\CxTrackBallCamera.cs" />
+    <Compile Include="3D\RenderItem\Enums.cs" />
+    <Compile Include="3D\RenderItem\IRenderItem.cs" />
+    <Compile Include="3D\RenderItem\ICxObjRenderItem.cs" />
+    <Compile Include="3D\RenderItem\RenderData.cs" />
+    <Compile Include="3D\RenderItem\GLResourceHandle.cs" />
+    <Compile Include="3D\RenderItem\Surface\CxSurfaceItem.cs" />
+    <Compile Include="3D\RenderItem\Surface\CxSurfaceAdvancedItem.cs" />
+    <Compile Include="3D\RenderItem\PointCloud\CxPointCloudItem.cs" />
+    <Compile Include="3D\RenderItem\PointCloud\CxPointCloudAdvancedItem.cs" />
+    <Compile Include="3D\RenderItem\Mesh\CxMeshItem.cs" />
+    <Compile Include="3D\RenderItem\Mesh\CxMeshAdvancedItem.cs" />
+    <Compile Include="3D\RenderItem\Geometry\CxPoint3DItem.cs" />
+    <Compile Include="3D\RenderItem\Geometry\CxSegment3DItem.cs" />
+    <Compile Include="3D\RenderItem\Geometry\CxPolygon3DItem.cs" />
+    <Compile Include="3D\RenderItem\Geometry\CxPlane3DItem.cs" />
+    <Compile Include="3D\RenderItem\Geometry\CxBox3DItem.cs" />
+    <Compile Include="3D\RenderItem\Overlay\CxColorBarItem.cs" />
+    <Compile Include="3D\RenderItem\Overlay\CxCoordinateSystemItem.cs" />
+    <Compile Include="3D\RenderItem\Overlay\CxCoordinationTagItem.cs" />
+    <Compile Include="3D\RenderItem\Overlay\CxText2DItem.cs" />
+    <Compile Include="3D\RenderItem\Overlay\CxTextInfoItem.cs" />
+    <Compile Include="3D\CxExtension.cs" />
+    <!-- 2D display control -->
+    <Compile Include="2D\CxDisplay2D.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="2D\CxDisplay2D.Api.cs">
+      <DependentUpon>CxDisplay2D.cs</DependentUpon>
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="2D\CxDisplay2D.Render.cs">
+      <DependentUpon>CxDisplay2D.cs</DependentUpon>
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="2D\CxDisplay2D.Input.cs">
+      <DependentUpon>CxDisplay2D.cs</DependentUpon>
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="2D\CxDisplay2D.Designer.cs">
+      <DependentUpon>CxDisplay2D.cs</DependentUpon>
+    </Compile>
+    <EmbeddedResource Include="2D\CxDisplay2D.resx">
+      <DependentUpon>CxDisplay2D.cs</DependentUpon>
+    </EmbeddedResource>
+    <Compile Include="2D\RenderItem2D\I2DRenderItem.cs" />
+    <Compile Include="2D\RenderItem2D\Abstract2DRenderItem.cs" />
+    <Compile Include="2D\RenderItem2D\Image\CxImageItem.cs" />
+    <Compile Include="2D\RenderItem2D\Geometry\CxPoint2DItem.cs" />
+    <Compile Include="2D\RenderItem2D\Geometry\CxSegment2DItem.cs" />
+    <Compile Include="2D\RenderItem2D\Geometry\CxPolygon2DItem.cs" />
+    <Compile Include="2D\RenderItem2D\Geometry\CxCircle2DItem.cs" />
+    <Compile Include="2D\RenderItem2D\Geometry\CxLine2DItem.cs" />
+    <Compile Include="2D\RenderItem2D\Geometry\CxBox2DItem.cs" />
+    <Compile Include="2D\RenderItem2D\Geometry\CxArc2DItem.cs" />
+    <Compile Include="2D\RenderItem2D\Geometry\CxRectangle2DItem.cs" />
+    <Compile Include="2D\RenderItem2D\Geometry\CxText2DItem.cs" />
+    <Compile Include="2D\RenderItem2D\Geometry\CxSegment2DFittingFieldItem.cs" />
+    <Compile Include="2D\RenderItem2D\Geometry\CxArc2DFittingFieldItem.cs" />
+    <Compile Include="2D\RenderItem2D\Geometry\CxPolygon2DFittingFieldItem.cs" />
+    <Compile Include="2D\RenderItem2D\Geometry\CxCircle2DFittingFieldItem.cs" />
+    <Compile Include="2D\RenderItem2D\Geometry\CxRegion2DItem.cs" />
+    <Compile Include="2D\RenderItem2D\Geometry\CxCoordination2DItem.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Service Include="{94E38DFF-614B-4cbd-B67C-F211BB35CE8B}" />
   </ItemGroup>

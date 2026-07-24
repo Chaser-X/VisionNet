@@ -23,17 +23,27 @@ VisionNet 由两个互相独立的库组成：
 | 库                 | 说明                                                            |
 | ----------------- | ------------------------------------------------------------- |
 | **VisionNet.dll** | 核心数据类型（点云、网格、几何体）+ 静态算子 API（通过 P/Invoke 调用本地 C++ 库）           |
-| **CxControl.dll** | 基于 SharpGL/OpenGL 的高性能 3D 渲染控件 `CxDisplay`，支持点云、网格、几何叠加层的实时渲染 |
+| **CxControl.dll** | 基于 SharpGL/OpenGL 的高性能 3D 渲染控件 `CxDisplay` + 基于 ScottPlot 的 2D 渲染控件 `CxDisplay2D`，支持点云、网格、2D/3D 几何叠加层的实时渲染 |
 
 ### 主要特性
 
 - 🗂️ 丰富的 3D/2D 几何数据类型，内存布局与 C++ 互操作兼容
-- ⚡ 高性能渲染：VAO + GLSL Shader + 强度纹理，支持百万级点云实时显示
-- 🎨 多 Item 叠加：点云、网格、几何图元可同时显示，颜色条自动同步全局 Z 范围
+- ⚡ 高性能 3D 渲染：VAO + GLSL Shader + 强度纹理，支持百万级点云实时显示
+- 📈 高性能 2D 渲染：基于 ScottPlot，支持坐标轴自动缩放、自适应视野裁剪
+- 🎨 多 Item 叠加：点云、网格、2D/3D 几何图元可同时显示，颜色条自动同步全局 Z 范围
 - 🖱️ 完整鼠标交互：追踪球旋转、平移、缩放、双击对焦、悬停坐标标签
 - 🔒 线程安全：GL 资源延迟释放机制，数据更新可在后台线程执行
 - 💾 **文件 I/O**：自定义紧凑二进制格式（`.cxsurface` / `.cxpc` / `.cxmesh`）及标准工业格式 OBJ（`.obj`）、STL（`.stl` / `.stla`）的保存/加载
-- ✂️ **ROI 裁剪**：`ClipMesh` / `ClipPointCloud` / `ClipSurface` — 以 `Box3D` 为 ROI 对三种数据类型做空间裁剪，全程并行加速
+- ✂️ **ROI 裁剪**：`ClipMesh` / `ClipPointCloud` / `ClipSurface` — 以 `CxBox3D` 为 ROI 对三种数据类型做空间裁剪，全程并行加速
+- 🚀 **OpenCL GPU 计算**：并行包围盒计算、GPU 点云重采样（`CxUniformSurface`）、GPU 表面变换（`CxTransformSurface` / `CxTransformPointCloud`）、GPU 网格栅格化（`CxMeshToSurface`）
+- 🔄 **坐标系切换**：一行代码在右手系与左手系之间切换，视角预设（Top / Front / Left / Right）自动适配，无需修改数据
+- 🔧 **几何算子**：2D/3D 几何构造（直线/平面）、求交、投影、距离计算；坐标系对齐（Align 正向/反向）与坐标变换
+- 🖼️ **图像处理**：`CxImage ↔ Bitmap` 互转（自适应像素格式）、OpenCV 缩放/缩略图、`Surface → Image` 导出
+- 📐 **最小二乘拟合**：2D 圆拟合、2D/3D 直线拟合、平面拟合、球拟合
+- 🖱️ 完整鼠标交互：追踪球旋转、平移、缩放、双击对焦、悬停坐标标签
+- 🔒 线程安全：GL 资源延迟释放机制，数据更新可在后台线程执行
+- 💾 **文件 I/O**：自定义紧凑二进制格式（`.cxsurface` / `.cxpc` / `.cxmesh`）及标准工业格式 OBJ（`.obj`）、STL（`.stl` / `.stla`）的保存/加载
+- ✂️ **ROI 裁剪**：`ClipMesh` / `ClipPointCloud` / `ClipSurface` — 以 `CxBox3D` 为 ROI 对三种数据类型做空间裁剪，全程并行加速
 - 🚀 **OpenCL GPU 计算**：并行包围盒计算、GPU 点云重采样（`CxUniformSurface`）、GPU 表面变换（`CxTransformSurface` / `CxTransformPointCloud`）、GPU 网格栅格化（`CxMeshToSurface`）
 - 🔄 **坐标系切换**：一行代码在右手系与左手系之间切换，视角预设（Top / Front / Left / Right）自动适配，无需修改数据
 
@@ -123,12 +133,12 @@ cxDisplay1.AddSurface(surface2);
 
 // 叠加包围盒
 cxDisplay1.SetBox(new[] {
-    new Box3D(new CxPoint3D(0, 0, 0), new CxSize3D(10, 10, 5))
+    new CxBox3D(new CxPoint3D(0, 0, 0), new CxSize3D(10, 10, 5))
 }, Color.Yellow);
 
 // 叠加线段
 cxDisplay1.SetSegment(new[] {
-    new Segment3D(new CxPoint3D(0, 0, 0), new CxPoint3D(5, 5, 5))
+    new CxSegment3D(new CxPoint3D(0, 0, 0), new CxPoint3D(5, 5, 5))
 }, Color.Red, size: 2f);
 ```
 
@@ -153,9 +163,11 @@ VisionNet/
 ├── src/
 │   ├── VisionNet/                  # 核心库
 │   │   ├── DataType/
-│   │   │   ├── Geometry3D/         # CxPoint3D, CxVector3D, Box3D, Plane3D ...
-│   │   │   ├── Geometry2D/         # CxPoint2D, Segment2D, Polygon2D ...
+│   │   │   ├── Geometry3D/         # CxPoint3D, CxVector3D, CxBox3D, CxPose3D ...
+│   │   │   ├── Geometry2D/         # CxPoint2D, CxCoordination2D, CxMatrix3X3, CxCircle2D ...
 │   │   │   └── Models/             # CxSurface, CxPointCloud, CxMesh, CxImage, CxMatrix4X4
+│   │   ├── Analysis/               # 统计分析 / 拟合算子
+│   │   │   └── VisionOperator.Analysis.cs  # FitPointsToCircle2D, FitPointsToPlane ...
 │   │   ├── Compute/                # OpenCL GPU 计算模块
 │   │   │   ├── Kernels/            # .cl 内核源码（嵌入资源）
 │   │   │   ├── OpenCLEnvironment   # 单例：上下文 / 命令队列 / 编译程序
@@ -163,32 +175,55 @@ VisionNet/
 │   │   │   ├── CxTransformSurface  # GPU 表面变换
 │   │   │   ├── CxTransformPointCloud# GPU 点云变换
 │   │   │   └── CxMeshToSurface     # GPU 网格栅格化
+│   │   ├── Filter/                 # 滤波器算子
+│   │   │   ├── VisionOperator.Filter.cs
+│   │   │   └── VisionOperator.Clip.cs
+│   │   ├── Geometry/               # 几何构造 / 求交 / 距离算子
+│   │   │   └── VisionOperator.Geometry.cs  # CreateLine2D, IntersectPlanePlane ...
+│   │   ├── Image/                  # 图像处理算子
+│   │   │   └── VisionOperator.Image.cs     # ResizeImage, ToBitmap, FromBitmap
 │   │   ├── IO/                     # 文件序列化
-│                   │   │   └── VisionOperator.IO.cs# SaveSurface / LoadMesh / LoadObj / STL 等
-│   │   ├── VisionOperator.cs       # 静态算子 API
+│   │   │   └── VisionOperator.IO.cs        # SaveSurface / LoadMesh / LoadObj / STL 等
+│   │   ├── Surface/                # 表面处理算子
+│   │   │   └── VisionOperator.Surface.cs   # SurfaceToMesh, CreateImageFromSurface
+│   │   ├── Transform/              # 坐标系对齐算子（2D/3D）
+│   │   │   ├── VisionOperator.Transform.cs     # TransformPoint3D, TransformSurface
+│   │   │   ├── VisionOperator.Transform.2D.cs  # AlignCircle2D, AlignPolygon2D ...
+│   │   │   └── VisionOperator.Transform.3D.cs  # AlignPlane3D, AlignSphere ...
+│   │   ├── VisionOperator.cs       # 静态算子 API 入口
 │   │   └── Export.cs               # P/Invoke 声明（VisionLib.dll）
 │   └── Controls/
 │       └── CxControl/              # 渲染控件库
-│           ├── Camera/             # ICamera, CxAdvancedTrackBallCamera
-│           ├── RenderItem/
-│           │   ├── Surface/        # CxSurfaceItem, CxSurfaceAdvancedItem
-│           │   ├── PointCloud/     # CxPointCloudItem, CxPointCloudAdvancedItem
-│           │   ├── Mesh/           # CxMeshItem, CxMeshAdvancedItem
-│           │   ├── Geometry/       # Point / Segment / Polygon / Plane / Box
-│           │   └── Overlay/        # ColorBar, CoordinateSystem, Tag, Text
-│           ├── CxDisplay.cs            # 状态 / 初始化 / 共用私有工具
-│           ├── CxDisplay.Api.cs        # 公共 API（Set* / Add* / 视图管理）
-│           ├── CxDisplay.Render.cs     # 渲染管线（帧驱动）
-│           ├── CxDisplay.GLResources.cs# GL 资源生命周期
-│           ├── CxDisplay.Input.cs      # 鼠标 / 菜单 / 坐标拾取
-│           └── CxDisplay.Designer.cs   # WinForms UI 初始化
+│           ├── 3D/                 # 3D 渲染（OpenGL）
+│           │   ├── Camera/         # ICamera, CxAdvancedTrackBallCamera
+│           │   ├── RenderItem/
+│           │   │   ├── Surface/    # CxSurfaceItem, CxSurfaceAdvancedItem
+│           │   │   ├── PointCloud/ # CxPointCloudItem, CxPointCloudAdvancedItem
+│           │   │   ├── Mesh/       # CxMeshItem, CxMeshAdvancedItem
+│           │   │   ├── Geometry/   # Point / Segment / Polygon / Plane / Box
+│           │   │   └── Overlay/    # ColorBar, CoordinateSystem, Tag, Text
+│           │   └── CxDisplay.cs   # 状态 / 初始化 / 框架
+│           │       ├── CxDisplay.Api.cs
+│           │       ├── CxDisplay.Render.cs
+│           │       ├── CxDisplay.GLResources.cs
+│           │       ├── CxDisplay.Input.cs
+│           │       └── CxDisplay.Designer.cs
+│           └── 2D/                 # 2D 渲染（ScottPlot）
+│               ├── CxDisplay2D.cs           # 2D 控件状态 / 渲染
+│               ├── CxDisplay2D.Api.cs       # 公共 API（Set* / Add* / 视图管理）
+│               ├── CxDisplay2D.Render.cs    # 轴范围 / 缩放控制
+│               └── RenderItem2D/
+│                   ├── Image/      # CxImageItem
+│                   └── Geometry/   # Point / Segment / Line / Circle / Arc / Polygon ...
 ├── Test/
 │   ├── Test/                       # 控制台单元测试
 │   └── DemoFrom/                   # WinForms 演示应用
-└── 3rd/                            # 第三方 DLL（SharpGL, GoSdk 等）
+└── 3rd/                            # 第三方 DLL（SharpGL, OpenCvSharp, ScottPlot 等）
 ```
 
-### CxDisplay 设计原则
+### CxDisplay / CxDisplay2D 设计原则
+
+#### CxDisplay（3D，OpenGL）
 
 ```
 ┌──────────────────────────────────────┐
@@ -209,6 +244,12 @@ VisionNet/
 - **延迟释放**：`Dispose` / 替换触发的 GL 资源回收推迟到下一渲染帧，避免跨线程 GL 调用
 - **线程安全**：`_resourceLock` 保护资源池；`Render()` 取快照遍历，不持锁执行 GL 调用
 
+#### CxDisplay2D（2D，ScottPlot）
+
+- **基于 ScottPlot**：每个 2D 渲染 Item 包装为 ScottPlot `IPlottable`，由 `CxDisplay2D` 统一管理
+- **自适应裁剪**：无限长直线（`CxLine2DItem`）根据当前 `AxisLimits` 动态计算线段端点，始终刚好覆盖视野 + 10% 边距
+- **非侵入式**：不修改 ScottPlot 内部逻辑，仅通过标准 API（`Add.Scatter` / `Add.Arrow` / `Add.Text`）叠加图元
+
 ---
 
 ## API 参考
@@ -224,14 +265,14 @@ VisionNet/
 | `CxPoint3DI`       | 带强度的 3D 点                                            |
 | `CxVector3D`       | 3D 向量，支持 `+` `-` `×` `÷` `Dot` `Cross` `Normalize` `FromSpherical` |
 | `CxSize3D`         | 3D 尺寸（Width, Height, Depth）                          |
-| `Box3D`            | 轴对齐包围盒（Center + Size）                                |
-| `Plane3D`          | 平面（Point + Normal）                                   |
-| `Sphere`           | 球体（Center + Radius）                                  |
-| `Circle3D`         | 3D 圆（Center + Normal + Radius）                       |
-| `Segment3D`        | 线段（Start + End）                                      |
-| `Polygon3D`        | 多边形顶点序列（`IsClosed` 控制是否闭合）                           |
+| `CxBox3D`          | 轴对齐包围盒（Center + Size）                                |
+| `CxPlane3D`        | 平面（Point + Normal）                                   |
+| `CxSphere`         | 球体（Center + Radius）                                  |
+| `CxCircle3D`       | 3D 圆（Center + Normal + Radius）                       |
+| `CxSegment3D`      | 线段（Start + End）                                      |
+| `CxPolygon3D`      | 多边形顶点序列（`IsClosed` 控制是否闭合）                           |
 | `CxCoordination3D` | 3D 坐标系（Origin + XAxis + YAxis + ZAxis）               |
-| `TextInfo`         | 世界坐标锚定文本标签（Location + Text + Size）                   |
+| `CxTextInfo`       | 世界坐标锚定文本标签（Location + Text + Size）                   |
 
 </details>
 
@@ -240,11 +281,18 @@ VisionNet/
 
 | 类型                         | 说明                                 |
 | -------------------------- | ---------------------------------- |
-| `CxPoint2D` / `CxVector2D` | 2D 点 / 向量                          |
-| `Segment2D`                | 2D 线段                              |
-| `Polygon2D`                | 2D 多边形                             |
-| `Circle2D`                 | 2D 圆                               |
-| `Text2D`                   | 屏幕空间文本（Location + Text + FontSize） |
+| `CxPoint2D` / `CxVector2D`  | 2D 点 / 向量                          |
+| `CxCoordination2D`         | 2D 坐标系（Origin + Scale + Angle 度）    |
+| `CxMatrix3X3`              | 3×3 行主序矩阵（旋转 / 缩放 / 平移 / 求逆 / 克莱默 2×2） |
+| `CxSegment2D`               | 2D 线段                              |
+| `CxLine2D`                 | 2D 无限长直线（`FromTwoPoints` / `FromGeneralForm(A,B,C)` / `FromPointSlope`） |
+| `CxArc2D`                  | 2D 圆弧（Center + Radius + StartAngle + SweepAngle） |
+| `CxPolygon2D`               | 2D 多边形                             |
+| `CxCircle2D`                | 2D 圆                               |
+| `CxBox2D`                  | 2D 轴对齐包围盒（Center + Size）           |
+| `CxRectangle2D`            | 2D 带角度的矩形（Center + Size + Angle）   |
+| `CxSize2D`                 | 2D 尺寸（Width + Height）                |
+| `CxText2D`                  | 屏幕空间文本（Location + Text + FontSize） |
 
 </details>
 
@@ -297,11 +345,15 @@ var mesh = new CxMesh
 - `generateUVs=false`：`Intensity` 为压缩逐顶点格式（`length = validCount`），供 `CxMeshItem` 固定管线渲染
 - `generateUVs=true`：`Intensity` 为 W×H 网格格式（`length = W×H`，无效格填 0），供 `CxMeshAdvancedItem` Shader 路径渲染
 
-**`CxImage<T>`** — 泛型 2D 图像
+**`CxImage`** — 2D 图像容器
 
 ```csharp
-var img = new CxImage<byte>(640, 480);
-// 行主序访问：img.Data[row * img.Width + col]
+// 支持 byte[] / short[] / int[] / float[] 四种像素类型
+var img = new CxImage(w, h, PlainType.UInt8, channel: 1);
+var img = new CxImage(w, h, data, channel: 3);   // 从已有数组构造
+
+img.ToBitmap()                                    // → System.Drawing.Bitmap (Format32bppArgb)
+img.GetThumbnail(maxW, maxH)                      // → 等比例缩略图
 ```
 
 **`CxMatrix4X4`** — 4×4 行主序矩阵（`Data[i*4+j]` = 第 i 行第 j 列；传给 OpenGL 时需先转置）
@@ -321,6 +373,23 @@ var vec     = product.TransformVector3D(vector);          // 向量变换（仅 
 var x       = product.Solve3x3(b);                        // 克莱默法则求解 3×3 线性方程组
 ```
 
+**`CxMatrix3X3`** — 3×3 行主序矩阵，用于 2D 仿射变换（角度为度）
+
+```csharp
+var m = CxMatrix3X3.Rotation(45f);                        // 旋转 45°（逆时针，角度制）
+var t = CxMatrix3X3.Translation(10, 20);                  // 平移
+var s = CxMatrix3X3.Scale(0.5f, 2f);                      // 缩放
+var i = CxMatrix3X3.Identity();                           // 单位矩阵
+
+var product = m * t;                                      // 矩阵乘法
+var inv     = product.Inverse();                          // 伴随矩阵求逆
+var det     = product.Determinant;                        // 行列式
+var trans   = product.Transpose();                        // 转置
+var pt      = product.TransformPoint2D(point);            // 点变换（齐次坐标）
+var vec     = product.TransformVector2D(vector);          // 向量变换（仅 2×2 子块）
+var x       = product.Solve2x2(b);                        // 克莱默法则求解 2×2 线性方程组
+```
+
 </details>
 
 ### 算子 API
@@ -338,10 +407,10 @@ CxSurface result = VisionOperator.UniformSurface(
 CxPoint3D transformed = VisionOperator.TransformPoint3D(point, matrix);
 
 // 并行包围盒（Parallel.ForEach）
-Box3D? box = VisionOperator.CalculateBoundingBox(points);
+CxBox3D? box = VisionOperator.CalculateBoundingBox(points);
 
 // SIMD 包围盒（Vector3.Min / Max）
-Box3D? boxFast = VisionOperator.CalculateBoundingBoxSIMD(points);
+CxBox3D? boxFast = VisionOperator.CalculateBoundingBoxSIMD(points);
 
 // GPU 表面变换（OpenCL，需先调用 InitialLib）
 VisionOperator.InitialLib();
@@ -354,10 +423,10 @@ VisionOperator.DestroyLib();
 // GPU 点云矩阵变换（方案 A：复用 TransformVertices kernel）
 var (pts, intensities) = VisionOperator.TransformPointCloud(cloud, matrix);
 
-// Mesh → Surface 高度图投影（全自动，Box3D 范围从 mesh 包围盒推导）
+// Mesh → Surface 高度图投影（全自动，CxBox3D 范围从 mesh 包围盒推导）
 CxSurface heightMap = VisionOperator.MeshToSurface(mesh, matrix, 0.01f, 0.01f);
 
-// Mesh → Surface 高度图投影（指定固定 Box3D 范围，用于对齐多帧）
+// Mesh → Surface 高度图投影（指定固定 CxBox3D 范围，用于对齐多帧）
 CxSurface heightMapFixed = VisionOperator.MeshToSurface(mesh, matrix, bounds, 0.01f, 0.01f);
 
 // Surface → Mesh 三角网格转换（结构化表面）
@@ -366,9 +435,9 @@ CxMesh mesh = VisionOperator.SurfaceToMesh(surface, generateUVs: true);
 // PointCloud → Mesh 三角网格转换（有序点云）
 CxMesh meshFromCloud = VisionOperator.PointCloudToMesh(cloud, generateUVs: true);
 
-// ── ROI 裁剪（Box3D，CPU 并行） ──────────────────────────────────
+// ── ROI 裁剪（CxBox3D，CPU 并行） ──────────────────────────────────
 
-var roi = new Box3D(new CxPoint3D(0, 0, 0), new CxSize3D(10, 10, 5));
+var roi = new CxBox3D(new CxPoint3D(0, 0, 0), new CxSize3D(10, 10, 5));
 
 // 保留三顶点全在 ROI 内的三角形，压缩顶点索引，UV/Intensity 随顶点保留
 CxMesh clippedMesh = VisionOperator.ClipMesh(mesh, roi);
@@ -378,6 +447,73 @@ CxPointCloud clippedCloud = VisionOperator.ClipPointCloud(cloud, roi);
 
 // 按 XY 网格裁剪（返回更小网格），Z 越界单元设为 -32768
 CxSurface clippedSurface = VisionOperator.ClipSurface(surface, roi);
+
+// ── 2D/3D 几何变换（VisionOperator.Transform.*） ───────────────
+
+// 2D 坐标系对齐（CxCoordination2D）
+var l2w = VisionOperator.AlignCircle2D(circle, coord, false);     // 反向 Local→World
+var w2l = VisionOperator.AlignCircle2D(circle, coord, true);      // 正向 World→Local
+
+// 3D 坐标系对齐（CxCoordination3D）
+var l2wPt = VisionOperator.AlignPoint3D(pt, coord3d, false);      // 反向
+var w2lLn = VisionOperator.AlignLine3D(line, coord3d, true);      // 正向
+
+// 支持：Point2D/3D, Vector2D/3D, Segment2D/3D, Line2D/3D,
+//       Circle2D/Arc2D/Polygon2D/Rectangle2D,
+//       Plane3D/Sphere/Circle3D/Polygon3D/Box3D/TextInfo,
+//       Segment/Arc/Polygon/Circle2DFittingField
+
+// ── 2D 几何构造与计算（VisionOperator.Geometry） ────────────────
+
+VisionOperator.CreateLine2D(p1, p2, out var line);                 // 两点构造直线
+VisionOperator.LineOrientation(line, AngleMode.Signed180, out var a); // 直线角度（-180~180）
+VisionOperator.SegmentLength(seg, out var len);                    // 线段长度
+VisionOperator.SegmentMidpoint(seg, out var mid);                  // 线段中点
+
+if (VisionOperator.IntersectLineLine(l1, l2, out var pt))          // 线线求交
+    Console.WriteLine($"Intersection: ({pt.X}, {pt.Y})");
+
+VisionOperator.ProjectPointToLine(p, line, out var proj);          // 点投影到直线
+VisionOperator.DistancePointToLine2D(p, line, out var dist);       // 点线距
+
+// 3D
+VisionOperator.CreatePlane(p1, p2, p3, out var plane);             // 三点构造平面
+if (VisionOperator.IntersectPlanePlane(p1, p2, out var line3d))    // 平面求交线
+    { /* line3d.Point, line3d.Direction */ }
+VisionOperator.ProjectPointToPlane(pt, plane, out var projPt);     // 点投影到平面
+VisionOperator.DistancePointToPlane3D(pt, plane, out var d);       // 点面距
+VisionOperator.ClosestPointOnLine(pt, line3d, out var closest);     // 点到直线最近点
+
+// ── 统计拟合（VisionOperator.Analysis） ──────────────────────────
+
+if (VisionOperator.FitPointsToCircle2D(pts, out var circle))       // 圆拟合
+    Console.WriteLine($"Center=({circle.Center.X},{circle.Center.Y}) R={circle.Radius}");
+
+if (VisionOperator.FitPointsToLine2D(pts, out var line2d))         // 直线拟合（PCA）
+    Console.WriteLine($"Dir=({line2d.Direction.X},{line2d.Direction.Y})");
+
+if (VisionOperator.FitPointsToPlane(pts, out var plane3d))         // 平面拟合（PCA）
+    Console.WriteLine($"Normal=({plane3d.Normal.X},{plane3d.Normal.Y},{plane3d.Normal.Z})");
+
+if (VisionOperator.FitSphere(pts, out var sphere))                 // 球拟合
+    Console.WriteLine($"Center=({sphere.Center.X},...) R={sphere.Radius}");
+
+// ── 图像处理（VisionOperator.Image） ─────────────────────────────
+
+var thumb = image.GetThumbnail(128, 128);                          // 等比例缩略图
+using (var bmp = VisionOperator.ToBitmap(image))                   // CxImage → Bitmap
+    bmp.Save(@"C:\output.bmp");
+
+using (var src = new Bitmap(@"C:\input.bmp"))                      // Bitmap → CxImage
+{
+    var img = VisionOperator.FromBitmap(src);                      // 自适应像素格式
+    // img.Type == UInt8/Int16, img.Channel == 1/3/4
+}
+
+// ── Surface → Image ─────────────────────────────────────────────
+
+VisionOperator.CreateImageFromSurface(surface, true, out var img);  // Real 浮点（Z = ZOffset+Data×ZScale）
+VisionOperator.CreateImageFromSurface(surface, false, out var img); // Int16 原始高度
 
 // ── 文件 I/O（自动按扩展名分支） ─────────────────────────────────
 
@@ -524,6 +660,15 @@ VisionOperator.DestroyLib();
 | `CxCoordinationTagItem`    | 2D 正交 HUD                        | 鼠标悬停坐标标签                 |
 | `CxTextInfoItem`           | 世界坐标投影                           | 世界锚定文本                   |
 | `CxText2DItem`             | 2D 正交 HUD                        | 屏幕固定文本                   |
+| `CxCoordination2DItem`    | X/Y 箭头 + 标签                      | 2D 坐标系指示器                  |
+| `CxLine2DItem`            | ScottPlot Scatter                  | 2D 无限长直线（自适应视野裁剪）    |
+| `CxSegment2DItem`         | ScottPlot Scatter                  | 2D 线段                       |
+| `CxCircle2DItem`          | ScottPlot Ellipse                  | 2D 圆（可交互缩放半径）           |
+| `CxArc2DItem`             | ScottPlot Ellipse 圆弧               | 2D 圆弧                       |
+| `CxPolygon2DItem`         | ScottPlot Polygon                  | 2D 多边形 / 折线                |
+| `CxRectangle2DItem`       | ScottPlot Rectangle                | 2D 旋转矩形                    |
+| `CxBox2DItem`             | ScottPlot Rectangle                | 2D 轴对齐包围盒                 |
+| `CxPoint2DItem`           | ScottPlot Scatter                  | 2D 离散点集                    |
 
 ---
 

@@ -7,6 +7,7 @@ using System.ComponentModel;
 using System.Data;
 using System.Drawing;
 using System.Drawing.Drawing2D;
+using System.Drawing.Imaging;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices.ComTypes;
@@ -27,6 +28,7 @@ namespace DemoFrom
         public DemoFrom()
         {
             InitializeComponent();
+            Build2DTab(tabPage2D);
             GocatorHandle.GocatorHandle.Instance.Connect("127.0.0.1", false);
             GocatorHandle.GocatorHandle.Instance.SetDataHandler(onData);
             //camera = new CxCamera(openGLControl1);
@@ -39,7 +41,7 @@ namespace DemoFrom
                 return;
             }
             VisionOperator.InitialLib();
-           // cxDisplay1.SetViewUpDirection(new CxVector3D(0, 1, 0));
+            // cxDisplay1.SetViewUpDirection(new CxVector3D(0, 1, 0));
             cxDisplay1.SetCoordinateSystemLeftHanded(true);
             cxDisplay1.Camera.Enable2DView = false;
         }
@@ -185,6 +187,8 @@ namespace DemoFrom
             GocatorHandle.GocatorHandle.Instance.DisConnect();
             cxDisplay1.Dispose();
             cxDisplay2.Dispose();
+            _cxDisplay2D?.Dispose();
+            _currentImage?.Dispose();
             VisionOperator.DestroyLib();
             //  Environment.Exit(0);
         }
@@ -246,6 +250,123 @@ namespace DemoFrom
             //添加Text2D
             var text2d = new CxText2D(new CxPoint2D(10, 50), "2D Labels", 10);
             cxDisplay2.SetText2D(new CxText2D[] { text2d }, Color.Green);
+            cxDisplay2.ActivateAllItems();
+        }
+
+        private void btn_dragMark_Click(object sender, EventArgs e)
+        {
+            cxDisplay2.ResetView();
+
+            // 1. 程序生成平坦参考面（为深度缓冲提供有效值，并触发 FitView）
+            const int W = 50, L = 50;
+            var flatData = new short[W * L]; // 全零 = Z=0
+            var flatSurf = new CxSurface(W, L, flatData, null,
+                xOffset: 0, yOffset: 0, zOffset: 0,
+                xScale: 0.2f, yScale: 0.2f, zScale: 0.001f);
+            cxDisplay2.SetSurface(flatSurf); // 10×10 平面，FitView 自动对齐相机
+
+            // 2. 放置可拖动 MARK 点（位于平面中心 5,5,0）
+            var mark = cxDisplay2.SetPoint(
+                new[] { new CxPoint3D(5.0f, 5.0f, 0f) }, Color.Red, 1f, PointShape.Sphere);
+            mark.IsActiveObj = true;
+            mark.HitThreshold = 2f;
+
+            // 3. 订阅 OnChanged，实时更新坐标标签
+            mark.OnChanged += item =>
+            {
+                var pos = ((CxPoint3DItem)item).Point3Ds[0];
+                lbl_markPos.Text = $"X:{pos.X:F3}  Y:{pos.Y:F3}  Z:{pos.Z:F3}";
+            };
+        }
+
+        private void btn_boxDemo_Click(object sender, EventArgs e)
+        {
+            cxDisplay2.ResetView();
+
+            // 1. 平坦参考面（为深度缓冲提供有效值，触发 FitView）
+            const int W = 60, L = 60;
+            var flatData = new short[W * L];
+            var flatSurf = new CxSurface(W, L, flatData, null,
+                xOffset: 0, yOffset: 0, zOffset: 0,
+                xScale: 0.2f, yScale: 0.2f, zScale: 0.001f);
+            cxDisplay2.SetSurface(flatSurf);  // 12×12 平面
+
+            // 2. 放置可拖拽 Box（位于平面中央）
+            var initBox = new CxBox3D(new CxPoint3D(6.0f, 6.0f, 0.5f), new CxSize3D(4.0f, 3.0f, 1.0f));
+            var box = cxDisplay2.SetBox(new[] { initBox }, Color.FromArgb(80, Color.Cyan));
+            box.IsActiveObj = true;
+            box.HitThreshold = 1f;
+
+            // 3. 实时显示 Box 的 Center 和 Size
+            box.OnChanged += item =>
+            {
+                var b = ((CxBox3DItem)item).Box3Ds[0];
+                lbl_markPos.Text =
+                    $"C({b.Center.X:F2},{b.Center.Y:F2},{b.Center.Z:F2})\n" +
+                    $"W{b.Size.Width:F2} H{b.Size.Height:F2} D{b.Size.Depth:F2}";
+            };
+        }
+
+        private void btn_segDemo_Click(object sender, EventArgs e)
+        {
+            cxDisplay2.ResetView();
+
+            // 参考平面（深度缓冲）
+            const int W = 60, L = 60;
+            var flatSurf = new CxSurface(W, L, new short[W * L], null,
+                xOffset: 0, yOffset: 0, zOffset: 0, xScale: 0.2f, yScale: 0.2f, zScale: 0.001f);
+            cxDisplay2.SetSurface(flatSurf);
+
+            // 放置三条可拖拽线段
+            var seg = cxDisplay2.SetSegment(new[]
+            {
+                new CxSegment3D(new CxPoint3D(2f, 4f, 0f), new CxPoint3D(8f, 4f, 0f)),
+                new CxSegment3D(new CxPoint3D(3f, 7f, 0f), new CxPoint3D(9f, 9f, 0f)),
+            }, Color.Lime, 2f);
+            seg.IsActiveObj = true;
+            seg.HitThreshold = 0.3f;
+
+            seg.OnChanged += item =>
+            {
+                var s = ((CxSegment3DItem)item).Segment3Ds[0];
+                lbl_markPos.Text =
+                    $"S({s.Start.X:F2},{s.Start.Y:F2})\n" +
+                    $"E({s.End.X:F2},{s.End.Y:F2})";
+            };
+        }
+
+        private void btn_polyDemo_Click(object sender, EventArgs e)
+        {
+            cxDisplay2.ResetView();
+
+            // 参考平面（深度缓冲）
+            const int W = 60, L = 60;
+            var flatSurf = new CxSurface(W, L, new short[W * L], null,
+                xOffset: 0, yOffset: 0, zOffset: 0, xScale: 0.2f, yScale: 0.2f, zScale: 0.001f);
+            cxDisplay2.SetSurface(flatSurf);
+
+            // 放置一个矩形多边形（闭合）和一条折线（开放）
+            var rect = new CxPolygon3D(new[]
+            {
+                new CxPoint3D(2f, 3f, 0f), new CxPoint3D(8f, 3f, 0f),
+                new CxPoint3D(8f, 7f, 0f), new CxPoint3D(2f, 7f, 0f),
+            }, isClosed: true);
+            var open = new CxPolygon3D(new[]
+            {
+                new CxPoint3D(3f, 9f, 0f), new CxPoint3D(6f, 10f, 0f), new CxPoint3D(9f, 9f, 0f),
+            }, isClosed: false);
+
+            var poly = cxDisplay2.SetPolygon(new[] { rect, open }, Color.Cyan, 2f);
+            poly.IsActiveObj = true;
+            poly.HitThreshold = 0.3f;
+
+            poly.OnChanged += item =>
+            {
+                var pts = ((CxPolygon3DItem)item).Polygon3Ds[0].Points;
+                lbl_markPos.Text = pts.Length > 0
+                    ? $"V0({pts[0].X:F2},{pts[0].Y:F2})\nV2({pts[2].X:F2},{pts[2].Y:F2})"
+                    : "--";
+            };
         }
 
         private void button1_Click(object sender, EventArgs e)
@@ -362,6 +483,603 @@ namespace DemoFrom
                 _currentMesh = mesh;
                 cxDisplay2.ResetView();
                 cxDisplay2.SetMesh(mesh);
+            }
+        }
+
+        // ── 2D Tab ──────────────────────────────────────────────────────────────────
+
+        private CxDisplay2D _cxDisplay2D;
+        private Label _lbl2DPos;
+        private CxImage _currentImage;
+        private SplitContainer _split2D;
+        private bool _split2DInit;
+
+        private void Build2DTab(TabPage page)
+        {
+            _split2D = new SplitContainer
+            {
+                Dock = DockStyle.Fill,
+                FixedPanel = FixedPanel.Panel2,
+                Panel2MinSize = 146,
+            };
+
+            // Set splitter position once the container has a valid size
+            _split2D.SizeChanged += (s, ev) =>
+            {
+                if (!_split2DInit && _split2D.Width > 200)
+                {
+                    _split2DInit = true;
+                    _split2D.SplitterDistance = Math.Max(_split2D.Width - 150, 100);
+                }
+            };
+
+            _cxDisplay2D = new CxDisplay2D { Dock = DockStyle.Fill };
+            _cxDisplay2D.ShowAxes(true);
+            _cxDisplay2D.SetBackgroundColor(Color.White);
+            _cxDisplay2D.SetAspectLock(false);
+            _cxDisplay2D.CoordinatesChanged += pos =>
+            {
+                var text = $"X:{pos.X:F1}  Y:{pos.Y:F1}";
+                if (_lbl2DPos.InvokeRequired)
+                    _lbl2DPos.Invoke(new Action(() => _lbl2DPos.Text = text));
+                else
+                    _lbl2DPos.Text = text;
+            };
+            _split2D.Panel1.Controls.Add(_cxDisplay2D);
+            // Button panel (built entirely in code)
+            var btnPanel = new Panel { Dock = DockStyle.Fill };
+            int y = 10;
+            Button MakeBtn(string text, EventHandler click)
+            {
+                var b = new Button { Text = text, Location = new Point(7, y), Size = new Size(132, 26) };
+                b.Click += click;
+                btnPanel.Controls.Add(b);
+                y += 33;
+                return b;
+            }
+
+            MakeBtn("Load Image", btn2D_loadImage_Click);
+            MakeBtn("Static Segs", btn2D_staticSeg_Click);
+            MakeBtn("Drag Segs", btn2D_dragSeg_Click);
+            MakeBtn("Static Circles", btn2D_staticCircle_Click);
+            MakeBtn("Drag Circles", btn2D_dragCircle_Click);
+            MakeBtn("Drag 2 Circs", btn2D_drag2Circles_Click);
+            MakeBtn("Static Lines", btn2D_staticLine_Click);
+            MakeBtn("Drag Lines",   btn2D_dragLine_Click);
+            MakeBtn("Static Boxes", btn2D_staticBox_Click);
+            MakeBtn("Drag Box",     btn2D_dragBox_Click);
+            MakeBtn("Drag Polygon", btn2D_dragPolygon_Click);
+            MakeBtn("Static Rect", btn2D_staticRect_Click);
+            MakeBtn("Drag Rect",   btn2D_dragRect_Click);
+            MakeBtn("Arc Demo",    btn2D_arcDemo_Click);
+            MakeBtn("Drag Arc",    btn2D_dragArc_Click);
+            MakeBtn("Drag Fitting", btn2D_dragFitting_Click);
+            MakeBtn("Drag ArcFit", btn2D_dragArcFitting_Click);
+            MakeBtn("Drag PolyFit", btn2D_dragPolyFitting_Click);
+            MakeBtn("Region Demo", btn2D_regionDemo_Click);
+            MakeBtn("Drag CircleFit", btn2D_dragCircleFitting_Click);
+            MakeBtn("Show Coord", btn2D_showCoord_Click);
+            MakeBtn("Clear Overlays", btn2D_clearOverlays_Click);
+            MakeBtn("Clear All", btn2D_clearAll_Click);
+
+            _lbl2DPos = new Label
+            {
+                Font = new Font("Consolas", 8F),
+                Location = new Point(5, y + 8),
+                Size = new Size(140, 48),
+                Text = "X: ---  Y: ---",
+            };
+            btnPanel.Controls.Add(_lbl2DPos);
+            _split2D.Panel2.Controls.Add(btnPanel);
+            page.Controls.Add(_split2D);
+        }
+
+
+        // ── 2D Button Handlers ───────────────────────────────────────────────────────
+
+        private void btn2D_loadImage_Click(object sender, EventArgs e)
+        {
+            using (var dlg = new OpenFileDialog
+            {
+                Filter = "Image files|*.png;*.jpg;*.jpeg;*.bmp;*.tif;*.tiff|All files|*.*"
+            })
+            {
+                if (dlg.ShowDialog() != DialogResult.OK) return;
+                var img = LoadColorImage(dlg.FileName);
+                if (img == null) return;
+                _currentImage?.Dispose();
+                _currentImage = img;
+                _cxDisplay2D.ClearOverlays();
+                _cxDisplay2D.SetImage(img);
+            }
+        }
+
+        private void btn2D_staticSeg_Click(object sender, EventArgs e)
+        {
+            var box = _cxDisplay2D.GetImageWorldRect();
+            float w = box.Size.Width > 0 ? box.Size.Width : 400f;
+            float h = box.Size.Height > 0 ? box.Size.Height : 400f;
+
+            var segs = new[]
+            {
+                new CxSegment2D(new CxPoint2D(w * 0.2f, 0),    new CxPoint2D(w * 0.2f, h)),
+                new CxSegment2D(new CxPoint2D(w * 0.8f, 0),    new CxPoint2D(w * 0.8f, h)),
+                new CxSegment2D(new CxPoint2D(0,         h * 0.5f), new CxPoint2D(w, h * 0.5f)),
+            };
+            _cxDisplay2D.SetSegment(segs, Color.LimeGreen, 1.5f);
+        }
+
+        private void btn2D_dragSeg_Click(object sender, EventArgs e)
+        {
+            var box = _cxDisplay2D.GetImageWorldRect();
+            float cx = box.Size.Width > 0 ? box.Center.X : 200f;
+            float cy = box.Size.Height > 0 ? box.Center.Y : 200f;
+            float len = Math.Max(box.Size.Width > 0 ? box.Size.Width : 400,
+                                  box.Size.Height > 0 ? box.Size.Height : 400) * 0.15f;
+            if (len < 20) len = 60f;
+
+            var segs = new[] { new CxSegment2D(new CxPoint2D(cx - len, cy), new CxPoint2D(cx + len, cy)) };
+            var item = _cxDisplay2D.SetSegment(segs, Color.Yellow, 2f);
+            item.IsActiveObj = true;
+            item.OnChanged += i =>
+            {
+                var seg = ((CxSegment2DItem)i).Segments[0];
+                var text = $"S:({seg.Start.X:F0},{seg.Start.Y:F0})\nE:({seg.End.X:F0},{seg.End.Y:F0})";
+                if (_lbl2DPos.InvokeRequired)
+                    _lbl2DPos.Invoke(new Action(() => _lbl2DPos.Text = text));
+                else
+                    _lbl2DPos.Text = text;
+            };
+        }
+
+        private void btn2D_staticCircle_Click(object sender, EventArgs e)
+        {
+            var box = _cxDisplay2D.GetImageWorldRect();
+            float cx = box.Size.Width > 0 ? box.Center.X : 100;
+            float cy = box.Size.Height > 0 ? box.Center.Y : 100;
+            float minDim = Math.Min(box.Size.Width > 0 ? box.Size.Width : 400,
+                                     box.Size.Height > 0 ? box.Size.Height : 400);
+
+            var circles = new[]
+            {
+                new CxCircle2D(new CxPoint2D(cx, cy), minDim * 0.08f),
+                new CxCircle2D(new CxPoint2D(cx, cy), minDim * 0.18f),
+            };
+            _cxDisplay2D.SetCircle(circles, Color.LightBlue, 1.5f);
+        }
+
+        private void btn2D_dragCircle_Click(object sender, EventArgs e)
+        {
+            var box = _cxDisplay2D.GetImageWorldRect();
+            float cx = box.Size.Width > 0 ? box.Center.X : 100;
+            float cy = box.Size.Height > 0 ? box.Center.Y : 100;
+            float r = Math.Min(box.Size.Width > 0 ? box.Size.Width : 400,
+                                     box.Size.Height > 0 ? box.Size.Height : 400) * 0.1f;
+            if (r < 10) r = 40f;
+
+            var circles = new[] { new CxCircle2D(new CxPoint2D(cx, cy), r) };
+            var item = _cxDisplay2D.SetCircle(circles, Color.Cyan, 2f,true);
+            item.IsActiveObj = true;
+            item.OnChanged += i =>
+            {
+                var c = ((CxCircle2DItem)i).Circles[0];
+                var text = $"C:({c.Center.X:F0},{c.Center.Y:F0})\nR:{c.Radius:F1}";
+                if (_lbl2DPos.InvokeRequired)
+                    _lbl2DPos.Invoke(new Action(() => _lbl2DPos.Text = text));
+                else
+                    _lbl2DPos.Text = text;
+            };
+        }
+
+        private void btn2D_drag2Circles_Click(object sender, EventArgs e)
+        {
+            var box = _cxDisplay2D.GetImageWorldRect();
+            float cx = box.Size.Width > 0 ? box.Center.X : 200f;
+            float cy = box.Size.Height > 0 ? box.Center.Y : 200f;
+            float r = Math.Min(box.Size.Width > 0 ? box.Size.Width : 400,
+                                box.Size.Height > 0 ? box.Size.Height : 400) * 0.08f;
+           // if (r < 10) r = 40f;
+
+            var circles = new[]
+            {
+                new CxCircle2D(new CxPoint2D(cx - r * 2, cy), r),
+                new CxCircle2D(new CxPoint2D(cx + r * 2, cy), r),
+            };
+            var item = _cxDisplay2D.SetCircle(circles, Color.Orange, 2f, filled: true);
+            item.IsActiveObj = true;
+            item.OnChanged += i =>
+            {
+                var cs = ((CxCircle2DItem)i).Circles;
+                var text = $"C1:({cs[0].Center.X:F0},{cs[0].Center.Y:F0})R:{cs[0].Radius:F1}\nC2:({cs[1].Center.X:F0},{cs[1].Center.Y:F0})R:{cs[1].Radius:F1}";
+                if (_lbl2DPos.InvokeRequired)
+                    _lbl2DPos.Invoke(new Action(() => _lbl2DPos.Text = text));
+                else
+                    _lbl2DPos.Text = text;
+            };
+        }
+
+        private void btn2D_staticLine_Click(object sender, EventArgs e)
+        {
+            var box = _cxDisplay2D.GetImageWorldRect();
+            float cx = box.Size.Width > 0 ? box.Center.X : 200f;
+            float cy = box.Size.Height > 0 ? box.Center.Y : 200f;
+
+            var lines = new[]
+            {
+                new CxLine2D(new CxPoint2D(cx, cy), new CxVector2D(1, 0)),
+                new CxLine2D(new CxPoint2D(cx, cy), new CxVector2D(0, 1)),
+                new CxLine2D(new CxPoint2D(cx, cy), new CxVector2D(1, 1)),
+            };
+            _cxDisplay2D.SetLine(lines, Color.OrangeRed, 1.5f);
+        }
+
+        private void btn2D_dragLine_Click(object sender, EventArgs e)
+        {
+            var box = _cxDisplay2D.GetImageWorldRect();
+            float cx = box.Size.Width > 0 ? box.Center.X : 200f;
+            float cy = box.Size.Height > 0 ? box.Center.Y : 200f;
+
+            var lines = new[] { new CxLine2D(new CxPoint2D(cx, cy), new CxVector2D(1, 0.3f)) };
+            var item = _cxDisplay2D.SetLine(lines, Color.Magenta, 2f);
+            item.IsActiveObj = true;
+            item.OnChanged += i =>
+            {
+                var line = ((CxLine2DItem)i).Lines[0];
+                var text = $"P:({line.Point.X:F0},{line.Point.Y:F0})\nD:({line.Direction.X:F2},{line.Direction.Y:F2})";
+                if (_lbl2DPos.InvokeRequired)
+                    _lbl2DPos.Invoke(new Action(() => _lbl2DPos.Text = text));
+                else
+                    _lbl2DPos.Text = text;
+            };
+        }
+
+        private void btn2D_staticBox_Click(object sender, EventArgs e)
+        {
+            var box = _cxDisplay2D.GetImageWorldRect();
+            float cx = box.Size.Width > 0 ? box.Center.X : 200f;
+            float cy = box.Size.Height > 0 ? box.Center.Y : 200f;
+            float minDim = Math.Min(box.Size.Width > 0 ? box.Size.Width : 400,
+                                     box.Size.Height > 0 ? box.Size.Height : 400);
+
+            var boxes = new[]
+            {
+                new CxBox2D(new CxPoint2D(cx, cy), new CxSize2D(minDim * 0.6f, minDim * 0.4f)),
+                new CxBox2D(new CxPoint2D(cx, cy), new CxSize2D(minDim * 0.3f, minDim * 0.3f)),
+            };
+            _cxDisplay2D.SetBox(boxes, Color.YellowGreen, 1.5f);
+        }
+
+        private void btn2D_dragBox_Click(object sender, EventArgs e)
+        {
+            var box = _cxDisplay2D.GetImageWorldRect();
+            float cx = box.Size.Width > 0 ? box.Center.X : 200f;
+            float cy = box.Size.Height > 0 ? box.Center.Y : 200f;
+            float s = Math.Min(box.Size.Width > 0 ? box.Size.Width : 400,
+                                box.Size.Height > 0 ? box.Size.Height : 400) * 0.2f;
+            if (s < 20) s = 80f;
+
+            var boxes = new[] { new CxBox2D(new CxPoint2D(cx, cy), new CxSize2D(s, s)) };
+            var item = _cxDisplay2D.SetBox(boxes, Color.Gold, 2f, filled: false);
+            item.IsActiveObj = true;
+            item.OnChanged += i =>
+            {
+                var b = ((CxBox2DItem)i).Boxes[0];
+                var text = $"C:({b.Center.X:F0},{b.Center.Y:F0})\nS:({b.Size.Width:F0}×{b.Size.Height:F0})";
+                if (_lbl2DPos.InvokeRequired)
+                    _lbl2DPos.Invoke(new Action(() => _lbl2DPos.Text = text));
+                else
+                    _lbl2DPos.Text = text;
+            };
+        }
+
+        private void btn2D_dragPolygon_Click(object sender, EventArgs e)
+        {
+            var box = _cxDisplay2D.GetImageWorldRect();
+            float cx = box.Size.Width > 0 ? box.Center.X : 200f;
+            float cy = box.Size.Height > 0 ? box.Center.Y : 200f;
+            float s = Math.Min(box.Size.Width > 0 ? box.Size.Width : 400,
+                                box.Size.Height > 0 ? box.Size.Height : 400) * 0.12f;
+            if (s < 20) s = 80f;
+
+            var tri = new CxPolygon2D(new[]
+            {
+                new CxPoint2D(cx, cy - s),
+                new CxPoint2D(cx - s * 0.866f, cy + s * 0.5f),
+                new CxPoint2D(cx + s * 0.866f, cy + s * 0.5f),
+            }, isClosed: true);
+
+            var open = new CxPolygon2D(new[]
+            {
+                new CxPoint2D(cx - s * 1.8f, cy),
+                new CxPoint2D(cx, cy - s * 0.8f),
+                new CxPoint2D(cx + s * 1.8f, cy),
+            }, isClosed: false);
+
+            var item = _cxDisplay2D.SetPolygon(new[] { tri, open }, Color.DeepSkyBlue, 2f, filled: true);
+            item.IsActiveObj = true;
+            item.OnChanged += i =>
+            {
+                var pts = ((CxPolygon2DItem)i).Polygons[0].Points;
+                var text = pts.Length > 0
+                    ? $"V0:({pts[0].X:F0},{pts[0].Y:F0})\nV1:({pts[1].X:F0},{pts[1].Y:F0})"
+                    : "--";
+                if (_lbl2DPos.InvokeRequired)
+                    _lbl2DPos.Invoke(new Action(() => _lbl2DPos.Text = text));
+                else
+                    _lbl2DPos.Text = text;
+            };
+        }
+
+        private void btn2D_staticRect_Click(object sender, EventArgs e)
+        {
+            _cxDisplay2D.ClearOverlays();
+            var rects = new[]
+            {
+                new CxRectangle2D(new CxPoint2D(200, 200), new CxSize2D(120, 80), 0f),
+                new CxRectangle2D(new CxPoint2D(400, 300), new CxSize2D(100, 60), 30f),
+                new CxRectangle2D(new CxPoint2D(600, 200), new CxSize2D(140, 90), -45f),
+            };
+            _cxDisplay2D.SetRectangle(rects, Color.Coral, 2f, filled: false);
+            _cxDisplay2D.DeactivateAllItems();
+        }
+
+        private void btn2D_dragRect_Click(object sender, EventArgs e)
+        {
+            _cxDisplay2D.ClearOverlays();
+            var initRect = new CxRectangle2D(new CxPoint2D(400, 300), new CxSize2D(200, 120), 15f);
+            var item = _cxDisplay2D.SetRectangle(new[] { initRect }, Color.Gold, 2f, filled: false);
+            item.IsActiveObj = true;
+            item.OnChanged += i =>
+            {
+                var r = ((CxRectangle2DItem)i).Rectangles[0];
+                var text = $"C:({r.Center.X:F0},{r.Center.Y:F0}) A:{r.Angle:F1}";
+                if (_lbl2DPos.InvokeRequired)
+                    _lbl2DPos.Invoke(new Action(() => _lbl2DPos.Text = text));
+                else
+                    _lbl2DPos.Text = text;
+            };
+        }
+
+        private void btn2D_arcDemo_Click(object sender, EventArgs e)
+        {
+            _cxDisplay2D.ClearOverlays();
+            var arcs = new[]
+            {
+                new CxArc2D(new CxPoint2D(200, 200), 80, 0f, 90f),
+                new CxArc2D(new CxPoint2D(400, 200), 60, 45f, 180f),
+                new CxArc2D(new CxPoint2D(600, 200), 100, -30f, 270f),
+            };
+            _cxDisplay2D.SetArc(arcs, Color.Cyan, 2f);
+            _cxDisplay2D.DeactivateAllItems();
+        }
+
+        private void btn2D_dragArc_Click(object sender, EventArgs e)
+        {
+            _cxDisplay2D.ClearOverlays();
+            var box = _cxDisplay2D.GetImageWorldRect();
+            float cx = box.Size.Width > 0 ? box.Center.X : 200f;
+            float cy = box.Size.Height > 0 ? box.Center.Y : 200f;
+            float r = Math.Max(box.Size.Width > 0 ? box.Size.Width : 400,
+                                box.Size.Height > 0 ? box.Size.Height : 400) * 0.15f;
+            if (r < 20) r = 80f;
+            var initArc = new CxArc2D(new CxPoint2D(cx, cy), r, 0f, 90f);
+            var item = _cxDisplay2D.SetArc(new[] { initArc }, Color.Orange, 2f);
+            item.IsActiveObj = true;
+            item.OnChanged += i =>
+            {
+                var a = ((CxArc2DItem)i).Arcs[0];
+                var text = $"R:{a.Radius:F0} S:{a.StartAngle:F0} W:{a.SweepAngle:F0}";
+                if (_lbl2DPos.InvokeRequired)
+                    _lbl2DPos.Invoke(new Action(() => _lbl2DPos.Text = text));
+                else
+                    _lbl2DPos.Text = text;
+            };
+        }
+
+        private void btn2D_dragFitting_Click(object sender, EventArgs e)
+        {
+            _cxDisplay2D.ClearOverlays();
+            var box = _cxDisplay2D.GetImageWorldRect();
+            float cx = box.Size.Width > 0 ? box.Center.X : 200f;
+            float cy = box.Size.Height > 0 ? box.Center.Y : 200f;
+            float len = Math.Max(box.Size.Width > 0 ? box.Size.Width : 400,
+                                  box.Size.Height > 0 ? box.Size.Height : 400) * 0.15f;
+            if (len < 20) len = 60f;
+
+            var field = new CxSegment2DFittingField(
+                new CxSegment2D(new CxPoint2D(cx - len, cy), new CxPoint2D(cx + len, cy)),
+                40f);
+            var item = _cxDisplay2D.SetSegmentFittingField(new[] { field }, Color.Yellow, 2f);
+            item.IsActiveObj = true;
+            item.OnChanged += i =>
+            {
+                var f = ((CxSegment2DFittingFieldItem)i).Fields[0];
+                var text = $"S:({f.Axis.Start.X:F0},{f.Axis.Start.Y:F0}) E:({f.Axis.End.X:F0},{f.Axis.End.Y:F0}) W:{f.Width:F0}";
+                if (_lbl2DPos.InvokeRequired)
+                    _lbl2DPos.Invoke(new Action(() => _lbl2DPos.Text = text));
+                else
+                    _lbl2DPos.Text = text;
+            };
+        }
+
+        private void btn2D_dragArcFitting_Click(object sender, EventArgs e)
+        {
+            _cxDisplay2D.ClearOverlays();
+            var box = _cxDisplay2D.GetImageWorldRect();
+            float cx = box.Size.Width > 0 ? box.Center.X : 200f;
+            float cy = box.Size.Height > 0 ? box.Center.Y : 200f;
+            float r = Math.Max(box.Size.Width > 0 ? box.Size.Width : 400,
+                               box.Size.Height > 0 ? box.Size.Height : 400) * 0.12f;
+            if (r < 30) r = 80f;
+
+            var field = new CxArc2DFittingField(
+                new CxArc2D(new CxPoint2D(cx, cy), r, 0f, 90f), 40f);
+            var item = _cxDisplay2D.SetArcFittingField(new[] { field }, Color.Yellow, 2f);
+            item.IsActiveObj = true;
+            item.OnChanged += i =>
+            {
+                var f = ((CxArc2DFittingFieldItem)i).Fields[0];
+                var a = f.Axis;
+                var text = $"C:({a.Center.X:F0},{a.Center.Y:F0}) R:{a.Radius:F0} S:{a.StartAngle:F0} W:{a.SweepAngle:F0} BW:{f.Width:F0}";
+                if (_lbl2DPos.InvokeRequired)
+                    _lbl2DPos.Invoke(new Action(() => _lbl2DPos.Text = text));
+                else
+                    _lbl2DPos.Text = text;
+            };
+        }
+
+        private void btn2D_dragPolyFitting_Click(object sender, EventArgs e)
+        {
+            _cxDisplay2D.ClearOverlays();
+            var box = _cxDisplay2D.GetImageWorldRect();
+            float cx = box.Size.Width > 0 ? box.Center.X : 200f;
+            float cy = box.Size.Height > 0 ? box.Center.Y : 200f;
+            float r = Math.Max(box.Size.Width > 0 ? box.Size.Width : 400,
+                               box.Size.Height > 0 ? box.Size.Height : 400) * 0.15f;
+            if (r < 30) r = 60f;
+
+            var line = new CxPoint2D[]
+            {
+                new CxPoint2D(cx - r, cy - r * 0.3f),
+                new CxPoint2D(cx,     cy + r * 0.4f),
+                new CxPoint2D(cx + r, cy - r * 0.3f),
+            };
+            var field = new CxPolygon2DFittingField(new CxPolygon2D(line, false), 30f);
+            var item = _cxDisplay2D.SetPolygonFittingField(new[] { field }, Color.Yellow, 2f);
+            item.IsActiveObj = true;
+            item.OnChanged += i =>
+            {
+                var f = ((CxPolygon2DFittingFieldItem)i).Fields[0];
+                var text = $"N:{f.Axis.Points?.Length ?? 0} W:{f.Width:F0}";
+                if (_lbl2DPos.InvokeRequired)
+                    _lbl2DPos.Invoke(new Action(() => _lbl2DPos.Text = text));
+                else
+                    _lbl2DPos.Text = text;
+            };
+        }
+
+        private void btn2D_dragCircleFitting_Click(object sender, EventArgs e)
+        {
+            _cxDisplay2D.ClearOverlays();
+            var box = _cxDisplay2D.GetImageWorldRect();
+            float cx = box.Size.Width > 0 ? box.Center.X : 200f;
+            float cy = box.Size.Height > 0 ? box.Center.Y : 200f;
+            float r = Math.Max(box.Size.Width > 0 ? box.Size.Width : 400,
+                               box.Size.Height > 0 ? box.Size.Height : 400) * 0.1f;
+            if (r < 30) r = 50f;
+
+            var field = new CxCircle2DFittingField(new CxCircle2D(new CxPoint2D(cx, cy), r), 30f);
+            var item = _cxDisplay2D.SetCircleFittingField(new[] { field }, Color.Yellow, 2f);
+            item.IsActiveObj = true;
+            item.OnChanged += i =>
+            {
+                var f = ((CxCircle2DFittingFieldItem)i).Fields[0];
+                var c = f.Axis;
+                var text = $"C:({c.Center.X:F0},{c.Center.Y:F0}) R:{c.Radius:F0} W:{f.Width:F0}";
+                if (_lbl2DPos.InvokeRequired)
+                    _lbl2DPos.Invoke(new Action(() => _lbl2DPos.Text = text));
+                else
+                    _lbl2DPos.Text = text;
+            };
+        }
+
+        private void btn2D_regionDemo_Click(object sender, EventArgs e)
+        {
+            _cxDisplay2D.ClearOverlays();
+
+            var pts = new CxPoint2D[]
+            {
+                new CxPoint2D(100, 20),
+                new CxPoint2D(180, 60),
+                new CxPoint2D(180, 140),
+                new CxPoint2D(100, 180),
+                new CxPoint2D(20, 140),
+                new CxPoint2D(20, 60),
+            };
+            var poly = new CxPolygon2D(pts, true);
+            VisionOperator.PolygonToRegion2D(poly, 200, 200, out var region);
+
+            // Also create a second region via union with a smaller shifted shape
+            var pts2 = new CxPoint2D[]
+            {
+                new CxPoint2D(70, 70),
+                new CxPoint2D(130, 70),
+                new CxPoint2D(130, 130),
+                new CxPoint2D(70, 130),
+            };
+            var poly2 = new CxPolygon2D(pts2, true);
+            VisionOperator.PolygonToRegion2D(poly2, 200, 200, out var region2);
+            VisionOperator.SubtractRegion2D(region, region2, out var regionDiff);
+
+            var item = _cxDisplay2D.SetRegion(new[] { region, region2, regionDiff }, Color.Yellow, 2f);
+            item.IsActiveObj = true;
+            item.OnChanged += i =>
+            {
+                var r = ((CxRegion2DItem)i).Regions[0];
+                var text = $"Area:{r.Area} Runs:{r.Runs?.Length ?? 0}";
+                if (_lbl2DPos.InvokeRequired)
+                    _lbl2DPos.Invoke(new Action(() => _lbl2DPos.Text = text));
+                else
+                    _lbl2DPos.Text = text;
+            };
+        }
+
+        private void btn2D_showCoord_Click(object sender, EventArgs e)
+        {
+            _cxDisplay2D.ClearOverlays();
+            var box = _cxDisplay2D.GetImageWorldRect();
+            float cx = box.Size.Width > 0 ? box.Center.X : 200f;
+            float cy = box.Size.Height > 0 ? box.Center.Y : 200f;
+            float r = Math.Max(box.Size.Width > 0 ? box.Size.Width : 400,
+                               box.Size.Height > 0 ? box.Size.Height : 400) * 0.12f;
+            if (r < 40) r = 60f;
+
+            var frames = new[]
+            {
+                new CxCoordination2D(new CxPoint2D(cx, cy), new CxPoint2D(r, r * 0.65f), 0f),
+                new CxCoordination2D(new CxPoint2D(cx + r * 0.9f, cy + r * 0.4f), new CxPoint2D(r * 0.65f, r * 0.4f), -30f),
+            };
+            _cxDisplay2D.SetCoordination(frames,10,10, 2f);
+        }
+
+        private void btn2D_clearOverlays_Click(object sender, EventArgs e) =>
+            _cxDisplay2D.ClearOverlays();
+
+        private void btn2D_clearAll_Click(object sender, EventArgs e)
+        {
+            _cxDisplay2D.ClearOverlays();
+            _cxDisplay2D.ClearImage();
+            _currentImage?.Dispose();
+            _currentImage = null;
+            _lbl2DPos.Text = "X: ---  Y: ---";
+        }
+
+        // ── Image Loading Helper ─────────────────────────────────────────────────────
+
+        private CxImage LoadColorImage(string path)
+        {
+            try
+            {
+                _cxDisplay2D.ResetView();
+                 _cxDisplay2D.SetScaleAndOffset(new CxPoint3D(1f, 1f, 1f), new CxPoint3D(-40f,-80f,0));
+                _cxDisplay2D.ShowAxes(true);
+                _cxDisplay2D.SetBackgroundColor(Color.White);
+                _cxDisplay2D.SetAspectLock(false);
+                using (var bmp = new Bitmap(path))
+                {
+                    // 4-channel BGRA (matches Format32bppArgb memory layout)
+                    var lockRect = new Rectangle(0, 0, bmp.Width, bmp.Height);
+                    var bd = bmp.LockBits(lockRect, ImageLockMode.ReadOnly, PixelFormat.Format32bppArgb);
+                    var img = new CxImage();
+                    img.SetData(bmp.Width, bmp.Height, bd.Scan0, PlainType.UInt8, 4);
+                    bmp.UnlockBits(bd);
+                    return img;
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"图片加载失败: {ex.Message}", "Load Image");
+                return null;
             }
         }
     }

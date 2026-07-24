@@ -32,11 +32,16 @@
     <DefineConstants>TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="OpenCL.Net">
       <HintPath>..\..\3rd\OpenCL.Net.dll</HintPath>
     </Reference>
+    <Reference Include="OpenCvSharp">
+      <HintPath>..\..\3rd\OpenCvSharp.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Drawing" />
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Numerics" />
@@ -56,14 +61,28 @@
     <Compile Include="DataType\Geometry3D\CxSphere.cs" />
     <Compile Include="DataType\Geometry3D\CxCircle3D.cs" />
     <Compile Include="DataType\Geometry3D\CxSegment3D.cs" />
+    <Compile Include="DataType\Geometry3D\CxLine3D.cs" />
     <Compile Include="DataType\Geometry3D\CxPolygon3D.cs" />
     <Compile Include="DataType\Geometry3D\CxCoordination3D.cs" />
     <Compile Include="DataType\Geometry3D\CxTextInfo.cs" />
+    <Compile Include="DataType\Geometry2D\CxCoordination2D.cs" />
+    <Compile Include="DataType\Geometry2D\CxMatrix3X3.cs" />
     <Compile Include="DataType\Geometry2D\CxPoint2D.cs" />
+    <Compile Include="DataType\Geometry2D\CxVector2D.cs" />
     <Compile Include="DataType\Geometry2D\CxSegment2D.cs" />
     <Compile Include="DataType\Geometry2D\CxPolygon2D.cs" />
     <Compile Include="DataType\Geometry2D\CxCircle2D.cs" />
+    <Compile Include="DataType\Geometry2D\CxSize2D.cs" />
+    <Compile Include="DataType\Geometry2D\CxBox2D.cs" />
     <Compile Include="DataType\Geometry2D\CxText2D.cs" />
+    <Compile Include="DataType\Geometry2D\CxLine2D.cs" />
+    <Compile Include="DataType\Geometry2D\CxArc2D.cs" />
+    <Compile Include="DataType\Geometry2D\CxRectangle2D.cs" />
+    <Compile Include="DataType\Geometry2D\CxSegment2DFittingField.cs" />
+    <Compile Include="DataType\Geometry2D\CxArc2DFittingField.cs" />
+    <Compile Include="DataType\Geometry2D\CxPolygon2DFittingField.cs" />
+    <Compile Include="DataType\Geometry2D\CxRegion2D.cs" />
+    <Compile Include="DataType\Geometry2D\CxCircle2DFittingField.cs" />
     <Compile Include="DataType\Models\CxSurface.cs" />
     <Compile Include="DataType\Models\CxPointCloud.cs" />
     <Compile Include="DataType\Models\CxMesh.cs" />
@@ -80,13 +99,17 @@
     <Compile Include="Filter\VisionOperator.Filter.cs" />
     <Compile Include="Filter\VisionOperator.Clip.cs" />
     <Compile Include="Transform\VisionOperator.Transform.cs" />
+    <Compile Include="Transform\VisionOperator.Transform.2D.cs" />
+    <Compile Include="Transform\VisionOperator.Transform.3D.cs" />
     <Compile Include="Surface\VisionOperator.Surface.cs" />
     <Compile Include="Analysis\VisionOperator.Analysis.cs" />
     <Compile Include="Geometry\VisionOperator.Geometry.cs" />
+    <Compile Include="Geometry\VisionOperator.Region.cs" />
     <Compile Include="Feature\VisionOperator.Feature.cs" />
     <Compile Include="Segmentation\VisionOperator.Segmentation.cs" />
     <Compile Include="Detection\VisionOperator.Detection.cs" />
     <Compile Include="IO\VisionOperator.IO.cs" />
+    <Compile Include="Image\VisionOperator.Image.cs" />
     <Compile Include="VisionOperator.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>

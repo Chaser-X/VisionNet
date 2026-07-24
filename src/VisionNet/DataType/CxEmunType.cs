@@ -25,4 +25,29 @@ namespace VisionNet.DataType
         /// <summary>Keep the lowest Z value in each cell.</summary>
         Min = 1,
     }
+
+    /// <summary>Pixel element data type for <see cref="CxImage"/>.</summary>
+    public enum PlainType
+    {
+        /// <summary>Unsigned 8-bit integer — 1 byte per element.</summary>
+        UInt8 = 0,
+
+        /// <summary>Signed 16-bit integer — 2 bytes per element.</summary>
+        Int16 = 1,
+
+        /// <summary>Signed 32-bit integer — 4 bytes per element.</summary>
+        Int32 = 2,
+
+        /// <summary>Single-precision floating-point — 4 bytes per element.</summary>
+        Real  = 3,
+    }
+
+    /// <summary>Angle range mode for orientation queries.</summary>
+    public enum AngleMode
+    {
+        /// <summary>Angle in the range (−180, 180] degrees.</summary>
+        Signed180 = 0,
+        /// <summary>Angle in the range [0, 360) degrees.</summary>
+        Unsigned360 = 1,
+    }
 }

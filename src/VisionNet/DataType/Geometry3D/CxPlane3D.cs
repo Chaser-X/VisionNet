@@ -13,5 +13,11 @@ namespace VisionNet.DataType
 
         /// <summary>Initializes a plane with the given point and normal.</summary>
         public CxPlane3D(CxPoint3D point, CxVector3D normal) { Point = point; Normal = normal; }
+        /// <summary>Initializes a plane with the given AX + BY + CZ + D = 0.</summary>
+        public CxPlane3D(float a, float b, float c, float d)
+        {
+            Normal = new CxVector3D(a, b, c).Normalize();
+            Point = new CxPoint3D(-d * Normal.X, -d * Normal.Y, -d * Normal.Z);
+        }
     }
 }
