@@ -14,7 +14,7 @@ namespace VisionNet.Controls
     /// a low-resolution global thumbnail and a sharp full-resolution viewport tile.
     /// The viewport tile is cropped from the original at full resolution when zoomed in.
     /// </summary>
-    public class CxImageItemAdvance : I2DRenderItem
+    public class CxImageItemAdvance : Abstract2DImageRenderItem
     {
         private const int GlobalMaxSize = 1024;
 
@@ -34,13 +34,17 @@ namespace VisionNet.Controls
         private bool _hasDetail;
         private int _lastL, _lastR, _lastT, _lastB;
 
-        Color I2DRenderItem.Color { get => Color.White; set { } }
-        float I2DRenderItem.Size { get => 1f; set { } }
+        // Cached single-channel data for Z-coordinate query (zero-copy reference)
+        private Array _imageData;
+        private PlainType _imageType;
+
+        //Color Color { get => Color.White; set { } }
+        //float Size { get => 1f; set { } }
 
         public int Width => _imgW;
         public int Height => _imgH;
 
-        public void SetImage(CxImage image)
+        public override void SetImage(CxImage image)
         {
             if (image == null || image.Data == null) return;
 
@@ -51,6 +55,9 @@ namespace VisionNet.Controls
             _globalThumb = image.Width > GlobalMaxSize || image.Height > GlobalMaxSize
                 ? VisionOperator.ResizeImage(image, GlobalMaxSize, GlobalMaxSize)
                 : image;
+
+            _imageData = image.Channel == 1 ? image.Data : null;
+            _imageType = image.Type;
 
             _globalScottImage = CxImageToScottImage(_globalThumb);
 
@@ -67,7 +74,7 @@ namespace VisionNet.Controls
             }
         }
 
-        public void AddToPlot(Plot plot)
+        public override void AddToPlot(Plot plot)
         {
             _plot = plot;
             if (_globalScottImage != null)
@@ -80,7 +87,7 @@ namespace VisionNet.Controls
             }
         }
 
-        public void RemoveFromPlot(Plot plot)
+        public override void RemoveFromPlot(Plot plot)
         {
             if (_globalPlot != null) { plot.PlottableList.Remove(_globalPlot); _globalPlot = null; }
             if (_detailPlot != null) { plot.PlottableList.Remove(_detailPlot); _detailPlot = null; }
@@ -88,12 +95,12 @@ namespace VisionNet.Controls
             _hasDetail = false;
         }
 
-        public void UpdatePlottable()
+        public override void UpdatePlottable()
         {
             RefreshViewport();
         }
 
-        public void Dispose()
+        public override void Dispose()
         {
             _original = null;
             _globalThumb = null;
@@ -103,10 +110,11 @@ namespace VisionNet.Controls
             _detailPlot = null;
             _plot = null;
             _hasDetail = false;
+            _imageData = null;
         }
 
         /// <summary>Repositions the image plottable to the given world-space rectangle.</summary>
-        public void UpdateWorldRect(CxBox2D rect)
+        public override void UpdateWorldRect(CxBox2D rect)
         {
             _worldRect = rect;
             if (_globalPlot != null)
@@ -214,6 +222,23 @@ namespace VisionNet.Controls
                 bmp.Save(ms, System.Drawing.Imaging.ImageFormat.Png);
                 return new ScottPlot.Image(ms.ToArray());
             }
+        }
+
+        /// <summary>Returns the raw pixel value at image coordinate (x, y) as float, or null if out of range.</summary>
+        public override float? GetPixelFloat(int x, int y)
+        {
+            if (_imageData == null || x < 0 || x >= _imgW || y < 0 || y >= _imgH)
+                return null;
+            int idx = y * _imgW + x;
+            var item = _imageData.GetValue(idx);
+            switch (_imageType)
+            {
+                case PlainType.UInt8: return (byte)item;
+                case PlainType.Int16: return (short)item;
+                case PlainType.Int32: return (int)item;
+                case PlainType.Real: return (float)item;
+            }
+            return null;
         }
     }
 }

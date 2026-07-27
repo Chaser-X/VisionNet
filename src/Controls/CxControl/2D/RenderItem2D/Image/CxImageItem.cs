@@ -14,7 +14,7 @@ namespace VisionNet.Controls
     /// Renders a <see cref="CxImage"/> as a ScottPlot <c>ImageRect</c> plottable.
     /// This item is non-interactive; it always occupies the background layer (index 0).
     /// </summary>
-    public class CxImageItem : I2DRenderItem
+    public class CxImageItem : Abstract2DImageRenderItem
     {
         private ScottPlot.Plottables.ImageRect _plottable;
         private ScottPlot.Plot _plot;
@@ -26,8 +26,8 @@ namespace VisionNet.Controls
         private Array _imageData;
         private PlainType _imageType;
 
-        Color I2DRenderItem.Color { get => Color.White; set { } }
-        float I2DRenderItem.Size { get => 1f; set { } }
+        //Color Color { get => Color.White; set { } }
+        //float Size { get => 1f; set { } }
 
         /// <summary>Gets the image width in pixels.</summary>
         public int Width => _width;
@@ -38,7 +38,7 @@ namespace VisionNet.Controls
         // ── I2DRenderItem ─────────────────────────────────────────────────────────
 
         /// <summary>Sets the image to render.</summary>
-        public void SetImage(CxImage image)
+        public override void SetImage(CxImage image)
         {
             if (image == null || image.Data == null) return;
 
@@ -71,7 +71,7 @@ namespace VisionNet.Controls
         private ScottPlot.Image _pendingImage;
 
         /// <inheritdoc/>
-        public void AddToPlot(Plot plot)
+        public override void AddToPlot(Plot plot)
         {
             _plot = plot;
             if (_pendingImage != null)
@@ -84,17 +84,17 @@ namespace VisionNet.Controls
         }
 
         /// <inheritdoc/>
-        public void RemoveFromPlot(Plot plot)
+        public override void RemoveFromPlot(Plot plot)
         {
             if (_plottable != null) { plot.PlottableList.Remove(_plottable); _plottable = null; }
             _plot = null;
         }
 
         /// <inheritdoc/>
-        public void UpdatePlottable() { }
+        public override void UpdatePlottable() { }
 
         /// <inheritdoc/>
-        public void Dispose()
+        public override void Dispose()
         {
             _pendingImage = null;
             _plottable = null;
@@ -103,14 +103,14 @@ namespace VisionNet.Controls
         }
 
         /// <summary>Repositions the image plottable to the given world-space rectangle.</summary>
-        public void UpdateWorldRect(CxBox2D rect)
+        public override void UpdateWorldRect(CxBox2D rect)
         {
             if (_plottable != null)
                 _plottable.Rect = new ScottPlot.CoordinateRect(rect.Left, rect.Right, rect.Bottom, rect.Top);
         }
 
         /// <summary>Returns the raw pixel value at image coordinate (x, y) as float, or null if out of range.</summary>
-        public float? GetPixelFloat(int x, int y)
+        public override float? GetPixelFloat(int x, int y)
         {
             if (_imageData == null || x < 0 || x >= _width || y < 0 || y >= _height)
                 return null;

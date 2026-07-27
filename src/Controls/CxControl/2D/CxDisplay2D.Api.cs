@@ -122,17 +122,17 @@ namespace VisionNet.Controls
         {
             if (image == null) { ClearImage(); return; }
 
-            if (_advImageItem == null)
+            if (_imageItem == null)
             {
-                _advImageItem = new CxImageItemAdvance();
-                _advImageItem.AddToPlot(_formsPlot.Plot);
+                _imageItem = new CxImageItemAdvance();
+                _imageItem.AddToPlot(_formsPlot.Plot);
             }
 
-            _advImageItem.SetImage(image);
+            _imageItem.SetImage(image);
             _imageWidth = image.Width;
             _imageHeight = image.Height;
 
-            _advImageItem.UpdateWorldRect(GetImageWorldRect());
+            _imageItem.UpdateWorldRect(GetImageWorldRect());
             if (_displayMode != DisplayMode.None)
                 FitImage1to1();
             else
@@ -147,12 +147,6 @@ namespace VisionNet.Controls
                 _imageItem.RemoveFromPlot(_formsPlot.Plot);
                 _imageItem.Dispose();
                 _imageItem = null;
-            }
-            if (_advImageItem != null)
-            {
-                _advImageItem.RemoveFromPlot(_formsPlot.Plot);
-                _advImageItem.Dispose();
-                _advImageItem = null;
             }
             _imageWidth = 0;
             _imageHeight = 0;

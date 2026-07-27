@@ -27,4 +27,20 @@ namespace VisionNet.Controls
         void UpdatePlottable();
     }
 
+
+    public abstract class Abstract2DImageRenderItem : I2DRenderItem
+    {
+        public virtual Color Color { get; set; }
+        public virtual float Size { get; set; }
+
+        public virtual void AddToPlot(Plot plot) { }
+        public virtual void Dispose() { }
+        public virtual void RemoveFromPlot(Plot plot) { }
+        public virtual void UpdatePlottable() { }
+        public virtual void UpdateWorldRect(CxBox2D rect) { }
+
+        public virtual void SetImage(CxImage image) { }
+
+        public virtual float? GetPixelFloat(int x, int y) { return float.NegativeInfinity; }
+    }
 }

@@ -48,8 +48,7 @@ namespace VisionNet.Controls
         internal readonly FormsPlot _formsPlot;
 
         // ── Image layer ───────────────────────────────────────────────────────────
-        private CxImageItem _imageItem;
-        private CxImageItemAdvance _advImageItem;
+        private Abstract2DImageRenderItem _imageItem;
         private int _imageWidth;
         private int _imageHeight;
 
