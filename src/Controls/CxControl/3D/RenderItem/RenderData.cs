@@ -48,6 +48,13 @@ namespace VisionNet.Controls
         public bool UseVAO { get; set; }
 
         /// <summary>
+        /// Per-vertex difference values as <c>float[n]</c> (one per vertex), or <c>null</c>
+        /// when the shader path is not using differential coloring.
+        /// When set, <see cref="CxDisplay"/> creates an additional VBO at attribute location 2.
+        /// </summary>
+        public float[] DiffValues { get; set; }
+
+        /// <summary>
         /// Named uniform values passed to the shader each frame.
         /// Supported value types: <see cref="float"/>, <see cref="int"/>.
         /// </summary>

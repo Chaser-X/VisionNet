@@ -21,5 +21,8 @@ namespace VisionNet.Controls
 
         /// <summary>Colour blends height-based colour with per-vertex intensity.</summary>
         ColorWithIntensity,
+
+        /// <summary>Colour is derived from the per-vertex difference value using the rainbow colour map.</summary>
+        Diff,
     }
 }

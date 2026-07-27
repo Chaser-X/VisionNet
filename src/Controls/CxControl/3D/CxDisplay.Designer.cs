@@ -21,6 +21,7 @@ namespace VisionNet.Controls
         private ToolStripMenuItem colorMapToolStripMenuItem;
         private ToolStripMenuItem itensityToolStripMenuItem;
         private ToolStripMenuItem colorWithIntensityToolStripMenuItem;
+        private ToolStripMenuItem diffToolStripMenuItem;
         private ToolStripMenuItem d2DToolStripMenuItem;
 
         // ── Dispose ──────────────────────────────────────────────────────────────
@@ -71,6 +72,7 @@ namespace VisionNet.Controls
             this.colorMapToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.itensityToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.colorWithIntensityToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.diffToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.menu_right.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this)).BeginInit();
             this.SuspendLayout();
@@ -149,7 +151,8 @@ namespace VisionNet.Controls
             this.surfaceColorModeToolStripMenuItem.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
                 this.colorMapToolStripMenuItem,
                 this.itensityToolStripMenuItem,
-                this.colorWithIntensityToolStripMenuItem});
+                this.colorWithIntensityToolStripMenuItem,
+                this.diffToolStripMenuItem});
             this.surfaceColorModeToolStripMenuItem.Name = "surfaceColorModeToolStripMenuItem";
             this.surfaceColorModeToolStripMenuItem.Size = new System.Drawing.Size(186, 22);
             this.surfaceColorModeToolStripMenuItem.Text = "SurfaceColorMode";
@@ -168,6 +171,11 @@ namespace VisionNet.Controls
             this.colorWithIntensityToolStripMenuItem.Size = new System.Drawing.Size(182, 22);
             this.colorWithIntensityToolStripMenuItem.Text = "ColorWithIntensity";
             this.colorWithIntensityToolStripMenuItem.Click += new System.EventHandler(this.toolStripMenuItem_SurfaceColorModeClick);
+
+            this.diffToolStripMenuItem.Name = "diffToolStripMenuItem";
+            this.diffToolStripMenuItem.Size = new System.Drawing.Size(182, 22);
+            this.diffToolStripMenuItem.Text = "Diff";
+            this.diffToolStripMenuItem.Click += new System.EventHandler(this.toolStripMenuItem_SurfaceColorModeClick);
 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.BackColor = System.Drawing.SystemColors.ActiveCaptionText;

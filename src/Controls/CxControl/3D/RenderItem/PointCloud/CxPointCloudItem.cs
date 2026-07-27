@@ -34,6 +34,7 @@ namespace VisionNet.Controls
             get => _surfaceColorMode;
             set
             {
+                if (value == SurfaceColorMode.Diff) value = SurfaceColorMode.Color;
                 if (_surfaceColorMode != value)
                 {
                     _surfaceColorMode = value;
