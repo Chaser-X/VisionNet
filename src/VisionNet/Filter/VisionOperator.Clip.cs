@@ -290,6 +290,72 @@ namespace VisionNet
         }
 
         /// <summary>
+        /// Crops a <see cref="CxImage"/> to the region defined by an axis-aligned box.
+        /// Returns a new image whose dimensions equal the cropped region size.
+        /// </summary>
+        /// <param name="image">Source image.</param>
+        /// <param name="box">Clipping box in pixel coordinates.</param>
+        /// <param name="fillValue">Value to fill for out-of-bounds pixels (unused when box is within image bounds).</param>
+        /// <returns>A new <see cref="CxImage"/> with the same pixel type and channel count, or null on invalid input.</returns>
+        public static CxImage ClipImage(CxImage image, CxBox2D box, float fillValue)
+        {
+            if (image == null || image.Data == null) return null;
+
+            int w = image.Width, h = image.Height, ch = image.Channel;
+            int left   = Math.Max(0, (int)Math.Round(box.Left));
+            int right  = Math.Min(w, (int)Math.Round(box.Right));
+            int top    = Math.Max(0, (int)Math.Round(box.Top));
+            int bottom = Math.Min(h, (int)Math.Round(box.Bottom));
+
+            int cropW = right - left;
+            int cropH = bottom - top;
+            if (cropW < 1 || cropH < 1) return null;
+
+            int rowBytes = cropW * ch;
+
+            if (image.Type == PlainType.UInt8)
+            {
+                var src = (byte[])image.Data;
+                var dst = new byte[cropW * cropH * ch];
+                for (int row = 0; row < cropH; row++)
+                    Buffer.BlockCopy(src, ((top + row) * w + left) * ch,
+                                     dst, row * rowBytes, rowBytes);
+                return new CxImage(cropW, cropH, dst, ch);
+            }
+
+            if (image.Type == PlainType.Int16)
+            {
+                var src = (short[])image.Data;
+                var dst = new short[cropW * cropH * ch];
+                int rowBytesShort = rowBytes / 2;
+                for (int row = 0; row < cropH; row++)
+                    Buffer.BlockCopy(src, ((top + row) * w + left) * ch,
+                                     dst, row * rowBytesShort * 2, rowBytes);
+                return new CxImage(cropW, cropH, dst, ch);
+            }
+
+            if (image.Type == PlainType.Int32)
+            {
+                var src = (int[])image.Data;
+                var dst = new int[cropW * cropH * ch];
+                for (int row = 0; row < cropH; row++)
+                    Buffer.BlockCopy(src, ((top + row) * w + left) * ch,
+                                     dst, row * rowBytes, rowBytes);
+                return new CxImage(cropW, cropH, dst, ch);
+            }
+
+            // PlainType.Real
+            {
+                var src = (float[])image.Data;
+                var dst = new float[cropW * cropH * ch];
+                for (int row = 0; row < cropH; row++)
+                    Buffer.BlockCopy(src, ((top + row) * w + left) * ch,
+                                     dst, row * rowBytes, rowBytes);
+                return new CxImage(cropW, cropH, dst, ch);
+            }
+        }
+
+        /// <summary>
         /// Clips a <see cref="CxSurface"/> using a closed 2D polygon as ROI (XY only, Z ignored).
         /// Cells outside the polygon are marked invalid (<see cref="short.MinValue"/>).
         /// </summary>

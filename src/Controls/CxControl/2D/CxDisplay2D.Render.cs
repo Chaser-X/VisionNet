@@ -111,6 +111,7 @@ namespace VisionNet.Controls
         /// <summary>Forces an immediate redraw of the plot.</summary>
         public void RefreshDisplay()
         {
+            _advImageItem?.UpdatePlottable();
             if (_formsPlot.InvokeRequired)
                 _formsPlot.Invoke(new Action(_formsPlot.Refresh));
             else

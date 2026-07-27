@@ -590,7 +590,7 @@ namespace DemoFrom
                 _currentImage?.Dispose();
                 _currentImage = img;
                 _cxDisplay2D.ClearOverlays();
-                _cxDisplay2D.SetImage(img);
+                _cxDisplay2D.SetImageAdvance(img);
             }
         }
 

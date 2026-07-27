@@ -49,6 +49,7 @@ namespace VisionNet.Controls
 
         // ── Image layer ───────────────────────────────────────────────────────────
         private CxImageItem _imageItem;
+        private CxImageItemAdvance _advImageItem;
         private int _imageWidth;
         private int _imageHeight;
 

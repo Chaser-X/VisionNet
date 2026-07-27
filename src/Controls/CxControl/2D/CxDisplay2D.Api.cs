@@ -113,6 +113,32 @@ namespace VisionNet.Controls
                 RefreshDisplay();
         }
 
+        /// <summary>
+        /// Replaces the displayed image with a new <see cref="CxImage"/> using the advanced
+        /// two-layer renderer (global thumbnail + viewport detail). Supports large images
+        /// with minimal GPU resource usage.
+        /// </summary>
+        public void SetImageAdvance(CxImage image)
+        {
+            if (image == null) { ClearImage(); return; }
+
+            if (_advImageItem == null)
+            {
+                _advImageItem = new CxImageItemAdvance();
+                _advImageItem.AddToPlot(_formsPlot.Plot);
+            }
+
+            _advImageItem.SetImage(image);
+            _imageWidth = image.Width;
+            _imageHeight = image.Height;
+
+            _advImageItem.UpdateWorldRect(GetImageWorldRect());
+            if (_displayMode != DisplayMode.None)
+                FitImage1to1();
+            else
+                RefreshDisplay();
+        }
+
         /// <summary>Removes the currently displayed image.</summary>
         public void ClearImage()
         {
@@ -121,9 +147,15 @@ namespace VisionNet.Controls
                 _imageItem.RemoveFromPlot(_formsPlot.Plot);
                 _imageItem.Dispose();
                 _imageItem = null;
-                _imageWidth = 0;
-                _imageHeight = 0;
             }
+            if (_advImageItem != null)
+            {
+                _advImageItem.RemoveFromPlot(_formsPlot.Plot);
+                _advImageItem.Dispose();
+                _advImageItem = null;
+            }
+            _imageWidth = 0;
+            _imageHeight = 0;
             HideCoordAnnotation();
             RefreshDisplay();
         }
