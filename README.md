@@ -30,7 +30,8 @@ VisionNet 由两个互相独立的库组成：
 - 🗂️ 丰富的 3D/2D 几何数据类型，内存布局与 C++ 互操作兼容
 - ⚡ 高性能 3D 渲染：VAO + GLSL Shader + 强度纹理，支持百万级点云实时显示
 - 📈 高性能 2D 渲染：基于 ScottPlot，支持坐标轴自动缩放、自适应视野裁剪
-- 🎨 多 Item 叠加：点云、网格、2D/3D 几何图元可同时显示，颜色条自动同步全局 Z 范围
+- 🎨 多 Item 叠加：点云、网格、2D/3D 几何图元可同时显示，颜色条自动同步全局 Z / Diff 范围
+- 🎨 **差分伪彩（Diff）**：为 Mesh 提供每顶点差分值，按彩虹色映射显示偏差，颜色条自动跟随差分范围；混合场景自动隐藏颜色条以避免误导
 - 🖱️ 完整鼠标交互：追踪球旋转、平移、缩放、双击对焦、悬停坐标标签
 - 🔒 线程安全：GL 资源延迟释放机制，数据更新可在后台线程执行
 - 💾 **文件 I/O**：自定义紧凑二进制格式（`.cxsurface` / `.cxpc` / `.cxmesh`）及标准工业格式 OBJ（`.obj`）、STL（`.stl` / `.stla`）的保存/加载
@@ -40,12 +41,6 @@ VisionNet 由两个互相独立的库组成：
 - 🔧 **几何算子**：2D/3D 几何构造（直线/平面）、求交、投影、距离计算；坐标系对齐（Align 正向/反向）与坐标变换
 - 🖼️ **图像处理**：`CxImage ↔ Bitmap` 互转（自适应像素格式）、OpenCV 缩放/缩略图、`Surface → Image` 导出
 - 📐 **最小二乘拟合**：2D 圆拟合、2D/3D 直线拟合、平面拟合、球拟合
-- 🖱️ 完整鼠标交互：追踪球旋转、平移、缩放、双击对焦、悬停坐标标签
-- 🔒 线程安全：GL 资源延迟释放机制，数据更新可在后台线程执行
-- 💾 **文件 I/O**：自定义紧凑二进制格式（`.cxsurface` / `.cxpc` / `.cxmesh`）及标准工业格式 OBJ（`.obj`）、STL（`.stl` / `.stla`）的保存/加载
-- ✂️ **ROI 裁剪**：`ClipMesh` / `ClipPointCloud` / `ClipSurface` — 以 `CxBox3D` 为 ROI 对三种数据类型做空间裁剪，全程并行加速
-- 🚀 **OpenCL GPU 计算**：并行包围盒计算、GPU 点云重采样（`CxUniformSurface`）、GPU 表面变换（`CxTransformSurface` / `CxTransformPointCloud`）、GPU 网格栅格化（`CxMeshToSurface`）
-- 🔄 **坐标系切换**：一行代码在右手系与左手系之间切换，视角预设（Top / Front / Left / Right）自动适配，无需修改数据
 
 ---
 
@@ -335,6 +330,7 @@ var mesh = new CxMesh
     Indices       = new uint[m * 3],   // 三角形索引（每三个为一个面片）
     UVs           = new CxPoint2D[n],  // 强度纹理 UV 坐标
     Intensity     = new byte[w * h],   // 强度纹理像素（W×H 网格）或逐顶点（压缩）
+    Diff          = new float[n],      // 每顶点差分值（可选），用于 SurfaceColorMode.Diff 模式
     TextureWidth  = w,
     TextureHeight = h,
 };
@@ -614,12 +610,14 @@ VisionOperator.DestroyLib();
 | 属性                     | 可选值                                      | 说明      |
 | ---------------------- | ---------------------------------------- | ------- |
 | `SurfaceMode`          | `PointCloud` `Mesh`                      | 点云或三角面片 |
-| `SurfaceColorMode`     | `Color` `Intensity` `ColorWithIntensity` | 颜色来源    |
+| `SurfaceColorMode`     | `Color` `Intensity` `ColorWithIntensity` `Diff` | 颜色来源；Diff 为每顶点差分彩虹伪彩 |
 | `SurfaceViewMode`      | `Top` `Front` `Left` `Right` `None`      | 预设视角    |
 | `ShowCoordinateSystem` | `bool`                                   | 显示世界坐标轴 |
 | `IsLeftHanded`         | `bool`                                   | 左手坐标系（默认 `false`） |
 
-颜色梯度（`Color` / `ColorWithIntensity` 模式，Z 由低到高）：
+`Diff` 模式复用 `getColorByHeight` 彩虹映射，`ZMin/ZMax`  自动切换为差分范围；SetGlobalZRange 早返回，不受外部 Z 同步影响。
+
+颜色梯度（`Color` / `ColorWithIntensity` / `Diff` 模式）：
 
 ```
 ■ 深蓝  →  ■ 天空蓝  →  ■ 绿  →  ■ 黄  →  ■ 红  →  ■ 粉  →  ■ 白
@@ -685,6 +683,7 @@ VisionOperator.DestroyLib();
 
 > **多 Item 颜色一致性**
 > 叠加多个表面时，颜色条与每个 Item 的颜色映射统一采用**所有 Item 的全局 Z 范围**，无需手动同步。
+> Diff 模式 Item 使用差分范围而非 Z 范围；混合场景（Diff + 非 Diff 共存）时颜色条自动隐藏。
 
 > **线程安全**
 > `SetPointCloud` 等数据设置 API 可在后台线程调用；GL 资源的创建与释放由 `CxDisplay` 在渲染线程内完成。
