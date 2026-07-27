@@ -41,10 +41,10 @@ namespace VisionNet.Controls
             get => _surfaceColorMode;
             set
             {
+                if (value == SurfaceColorMode.Diff) value = SurfaceColorMode.Color;
                 if (_surfaceColorMode != value)
                 {
                     _surfaceColorMode = value;
-                    // 颜色数组已缓存到 VBO，Mode 变化需重建
                     _cachedRenderData = null;
                     OnRenderDataChanged?.Invoke();
                 }

@@ -109,15 +109,24 @@ namespace VisionNet.Controls
             lock (_resourceLock)
                 snapshot = new List<ICxObjRenderItem>(_surfaceItems);
 
-            // Phase 1 — compute global Z range across all non-intensity items.
+            // Phase 1 — compute global Z range and global diff range separately.
             float globalZMin = float.MaxValue, globalZMax = float.MinValue;
+            float globalDiffMin = float.MaxValue, globalDiffMax = float.MinValue;
+            int zCount = 0, diffCount = 0;
             foreach (var cur in snapshot)
             {
                 if (cur == null || cur.IsDisposed) continue;
-                if (cur.SurfaceColorMode != SurfaceColorMode.Intensity)
+                if (cur.SurfaceColorMode == SurfaceColorMode.Diff)
+                {
+                    if (cur.ZMin < globalDiffMin) globalDiffMin = cur.ZMin;
+                    if (cur.ZMax > globalDiffMax) globalDiffMax = cur.ZMax;
+                    diffCount++;
+                }
+                else if (cur.SurfaceColorMode != SurfaceColorMode.Intensity)
                 {
                     if (cur.ZMin < globalZMin) globalZMin = cur.ZMin;
                     if (cur.ZMax > globalZMax) globalZMax = cur.ZMax;
+                    zCount++;
                 }
             }
 
@@ -146,10 +155,20 @@ namespace VisionNet.Controls
             }
 
             // Phase 4 — HUD overlays.
-            if (anyDrawn && globalZMin < globalZMax)
+            bool hybrid = zCount > 0 && diffCount > 0;
+            bool pureDiff = diffCount > 0 && zCount == 0;
+            if (anyDrawn && !hybrid)
             {
-                _colorBarItem.SetRange(globalZMin, globalZMax);
-                _colorBarItem.Draw(gl);
+                if (pureDiff && globalDiffMin < globalDiffMax)
+                {
+                    _colorBarItem.SetRange(globalDiffMin, globalDiffMax);
+                    _colorBarItem.Draw(gl);
+                }
+                else if (globalZMin < globalZMax)
+                {
+                    _colorBarItem.SetRange(globalZMin, globalZMax);
+                    _colorBarItem.Draw(gl);
+                }
             }
             if (anyDrawn)
                 _coordTagItem.Draw(gl);

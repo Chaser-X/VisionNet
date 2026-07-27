@@ -38,6 +38,7 @@ namespace DemoFrom
             this.btn_boxDemo = new System.Windows.Forms.Button();
             this.btn_segDemo = new System.Windows.Forms.Button();
             this.btn_polyDemo = new System.Windows.Forms.Button();
+            this.btn_diffDemo = new System.Windows.Forms.Button();
             this.lbl_markPos = new System.Windows.Forms.Label();
             this.tabControl1.SuspendLayout();
             this.tabPage3D.SuspendLayout();
@@ -111,6 +112,7 @@ namespace DemoFrom
             this.splitContainer1.Panel2.Controls.Add(this.btn_boxDemo);
             this.splitContainer1.Panel2.Controls.Add(this.btn_segDemo);
             this.splitContainer1.Panel2.Controls.Add(this.btn_polyDemo);
+            this.splitContainer1.Panel2.Controls.Add(this.btn_diffDemo);
             this.splitContainer1.Panel2.Controls.Add(this.lbl_markPos);
             this.splitContainer1.Size = new System.Drawing.Size(1085, 703);
             this.splitContainer1.SplitterDistance = 922;
@@ -301,6 +303,16 @@ namespace DemoFrom
             this.btn_polyDemo.UseVisualStyleBackColor = true;
             this.btn_polyDemo.Click += new System.EventHandler(this.btn_polyDemo_Click);
             //
+            // btn_diffDemo
+            //
+            this.btn_diffDemo.Location = new System.Drawing.Point(22, 640);
+            this.btn_diffDemo.Name = "btn_diffDemo";
+            this.btn_diffDemo.Size = new System.Drawing.Size(92, 23);
+            this.btn_diffDemo.TabIndex = 0;
+            this.btn_diffDemo.Text = "Diff Demo";
+            this.btn_diffDemo.UseVisualStyleBackColor = true;
+            this.btn_diffDemo.Click += new System.EventHandler(this.btn_diffDemo_Click);
+            //
             // lbl_markPos
             //
             this.lbl_markPos.Font = new System.Drawing.Font("Consolas", 8F);
@@ -357,6 +369,7 @@ namespace DemoFrom
         private System.Windows.Forms.Button btn_boxDemo;
         private System.Windows.Forms.Button btn_segDemo;
         private System.Windows.Forms.Button btn_polyDemo;
+        private System.Windows.Forms.Button btn_diffDemo;
         private System.Windows.Forms.Label lbl_markPos;
     }
 }

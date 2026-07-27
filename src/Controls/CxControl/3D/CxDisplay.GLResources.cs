@@ -66,6 +66,20 @@ namespace VisionNet.Controls
                 vboIndex++;
             }
 
+            if (data.DiffValues != null)
+            {
+                gl.GenBuffers(1, tempId);
+                handle.VboIds[vboIndex] = tempId[0];
+                gl.BindBuffer(OpenGL.GL_ARRAY_BUFFER, handle.VboIds[vboIndex]);
+                gl.BufferData(OpenGL.GL_ARRAY_BUFFER, data.DiffValues, OpenGL.GL_STATIC_DRAW);
+                if (data.UseVAO)
+                {
+                    gl.VertexAttribPointer(2, 1, OpenGL.GL_FLOAT, false, 0, IntPtr.Zero);
+                    gl.EnableVertexAttribArray(2);
+                }
+                vboIndex++;
+            }
+
             handle.VboCount = vboIndex;
 
             if (data.Indices != null && data.Indices.Length > 0)

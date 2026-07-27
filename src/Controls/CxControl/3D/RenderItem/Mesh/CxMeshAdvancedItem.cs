@@ -41,22 +41,61 @@ namespace VisionNet.Controls
             get => _surfaceColorMode;
             set
             {
-                if (_surfaceColorMode != value)
+                if (_surfaceColorMode == value) return;
+                var old = _surfaceColorMode;
+
+                // ① 数据缺失回退（直接改 backing field，不递归事件）
+                bool wantDiff = value == SurfaceColorMode.Diff;
+                bool hasDiffData = Mesh?.Diff != null && Mesh.Diff.Length >= Mesh.Vertices.Length;
+                if (wantDiff && !hasDiffData)
+                {
+                    _surfaceColorMode = SurfaceColorMode.Color;
+                    value = SurfaceColorMode.Color;
+                    wantDiff = false;
+                }
+                else
                 {
                     _surfaceColorMode = value;
-                    if (_cachedRenderData?.Uniforms != null)
-                        _cachedRenderData.Uniforms["colorMode"] = (int)value;
+                }
+
+                // ② 重新设定活跃映射范围
+                if (value == SurfaceColorMode.Diff)
+                {
+                    ZMin = _diffMin; ZMax = _diffMax;
+                }
+                else if (old == SurfaceColorMode.Diff)
+                {
+                    ZMin = _trueZMin; ZMax = _trueZMax;
+                }
+                // 其它切换不动 ZMin/ZMax
+
+                // ③ 决定是否 invalidate 缓存
+                if (wantDiff)
+                {
+                    _cachedRenderData = null;
+                    OnRenderDataChanged?.Invoke();
+                }
+                else if (_cachedRenderData?.Uniforms != null)
+                {
+                    _cachedRenderData.Uniforms["colorMode"] = (int)value;
+                    _cachedRenderData.Uniforms["zMin"] = ZMin;
+                    _cachedRenderData.Uniforms["zMax"] = ZMax;
                 }
             }
         }
 
         private RenderData _cachedRenderData;
 
+        // 构造时一次性预计算的范围缓存（供 SurfaceColorMode 切换时快速赋值）
+        private float _trueZMin, _trueZMax;   // BoundingBox Z 范围
+        private float _diffMin, _diffMax;     // Mesh.Diff 范围（null → 0,0）
+
         #region Shader 源码（与 CxSurfaceAdvancedItem 内容一致，为解耦独立维护）
         internal static readonly string VertexShaderSource =
             @"#version 330 core
             layout (location = 0) in vec3 aPos;
             layout (location = 1) in vec2 aTexCoord;
+            layout (location = 2) in float aDiff;
 
             uniform mat4 view;
             uniform mat4 projection;
@@ -64,18 +103,21 @@ namespace VisionNet.Controls
 
             out float height;
             out vec2 TexCoord;
+            out float diffValue;
 
             void main()
             {
                 gl_Position = projection * view * model * vec4(aPos, 1.0);
                 height = aPos.z;
                 TexCoord = aTexCoord;
+                diffValue = aDiff;
             }";
 
         internal static readonly string FragmentShaderSource =
             @"#version 330 core
             in float height;
             in vec2 TexCoord;
+            in float diffValue;
             out vec4 FragColor;
 
             uniform float zMin;
@@ -97,7 +139,10 @@ namespace VisionNet.Controls
             {
                 if (isinf(height)) discard;
                 float intensity = texture(intensityTexture, TexCoord).r;
-                if (colorMode == 0) {
+                if (colorMode == 3) {
+                    if (isinf(diffValue)) discard;
+                    FragColor = vec4(getColorByHeight(diffValue), 1.0);
+                } else if (colorMode == 0) {
                     FragColor = vec4(getColorByHeight(height), 1.0);
                 } else if (colorMode == 1) {
                     FragColor = vec4(vec3(intensity), 1.0);
@@ -116,8 +161,29 @@ namespace VisionNet.Controls
             _surfaceColorMode = surfaceColorMode;
 
             BoundingBox = CxExtension.CalculateBoundingBox(mesh?.Vertices);
-            ZMax = (float)(BoundingBox?.Center.Z + BoundingBox?.Size.Depth / 2);
-            ZMin = (float)(BoundingBox?.Center.Z - BoundingBox?.Size.Depth / 2);
+            _trueZMax = ZMax = (float)(BoundingBox?.Center.Z + BoundingBox?.Size.Depth / 2);
+            _trueZMin = ZMin = (float)(BoundingBox?.Center.Z - BoundingBox?.Size.Depth / 2);
+
+            // 预计算差分范围
+            ComputeDiffRange(mesh?.Diff);
+        }
+
+        private void ComputeDiffRange(float[] diffData)
+        {
+            if (diffData == null || diffData.Length == 0)
+            {
+                _diffMin = 0f; _diffMax = 0f;
+                return;
+            }
+            float dmin = float.MaxValue, dmax = float.MinValue;
+            foreach (var d in diffData)
+            {
+                if (float.IsInfinity(d) || float.IsNaN(d)) continue;
+                if (d < dmin) dmin = d;
+                if (d > dmax) dmax = d;
+            }
+            if (dmax - dmin < 1e-6f) dmax = dmin + 1e-6f;
+            _diffMin = dmin; _diffMax = dmax;
         }
 
         public RenderData PrepareRenderData()
@@ -171,6 +237,14 @@ namespace VisionNet.Controls
                 },
             };
 
+            // 惰性填充 DiffValues VBO（只在 Diff 模式且数据充足时）
+            if (_surfaceColorMode == SurfaceColorMode.Diff
+                && Mesh?.Diff != null && Mesh.Diff.Length >= Mesh.Vertices.Length)
+            {
+                _cachedRenderData.DiffValues = new float[Mesh.Vertices.Length];
+                Array.Copy(Mesh.Diff, _cachedRenderData.DiffValues, _cachedRenderData.DiffValues.Length);
+            }
+
             return _cachedRenderData;
         }
 
@@ -216,6 +290,7 @@ namespace VisionNet.Controls
         public void SetGlobalZRange(float zMin, float zMax)
         {
             if (_surfaceColorMode == SurfaceColorMode.Intensity) return;
+            if (_surfaceColorMode == SurfaceColorMode.Diff) return;
             if (Math.Abs(ZMin - zMin) < 1e-6f && Math.Abs(ZMax - zMax) < 1e-6f) return;
 
             ZMin = zMin;

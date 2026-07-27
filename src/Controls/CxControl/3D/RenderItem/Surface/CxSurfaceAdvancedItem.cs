@@ -46,10 +46,10 @@ namespace VisionNet.Controls
             get => _surfaceColorMode;
             set
             {
+                if (value == SurfaceColorMode.Diff) value = SurfaceColorMode.Color;
                 if (_surfaceColorMode != value)
                 {
                     _surfaceColorMode = value;
-                    // colorMode 以 Uniform 传入 Shader，只需更新缓存中的 Uniform 值
                     if (_cachedRenderData?.Uniforms != null)
                         _cachedRenderData.Uniforms["colorMode"] = (int)value;
                 }

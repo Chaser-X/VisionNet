@@ -984,6 +984,70 @@ namespace DemoFrom
             };
         }
 
+        private void btn_diffDemo_Click(object sender, EventArgs e)
+        {
+            cxDisplay2.ResetView();
+
+            const int w = 80, h = 80;
+            float spacing = 0.15f;
+            float freq = 0.35f;
+            float amp = 1.5f;
+
+            var verts = new CxPoint3D[w * h];
+            var uvs = new CxPoint2D[w * h];
+            var diff = new float[w * h];
+
+            for (int y = 0; y < h; y++)
+            {
+                for (int x = 0; x < w; x++)
+                {
+                    int idx = y * w + x;
+                    float fx = x * spacing;
+                    float fy = y * spacing;
+                    float z = amp * (float)(Math.Sin(fx * freq) * Math.Cos(fy * freq));
+                    verts[idx] = new CxPoint3D(fx, fy, 0);
+                    uvs[idx] = new CxPoint2D((float)x / (w - 1), (float)y / (h - 1));
+                    diff[idx] = z;
+                }
+            }
+
+            var indices = new uint[(w - 1) * (h - 1) * 6];
+            int i = 0;
+            for (int y = 0; y < h - 1; y++)
+            {
+                uint row = (uint)(y * w);
+                uint next = (uint)((y + 1) * w);
+                for (int x = 0; x < w - 1; x++)
+                {
+                    uint tl = row + (uint)x;
+                    uint tr = tl + 1;
+                    uint bl = next + (uint)x;
+                    uint br = bl + 1;
+                    indices[i++] = tl; indices[i++] = bl; indices[i++] = tr;
+                    indices[i++] = tr; indices[i++] = bl; indices[i++] = br;
+                }
+            }
+
+            var mesh = new CxMesh
+            {
+                Vertices = verts,
+                Indices = indices,
+                UVs = uvs,
+                TextureWidth = w,
+                TextureHeight = h,
+                Diff = diff,
+            };
+
+            _currentMesh = mesh;
+
+            cxDisplay2.SurfaceMode = SurfaceMode.Mesh;
+            cxDisplay2.SetMeshAdvancedItem(mesh);
+            // 若想自动进入 Diff 模式，取消下行注释
+            // cxDisplay2.SurfaceColorMode = SurfaceColorMode.Diff;
+
+            lbl_markPos.Text = "Diff Demo: 合成正弦波 mesh\n右键→SurfaceColorMode→Diff 切换";
+        }
+
         private void btn2D_regionDemo_Click(object sender, EventArgs e)
         {
             _cxDisplay2D.ClearOverlays();
