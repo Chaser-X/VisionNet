@@ -150,7 +150,7 @@ namespace VisionNet.Controls
             int vpPxH = pxB - pxT;
 
             // Show detail only when viewport is smaller than global thumbnail resolution
-            bool needDetail = vpPxW < _imgW * 0.9 && vpPxH < _imgH * 0.9;
+            bool needDetail = vpPxW < _imgW * 0.5 && vpPxH < _imgH * 0.5;
 
             if (!needDetail)
             {
