@@ -19,34 +19,15 @@ namespace VisionNet.Controls
         private ScottPlot.Plottables.ImageRect _plottable;
         private ScottPlot.Plot _plot;
 
-        private int _width;
-        private int _height;
-
-        // Cached single-channel data for Z-coordinate query (zero-copy reference)
-        private Array _imageData;
-        private PlainType _imageType;
-
-        //Color Color { get => Color.White; set { } }
-        //float Size { get => 1f; set { } }
-
-        /// <summary>Gets the image width in pixels.</summary>
-        public int Width => _width;
-
-        /// <summary>Gets the image height in pixels.</summary>
-        public int Height => _height;
-
         // ── I2DRenderItem ─────────────────────────────────────────────────────────
 
         /// <summary>Sets the image to render.</summary>
         public override void SetImage(CxImage image)
         {
             if (image == null || image.Data == null) return;
+            base.SetImage(image);
 
-            _width = image.Width;
-            _height = image.Height;
-
-            _imageData = image.Channel == 1 ? image.Data : null;
-            _imageType = image.Type;
+            //_imageData = image.Channel == 1 ? image.Data : null;
 
             var displayImage = image;
             if (displayImage.Width > 2048 || displayImage.Height > 2048)
@@ -57,7 +38,7 @@ namespace VisionNet.Controls
             if (_plot != null)
             {
                 if (_plottable != null) _plot.PlottableList.Remove(_plottable);
-                _plottable = _plot.Add.ImageRect(scottImage, new CoordinateRect(0, _width, _height, 0));
+                _plottable = _plot.Add.ImageRect(scottImage, new CoordinateRect(0, orignalImage.Width, orignalImage.Height, 0));
                 _plot.PlottableList.Remove(_plottable);
                 _plot.PlottableList.Insert(0, _plottable);
             }
@@ -76,7 +57,7 @@ namespace VisionNet.Controls
             _plot = plot;
             if (_pendingImage != null)
             {
-                _plottable = plot.Add.ImageRect(_pendingImage, new CoordinateRect(0, _width, _height, 0));
+                _plottable = plot.Add.ImageRect(_pendingImage, new CoordinateRect(0, orignalImage.Width, orignalImage.Height, 0));
                 _pendingImage = null;
                 plot.PlottableList.Remove(_plottable);
                 plot.PlottableList.Insert(0, _plottable);
@@ -96,10 +77,10 @@ namespace VisionNet.Controls
         /// <inheritdoc/>
         public override void Dispose()
         {
+            base.Dispose();
             _pendingImage = null;
             _plottable = null;
             _plot = null;
-            _imageData = null;
         }
 
         /// <summary>Repositions the image plottable to the given world-space rectangle.</summary>
@@ -107,44 +88,6 @@ namespace VisionNet.Controls
         {
             if (_plottable != null)
                 _plottable.Rect = new ScottPlot.CoordinateRect(rect.Left, rect.Right, rect.Bottom, rect.Top);
-        }
-
-        /// <summary>Returns the raw pixel value at image coordinate (x, y) as float, or null if out of range.</summary>
-        public override float? GetPixelFloat(int x, int y)
-        {
-            if (_imageData == null || x < 0 || x >= _width || y < 0 || y >= _height)
-                return null;
-            int idx = y * _width + x;
-            var item = _imageData.GetValue(idx);
-            switch (_imageType)
-            {
-                case PlainType.UInt8: return (byte)item;
-                case PlainType.Int16: return (short)item;
-                case PlainType.Int32: return (int)item;
-                case PlainType.Real: return (float)item;
-            }
-            return null;
-        }
-
-        // ── Image conversion (no BitConverter — direct typed array casts) ─────────
-        private static unsafe ScottPlot.Image BuildScottImage(CxImage image)
-        {
-            int w = image.Width;
-            int h = image.Height;
-            int ch = image.Channel;
-            var bmp = image.ToBitmap();
-            try
-            {
-                using (var ms = new MemoryStream())
-                {
-                    bmp.Save(ms, System.Drawing.Imaging.ImageFormat.Png);
-                    return new ScottPlot.Image(ms.ToArray());
-                }
-            }
-            finally
-            {
-                bmp.Dispose();
-            }
         }
     }
 }

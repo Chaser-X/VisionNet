@@ -17,8 +17,6 @@ namespace VisionNet.Controls
     public class CxImageItemAdvance : Abstract2DImageRenderItem
     {
         private const int GlobalMaxSize = 1024;
-
-        private CxImage _original;
         private CxImage _globalThumb;
         private ScottPlot.Image _globalScottImage;
         private ScottPlot.Image _detailScottImage;
@@ -27,39 +25,23 @@ namespace VisionNet.Controls
         private ScottPlot.Plottables.ImageRect _detailPlot;
         private ScottPlot.Plot _plot;
 
-        private int _imgW;
-        private int _imgH;
         private CxBox2D _worldRect;
 
         private bool _hasDetail;
         private int _lastL, _lastR, _lastT, _lastB;
 
-        // Cached single-channel data for Z-coordinate query (zero-copy reference)
-        private Array _imageData;
-        private PlainType _imageType;
-
-        //Color Color { get => Color.White; set { } }
-        //float Size { get => 1f; set { } }
-
-        public int Width => _imgW;
-        public int Height => _imgH;
 
         public override void SetImage(CxImage image)
         {
             if (image == null || image.Data == null) return;
+            base.SetImage(image);
 
-            _original = image;
-            _imgW = image.Width;
-            _imgH = image.Height;
 
             _globalThumb = image.Width > GlobalMaxSize || image.Height > GlobalMaxSize
                 ? VisionOperator.ResizeImage(image, GlobalMaxSize, GlobalMaxSize)
                 : image;
 
-            _imageData = image.Channel == 1 ? image.Data : null;
-            _imageType = image.Type;
-
-            _globalScottImage = CxImageToScottImage(_globalThumb);
+            _globalScottImage = BuildScottImage(_globalThumb);
 
             if (_plot != null)
             {
@@ -68,7 +50,7 @@ namespace VisionNet.Controls
                 _hasDetail = false;
 
                 _globalPlot = _plot.Add.ImageRect(_globalScottImage,
-                    new CoordinateRect(0, _imgW, _imgH, 0));
+                    new CoordinateRect(0, orignalImage.Width, orignalImage.Height, 0));
                 _plot.PlottableList.Remove(_globalPlot);
                 _plot.PlottableList.Insert(0, _globalPlot);
             }
@@ -80,7 +62,7 @@ namespace VisionNet.Controls
             if (_globalScottImage != null)
             {
                 _globalPlot = plot.Add.ImageRect(_globalScottImage,
-                    new CoordinateRect(0, _imgW, _imgH, 0));
+                    new CoordinateRect(0, orignalImage.Width, orignalImage.Height, 0));
                 plot.PlottableList.Remove(_globalPlot);
                 plot.PlottableList.Insert(0, _globalPlot);
                 _hasDetail = false;
@@ -102,7 +84,7 @@ namespace VisionNet.Controls
 
         public override void Dispose()
         {
-            _original = null;
+            base.Dispose();
             _globalThumb = null;
             _globalScottImage = null;
             _detailScottImage = null;
@@ -110,7 +92,6 @@ namespace VisionNet.Controls
             _detailPlot = null;
             _plot = null;
             _hasDetail = false;
-            _imageData = null;
         }
 
         /// <summary>Repositions the image plottable to the given world-space rectangle.</summary>
@@ -123,7 +104,7 @@ namespace VisionNet.Controls
 
         private void RefreshViewport()
         {
-            if (_plot == null || _original == null || _imgW <= 0 || _imgH <= 0) return;
+            if (_plot == null || orignalImage == null || orignalImage.Width <= 0 || orignalImage.Height <= 0) return;
 
             double vpL = _plot.Axes.Bottom.Min;
             double vpR = _plot.Axes.Bottom.Max;
@@ -138,66 +119,69 @@ namespace VisionNet.Controls
             double worldH = Math.Abs(_worldRect.Bottom - _worldRect.Top);
             if (worldW <= 0 || worldH <= 0) return;
 
-            double scaleX = _imgW / worldW;
-            double scaleY = _imgH / worldH;
+            double scaleX = orignalImage.Width / worldW;
+            double scaleY = orignalImage.Height / worldH;
 
-            int pxL = (int)Math.Round((vpL - _worldRect.Left) * scaleX);
-            int pxR = (int)Math.Round((vpR - _worldRect.Left) * scaleX);
-            int pxT = (int)Math.Round((vpT - _worldRect.Top) * scaleY);
-            int pxB = (int)Math.Round((vpB - _worldRect.Top) * scaleY);
+            int pxL_raw = (int)Math.Round((vpL - _worldRect.Left) * scaleX);
+            int pxR_raw = (int)Math.Round((vpR - _worldRect.Left) * scaleX);
+            int pxT_raw = (int)Math.Round((vpT - _worldRect.Top) * scaleY);
+            int pxB_raw = (int)Math.Round((vpB - _worldRect.Top) * scaleY);
 
-            int vpPxW = pxR - pxL;
-            int vpPxH = pxB - pxT;
+            int vpPxW = pxR_raw - pxL_raw;
+            int vpPxH = pxB_raw - pxT_raw;
 
             // Show detail only when viewport is smaller than global thumbnail resolution
-            bool needDetail = vpPxW < _imgW * 0.5 && vpPxH < _imgH * 0.5;
+            bool needDetail = vpPxW < orignalImage.Width * 0.5 && vpPxH < orignalImage.Height * 0.5;
 
             if (!needDetail)
             {
-                if (_hasDetail)
-                {
-                    if (_detailPlot != null) _plot.PlottableList.Remove(_detailPlot);
-                    _detailPlot = null;
-                    _detailScottImage = null;
-                    _hasDetail = false;
-                }
+                RemoveDetail();
                 return;
             }
 
-            // Check cache: recalculate only if viewport moved >50% in any direction
+            // Check cache using raw (unclamped) viewport coords for movement detection
             int marginW = Math.Max(1, vpPxW / 2);
             int marginH = Math.Max(1, vpPxH / 2);
             if (_hasDetail &&
-                Math.Abs(pxL - _lastL) < marginW &&
-                Math.Abs(pxR - _lastR) < marginW &&
-                Math.Abs(pxT - _lastT) < marginH &&
-                Math.Abs(pxB - _lastB) < marginH)
+                Math.Abs(pxL_raw - _lastL) < marginW &&
+                Math.Abs(pxR_raw - _lastR) < marginW &&
+                Math.Abs(pxT_raw - _lastT) < marginH &&
+                Math.Abs(pxB_raw - _lastB) < marginH)
             {
                 return;
             }
 
-            // Clip detail from original
+            // Clamp to image bounds — ClipImage already does this internally,
+            // but we need clamped values for correct world positioning
+            int pxL = Math.Max(0, Math.Min(orignalImage.Width, pxL_raw));
+            int pxR = Math.Max(0, Math.Min(orignalImage.Width, pxR_raw));
+            int pxT = Math.Max(0, Math.Min(orignalImage.Height, pxT_raw));
+            int pxB = Math.Max(0, Math.Min(orignalImage.Height, pxB_raw));
+
+            int cropW = pxR - pxL;
+            int cropH = pxB - pxT;
+            if (cropW < 1 || cropH < 1)
+            {
+                RemoveDetail();
+                return;
+            }
+
+            // Clip detail from original (box already in-bounds)
             var box = new CxBox2D(
                 new CxPoint2D((pxL + pxR) / 2f, (pxT + pxB) / 2f),
-                new CxSize2D(pxR - pxL, pxB - pxT));
+                new CxSize2D(cropW, cropH));
 
-            var detailImage = VisionOperator.ClipImage(_original, box, 0f);
+            var detailImage = VisionOperator.ClipImage(orignalImage, box, 0f);
             if (detailImage == null) return;
 
-            _detailScottImage = CxImageToScottImage(detailImage);
-            _lastL = pxL; _lastR = pxR;
-            _lastT = pxT; _lastB = pxB;
+            _detailScottImage = BuildScottImage(detailImage);
+            _lastL = pxL_raw; _lastR = pxR_raw;
+            _lastT = pxT_raw; _lastB = pxB_raw;
 
-            // Use actual clipped pixel bounds (clamped to image) for world positioning
-            int actualL = Math.Max(0, pxL);
-            int actualR = Math.Min(_imgW, pxR);
-            int actualT = Math.Max(0, pxT);
-            int actualB = Math.Min(_imgH, pxB);
-
-            double detailWorldL = _worldRect.Left + actualL / scaleX;
-            double detailWorldR = _worldRect.Left + actualR / scaleX;
-            double detailWorldT = _worldRect.Top  + actualT / scaleY;
-            double detailWorldB = _worldRect.Top  + actualB / scaleY;
+            double detailWorldL = _worldRect.Left + pxL / scaleX;
+            double detailWorldR = _worldRect.Left + pxR / scaleX;
+            double detailWorldT = _worldRect.Top  + pxT / scaleY;
+            double detailWorldB = _worldRect.Top  + pxB / scaleY;
 
             if (_detailPlot != null)
                 _plot.PlottableList.Remove(_detailPlot);
@@ -214,31 +198,12 @@ namespace VisionNet.Controls
             _hasDetail = true;
         }
 
-        private static ScottPlot.Image CxImageToScottImage(CxImage image)
+        private void RemoveDetail()
         {
-            using (var bmp = VisionOperator.ToBitmap(image))
-            using (var ms = new MemoryStream())
-            {
-                bmp.Save(ms, System.Drawing.Imaging.ImageFormat.Png);
-                return new ScottPlot.Image(ms.ToArray());
-            }
-        }
-
-        /// <summary>Returns the raw pixel value at image coordinate (x, y) as float, or null if out of range.</summary>
-        public override float? GetPixelFloat(int x, int y)
-        {
-            if (_imageData == null || x < 0 || x >= _imgW || y < 0 || y >= _imgH)
-                return null;
-            int idx = y * _imgW + x;
-            var item = _imageData.GetValue(idx);
-            switch (_imageType)
-            {
-                case PlainType.UInt8: return (byte)item;
-                case PlainType.Int16: return (short)item;
-                case PlainType.Int32: return (int)item;
-                case PlainType.Real: return (float)item;
-            }
-            return null;
+            if (_detailPlot != null) _plot.PlottableList.Remove(_detailPlot);
+            _detailPlot = null;
+            _detailScottImage = null;
+            _hasDetail = false;
         }
     }
 }
