@@ -295,9 +295,8 @@ namespace VisionNet
         /// </summary>
         /// <param name="image">Source image.</param>
         /// <param name="box">Clipping box in pixel coordinates.</param>
-        /// <param name="fillValue">Value to fill for out-of-bounds pixels (unused when box is within image bounds).</param>
         /// <returns>A new <see cref="CxImage"/> with the same pixel type and channel count, or null on invalid input.</returns>
-        public static CxImage ClipImage(CxImage image, CxBox2D box, float fillValue)
+        public static CxImage ClipImage(CxImage image, CxBox2D box)
         {
             if (image == null || image.Data == null) return null;
 

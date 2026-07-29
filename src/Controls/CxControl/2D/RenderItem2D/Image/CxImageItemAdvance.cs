@@ -171,7 +171,7 @@ namespace VisionNet.Controls
                 new CxPoint2D((pxL + pxR) / 2f, (pxT + pxB) / 2f),
                 new CxSize2D(cropW, cropH));
 
-            var detailImage = VisionOperator.ClipImage(orignalImage, box, 0f);
+            var detailImage = VisionOperator.ClipImage(orignalImage, box);
             if (detailImage == null) return;
 
             _detailScottImage = BuildScottImage(detailImage);
