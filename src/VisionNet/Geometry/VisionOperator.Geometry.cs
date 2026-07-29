@@ -273,6 +273,42 @@ namespace VisionNet
             length = sum;
         }
 
+        /// <summary>Returns the axis-aligned bounding box of a rotated rectangle.</summary>
+        public static void RectangleBoundingBox2D(CxRectangle2D rect, out CxBox2D box)
+        {
+            rect.GetCorners(out var tl, out var tr, out var bl, out var br);
+            float minX = Math.Min(Math.Min(tl.X, tr.X), Math.Min(bl.X, br.X));
+            float maxX = Math.Max(Math.Max(tl.X, tr.X), Math.Max(bl.X, br.X));
+            float minY = Math.Min(Math.Min(tl.Y, tr.Y), Math.Min(bl.Y, br.Y));
+            float maxY = Math.Max(Math.Max(tl.Y, tr.Y), Math.Max(bl.Y, br.Y));
+            float cx = (minX + maxX) * 0.5f;
+            float cy = (minY + maxY) * 0.5f;
+            box = new CxBox2D(new CxPoint2D(cx, cy), new CxSize2D(maxX - minX, maxY - minY));
+        }
+
+        /// <summary>Returns the axis-aligned bounding box of a polygon.</summary>
+        public static void PolygonBoundingBox2D(CxPolygon2D polygon, out CxBox2D box)
+        {
+            var pts = polygon.Points;
+            if (pts == null || pts.Length == 0)
+            {
+                box = default;
+                return;
+            }
+            float minX = pts[0].X, maxX = pts[0].X;
+            float minY = pts[0].Y, maxY = pts[0].Y;
+            for (int i = 1; i < pts.Length; i++)
+            {
+                if (pts[i].X < minX) minX = pts[i].X;
+                if (pts[i].X > maxX) maxX = pts[i].X;
+                if (pts[i].Y < minY) minY = pts[i].Y;
+                if (pts[i].Y > maxY) maxY = pts[i].Y;
+            }
+            float cx = (minX + maxX) * 0.5f;
+            float cy = (minY + maxY) * 0.5f;
+            box = new CxBox2D(new CxPoint2D(cx, cy), new CxSize2D(maxX - minX, maxY - minY));
+        }
+
         // ── 2D: Intersection ─────────────────────────────────────────────────────
 
         /// <summary>Computes the intersection point of two infinite lines. Returns false if parallel.</summary>
