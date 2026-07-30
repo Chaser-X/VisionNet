@@ -259,7 +259,7 @@ namespace VisionNet.Controls
         public void Dispose()
         {
             if (IsDisposed) return;
-            Surface?.Dispose();
+            //Surface?.Dispose();
             Surface = null;
             _cachedRenderData = null;
             IsDisposed = true;

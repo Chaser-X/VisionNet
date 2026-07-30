@@ -261,7 +261,7 @@ namespace VisionNet.Controls
         public void Dispose()
         {
             if (IsDisposed) return;
-            PointCloud?.Dispose();
+            //PointCloud?.Dispose();
             PointCloud = null;
             _cachedRenderData = null;
             IsDisposed = true;
