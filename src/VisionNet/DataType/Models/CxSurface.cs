@@ -85,6 +85,14 @@ namespace VisionNet.DataType
             }
         }
 
+        public void SetData(short[] data)
+        {
+            lock (_lock)
+            {
+                Data = data;
+            }
+        }
+
         /// <summary>
         /// Copies intensity data from an unmanaged memory block into <see cref="Intensity"/>.
         /// Thread-safe.
