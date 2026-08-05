@@ -25,13 +25,13 @@ namespace VisionNet
 
             MatType srcType;
             if (image.Type == PlainType.UInt8)
-                srcType = ch == 1 ? MatType.CV_8UC1 : MatType.CV_8UC4;
+                srcType = MatType.CV_8UC(ch);
             else if (image.Type == PlainType.Int16)
-                srcType = ch == 1 ? MatType.CV_16SC1 : MatType.CV_16SC4;
+                srcType = MatType.CV_16UC(ch);
             else if (image.Type == PlainType.Int32)
-                srcType = ch == 1 ? MatType.CV_32SC1 : MatType.CV_32SC4;
+                srcType = MatType.CV_32SC(ch);
             else
-                srcType = ch == 1 ? MatType.CV_32FC1 : MatType.CV_32FC4;
+                srcType = MatType.CV_32FC(ch);
 
             var handle = GCHandle.Alloc(image.Data, GCHandleType.Pinned);
             try
