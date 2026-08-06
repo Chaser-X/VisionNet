@@ -50,6 +50,47 @@ namespace VisionNet.Controls
         }
 
         /// <summary>
+        /// Computes the world-space Z range of an axis-aligned box transformed by an affine matrix.
+        /// The eight corners of the box are transformed; the resulting min/max Z bounds every
+        /// transformed point (conservative). When the box is <c>null</c> or the range collapses,
+        /// a small centred span is returned so colour mapping never divides by zero.
+        /// </summary>
+        /// <param name="box">Local-space axis-aligned bounding box.</param>
+        /// <param name="matrix">Affine transform (model matrix / pose).</param>
+        /// <param name="zMin">World-space minimum Z.</param>
+        /// <param name="zMax">World-space maximum Z.</param>
+        public static void ComputeWorldZRange(CxBox3D? box, CxMatrix4X4 matrix, out float zMin, out float zMax)
+        {
+            zMin = float.MaxValue;
+            zMax = float.MinValue;
+
+            if (box.HasValue)
+            {
+                float cx = box.Value.Center.X, cy = box.Value.Center.Y, cz = box.Value.Center.Z;
+                float hw = box.Value.Size.Width / 2f;
+                float hh = box.Value.Size.Height / 2f;
+                float hd = box.Value.Size.Depth / 2f;
+
+                for (int i = 0; i < 8; i++)
+                {
+                    float x = cx + ((i & 1) == 0 ? -hw : hw);
+                    float y = cy + ((i & 2) == 0 ? -hh : hh);
+                    float z = cz + ((i & 4) == 0 ? -hd : hd);
+                    var wp = matrix.TransformPoint3D(new CxPoint3D(x, y, z));
+                    if (wp.Z < zMin) zMin = wp.Z;
+                    if (wp.Z > zMax) zMax = wp.Z;
+                }
+            }
+
+            if (zMax - zMin < 1e-6f)
+            {
+                float mid = (zMin + zMax) * 0.5f;
+                zMin = mid - 0.5f;
+                zMax = mid + 0.5f;
+            }
+        }
+
+        /// <summary>
         /// Maps a Z height value to an RGB colour using a 7-band rainbow gradient
         /// (dark-blue → sky-blue → green → yellow → red → pink → white).
         /// </summary>

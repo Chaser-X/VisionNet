@@ -26,8 +26,14 @@ namespace VisionNet.Controls
         /// Model matrix applied to this item's geometry before the camera transform.
         /// Represents the item's pose (position and orientation) in world space.
         /// Defaults to identity (no transform).
+        /// Setting a new pose recomputes the world-space Z range used for colour mapping.
         /// </summary>
-        public CxMatrix4X4 ModelMatrix { get; set; } = CxMatrix4X4.Identity();
+        private CxMatrix4X4 _modelMatrix = CxMatrix4X4.Identity();
+        public CxMatrix4X4 ModelMatrix
+        {
+            get => _modelMatrix;
+            set { _modelMatrix = value; UpdateWorldZRange(); }
+        }
 
         private int _samplingFactorX = 1;
         private int _samplingFactorY = 1;
@@ -72,8 +78,9 @@ namespace VisionNet.Controls
 
             void main()
             {
-                gl_Position = projection * view * model * vec4(aPos, 1.0);
-                height = aPos.z;
+                vec4 worldPos = model * vec4(aPos, 1.0);
+                gl_Position = projection * view * worldPos;
+                height = worldPos.z;
                 TexCoord = aTexCoord;
             }";
 
@@ -90,7 +97,8 @@ namespace VisionNet.Controls
 
             vec3 getColorByHeight(float h)
             {
-                float n = clamp((h - zMin) / (zMax - zMin), 0.0, 1.0);
+                float span = max(zMax - zMin, 1e-6);
+                float n = clamp((h - zMin) / span, 0.0, 1.0);
                 if (n < 0.2) return mix(vec3(0,0,1), vec3(0,1,1), n * 5.0);
                 if (n < 0.4) return mix(vec3(0,1,1), vec3(0,1,0), (n-0.2)*5.0);
                 if (n < 0.6) return mix(vec3(0,1,0), vec3(1,1,0), (n-0.4)*5.0);
@@ -127,8 +135,23 @@ namespace VisionNet.Controls
             BoundingBox = pointCloud?.Data != null && pointCloud.Data.Length > 0
                 ? CxExtension.CalculateBoundingBox(pointCloud.ToPoints())
                 : null;
-            ZMax = (float)(BoundingBox?.Center.Z + BoundingBox?.Size.Depth / 2);
-            ZMin = (float)(BoundingBox?.Center.Z - BoundingBox?.Size.Depth / 2);
+            UpdateWorldZRange();
+        }
+
+        /// <summary>
+        /// Recomputes the world-space Z range (after applying the model matrix) used for
+        /// height-based colour mapping, and refreshes the cached shader uniforms.
+        /// </summary>
+        private void UpdateWorldZRange()
+        {
+            CxExtension.ComputeWorldZRange(BoundingBox, _modelMatrix, out float zMin, out float zMax);
+            ZMin = zMin;
+            ZMax = zMax;
+            if (_cachedRenderData?.Uniforms != null)
+            {
+                _cachedRenderData.Uniforms["zMin"] = zMin;
+                _cachedRenderData.Uniforms["zMax"] = zMax;
+            }
         }
 
         public RenderData PrepareRenderData()
