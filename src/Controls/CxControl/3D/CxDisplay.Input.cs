@@ -134,6 +134,9 @@ namespace VisionNet.Controls
         /// Finds the surface point nearest to the given screen pixel across all active surface items.
         /// Structured surfaces use a 5×5 neighbourhood grid search; mesh-type items
         /// and unordered point clouds contribute the un-projected world coordinate directly.
+        /// Each structured surface is searched in its <b>local</b> frame — the world-space picking
+        /// point is transformed by the inverse model matrix before grid indexing — so surfaces
+        /// rendered with a pose (model matrix) still report the correct grid cell and intensity.
         /// </summary>
         /// <returns>Nearest world-space location and its intensity, or <c>(null, null)</c> if no hit.</returns>
         public (CxPoint3D? Location, byte? Intensity) GetNearestSurfacePoint(int mouseX, int mouseY)
@@ -176,9 +179,16 @@ namespace VisionNet.Controls
                 else if (cur is CxSurfaceAdvancedItem ai) surface = ai.Surface;
                 if (surface == null) continue;
 
-                // Structured surface: 5×5 neighbourhood search.
-                int xi = (int)((world.X - surface.XOffset) / surface.XScale);
-                int yi = (int)((world.Y - surface.YOffset) / surface.YScale);
+                // Transform the world-space picking point into this item's local frame so that
+                // grid indexing stays correct even when a pose (model matrix) is applied.
+                var model = GetItemModelMatrix(cur);
+                var inv   = model.Inverse();
+                var local = inv.TransformPoint3D(world);
+                if (float.IsNaN(local.X) || float.IsNaN(local.Y) || float.IsNaN(local.Z)) continue;
+
+                // Structured surface: 5×5 neighbourhood search in local grid coordinates.
+                int xi = (int)Math.Round((local.X - surface.XOffset) / surface.XScale);
+                int yi = (int)Math.Round((local.Y - surface.YOffset) / surface.YScale);
                 if (xi < 0 || xi >= surface.Width || yi < 0 || yi >= surface.Length) continue;
 
                 float threshold = 5 * (surface.XScale * surface.XScale
@@ -200,14 +210,20 @@ namespace VisionNet.Controls
 
                         float px = surface.XOffset + nx * surface.XScale;
                         float py = surface.YOffset + ny * surface.YScale;
-                        float d  = (px - world.X) * (px - world.X)
-                                 + (py - world.Y) * (py - world.Y)
-                                 + (z  - world.Z) * (z  - world.Z);
+
+                        // Reconstruct the candidate in world space. The front-most surface
+                        // (whose geometry actually contains the depth-buffer point) reconstructs
+                        // nearest to `world`, so overlapping surfaces are disambiguated by
+                        // world-space distance rather than local coordinate overlap.
+                        var worldCand = model.TransformPoint3D(new CxPoint3D(px, py, z));
+                        float d  = (worldCand.X - world.X) * (worldCand.X - world.X)
+                                 + (worldCand.Y - world.Y) * (worldCand.Y - world.Y)
+                                 + (worldCand.Z - world.Z) * (worldCand.Z - world.Z);
 
                         if (d < bestDist && d < threshold)
                         {
                             bestDist      = d;
-                            bestPoint     = new CxPoint3D(px, py, z);
+                            bestPoint     = worldCand;
                             bestIntensity = (surface.Intensity != null && surface.Intensity.Length > idx)
                                 ? surface.Intensity[idx] : (byte?)null;
                         }
