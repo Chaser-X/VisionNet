@@ -6,9 +6,9 @@ namespace VisionNet.DataType
     /// A 4×4 single-precision floating-point matrix stored in <b>row-major</b> order.
     /// Element at row <c>i</c>, column <c>j</c> is accessed as <c>Data[i * 4 + j]</c>.
     /// <para>
-    /// Note: OpenGL and <see cref="VisionOperator.TransformPoint3D"/> use <b>column-major</b>
-    /// convention. When passing a <see cref="CxMatrix4X4"/> to those APIs, transpose first
-    /// or construct the matrix accordingly.
+    /// Point/vector transforms use the row-major convention <c>M · v</c>
+    /// (see <see cref="TransformPoint3D"/>). When uploading <see cref="Data"/> to OpenGL/GLSL
+    /// shaders, pass <c>transpose = true</c> so GLSL receives the equivalent column-major matrix.
     /// </para>
     /// </summary>
     public class CxMatrix4X4

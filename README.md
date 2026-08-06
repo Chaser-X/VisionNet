@@ -417,7 +417,7 @@ CxSurface result = VisionOperator.UniformSurface(
     points, intensity, width, height,
     xScale, yScale, zScale, xOffset, yOffset, zOffset);
 
-// 4×4 矩阵变换（OpenGL 列主序）
+// 4×4 矩阵变换（行主序 M·v，与 TransformPoint3D 实例方法 / OpenCL kernel 语义一致）
 CxPoint3D transformed = VisionOperator.TransformPoint3D(point, matrix);
 
 // 并行包围盒（Parallel.ForEach）
