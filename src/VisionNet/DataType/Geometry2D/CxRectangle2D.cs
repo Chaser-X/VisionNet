@@ -33,8 +33,9 @@ namespace VisionNet.DataType
             corners[2] = new CxPoint2D(-halfWidth, halfHeight);  // BottomLeft
             corners[3] = new CxPoint2D(halfWidth, halfHeight);   // BottomRight
             // Rotate and translate the corners
-            float cosAngle = (float)Math.Cos(Angle);
-            float sinAngle = (float)Math.Sin(Angle);
+            float rad = Angle * (float)Math.PI / 180f;
+            float cosAngle = (float)Math.Cos(rad);
+            float sinAngle = (float)Math.Sin(rad);
             for (int i = 0; i < corners.Length; i++)
             {
                 float xRotated = corners[i].X * cosAngle - corners[i].Y * sinAngle;

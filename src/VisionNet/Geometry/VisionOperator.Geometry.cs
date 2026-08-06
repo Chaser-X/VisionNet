@@ -25,6 +25,58 @@ namespace VisionNet
             line = new CxLine2D(point, direction);
         }
 
+        /// <summary>
+        /// Computes the convex hull of a set of 2D points (Andrew's monotone chain).
+        /// Returns a closed polygon in counter-clockwise order. Degenerate inputs
+        /// (fewer than 3 points) return an open polygon with the input points.
+        /// </summary>
+        public static void ConvexHull2D(CxPoint2D[] points, out CxPolygon2D hull)
+        {
+            if (points == null || points.Length == 0)
+            {
+                hull = new CxPolygon2D(null, true);
+                return;
+            }
+
+            var pts = new CxPoint2D[points.Length];
+            Array.Copy(points, pts, points.Length);
+            Array.Sort(pts, (a, b) => a.X != b.X ? a.X.CompareTo(b.X) : a.Y.CompareTo(b.Y));
+
+            if (pts.Length <= 2)
+            {
+                hull = new CxPolygon2D(pts, true);
+                return;
+            }
+
+            int n = pts.Length;
+            var lower = new CxPoint2D[n];
+            int lo = 0;
+            for (int i = 0; i < n; i++)
+            {
+                while (lo >= 2 && Cross2D(lower[lo - 2], lower[lo - 1], pts[i]) <= 0) lo--;
+                lower[lo++] = pts[i];
+            }
+
+            var upper = new CxPoint2D[n];
+            int up = 0;
+            for (int i = n - 1; i >= 0; i--)
+            {
+                while (up >= 2 && Cross2D(upper[up - 2], upper[up - 1], pts[i]) <= 0) up--;
+                upper[up++] = pts[i];
+            }
+
+            var result = new CxPoint2D[lo + up - 2];
+            for (int i = 0; i < lo - 1; i++) result[i] = lower[i];
+            for (int i = 0; i < up - 1; i++) result[lo - 1 + i] = upper[i];
+
+            hull = new CxPolygon2D(result, true);
+        }
+
+        private static float Cross2D(CxPoint2D o, CxPoint2D a, CxPoint2D b)
+        {
+            return (a.X - o.X) * (b.Y - o.Y) - (a.Y - o.Y) * (b.X - o.X);
+        }
+
         /// <summary>Converts an arc fitting field (annular sector) to a closed polygon.</summary>
         /// <param name="segmentCount">Number of segments for each arc (min 3). Total vertices = 2 × (segmentCount + 1).</param>
         public static void Arc2DFittingFieldToPolygon2D(CxArc2DFittingField field, int segmentCount, out CxPolygon2D polygon)
@@ -307,6 +359,102 @@ namespace VisionNet
             float cx = (minX + maxX) * 0.5f;
             float cy = (minY + maxY) * 0.5f;
             box = new CxBox2D(new CxPoint2D(cx, cy), new CxSize2D(maxX - minX, maxY - minY));
+        }
+
+        /// <summary>Returns the axis-aligned bounding box of a collection of 2D points.</summary>
+        public static void PointsBoundingBox2D(CxPoint2D[] points, out CxBox2D box)
+        {
+            if (points == null || points.Length == 0)
+            {
+                box = default;
+                return;
+            }
+            float minX = points[0].X, maxX = points[0].X;
+            float minY = points[0].Y, maxY = points[0].Y;
+            for (int i = 1; i < points.Length; i++)
+            {
+                if (points[i].X < minX) minX = points[i].X;
+                if (points[i].X > maxX) maxX = points[i].X;
+                if (points[i].Y < minY) minY = points[i].Y;
+                if (points[i].Y > maxY) maxY = points[i].Y;
+            }
+            float cx = (minX + maxX) * 0.5f;
+            float cy = (minY + maxY) * 0.5f;
+            box = new CxBox2D(new CxPoint2D(cx, cy), new CxSize2D(maxX - minX, maxY - minY));
+        }
+
+        /// <summary>Returns the minimum-area oriented bounding rectangle of a polygon.</summary>
+        public static void PolygonBoundingRectangle2D(CxPolygon2D polygon, out CxRectangle2D rect)
+        {
+            PointsBoundingRectangle2D(polygon.Points, out rect);
+        }
+
+        /// <summary>
+        /// Returns the minimum-area oriented bounding rectangle of a collection of 2D points.
+        /// The rectangle's angle is aligned with one of the convex hull edges, in degrees.
+        /// Degenerate inputs (fewer than 3 distinct points) fall back to the axis-aligned box.
+        /// </summary>
+        public static void PointsBoundingRectangle2D(CxPoint2D[] points, out CxRectangle2D rect)
+        {
+            ConvexHull2D(points, out var hull);
+            var hullPts = hull.Points;
+            if (hullPts == null || hullPts.Length == 0)
+            {
+                rect = default;
+                return;
+            }
+
+            if (hullPts.Length < 3)
+            {
+                PointsBoundingBox2D(hullPts, out var box);
+                rect = new CxRectangle2D(box.Center, box.Size, 0f);
+                return;
+            }
+
+            float bestArea = float.MaxValue;
+            float bestW = 0, bestH = 0, bestAngle = 0;
+            float bestCx = 0, bestCy = 0;
+
+            int h = hullPts.Length;
+            for (int i = 0; i < h; i++)
+            {
+                var a = hullPts[i];
+                var b = hullPts[(i + 1) % h];
+
+                float ex = b.X - a.X, ey = b.Y - a.Y;
+                float len = (float)Math.Sqrt(ex * ex + ey * ey);
+                if (len < Eps) continue;
+
+                float ux = ex / len, uy = ey / len;      // edge direction
+                float nx = -uy, ny = ux;                 // perpendicular
+
+                float minU = float.MaxValue, maxU = float.MinValue;
+                float minN = float.MaxValue, maxN = float.MinValue;
+                for (int j = 0; j < h; j++)
+                {
+                    float du = hullPts[j].X * ux + hullPts[j].Y * uy;
+                    float dn = hullPts[j].X * nx + hullPts[j].Y * ny;
+                    if (du < minU) minU = du;
+                    if (du > maxU) maxU = du;
+                    if (dn < minN) minN = dn;
+                    if (dn > maxN) maxN = dn;
+                }
+
+                float w = maxU - minU;
+                float ht = maxN - minN;
+                float area = w * ht;
+                if (area < bestArea)
+                {
+                    bestArea = area;
+                    bestW = w;
+                    bestH = ht;
+                    bestAngle = (float)(Math.Atan2(uy, ux) * 180.0 / Math.PI);
+                    bestCx = ((minU + maxU) * 0.5f) * ux + ((minN + maxN) * 0.5f) * nx;
+                    bestCy = ((minU + maxU) * 0.5f) * uy + ((minN + maxN) * 0.5f) * ny;
+                }
+            }
+
+            rect = new CxRectangle2D(new CxPoint2D(bestCx, bestCy), new CxSize2D(bestW, bestH), bestAngle);
         }
 
         // ── 2D: Intersection ─────────────────────────────────────────────────────
