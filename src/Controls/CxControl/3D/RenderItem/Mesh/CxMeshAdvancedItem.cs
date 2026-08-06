@@ -25,8 +25,14 @@ namespace VisionNet.Controls
         /// Model matrix applied to this item's geometry before the camera transform.
         /// Represents the item's pose (position and orientation) in world space.
         /// Defaults to identity (no transform).
+        /// Setting a new pose recomputes the world-space Z range used for colour mapping.
         /// </summary>
-        public CxMatrix4X4 ModelMatrix { get; set; } = CxMatrix4X4.Identity();
+        private CxMatrix4X4 _modelMatrix = CxMatrix4X4.Identity();
+        public CxMatrix4X4 ModelMatrix
+        {
+            get => _modelMatrix;
+            set { _modelMatrix = value; UpdateWorldZRange(); }
+        }
 
         private SurfaceMode _surfaceMode;
         public SurfaceMode SurfaceMode
@@ -107,8 +113,9 @@ namespace VisionNet.Controls
 
             void main()
             {
-                gl_Position = projection * view * model * vec4(aPos, 1.0);
-                height = aPos.z;
+                vec4 worldPos = model * vec4(aPos, 1.0);
+                gl_Position = projection * view * worldPos;
+                height = worldPos.z;
                 TexCoord = aTexCoord;
                 diffValue = aDiff;
             }";
@@ -127,7 +134,8 @@ namespace VisionNet.Controls
 
             vec3 getColorByHeight(float h)
             {
-                float n = clamp((h - zMin) / (zMax - zMin), 0.0, 1.0);
+                float span = max(zMax - zMin, 1e-6);
+                float n = clamp((h - zMin) / span, 0.0, 1.0);
                 if (n < 0.2) return mix(vec3(0,0,1), vec3(0,1,1), n * 5.0);
                 if (n < 0.4) return mix(vec3(0,1,1), vec3(0,1,0), (n-0.2)*5.0);
                 if (n < 0.6) return mix(vec3(0,1,0), vec3(1,1,0), (n-0.4)*5.0);
@@ -161,11 +169,40 @@ namespace VisionNet.Controls
             _surfaceColorMode = surfaceColorMode;
 
             BoundingBox = CxExtension.CalculateBoundingBox(mesh?.Vertices);
-            _trueZMax = ZMax = (float)(BoundingBox?.Center.Z + BoundingBox?.Size.Depth / 2);
-            _trueZMin = ZMin = (float)(BoundingBox?.Center.Z - BoundingBox?.Size.Depth / 2);
 
-            // 预计算差分范围
+            // 预计算差分范围（UpdateWorldZRange 在 Diff 模式时引用 _diff 范围，须先算）
             ComputeDiffRange(mesh?.Diff);
+            UpdateWorldZRange();
+        }
+
+        /// <summary>
+        /// Recomputes the world-space Z range (after applying the model matrix) used for
+        /// height-based colour mapping. <see cref="_trueZMin"/>/<see cref="_trueZMax"/> always
+        /// track the world range (used when leaving Diff mode); in Diff mode the active
+        /// <see cref="ZMin"/>/<see cref="ZMax"/> track the diff range instead.
+        /// </summary>
+        private void UpdateWorldZRange()
+        {
+            CxExtension.ComputeWorldZRange(BoundingBox, _modelMatrix, out float zMin, out float zMax);
+            _trueZMin = zMin;
+            _trueZMax = zMax;
+
+            if (_surfaceColorMode == SurfaceColorMode.Diff)
+            {
+                ZMin = _diffMin;
+                ZMax = _diffMax;
+            }
+            else
+            {
+                ZMin = zMin;
+                ZMax = zMax;
+            }
+
+            if (_cachedRenderData?.Uniforms != null)
+            {
+                _cachedRenderData.Uniforms["zMin"] = ZMin;
+                _cachedRenderData.Uniforms["zMax"] = ZMax;
+            }
         }
 
         private void ComputeDiffRange(float[] diffData)

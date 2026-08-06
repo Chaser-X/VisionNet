@@ -155,7 +155,9 @@ namespace VisionNet.Controls
         }
 
         /// <summary>
-        /// Computes the axis-aligned bounding box that encloses all active surface items.
+        /// Computes the world-space bounding box that encloses all active surface items,
+        /// accounting for each item's model matrix (pose). The eight corners of each item's
+        /// local bounding box are transformed and the union is accumulated.
         /// Returns <c>null</c> when no items are loaded or none have a valid bounding box.
         /// Caller must hold <see cref="_resourceLock"/>.
         /// </summary>
@@ -163,26 +165,51 @@ namespace VisionNet.Controls
         {
             float minX = float.MaxValue, minY = float.MaxValue, minZ = float.MaxValue;
             float maxX = float.MinValue, maxY = float.MinValue, maxZ = float.MinValue;
+            bool any = false;
 
             foreach (var item in _surfaceItems)
             {
                 var bb = item.BoundingBox;
                 if (bb == null) continue;
-                float x0 = bb.Value.Center.X - bb.Value.Size.Width  / 2f;
-                float x1 = bb.Value.Center.X + bb.Value.Size.Width  / 2f;
-                float y0 = bb.Value.Center.Y - bb.Value.Size.Height / 2f;
-                float y1 = bb.Value.Center.Y + bb.Value.Size.Height / 2f;
-                float z0 = bb.Value.Center.Z - bb.Value.Size.Depth  / 2f;
-                float z1 = bb.Value.Center.Z + bb.Value.Size.Depth  / 2f;
-                if (x0 < minX) minX = x0; if (x1 > maxX) maxX = x1;
-                if (y0 < minY) minY = y0; if (y1 > maxY) maxY = y1;
-                if (z0 < minZ) minZ = z0; if (z1 > maxZ) maxZ = z1;
+                var m = GetItemModelMatrix(item);
+
+                float cx = bb.Value.Center.X, cy = bb.Value.Center.Y, cz = bb.Value.Center.Z;
+                float hw = bb.Value.Size.Width  / 2f;
+                float hh = bb.Value.Size.Height / 2f;
+                float hd = bb.Value.Size.Depth  / 2f;
+
+                for (int i = 0; i < 8; i++)
+                {
+                    var wp = m.TransformPoint3D(new CxPoint3D(
+                        cx + ((i & 1) == 0 ? -hw : hw),
+                        cy + ((i & 2) == 0 ? -hh : hh),
+                        cz + ((i & 4) == 0 ? -hd : hd)));
+                    if (wp.X < minX) minX = wp.X;
+                    if (wp.X > maxX) maxX = wp.X;
+                    if (wp.Y < minY) minY = wp.Y;
+                    if (wp.Y > maxY) maxY = wp.Y;
+                    if (wp.Z < minZ) minZ = wp.Z;
+                    if (wp.Z > maxZ) maxZ = wp.Z;
+                    any = true;
+                }
             }
 
-            if (minX == float.MaxValue) return null;
+            if (!any) return null;
             return new CxBox3D(
                 new CxPoint3D((minX + maxX) / 2, (minY + maxY) / 2, (minZ + maxZ) / 2),
                 new CxSize3D(maxX - minX, maxY - minY, maxZ - minZ));
+        }
+
+        /// <summary>
+        /// Returns the model matrix (pose) of an advanced render item, or identity for
+        /// fixed-pipeline items that do not support poses.
+        /// </summary>
+        private static CxMatrix4X4 GetItemModelMatrix(ICxObjRenderItem item)
+        {
+            if (item is CxSurfaceAdvancedItem s) return s.ModelMatrix;
+            if (item is CxMeshAdvancedItem m) return m.ModelMatrix;
+            if (item is CxPointCloudAdvancedItem p) return p.ModelMatrix;
+            return CxMatrix4X4.Identity();
         }
 
         /// <summary>
