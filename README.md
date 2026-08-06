@@ -159,7 +159,7 @@ VisionNet/
 │   ├── VisionNet/                  # 核心库
 │   │   ├── DataType/
 │   │   │   ├── Geometry3D/         # CxPoint3D, CxVector3D, CxBox3D, CxPose3D ...
-│   │   │   ├── Geometry2D/         # CxPoint2D, CxCoordination2D, CxMatrix3X3, CxCircle2D ...
+│   │   │   ├── Geometry2D/         # CxPoint2D, CxCoordination2D, CxMatrix3X3, CxCircle2D, CxRegion2D ...
 │   │   │   └── Models/             # CxSurface, CxPointCloud, CxMesh, CxImage, CxMatrix4X4
 │   │   ├── Analysis/               # 统计分析 / 拟合算子
 │   │   │   └── VisionOperator.Analysis.cs  # FitPointsToCircle2D, FitPointsToPlane ...
@@ -208,8 +208,8 @@ VisionNet/
 │               ├── CxDisplay2D.Api.cs       # 公共 API（Set* / Add* / 视图管理）
 │               ├── CxDisplay2D.Render.cs    # 轴范围 / 缩放控制
 │               └── RenderItem2D/
-│                   ├── Image/      # CxImageItem
-│                   └── Geometry/   # Point / Segment / Line / Circle / Arc / Polygon ...
+│                   ├── Image/      # CxImageItem, CxImageItemAdvance
+│                   └── Geometry/   # Point / Segment / Line / Circle / Arc / Polygon / FittingField / Region ...
 ├── Test/
 │   ├── Test/                       # 控制台单元测试
 │   └── DemoFrom/                   # WinForms 演示应用
@@ -243,7 +243,11 @@ VisionNet/
 
 - **基于 ScottPlot**：每个 2D 渲染 Item 包装为 ScottPlot `IPlottable`，由 `CxDisplay2D` 统一管理
 - **自适应裁剪**：无限长直线（`CxLine2DItem`）根据当前 `AxisLimits` 动态计算线段端点，始终刚好覆盖视野 + 10% 边距
-- **非侵入式**：不修改 ScottPlot 内部逻辑，仅通过标准 API（`Add.Scatter` / `Add.Arrow` / `Add.Text`）叠加图元
+- **交互式几何 Item**：圆弧 / 矩形 / 线段 / 多边形 / 拟合场等支持鼠标拖拽编辑（控制点、宽度手柄、旋转手柄），命中优先级：宽度手柄 → 顶点/中点 → 图形内部 → 边缘
+- **像素空间命中**：控制点与选中态标记按**像素大小**绘制（不随缩放变化），命中阈值同样以像素计
+- **虚拟画布图像（`CxImageItemAdvance`）**：大图渲染采用"全局缩略图 + 视口高清瓦片"双层结构，`RefreshViewport()` 只在视口移动超过 50% 时重新裁剪瓦片，高倍缩放保持清晰且无错位
+- **双击对焦**：双击任意位置将视图中心移动到点击处（`DoubleClick` 事件 + `Control.MousePosition` 换算局部坐标，移除默认双击基准线）
+- **非侵入式**：不修改 ScottPlot 内部逻辑，仅通过标准 API（`Add.Scatter` / `Add.Arrow` / `Add.Text` / `Add.ImageRect`）叠加图元
 
 ---
 
@@ -267,6 +271,7 @@ VisionNet/
 | `CxSegment3D`      | 线段（Start + End）                                      |
 | `CxPolygon3D`      | 多边形顶点序列（`IsClosed` 控制是否闭合）                           |
 | `CxCoordination3D` | 3D 坐标系（Origin + XAxis + YAxis + ZAxis）               |
+| `CxPose3D`         | 6-DOF 位姿（X/Y/Z + Rx/Ry/Rz，旋转为度，外在 Z-Y-X 约定）     |
 | `CxTextInfo`       | 世界坐标锚定文本标签（Location + Text + Size）                   |
 
 </details>
@@ -286,6 +291,8 @@ VisionNet/
 | `CxCircle2D`                | 2D 圆                               |
 | `CxBox2D`                  | 2D 轴对齐包围盒（Center + Size）           |
 | `CxRectangle2D`            | 2D 带角度的矩形（Center + Size + Angle）   |
+| `CxRegion2D`               | RLE 区域（`CxRun` 行程 + 面积/包围盒/包含判定、轮廓与区域互转） |
+| `CxSegment2DFittingField` / `CxArc2DFittingField` / `CxPolygon2DFittingField` / `CxCircle2DFittingField` | 边缘查找拟合场（ROI 带 + 宽度，供寻边算子使用） |
 | `CxSize2D`                 | 2D 尺寸（Width + Height）                |
 | `CxText2D`                  | 屏幕空间文本（Location + Text + FontSize） |
 
@@ -352,11 +359,11 @@ img.ToBitmap()                                    // → System.Drawing.Bitmap (
 img.GetThumbnail(maxW, maxH)                      // → 等比例缩略图
 ```
 
-**`CxMatrix4X4`** — 4×4 行主序矩阵（`Data[i*4+j]` = 第 i 行第 j 列；传给 OpenGL 时需先转置）
+**`CxMatrix4X4`** — 4×4 行主序矩阵（`Data[i*4+j]` = 第 i 行第 j 列；传给 OpenGL 时需先转置），旋转角度均为**度**
 
 ```csharp
-var m = CxMatrix4X4.RotationZ((float)Math.PI / 4);      // Z 轴旋转
-var r = CxMatrix4X4.RotationAxis(axis, angle);           // 罗德里格任意轴旋转
+var m = CxMatrix4X4.RotationZ(45f);                      // Z 轴旋转 45°
+var r = CxMatrix4X4.RotationAxis(axis, 30f);             // 罗德里格任意轴旋转 30°
 var t = CxMatrix4X4.Translation(1, 2, 3);                // 平移
 var s = CxMatrix4X4.Scale(0.5f, 1f, 2f);                 // 缩放
 var v = CxMatrix4X4.LookAt(eye, center, up);             // 视图矩阵
@@ -367,6 +374,17 @@ var trans   = product.Transpose();                        // 转置
 var pt      = product.TransformPoint3D(point);            // 点变换（含透视除除）
 var vec     = product.TransformVector3D(vector);          // 向量变换（仅 3×3 子块）
 var x       = product.Solve3x3(b);                        // 克莱默法则求解 3×3 线性方程组
+```
+
+**`CxPose3D`** — 6 自由度位姿（平移 + 旋转），旋转角度均为**度**；旋转约定为外在 Z-Y-X（`R = Rz·Ry·Rx`）
+
+```csharp
+var pose = new CxPose3D(1, 2, 3, 45f, 0f, 0f);           // 平移 (1,2,3) + 绕 X 旋转 45°
+CxPose3D t = CxPose3D.FromTranslation(1, 2, 3);          // 仅平移
+CxPose3D r = CxPose3D.FromRotation(0f, 0f, 90f);         // 仅旋转
+
+CxMatrix4X4 mat = pose.ToMatrix();                       // 位姿 → 4×4 矩阵（度自动转弧度）
+CxPose3D back  = CxPose3D.FromMatrix(mat);               // 矩阵 → 位姿（含万向锁处理，返回度）
 ```
 
 **`CxMatrix3X3`** — 3×3 行主序矩阵，用于 2D 仿射变换（角度为度）
@@ -461,16 +479,25 @@ var w2lLn = VisionOperator.AlignLine3D(line, coord3d, true);      // 正向
 
 // ── 2D 几何构造与计算（VisionOperator.Geometry） ────────────────
 
-VisionOperator.CreateLine2D(p1, p2, out var line);                 // 两点构造直线
-VisionOperator.LineOrientation(line, AngleMode.Signed180, out var a); // 直线角度（-180~180）
-VisionOperator.SegmentLength(seg, out var len);                    // 线段长度
-VisionOperator.SegmentMidpoint(seg, out var mid);                  // 线段中点
+VisionOperator.CreateLine2D(p1, p2, out var line);                  // 两点构造直线
+VisionOperator.Line2DOrientation(line, AngleMode.Signed180, out var a); // 直线角度（-180~180）
+VisionOperator.Segment2DLength(seg, out var len);                   // 线段长度
+VisionOperator.Segment2DMidpoint(seg, out var mid);                 // 线段中点
 
-if (VisionOperator.IntersectLineLine(l1, l2, out var pt))          // 线线求交
+if (VisionOperator.IntersectLineLine2D(l1, l2, out var pt))         // 线线求交
     Console.WriteLine($"Intersection: ({pt.X}, {pt.Y})");
 
-VisionOperator.ProjectPointToLine(p, line, out var proj);          // 点投影到直线
-VisionOperator.DistancePointToLine2D(p, line, out var dist);       // 点线距
+VisionOperator.ProjectPointToLine2D(p, line, out var proj);         // 点投影到直线
+VisionOperator.DistancePointToLine2D(p, line, out var dist);        // 点线距
+
+// ── 2D 包围盒 / 凸包（VisionOperator.Geometry） ──────────────────
+
+VisionOperator.RectangleBoundingBox2D(rect, out var rbox);          // 旋转矩形 → 轴对齐包围盒
+VisionOperator.PolygonBoundingBox2D(poly, out var pbox);            // 多边形 → 轴对齐包围盒
+VisionOperator.PointsBoundingBox2D(pts, out var ptbox);             // 点集 → 轴对齐包围盒
+VisionOperator.PointsBoundingRectangle2D(pts, out var orect);       // 点集 → 最小面积有向矩形（角度=度）
+VisionOperator.PolygonBoundingRectangle2D(poly, out var orect2);    // 多边形 → 最小面积有向矩形
+VisionOperator.ConvexHull2D(pts, out var hull);                     // 点集凸包（Andrew 单调链，逆时针）
 
 // 3D
 VisionOperator.CreatePlane(p1, p2, p3, out var plane);             // 三点构造平面
@@ -636,6 +663,24 @@ VisionOperator.DestroyLib();
 | 鼠标悬停 | 显示世界坐标 X / Y / Z / 强度标签 |
 | 右键菜单 | 切换视角 / 渲染模式 / 颜色模式      |
 
+### CxDisplay2D 控件
+
+2D 渲染控件，基于 ScottPlot，面向机器视觉 ROI 标注与测量：
+
+```csharp
+var display2D = new CxDisplay2D();
+display2D.Dock = DockStyle.Fill;
+this.Controls.Add(display2D);
+
+display2D.SetImage(image);                      // 显示图像（等比例适配，DisplayMode.None 时不自动适配）
+display2D.SetImageAdvance(image);               // 虚拟画布大图模式（缩略图 + 视口高清瓦片）
+display2D.SetScaleAndOffset(new CxPoint3D(1, 1, 1), new CxPoint3D(0, 0, 0)); // 像素→世界缩放 / 偏移
+display2D.SetAspectLock(true);                  // 锁定 X/Y 宽高比（避免像素变形）
+display2D.SetBackgroundColor(Color.Black);
+```
+
+支持叠加以下可交互 2D Item：线段、直线、圆弧、圆、矩形、包围盒、多边形、点、坐标系、边缘查找拟合场、RLE 区域、文本；图像 Item 支持鼠标取像素值（`GetPixelFloat`）。双击视图居中到点击处。
+
 ---
 
 ## 渲染 Item 体系
@@ -659,18 +704,27 @@ VisionOperator.DestroyLib();
 | `CxTextInfoItem`           | 世界坐标投影                           | 世界锚定文本                   |
 | `CxText2DItem`             | 2D 正交 HUD                        | 屏幕固定文本                   |
 | `CxCoordination2DItem`    | X/Y 箭头 + 标签                      | 2D 坐标系指示器                  |
+| `CxImageItem`            | ScottPlot ImageRect                | 2D 图像（全局缩略图渲染）           |
+| `CxImageItemAdvance`     | 虚拟画布 + 视口裁剪（双层 ImageRect）       | 2D 大图高倍缩放（全局缩略图 + 视口高清瓦片） |
 | `CxLine2DItem`            | ScottPlot Scatter                  | 2D 无限长直线（自适应视野裁剪）    |
-| `CxSegment2DItem`         | ScottPlot Scatter                  | 2D 线段                       |
+| `CxSegment2DItem`         | ScottPlot Scatter                  | 2D 线段（选中态显示端点 + 方向箭头） |
 | `CxCircle2DItem`          | ScottPlot Ellipse                  | 2D 圆（可交互缩放半径）           |
-| `CxArc2DItem`             | ScottPlot Ellipse 圆弧               | 2D 圆弧                       |
+| `CxArc2DItem`             | ScottPlot Ellipse 圆弧               | 2D 圆弧（三点交互）               |
 | `CxPolygon2DItem`         | ScottPlot Polygon                  | 2D 多边形 / 折线                |
-| `CxRectangle2DItem`       | ScottPlot Rectangle                | 2D 旋转矩形                    |
+| `CxRectangle2DItem`       | ScottPlot Rectangle                | 2D 旋转矩形（顶点 + 顶部旋转手柄交互） |
 | `CxBox2DItem`             | ScottPlot Rectangle                | 2D 轴对齐包围盒                 |
 | `CxPoint2DItem`           | ScottPlot Scatter                  | 2D 离散点集                    |
+| `CxSegment2DFittingFieldItem` / `CxArc2DFittingFieldItem` / `CxPolygon2DFittingFieldItem` / `CxCircle2DFittingFieldItem` | ScottPlot Polygon/Scatter | 边缘查找拟合场（ROI 带 + 宽度手柄，可拖动调节） |
+| `CxRegion2DItem`          | ScottPlot Polygon                  | 2D RLE 区域（轮廓渲染，可选填充）  |
+| `CxText2DItem`            | ScottPlot Text                     | 2D 屏幕空间文本                  |
 
 ---
 
 ## 注意事项
+
+> **角度约定**
+> 全库统一使用**度**作为角度单位：`CxRectangle2D.Angle`、`CxArc2D.StartAngle/SweepAngle`、`CxCoordination2D.Angle`、`CxPose3D.Rx/Ry/Rz`、`CxMatrix4X4.RotationX/Y/Z/RotationAxis` 及 2D/3D 方向角均为度。
+> `CxMatrix4X4.Rotation*` 内部自动完成度 → 弧度换算；`CxPose3D.ToMatrix/FromMatrix` 度 → 弧度互转。
 
 > **GL 资源线程约束**
 > 所有 OpenGL 对象（VBO / VAO / Shader / Texture）只能在创建它们的 GL 线程中释放。
