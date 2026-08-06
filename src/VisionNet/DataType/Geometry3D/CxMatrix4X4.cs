@@ -94,12 +94,12 @@ namespace VisionNet.DataType
             });
 
         /// <summary>
-        /// Creates a rotation matrix around the X axis by <paramref name="angle"/> radians.
+        /// Creates a rotation matrix around the X axis by <paramref name="angle"/> degrees.
         /// </summary>
         public static CxMatrix4X4 RotationX(float angle)
         {
-            float c = (float)Math.Cos(angle);
-            float s = (float)Math.Sin(angle);
+            float c = (float)Math.Cos(angle * (float)Math.PI / 180f);
+            float s = (float)Math.Sin(angle * (float)Math.PI / 180f);
             return new CxMatrix4X4(new float[]
             {
                 1,  0, 0, 0,
@@ -110,12 +110,12 @@ namespace VisionNet.DataType
         }
 
         /// <summary>
-        /// Creates a rotation matrix around the Y axis by <paramref name="angle"/> radians.
+        /// Creates a rotation matrix around the Y axis by <paramref name="angle"/> degrees.
         /// </summary>
         public static CxMatrix4X4 RotationY(float angle)
         {
-            float c = (float)Math.Cos(angle);
-            float s = (float)Math.Sin(angle);
+            float c = (float)Math.Cos(angle * (float)Math.PI / 180f);
+            float s = (float)Math.Sin(angle * (float)Math.PI / 180f);
             return new CxMatrix4X4(new float[]
             {
                  c, 0, s, 0,
@@ -126,12 +126,12 @@ namespace VisionNet.DataType
         }
 
         /// <summary>
-        /// Creates a rotation matrix around the Z axis by <paramref name="angle"/> radians.
+        /// Creates a rotation matrix around the Z axis by <paramref name="angle"/> degrees.
         /// </summary>
         public static CxMatrix4X4 RotationZ(float angle)
         {
-            float c = (float)Math.Cos(angle);
-            float s = (float)Math.Sin(angle);
+            float c = (float)Math.Cos(angle * (float)Math.PI / 180f);
+            float s = (float)Math.Sin(angle * (float)Math.PI / 180f);
             return new CxMatrix4X4(new float[]
             {
                 c, -s, 0, 0,
@@ -142,19 +142,20 @@ namespace VisionNet.DataType
         }
 
         /// <summary>
-        /// Creates a rotation matrix around an arbitrary unit axis by <paramref name="angle"/> radians
+        /// Creates a rotation matrix around an arbitrary unit axis by <paramref name="angle"/> degrees
         /// using Rodrigues' rotation formula.
         /// </summary>
         /// <param name="axis">Rotation axis (will be normalized to unit length).</param>
-        /// <param name="angle">Rotation angle in radians.</param>
+        /// <param name="angle">Rotation angle in degrees.</param>
         public static CxMatrix4X4 RotationAxis(CxVector3D axis, float angle)
         {
             float kx = axis.X, ky = axis.Y, kz = axis.Z;
             float len = (float)Math.Sqrt(kx * kx + ky * ky + kz * kz);
             if (len > 1e-6f) { kx /= len; ky /= len; kz /= len; }
 
-            float c = (float)Math.Cos(angle);
-            float s = (float)Math.Sin(angle);
+            float rad = angle * (float)Math.PI / 180f;
+            float c = (float)Math.Cos(rad);
+            float s = (float)Math.Sin(rad);
             float t = 1f - c;
 
             float txx = t * kx * kx;

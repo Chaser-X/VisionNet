@@ -4,8 +4,8 @@ using System.Globalization;
 namespace VisionNet.DataType
 {
     /// <summary>
-    /// Represents a 6-DOF pose: translation (X, Y, Z) and rotation (Rx, Ry, Rz) in radians.
-    /// Rotation uses the intrinsic Z-Y-X convention: R = Rz * Ry * Rx.
+    /// Represents a 6-DOF pose: translation (X, Y, Z) and rotation (Rx, Ry, Rz) in degrees.
+    /// Rotation uses the extrinsic Z-Y-X convention: R = Rz * Ry * Rx.
     /// </summary>
     public struct CxPose3D
     {
@@ -13,13 +13,13 @@ namespace VisionNet.DataType
         public float Y;
         public float Z;
 
-        /// <summary>Rotation around the X axis, in radians.</summary>
+        /// <summary>Rotation around the X axis, in degrees.</summary>
         public float Rx;
 
-        /// <summary>Rotation around the Y axis, in radians.</summary>
+        /// <summary>Rotation around the Y axis, in degrees.</summary>
         public float Ry;
 
-        /// <summary>Rotation around the Z axis, in radians.</summary>
+        /// <summary>Rotation around the Z axis, in degrees.</summary>
         public float Rz;
 
         public CxPose3D(float x, float y, float z, float rx, float ry, float rz)
@@ -60,7 +60,7 @@ namespace VisionNet.DataType
         /// Extracts a 6-DOF pose from a 4×4 transformation matrix.
         /// Translation is taken from the rightmost column;
         /// rotation (Rx, Ry, Rz) is extracted from the upper-left 3×3 submatrix
-        /// using the Z-Y-X convention with gimbal-lock handling.
+        /// using the Z-Y-X convention with gimbal-lock handling, in degrees.
         /// </summary>
         public static CxPose3D FromMatrix(CxMatrix4X4 matrix)
         {
@@ -83,7 +83,8 @@ namespace VisionNet.DataType
                 rz = (float)Math.Atan2(-matrix.Data[1], matrix.Data[5]);
             }
 
-            return new CxPose3D(tx, ty, tz, rx, ry, rz);
+            const float rad2deg = 180f / (float)Math.PI;
+            return new CxPose3D(tx, ty, tz, rx * rad2deg, ry * rad2deg, rz * rad2deg);
         }
 
         // ── Accessors ───────────────────────────────────────────────────────────
