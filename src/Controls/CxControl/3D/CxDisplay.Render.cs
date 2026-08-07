@@ -8,7 +8,6 @@ namespace VisionNet.Controls
     /// <summary>Render pipeline: GL lifecycle callbacks, frame processing, and draw dispatch.</summary>
     public partial class CxDisplay
     {
-        private System.Drawing.Size _lastSurfaceSize = System.Drawing.Size.Empty;
         /// <inheritdoc/>
         protected override void DoOpenGLInitialized()
         {
@@ -26,9 +25,9 @@ namespace VisionNet.Controls
             if (DesignMode) return;
             base.DoOpenGLDraw(e);
 
-            if (Width > 0 && Height > 0 && _lastSurfaceSize != new System.Drawing.Size(Width, Height))
+            var rcp = OpenGL.RenderContextProvider;
+            if (rcp != null && Width > 0 && Height > 0)
             {
-                _lastSurfaceSize = new System.Drawing.Size(Width, Height);
                 OpenGL.SetDimensions(Width, Height);
                 OpenGL.Viewport(0, 0, Width, Height);
             }
