@@ -43,7 +43,10 @@ namespace VisionNet.Controls
                 _surfaceMode = value;
                 // Lit 仅在 Mesh 模式有效；模式切换时刷新 shader 的 colorMode
                 if (_cachedRenderData?.Uniforms != null)
+                {
                     _cachedRenderData.Uniforms["colorMode"] = EffectiveColorMode;
+                    _cachedRenderData.Uniforms["surfaceMode"] = value == SurfaceMode.Mesh ? 1 : 0;
+                }
             }
         }
 
@@ -153,6 +156,7 @@ namespace VisionNet.Controls
             uniform float zMin;
             uniform float zMax;
             uniform int colorMode;
+            uniform int surfaceMode;
             uniform sampler2D intensityTexture;
 
             vec3 getColorByHeight(float h)
@@ -170,26 +174,31 @@ namespace VisionNet.Controls
             {
                 if (isinf(height)) discard;
                 float intensity = texture(intensityTexture, TexCoord).r;
-                if (colorMode == 3) {
-                    if (isinf(diffValue)) discard;
-                    FragColor = vec4(getColorByHeight(diffValue), 1.0);
-                } else if (colorMode == 0) {
-                    FragColor = vec4(getColorByHeight(height), 1.0);
-                } else if (colorMode == 1) {
-                    FragColor = vec4(vec3(intensity), 1.0);
-                } else if (colorMode == 4) {
+                
+                vec3 lightFactor = vec3(1.0);
+                if(surfaceMode == 1)
+                {
                     vec3 N = normalize(cross(dFdx(viewPos), dFdy(viewPos)));
                     vec3 V = normalize(-viewPos);
                     if (dot(N, V) < 0.0) N = -N;
-                    if (dot(N, N) < 1e-6) N = V;
+                    if (!(dot(N, N) > 1e-6)) N = V;
                     vec3 L = normalize(lightDirView);
                     vec3 H = normalize(V + L);
                     float diff = max(dot(N, L), 0.0);
                     float spec = pow(max(dot(N, H), 0.0), 24.0) * 0.4;
-                    vec3 albedo = vec3(0.85);
-                    FragColor = vec4(0.35f * albedo + 0.8f * diff * albedo + 0.4f * spec, 1.0);
+                    lightFactor = vec3((0.35f + 0.8f * diff) + 0.4f * spec);
+                }
+                if (colorMode == 3) {
+                    if (isinf(diffValue)) discard;
+                    FragColor = vec4(getColorByHeight(diffValue) * lightFactor, 1.0);
+                } else if (colorMode == 0) {
+                    FragColor = vec4(getColorByHeight(height) * lightFactor, 1.0);
+                } else if (colorMode == 1) {
+                    FragColor = vec4(vec3(intensity) * lightFactor, 1.0);
+                } else if (colorMode == 4) {
+                    FragColor = vec4(vec3(0.85) * lightFactor, 1.0);
                 } else {
-                    FragColor = vec4(mix(vec3(intensity), getColorByHeight(height), 0.5), 1.0);
+                    FragColor = vec4(mix(vec3(intensity), getColorByHeight(height), 0.5) * lightFactor, 1.0);
                 }
             }";
         #endregion
@@ -305,6 +314,7 @@ namespace VisionNet.Controls
                     ["zMin"]      = ZMin,
                     ["zMax"]      = ZMax,
                     ["colorMode"] = EffectiveColorMode,
+                    ["surfaceMode"] = _surfaceMode == SurfaceMode.Mesh ? 1 : 0,
                 },
             };
 
