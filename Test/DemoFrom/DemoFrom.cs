@@ -482,7 +482,7 @@ namespace DemoFrom
                 }
                 _currentMesh = mesh;
                 cxDisplay2.ResetView();
-                cxDisplay2.SetMesh(mesh);
+                cxDisplay2.SetMeshAdvancedItem(mesh);
             }
         }
 

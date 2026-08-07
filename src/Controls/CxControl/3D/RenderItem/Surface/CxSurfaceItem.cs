@@ -42,6 +42,7 @@ namespace VisionNet.Controls
             set
             {
                 if (value == SurfaceColorMode.Diff) value = SurfaceColorMode.Color;
+                if (value == SurfaceColorMode.Lit) value = SurfaceColorMode.Color;
                 if (_surfaceColorMode != value)
                 {
                     _surfaceColorMode = value;
@@ -59,7 +60,10 @@ namespace VisionNet.Controls
         {
             Surface = surface;
             _surfaceMode = surfaceMode;
-            _surfaceColorMode = surfaceColorMode;
+            // 固定管线不支持 GLSL 光照 → Lit 回退为 Color
+            _surfaceColorMode = surfaceColorMode == SurfaceColorMode.Lit
+                ? SurfaceColorMode.Color
+                : surfaceColorMode;
 
             BoundingBox = surface?.Data != null && surface.Data.Length > 0
                 ? CxExtension.CalculateBoundingBox(surface.ToPoints())

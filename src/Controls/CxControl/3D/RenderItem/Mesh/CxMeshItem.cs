@@ -33,6 +33,8 @@ namespace VisionNet.Controls
             get => _surfaceColorMode;
             set
             {
+                // 固定管线不支持 GLSL 光照 → Lit 回退为 Color
+                if (value == SurfaceColorMode.Lit) value = SurfaceColorMode.Color;
                 if (_surfaceColorMode == value) return;
                 var old = _surfaceColorMode;
 
@@ -76,7 +78,10 @@ namespace VisionNet.Controls
         {
             Mesh = mesh;
             _surfaceMode = surfaceMode;
-            _surfaceColorMode = surfaceColorMode;
+            // 固定管线不支持 GLSL 光照 → Lit 回退为 Color
+            _surfaceColorMode = surfaceColorMode == SurfaceColorMode.Lit
+                ? SurfaceColorMode.Color
+                : surfaceColorMode;
 
             BoundingBox = CxExtension.CalculateBoundingBox(mesh?.Vertices);
             _trueZMax = ZMax = (float)(BoundingBox?.Center.Z + BoundingBox?.Size.Depth / 2);

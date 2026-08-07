@@ -43,7 +43,13 @@ namespace VisionNet.Controls
         public SurfaceMode SurfaceMode
         {
             get => _surfaceMode;
-            set => _surfaceMode = value; // 只影响 Draw() 选择 DrawArrays/DrawElements
+            set
+            {
+                _surfaceMode = value;
+                // Lit 仅在 Mesh 模式有效；模式切换时刷新 shader 的 colorMode
+                if (_cachedRenderData?.Uniforms != null)
+                    _cachedRenderData.Uniforms["colorMode"] = EffectiveColorMode;
+            }
         }
 
         private SurfaceColorMode _surfaceColorMode;
@@ -57,10 +63,21 @@ namespace VisionNet.Controls
                 {
                     _surfaceColorMode = value;
                     if (_cachedRenderData?.Uniforms != null)
-                        _cachedRenderData.Uniforms["colorMode"] = (int)value;
+                        _cachedRenderData.Uniforms["colorMode"] = EffectiveColorMode;
                 }
             }
         }
+
+        /// <summary>
+        /// Effective colour-mode value sent to the shader. <see cref="SurfaceColorMode.Lit"/>
+        /// is honoured only in <see cref="SurfaceMode.Mesh"/>; in point-cloud mode it falls back
+        /// to <see cref="SurfaceColorMode.Color"/> (the requested mode is preserved so switching
+        /// back to Mesh re-enables lighting automatically).
+        /// </summary>
+        private int EffectiveColorMode =>
+            _surfaceColorMode == SurfaceColorMode.Lit && _surfaceMode != SurfaceMode.Mesh
+                ? (int)SurfaceColorMode.Color
+                : (int)_surfaceColorMode;
 
         private RenderData _cachedRenderData;
 
@@ -76,6 +93,8 @@ namespace VisionNet.Controls
 
             out float height;
             out vec2 TexCoord;
+            out vec3 viewPos;
+            out vec3 lightDirView;
 
             void main()
             {
@@ -83,12 +102,16 @@ namespace VisionNet.Controls
                 gl_Position = projection * view * worldPos;
                 height = worldPos.z;
                 TexCoord = aTexCoord;
+                viewPos = (view * worldPos).xyz;
+                lightDirView = normalize(vec3(0.3, 0.4, 0.85));
             }";
 
         internal static readonly string FragmentShaderSource =
             @"#version 330 core
             in float height;
             in vec2 TexCoord;
+            in vec3 viewPos;
+            in vec3 lightDirView;
             out vec4 FragColor;
 
             uniform float zMin;
@@ -115,6 +138,17 @@ namespace VisionNet.Controls
                     FragColor = vec4(getColorByHeight(height), 1.0);
                 } else if (colorMode == 1) {
                     FragColor = vec4(vec3(intensity), 1.0);
+                } else if (colorMode == 4) {
+                    vec3 N = normalize(cross(dFdx(viewPos), dFdy(viewPos)));
+                    vec3 V = normalize(-viewPos);
+                    if (dot(N, V) < 0.0) N = -N;
+                    if (dot(N, N) < 1e-6) N = V;
+                    vec3 L = normalize(lightDirView);
+                    vec3 H = normalize(V + L);
+                    float diff = max(dot(N, L), 0.0);
+                    float spec = pow(max(dot(N, H), 0.0), 24.0) * 0.4;
+                    vec3 albedo = vec3(0.85);
+                    FragColor = vec4(0.35f * albedo + 0.8f * diff * albedo + 0.4f * spec, 1.0);
                 } else {
                     FragColor = vec4(mix(vec3(intensity), getColorByHeight(height), 0.5), 1.0);
                 }
@@ -219,7 +253,7 @@ namespace VisionNet.Controls
                 {
                     ["zMin"]      = ZMin,
                     ["zMax"]      = ZMax,
-                    ["colorMode"] = (int)_surfaceColorMode,
+                    ["colorMode"] = EffectiveColorMode,
                 },
             };
 
@@ -268,6 +302,7 @@ namespace VisionNet.Controls
         public void SetGlobalZRange(float zMin, float zMax)
         {
             if (_surfaceColorMode == SurfaceColorMode.Intensity) return;
+            if (_surfaceColorMode == SurfaceColorMode.Lit) return;
             if (Math.Abs(ZMin - zMin) < 1e-6f && Math.Abs(ZMax - zMax) < 1e-6f) return;
 
             ZMin = zMin;

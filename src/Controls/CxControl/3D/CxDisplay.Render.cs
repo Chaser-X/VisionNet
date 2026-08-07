@@ -129,7 +129,8 @@ namespace VisionNet.Controls
                     if (cur.ZMax > globalDiffMax) globalDiffMax = cur.ZMax;
                     diffCount++;
                 }
-                else if (cur.SurfaceColorMode != SurfaceColorMode.Intensity)
+                else if (cur.SurfaceColorMode != SurfaceColorMode.Intensity &&
+                         cur.SurfaceColorMode != SurfaceColorMode.Lit)
                 {
                     if (cur.ZMin < globalZMin) globalZMin = cur.ZMin;
                     if (cur.ZMax > globalZMax) globalZMax = cur.ZMax;
