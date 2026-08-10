@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 
 namespace VisionNet.DataType
 {
@@ -41,5 +42,8 @@ namespace VisionNet.DataType
         /// <summary>Creates a unit vector from an angle in radians (measured from +X axis).</summary>
         public static CxVector2D FromPolar(float angleRad) =>
             new CxVector2D((float)Math.Cos(angleRad), (float)Math.Sin(angleRad));
+
+        public override string ToString() =>
+            string.Format(CultureInfo.InvariantCulture, "CxVector2D(X={0:G9}, Y={1:G9})", X, Y);
     }
 }

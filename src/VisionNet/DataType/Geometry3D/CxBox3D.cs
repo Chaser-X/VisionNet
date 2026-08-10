@@ -1,3 +1,5 @@
+using System.Globalization;
+
 namespace VisionNet.DataType
 {
     /// <summary>An axis-aligned bounding box defined by its centre point and half-extents.</summary>
@@ -11,5 +13,8 @@ namespace VisionNet.DataType
 
         /// <summary>Initializes a box with the given centre and size.</summary>
         public CxBox3D(CxPoint3D center, CxSize3D size) { Center = center; Size = size; }
+
+        public override string ToString() =>
+            string.Format(CultureInfo.InvariantCulture, "CxBox3D(Center={0}, Size={1})", Center, Size);
     }
 }

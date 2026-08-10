@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 using System.Runtime.InteropServices;
 
 namespace VisionNet.DataType
@@ -61,5 +62,9 @@ namespace VisionNet.DataType
                 sp * (float)Math.Sin(roll),
                 (float)Math.Cos(pitch));
         }
+
+        public override string ToString() =>
+            string.Format(CultureInfo.InvariantCulture,
+                "CxVector3D(X={0:G9}, Y={1:G9}, Z={2:G9})", X, Y, Z);
     }
 }

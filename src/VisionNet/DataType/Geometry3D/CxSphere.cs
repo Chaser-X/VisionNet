@@ -1,3 +1,5 @@
+using System.Globalization;
+
 namespace VisionNet.DataType
 {
     /// <summary>Represents a 3D sphere defined by its centre point and radius.</summary>
@@ -11,5 +13,8 @@ namespace VisionNet.DataType
 
         /// <summary>Initializes a sphere with the given centre and radius.</summary>
         public CxSphere(CxPoint3D center, float radius) { Center = center; Radius = radius; }
+
+        public override string ToString() =>
+            string.Format(CultureInfo.InvariantCulture, "CxSphere(Center={0}, Radius={1:G9})", Center, Radius);
     }
 }

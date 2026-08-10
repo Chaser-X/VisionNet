@@ -1,3 +1,5 @@
+using System.Globalization;
+
 namespace VisionNet.DataType
 {
     /// <summary>
@@ -19,5 +21,8 @@ namespace VisionNet.DataType
             Normal = new CxVector3D(a, b, c).Normalize();
             Point = new CxPoint3D(-d * Normal.X, -d * Normal.Y, -d * Normal.Z);
         }
+
+        public override string ToString() =>
+            string.Format(CultureInfo.InvariantCulture, "CxPlane3D(Point={0}, Normal={1})", Point, Normal);
     }
 }

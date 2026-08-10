@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 
 namespace VisionNet.DataType
 {
@@ -43,5 +44,8 @@ namespace VisionNet.DataType
 
             return new CxLine2D(point, new CxVector2D(-b, a));
         }
+
+        public override string ToString() =>
+            string.Format(CultureInfo.InvariantCulture, "CxLine2D(Point={0}, Direction={1})", Point, Direction);
     }
 }

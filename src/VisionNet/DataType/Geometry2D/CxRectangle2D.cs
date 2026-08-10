@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 
 namespace VisionNet.DataType
 {
@@ -48,5 +49,9 @@ namespace VisionNet.DataType
             BottomLeft = corners[2];
             BottomRight = corners[3];
         }
+
+        public override string ToString() =>
+            string.Format(CultureInfo.InvariantCulture,
+                "CxRectangle2D(Center={0}, Size={1}, Angle={2:G9})", Center, Size, Angle);
     }
 }

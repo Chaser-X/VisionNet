@@ -1,3 +1,5 @@
+using System.Globalization;
+
 namespace VisionNet.DataType
 {
     public struct CxArc2D
@@ -14,5 +16,10 @@ namespace VisionNet.DataType
             StartAngle = startAngle;
             SweepAngle = sweepAngle;
         }
+
+        public override string ToString() =>
+            string.Format(CultureInfo.InvariantCulture,
+                "CxArc2D(Center={0}, Radius={1:G9}, StartAngle={2:G9}, SweepAngle={3:G9})",
+                Center, Radius, StartAngle, SweepAngle);
     }
 }

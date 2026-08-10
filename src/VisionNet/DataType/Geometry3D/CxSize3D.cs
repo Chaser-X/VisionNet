@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Runtime.InteropServices;
 
 namespace VisionNet.DataType
@@ -22,5 +23,9 @@ namespace VisionNet.DataType
 
         /// <summary>Extent along the Z axis.</summary>
         public float Depth;
+
+        public override string ToString() =>
+            string.Format(CultureInfo.InvariantCulture,
+                "CxSize3D(Width={0:G9}, Height={1:G9}, Depth={2:G9})", Width, Height, Depth);
     }
 }

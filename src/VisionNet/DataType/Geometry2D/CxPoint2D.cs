@@ -1,3 +1,5 @@
+using System.Globalization;
+
 namespace VisionNet.DataType
 {
     /// <summary>A 2D point with single-precision floating-point X and Y coordinates.</summary>
@@ -11,5 +13,8 @@ namespace VisionNet.DataType
 
         /// <summary>Y coordinate.</summary>
         public float Y;
+
+        public override string ToString() =>
+            string.Format(CultureInfo.InvariantCulture, "CxPoint2D(X={0:G9}, Y={1:G9})", X, Y);
     }
 }

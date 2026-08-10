@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Runtime.InteropServices;
 
 namespace VisionNet.DataType
@@ -20,6 +21,10 @@ namespace VisionNet.DataType
 
         /// <summary>Z coordinate (offset 8).</summary>
         [FieldOffset(8)] public float Z;
+
+        public override string ToString() =>
+            string.Format(CultureInfo.InvariantCulture,
+                "CxPoint3D(X={0:G9}, Y={1:G9}, Z={2:G9})", X, Y, Z);
     }
 
     /// <summary>A 3D point with an additional per-point intensity (reflectance) value.</summary>
@@ -43,5 +48,9 @@ namespace VisionNet.DataType
 
         /// <summary>Per-point intensity / reflectance value.</summary>
         public float Intensity;
+
+        public override string ToString() =>
+            string.Format(CultureInfo.InvariantCulture,
+                "CxPoint3DI(X={0:G9}, Y={1:G9}, Z={2:G9}, Intensity={3:G9})", X, Y, Z, Intensity);
     }
 }

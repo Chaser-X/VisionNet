@@ -1,3 +1,5 @@
+using System.Globalization;
+
 namespace VisionNet.DataType
 {
     /// <summary>
@@ -37,5 +39,10 @@ namespace VisionNet.DataType
             YAxis = yAxis;
             ZAxis = zAxis;
         }
+
+        public override string ToString() =>
+            string.Format(CultureInfo.InvariantCulture,
+                "CxCoordination3D(Origin={0}, Scale={1}, XAxis={2}, YAxis={3}, ZAxis={4})",
+                Origin, Scale, XAxis, YAxis, ZAxis);
     }
 }

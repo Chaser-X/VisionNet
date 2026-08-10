@@ -1,3 +1,5 @@
+using System.Globalization;
+
 namespace VisionNet.DataType
 {
     /// <summary>
@@ -21,5 +23,9 @@ namespace VisionNet.DataType
             Normal = normal;
             Radius = radius;
         }
+
+        public override string ToString() =>
+            string.Format(CultureInfo.InvariantCulture,
+                "CxCircle3D(Center={0}, Radius={1:G9}, Normal={2})", Center, Radius, Normal);
     }
 }

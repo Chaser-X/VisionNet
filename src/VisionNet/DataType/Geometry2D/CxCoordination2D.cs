@@ -1,3 +1,5 @@
+using System.Globalization;
+
 namespace VisionNet.DataType
 {
     /// <summary>
@@ -28,5 +30,9 @@ namespace VisionNet.DataType
             Scale = scale;
             Angle = angleDeg;
         }
+
+        public override string ToString() =>
+            string.Format(CultureInfo.InvariantCulture,
+                "CxCoordination2D(Origin={0}, Scale={1}, Angle={2:G9})", Origin, Scale, Angle);
     }
 }

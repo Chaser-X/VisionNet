@@ -1,3 +1,5 @@
+using System.Globalization;
+
 namespace VisionNet.DataType
 {
     public struct CxRun
@@ -14,6 +16,10 @@ namespace VisionNet.DataType
         }
 
         public int Length => ColEnd - ColStart;
+
+        public override string ToString() =>
+            string.Format(CultureInfo.InvariantCulture,
+                "CxRun(Row={0}, ColStart={1}, ColEnd={2})", Row, ColStart, ColEnd);
     }
 
     public struct CxRegion2D
@@ -95,5 +101,9 @@ namespace VisionNet.DataType
             }
             return false;
         }
+
+        public override string ToString() =>
+            string.Format(CultureInfo.InvariantCulture,
+                "CxRegion2D(Width={0}, Height={1}, Runs=[{2}])", Width, Height, Runs?.Length ?? 0);
     }
 }

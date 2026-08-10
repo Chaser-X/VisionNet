@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 
 namespace VisionNet.DataType
 {
@@ -243,5 +244,10 @@ namespace VisionNet.DataType
             float detY = a00 * b1 - b0 * a10;
             return new CxVector2D(detX / det, detY / det);
         }
+
+        public override string ToString() =>
+            string.Format(CultureInfo.InvariantCulture,
+                "CxMatrix3X3([{0:G9}, {1:G9}, {2:G9}, {3:G9}, {4:G9}, {5:G9}, {6:G9}, {7:G9}, {8:G9}])",
+                Data[0], Data[1], Data[2], Data[3], Data[4], Data[5], Data[6], Data[7], Data[8]);
     }
 }
