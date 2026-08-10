@@ -25,6 +25,14 @@ namespace VisionNet.DataType
         public override string ToString() =>
             string.Format(CultureInfo.InvariantCulture,
                 "CxPoint3D(X={0:G9}, Y={1:G9}, Z={2:G9})", X, Y, Z);
+
+        public static CxPoint3D operator +(CxPoint3D a, CxVector3D b) => new CxPoint3D(a.X + b.X, a.Y + b.Y, a.Z + b.Z);
+        public static CxPoint3D operator +(CxPoint3D a, CxPoint3D b)  => new CxPoint3D(a.X + b.X, a.Y + b.Y, a.Z + b.Z);
+        public static CxPoint3D operator -(CxPoint3D a, CxVector3D b) => new CxPoint3D(a.X - b.X, a.Y - b.Y, a.Z - b.Z);
+        public static CxVector3D operator -(CxPoint3D a, CxPoint3D b) => new CxVector3D(a.X - b.X, a.Y - b.Y, a.Z - b.Z);
+        public static CxPoint3D operator *(CxPoint3D p, float s)     => new CxPoint3D(p.X * s, p.Y * s, p.Z * s);
+        public static CxPoint3D operator *(float s, CxPoint3D p)     => new CxPoint3D(p.X * s, p.Y * s, p.Z * s);
+        public static CxPoint3D operator /(CxPoint3D p, float s)     => new CxPoint3D(p.X / s, p.Y / s, p.Z / s);
     }
 
     /// <summary>A 3D point with an additional per-point intensity (reflectance) value.</summary>

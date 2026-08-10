@@ -30,6 +30,9 @@ namespace VisionNet.DataType
         /// <summary>Returns the vector scaled by <paramref name="scale"/>.</summary>
         public static CxVector2D operator *(CxVector2D v, float scale) => new CxVector2D(v.X * scale, v.Y * scale);
 
+        /// <summary>Returns the vector scaled by <paramref name="scale"/>.</summary>
+        public static CxVector2D operator *(float scale, CxVector2D v) => new CxVector2D(v.X * scale, v.Y * scale);
+
         /// <summary>Returns the vector divided by <paramref name="scale"/>.</summary>
         public static CxVector2D operator /(CxVector2D v, float scale) => new CxVector2D(v.X / scale, v.Y / scale);
 
