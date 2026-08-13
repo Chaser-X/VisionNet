@@ -108,14 +108,14 @@ namespace VisionNet.Controls
             }
         }
 
-        /// <summary>Forces an immediate redraw of the plot.</summary>
+        /// <summary>Forces an immediate redraw of the plot on the UI thread.</summary>
         public void RefreshDisplay()
         {
-            _imageItem?.UpdatePlottable();
-            if (_formsPlot.InvokeRequired)
-                _formsPlot.Invoke(new Action(_formsPlot.Refresh));
-            else
+            OnUiThread(() =>
+            {
+                _imageItem?.UpdatePlottable();
                 _formsPlot.Refresh();
+            });
         }
     }
 

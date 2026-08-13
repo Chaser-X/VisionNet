@@ -90,6 +90,19 @@ namespace VisionNet.Controls
             WireMouseEvents();
         }
 
+        // ── Shared private helpers ────────────────────────────────────────────────
+
+        /// <summary>
+        /// Executes <paramref name="action"/> on the UI thread. When called from another
+        /// thread the action is marshalled synchronously via <see cref="Invoke"/>, matching
+        /// the existing <see cref="RefreshDisplay"/> pattern.
+        /// </summary>
+        private void OnUiThread(Action action)
+        {
+            if (InvokeRequired) { Invoke(new Action(action)); return; }
+            action();
+        }
+
         // ── Internal accessors ────────────────────────────────────────────────────
 
         /// <summary>Gets the underlying ScottPlot plot object for advanced configuration.</summary>

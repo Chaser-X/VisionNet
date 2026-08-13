@@ -16,13 +16,16 @@ namespace VisionNet.Controls
         /// </summary>
         public void SetScaleAndOffset(CxPoint3D scale, CxPoint3D offset)
         {
-            Scale = scale;
-            Offset = offset;
-            if (_imageItem != null) _imageItem.UpdateWorldRect(GetImageWorldRect());
-            if (_displayMode != DisplayMode.None)
-                FitImage1to1();
-            else
-                RefreshDisplay();
+            OnUiThread(() =>
+            {
+                Scale = scale;
+                Offset = offset;
+                if (_imageItem != null) _imageItem.UpdateWorldRect(GetImageWorldRect());
+                if (_displayMode != DisplayMode.None)
+                    FitImage1to1();
+                else
+                    RefreshDisplay();
+            });
         }
 
         /// <summary>Returns the image bounding rectangle expressed in world coordinates.</summary>
@@ -42,11 +45,14 @@ namespace VisionNet.Controls
         /// <summary>Shows or hides the X/Y coordinate axes (tick labels and axis lines). Default: <c>true</c>.</summary>
         public void ShowAxes(bool visible)
         {
-            _formsPlot.Plot.Axes.Bottom.IsVisible = visible;
-            _formsPlot.Plot.Axes.Left.IsVisible = visible;
-            _formsPlot.Plot.Axes.Right.IsVisible = visible;
-            _formsPlot.Plot.Axes.Top.IsVisible = visible;
-            RefreshDisplay();
+            OnUiThread(() =>
+            {
+                _formsPlot.Plot.Axes.Bottom.IsVisible = visible;
+                _formsPlot.Plot.Axes.Left.IsVisible = visible;
+                _formsPlot.Plot.Axes.Right.IsVisible = visible;
+                _formsPlot.Plot.Axes.Top.IsVisible = visible;
+                RefreshDisplay();
+            });
         }
 
         /// <summary>
@@ -59,24 +65,30 @@ namespace VisionNet.Controls
         /// </summary>
         public void SetAspectLock(bool locked)
         {
-            if (locked)
+            OnUiThread(() =>
             {
-                if (!_formsPlot.Plot.Axes.Rules.Contains(_squareRule))
-                    _formsPlot.Plot.Axes.Rules.Add(_squareRule);
-                FitImage1to1();
-            }
-            else
-            {
-                _formsPlot.Plot.Axes.Rules.Remove(_squareRule);
-                RefreshDisplay();
-            }
+                if (locked)
+                {
+                    if (!_formsPlot.Plot.Axes.Rules.Contains(_squareRule))
+                        _formsPlot.Plot.Axes.Rules.Add(_squareRule);
+                    FitImage1to1();
+                }
+                else
+                {
+                    _formsPlot.Plot.Axes.Rules.Remove(_squareRule);
+                    RefreshDisplay();
+                }
+            });
         }
 
         public void SetBackgroundColor(Color color)
         {
-            _formsPlot.BackColor = color;
-            _formsPlot.Plot.DataBackground.Color = ScottPlot.Color.FromColor(color);
-            RefreshDisplay();
+            OnUiThread(() =>
+            {
+                _formsPlot.BackColor = color;
+                _formsPlot.Plot.DataBackground.Color = ScottPlot.Color.FromColor(color);
+                RefreshDisplay();
+            });
         }
         #endregion
 
@@ -90,27 +102,30 @@ namespace VisionNet.Controls
         /// <param name="image">Source image. Pass <c>null</c> to clear.</param>
         public void SetImage(CxImage image)
         {
-            if (_imageItem == null)
+            OnUiThread(() =>
             {
-                _imageItem = new CxImageItem();
-                _imageItem.AddToPlot(_formsPlot.Plot);
-            }
+                if (_imageItem == null)
+                {
+                    _imageItem = new CxImageItem();
+                    _imageItem.AddToPlot(_formsPlot.Plot);
+                }
 
-            if (image == null)
-            {
-                ClearImage();
-                return;
-            }
+                if (image == null)
+                {
+                    ClearImage();
+                    return;
+                }
 
-            _imageItem.SetImage(image);
-            _imageWidth = image.Width;
-            _imageHeight = image.Height;
+                _imageItem.SetImage(image);
+                _imageWidth = image.Width;
+                _imageHeight = image.Height;
 
-            _imageItem.UpdateWorldRect(GetImageWorldRect());
-            if (_displayMode != DisplayMode.None)
-                FitImage1to1();
-            else
-                RefreshDisplay();
+                _imageItem.UpdateWorldRect(GetImageWorldRect());
+                if (_displayMode != DisplayMode.None)
+                    FitImage1to1();
+                else
+                    RefreshDisplay();
+            });
         }
 
         /// <summary>
@@ -120,38 +135,44 @@ namespace VisionNet.Controls
         /// </summary>
         public void SetImageAdvance(CxImage image)
         {
-            if (image == null) { ClearImage(); return; }
-
-            if (_imageItem == null)
+            OnUiThread(() =>
             {
-                _imageItem = new CxImageItemAdvance();
-                _imageItem.AddToPlot(_formsPlot.Plot);
-            }
+                if (image == null) { ClearImage(); return; }
 
-            _imageItem.SetImage(image);
-            _imageWidth = image.Width;
-            _imageHeight = image.Height;
+                if (_imageItem == null)
+                {
+                    _imageItem = new CxImageItemAdvance();
+                    _imageItem.AddToPlot(_formsPlot.Plot);
+                }
 
-            _imageItem.UpdateWorldRect(GetImageWorldRect());
-            if (_displayMode != DisplayMode.None)
-                FitImage1to1();
-            else
-                RefreshDisplay();
+                _imageItem.SetImage(image);
+                _imageWidth = image.Width;
+                _imageHeight = image.Height;
+
+                _imageItem.UpdateWorldRect(GetImageWorldRect());
+                if (_displayMode != DisplayMode.None)
+                    FitImage1to1();
+                else
+                    RefreshDisplay();
+            });
         }
 
         /// <summary>Removes the currently displayed image.</summary>
         public void ClearImage()
         {
-            if (_imageItem != null)
+            OnUiThread(() =>
             {
-                _imageItem.RemoveFromPlot(_formsPlot.Plot);
-                _imageItem.Dispose();
-                _imageItem = null;
-            }
-            _imageWidth = 0;
-            _imageHeight = 0;
-            HideCoordAnnotation();
-            RefreshDisplay();
+                if (_imageItem != null)
+                {
+                    _imageItem.RemoveFromPlot(_formsPlot.Plot);
+                    _imageItem.Dispose();
+                    _imageItem = null;
+                }
+                _imageWidth = 0;
+                _imageHeight = 0;
+                HideCoordAnnotation();
+                RefreshDisplay();
+            });
         }
 
         #endregion
@@ -221,29 +242,35 @@ namespace VisionNet.Controls
         /// <summary>Removes all overlay items from the display.</summary>
         public void ClearOverlays()
         {
-            foreach (var item in _overlayItems)
+            OnUiThread(() =>
             {
-                item.RemoveFromPlot(_formsPlot.Plot);
-                item.Dispose();
-            }
-            _overlayItems.Clear();
-            _selectedItem = null;
-            RefreshDisplay();
+                foreach (var item in _overlayItems)
+                {
+                    item.RemoveFromPlot(_formsPlot.Plot);
+                    item.Dispose();
+                }
+                _overlayItems.Clear();
+                _selectedItem = null;
+                RefreshDisplay();
+            });
         }
 
         /// <summary>Removes a specific overlay item from the display.</summary>
         public void RemoveOverlay(Abstract2DRenderItem item)
         {
-            if (!_overlayItems.Contains(item)) return;
-            item.RemoveFromPlot(_formsPlot.Plot);
-            item.Dispose();
-            _overlayItems.Remove(item);
-            if (_selectedItem == item)
+            OnUiThread(() =>
             {
-                _selectedItem = null;
-                SelectionChanged?.Invoke(null);
-            }
-            RefreshDisplay();
+                if (!_overlayItems.Contains(item)) return;
+                item.RemoveFromPlot(_formsPlot.Plot);
+                item.Dispose();
+                _overlayItems.Remove(item);
+                if (_selectedItem == item)
+                {
+                    _selectedItem = null;
+                    SelectionChanged?.Invoke(null);
+                }
+                RefreshDisplay();
+            });
         }
 
         #endregion
@@ -264,23 +291,32 @@ namespace VisionNet.Controls
         /// <summary>Deselects the currently selected overlay item, if any.</summary>
         public void ClearSelection()
         {
-            if (_selectedItem == null) return;
-            _selectedItem.OnDeselected();
-            _selectedItem = null;
-            SelectionChanged?.Invoke(null);
-            RefreshDisplay();
+            OnUiThread(() =>
+            {
+                if (_selectedItem == null) return;
+                _selectedItem.OnDeselected();
+                _selectedItem = null;
+                SelectionChanged?.Invoke(null);
+                RefreshDisplay();
+            });
         }
 
         /// <summary>Enables mouse interaction (selection and drag) for all overlay items.</summary>
         public void ActivateAllItems()
         {
-            foreach (var item in _overlayItems) item.IsActiveObj = true;
+            OnUiThread(() =>
+            {
+                foreach (var item in _overlayItems) item.IsActiveObj = true;
+            });
         }
 
         /// <summary>Disables mouse interaction for all overlay items.</summary>
         public void DeactivateAllItems()
         {
-            foreach (var item in _overlayItems) item.IsActiveObj = false;
+            OnUiThread(() =>
+            {
+                foreach (var item in _overlayItems) item.IsActiveObj = false;
+            });
         }
 
         #endregion
@@ -289,9 +325,12 @@ namespace VisionNet.Controls
 
         private T AppendOverlay<T>(T item) where T : Abstract2DRenderItem
         {
-            item.AddToPlot(_formsPlot.Plot);
-            _overlayItems.Add(item);
-            RefreshDisplay();
+            OnUiThread(() =>
+            {
+                item.AddToPlot(_formsPlot.Plot);
+                _overlayItems.Add(item);
+                RefreshDisplay();
+            });
             return item;
         }
 
