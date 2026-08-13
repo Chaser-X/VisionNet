@@ -47,7 +47,8 @@ namespace VisionNet.Controls
             gl.BlendFunc(OpenGL.GL_SRC_ALPHA, OpenGL.GL_ONE_MINUS_SRC_ALPHA);
             gl.LoadIdentity();
 
-            _camera.LookAtMatrix(gl);
+            lock (_cameraLock)
+                _camera.LookAtMatrix(gl);
             Render(gl);
 
             gl.Disable(OpenGL.GL_DEPTH_TEST);
@@ -182,7 +183,10 @@ namespace VisionNet.Controls
                 _coordTagItem.Draw(gl);
 
             // Phase 5 — overlay geometry (segments, points, polygons, etc.).
-            foreach (var item in _renderItems.ToArray())
+            IRenderItem[] overlaySnapshot;
+            lock (_resourceLock)
+                overlaySnapshot = _renderItems.ToArray();
+            foreach (var item in overlaySnapshot)
                 item.Draw(gl);
 
             if (!_camera.Enable2DView)

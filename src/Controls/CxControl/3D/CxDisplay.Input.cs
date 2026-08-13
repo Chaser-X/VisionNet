@@ -100,7 +100,9 @@ namespace VisionNet.Controls
         /// </summary>
         private AbstractRenderItem FindActiveItemHit(CxPoint3D worldPos)
         {
-            foreach (var item in _renderItems.ToArray())
+            IRenderItem[] snapshot;
+            lock (_resourceLock) snapshot = _renderItems.ToArray();
+            foreach (var item in snapshot)
                 if (item is AbstractRenderItem ar && ar.IsActiveObj && ar.HitTest(worldPos))
                     return ar;
             return null;

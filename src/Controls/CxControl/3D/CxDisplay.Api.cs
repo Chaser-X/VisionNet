@@ -37,8 +37,9 @@ namespace VisionNet.Controls
                 newItem.OnRenderDataChanged += OnItemRenderDataChanged;
             }
 
-            _camera.FitView(newItem.BoundingBox);
-            Invalidate();
+            lock (_cameraLock)
+                _camera.FitView(newItem.BoundingBox);
+            SafeInvalidate();
         }
 
         /// <summary>
@@ -56,8 +57,9 @@ namespace VisionNet.Controls
                 combined = GetCombinedBoundingBox();
             }
 
-            _camera.FitView(combined);
-            Invalidate();
+            lock (_cameraLock)
+                _camera.FitView(combined);
+            SafeInvalidate();
         }
 
         /// <summary>
@@ -72,7 +74,7 @@ namespace VisionNet.Controls
                     if (_resourcePool.TryGetValue(item, out var handle))
                         handle.NeedsUpdate = true;
             }
-            Invalidate();
+            SafeInvalidate();
         }
 
         // ── Surface: Set* (replace semantics) ───────────────────────────────────
@@ -170,7 +172,7 @@ namespace VisionNet.Controls
             lock (_resourceLock)
                 foreach (var item in _surfaceItems.OfType<CxSurfaceAdvancedItem>())
                     item.ModelMatrix = pose;
-            Invalidate();
+            SafeInvalidate();
         }
 
         /// <summary>Sets the model matrix (pose) of all <see cref="CxPointCloudAdvancedItem"/>s.</summary>
@@ -179,7 +181,7 @@ namespace VisionNet.Controls
             lock (_resourceLock)
                 foreach (var item in _surfaceItems.OfType<CxPointCloudAdvancedItem>())
                     item.ModelMatrix = pose;
-            Invalidate();
+            SafeInvalidate();
         }
 
         /// <summary>Sets the model matrix (pose) of all <see cref="CxMeshAdvancedItem"/>s.</summary>
@@ -188,7 +190,7 @@ namespace VisionNet.Controls
             lock (_resourceLock)
                 foreach (var item in _surfaceItems.OfType<CxMeshAdvancedItem>())
                     item.ModelMatrix = pose;
-            Invalidate();
+            SafeInvalidate();
         }
 
         // ── Surface: Add* with initial pose (append semantics) ───────────────────
@@ -288,7 +290,7 @@ namespace VisionNet.Controls
                 }
                 _surfaceItems.Clear();
             }
-            Invalidate();
+            SafeInvalidate();
         }
 
         // ── Geometric overlays (always append) ──────────────────────────────────
@@ -299,7 +301,7 @@ namespace VisionNet.Controls
         public CxSegment3DItem SetSegment(CxSegment3D[] segment, Color color, float size = 1.0f)
         {
             var item = new CxSegment3DItem(segment, color, size);
-            _renderItems.Add(item); Invalidate(); return item;
+            lock (_resourceLock) _renderItems.Add(item); SafeInvalidate(); return item;
         }
 
         /// <summary>Appends a set of 3D points to the overlay layer.</summary>
@@ -308,7 +310,7 @@ namespace VisionNet.Controls
             PointShape shape = PointShape.Point)
         {
             var item = new CxPoint3DItem(point, color, size, shape);
-            _renderItems.Add(item); Invalidate(); return item;
+            lock (_resourceLock) _renderItems.Add(item); SafeInvalidate(); return item;
         }
 
         /// <summary>Appends a set of 3D polygons to the overlay layer.</summary>
@@ -316,7 +318,7 @@ namespace VisionNet.Controls
         public CxPolygon3DItem SetPolygon(CxPolygon3D[] polygon, Color color, float size = 1.0f)
         {
             var item = new CxPolygon3DItem(polygon, color, size);
-            _renderItems.Add(item); Invalidate(); return item;
+            lock (_resourceLock) _renderItems.Add(item); SafeInvalidate(); return item;
         }
 
         /// <summary>Appends a set of 3D planes to the overlay layer.</summary>
@@ -324,7 +326,7 @@ namespace VisionNet.Controls
         public CxPlane3DItem SetPlane(CxPlane3D[] plane, Color color, float size = 100.0f)
         {
             var item = new CxPlane3DItem(plane, color, size);
-            _renderItems.Add(item); Invalidate(); return item;
+            lock (_resourceLock) _renderItems.Add(item); SafeInvalidate(); return item;
         }
 
         /// <summary>Appends a set of axis-aligned bounding boxes to the overlay layer.</summary>
@@ -332,7 +334,7 @@ namespace VisionNet.Controls
         public CxBox3DItem SetBox(CxBox3D[] box, Color color, float size = 1.0f)
         {
             var item = new CxBox3DItem(box, color, size);
-            _renderItems.Add(item); Invalidate(); return item;
+            lock (_resourceLock) _renderItems.Add(item); SafeInvalidate(); return item;
         }
 
         /// <summary>Appends world-anchored text labels to the overlay layer.</summary>
@@ -340,7 +342,7 @@ namespace VisionNet.Controls
         public CxTextInfoItem SetTextInfo(CxTextInfo[] textInfo, Color color)
         {
             var item = new CxTextInfoItem(textInfo, color, 1);
-            _renderItems.Add(item); Invalidate(); return item;
+            lock (_resourceLock) _renderItems.Add(item); SafeInvalidate(); return item;
         }
 
         /// <summary>Appends screen-space 2D text overlays.</summary>
@@ -348,7 +350,7 @@ namespace VisionNet.Controls
         public CxText2DItem SetText2D(CxText2D[] text2Ds, Color color)
         {
             var item = new CxText2DItem(text2Ds, color, 1);
-            _renderItems.Add(item); Invalidate(); return item;
+            lock (_resourceLock) _renderItems.Add(item); SafeInvalidate(); return item;
         }
 
         // ── Coordinate system ────────────────────────────────────────────────────
@@ -360,7 +362,8 @@ namespace VisionNet.Controls
         /// <param name="leftHanded"><c>true</c> for left-handed, <c>false</c> for right-handed.</param>
         public void SetCoordinateSystemLeftHanded(bool leftHanded)
         {
-            _camera.IsLeftHanded = leftHanded;
+            lock (_cameraLock)
+                _camera.IsLeftHanded = leftHanded;
         }
 
         /// <summary>
@@ -371,7 +374,8 @@ namespace VisionNet.Controls
         /// <param name="scale">Scale factor, clamped to [0.01, ∞).</param>
         public void SetZScale(float scale)
         {
-            _camera.ZScale = scale;
+            lock (_cameraLock)
+                _camera.ZScale = scale;
         }
 
         /// <summary>
@@ -388,9 +392,10 @@ namespace VisionNet.Controls
                     YAxis  = new CxVector3D(0, 1, 0),
                     ZAxis  = new CxVector3D(0, 0, 1),
                 };
-            _renderItems.Add(new CxCoordinateSystemItem(
-                axisLength, axisLength / 50, axisLength / 10, axisLength / 25, coordination));
-            Invalidate();
+            lock (_resourceLock)
+                _renderItems.Add(new CxCoordinateSystemItem(
+                    axisLength, axisLength / 50, axisLength / 10, axisLength / 25, coordination));
+            SafeInvalidate();
         }
 
         // ── Active-object selection management ──────────────────────────────────
@@ -404,7 +409,7 @@ namespace VisionNet.Controls
             if (_selectedItem == null) return;
             _selectedItem.OnDeselected();
             _selectedItem = null;
-            Invalidate();
+            SafeInvalidate();
         }
 
         /// <summary>
@@ -418,7 +423,7 @@ namespace VisionNet.Controls
             ClearSelection();
             _selectedItem = item;
             _selectedItem.OnMouseDown(default);
-            Invalidate();
+            SafeInvalidate();
         }
 
         /// <summary>
@@ -427,7 +432,9 @@ namespace VisionNet.Controls
         /// </summary>
         public void ActivateAllItems()
         {
-            foreach (var item in _renderItems.ToArray())
+            IRenderItem[] snapshot;
+            lock (_resourceLock) snapshot = _renderItems.ToArray();
+            foreach (var item in snapshot)
                 if (item is AbstractRenderItem ar)
                     ar.IsActiveObj = true;
         }
@@ -440,7 +447,9 @@ namespace VisionNet.Controls
         public void DeactivateAllItems()
         {
             ClearSelection();
-            foreach (var item in _renderItems.ToArray())
+            IRenderItem[] snapshot;
+            lock (_resourceLock) snapshot = _renderItems.ToArray();
+            foreach (var item in snapshot)
                 if (item is AbstractRenderItem ar)
                     ar.IsActiveObj = false;
         }
@@ -453,8 +462,11 @@ namespace VisionNet.Controls
         /// </summary>
         public void ResetView(bool resetAll = true)
         {
-            _renderItems.ForEach(item => item.Dispose());
-            _renderItems.Clear();
+            lock (_resourceLock)
+            {
+                _renderItems.ForEach(item => item.Dispose());
+                _renderItems.Clear();
+            }
 
             _coordinationItem = new CxCoordinateSystemItem();
             _coordTagItem     = new CxCoordinationTagItem();
@@ -463,20 +475,22 @@ namespace VisionNet.Controls
             if (resetAll)
                 ClearSurfaceItems();
 
-            Invalidate();
+            SafeInvalidate();
         }
 
         /// <summary>Sets the camera rotation pivot to the given world-space position.</summary>
         public void SetViewCenter(CxPoint3D center)
         {
-            _camera.FocusOnPoint(new Vector3(center.X, center.Y, center.Z));
-            Invalidate();
+            lock (_cameraLock)
+                _camera.FocusOnPoint(new Vector3(center.X, center.Y, center.Z));
+            SafeInvalidate();
         }
 
         /// <summary>Sets the camera up-direction vector.</summary>
         public void SetViewUpDirection(CxVector3D upDirection)
         {
-            _camera.SetDefaultUpView(new Vector3(upDirection.X, upDirection.Y, upDirection.Z));
+            lock (_cameraLock)
+                _camera.SetDefaultUpView(new Vector3(upDirection.X, upDirection.Y, upDirection.Z));
         }
 
         /// <summary>refresh fbo viewer size</summary>
@@ -486,7 +500,7 @@ namespace VisionNet.Controls
             //if (this.Width <= 0 || this.Height <= 0) return;
             //this.OpenGL.SetDimensions(this.Width, this.Height);
             //this.OpenGL.Viewport(0, 0, this.Width, this.Height);
-            this.Invalidate();
+            this.SafeInvalidate();
         }
     }
 }

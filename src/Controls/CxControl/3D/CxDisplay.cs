@@ -29,6 +29,7 @@ namespace VisionNet.Controls
         private readonly Dictionary<ICxObjRenderItem, GLResourceHandle> _resourcePool
             = new Dictionary<ICxObjRenderItem, GLResourceHandle>();
         private readonly object _resourceLock = new object();
+        private readonly object _cameraLock = new object();
 
         // Resources dequeued by Dispose/Replace that must be freed inside the GL thread.
         private readonly ConcurrentQueue<GLResourceHandle> _pendingRelease
@@ -141,6 +142,15 @@ namespace VisionNet.Controls
 
         // ── Shared private helpers ───────────────────────────────────────────────
 
+        /// <summary>
+        /// Thread-safe invalidation: marshals to the UI thread when called from another thread.
+        /// </summary>
+        private void SafeInvalidate()
+        {
+            if (InvokeRequired) { BeginInvoke(new Action(Invalidate)); return; }
+            Invalidate();
+        }
+
         /// <summary>Synchronizes the context-menu check marks with the current mode settings.</summary>
         private void UpdateMenuItems()
         {
@@ -236,10 +246,13 @@ namespace VisionNet.Controls
                 _surfaceItems.Clear();
             }
 
-            while (_renderItems.Count > 0)
+            lock (_resourceLock)
             {
-                _renderItems[0].Dispose();
-                _renderItems.RemoveAt(0);
+                while (_renderItems.Count > 0)
+                {
+                    _renderItems[0].Dispose();
+                    _renderItems.RemoveAt(0);
+                }
             }
         }
     }
