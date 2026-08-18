@@ -38,7 +38,7 @@ namespace VisionNet
         /// </summary>
         private static void RequireUniformScale(CxCoordination2D coord, float tolerance = 1e-6f)
         {
-            if (Math.Abs(coord.Scale.X - coord.Scale.Y) > tolerance)
+            if (Math.Abs(Math.Abs(coord.Scale.X) - Math.Abs(coord.Scale.Y)) > tolerance)
                 throw new ArgumentException(
                     "非均匀缩放不支持圆/弧/拟合场类型对齐。请保证 Scale.X == Scale.Y。");
         }
@@ -141,7 +141,7 @@ namespace VisionNet
             return new CxRectangle2D(
                 m.TransformPoint2D(rect.Center),
                 new CxSize2D(
-                    forward ? rect.Size.Width  / sx : rect.Size.Width  * sx,
+                    forward ? rect.Size.Width / sx : rect.Size.Width * sx,
                     forward ? rect.Size.Height / sy : rect.Size.Height * sy),
                 forward ? rect.Angle - coord.Angle : rect.Angle + coord.Angle);
         }
@@ -228,7 +228,7 @@ namespace VisionNet
         {
             result = new CxSegment2D(
                 new CxPoint2D(seg.Start.X * scaleX, seg.Start.Y * scaleY),
-                new CxPoint2D(seg.End.X   * scaleX, seg.End.Y   * scaleY));
+                new CxPoint2D(seg.End.X * scaleX, seg.End.Y * scaleY));
         }
 
         /// <summary>Uniformly scales an arc by <paramref name="scale"/> around the origin.</summary>
