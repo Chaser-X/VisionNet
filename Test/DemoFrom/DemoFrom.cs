@@ -37,7 +37,7 @@ namespace DemoFrom
             // MessageBox.Show(message);
             if (!state)
             {
-                //MessageBox.Show("OpenGL²»¿ÉÓÃ£¬Çë¼ì²éÄúµÄÏµÍ³ÅäÖÃ¡£");
+                //MessageBox.Show("OpenGLï¿½ï¿½ï¿½ï¿½ï¿½Ã£ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ÏµÍ³ï¿½ï¿½ï¿½Ã¡ï¿½");
                 return;
             }
             VisionOperator.InitialLib();
@@ -80,7 +80,7 @@ namespace DemoFrom
                         break;
                 }
             }
-            //surfaceMsgºÍsurfaceIntensityMsg¶¼»ñÈ¡µ½ÁË£¬×ª»»µ½µãÔÆÊý¾Ý
+            //surfaceMsgï¿½ï¿½surfaceIntensityMsgï¿½ï¿½ï¿½ï¿½È¡ï¿½ï¿½ï¿½Ë£ï¿½×ªï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
             if (msg != null)
             {
                 if (msg.MessageType == GoDataMessageType.UniformSurface)
@@ -167,17 +167,17 @@ namespace DemoFrom
                     cxDisplay1.AddSurfaceAdvancedItem(surface2, CxMatrix4X4.RotationZ(45f) * CxMatrix4X4.Translation(5, 3, 2));
             }
 
-            ////Ìí¼ÓÆ½Ãæ Plane3D
+            ////ï¿½ï¿½ï¿½ï¿½Æ½ï¿½ï¿½ Plane3D
             //var plane = new CxPlane3D(new CxPoint3D(0, 0, 0), new CxVector3D(1, 1, 1));
             //cxDisplay1.SetPlane(plane, Color.FromArgb(100, Color.Blue));
 
-            //Ìí¼ÓBox3D
+            //ï¿½ï¿½ï¿½ï¿½Box3D
             var box = new CxBox3D(new CxPoint3D(0, 0, 0), new CxSize3D(10, 10, 10));
             //cxDisplay1.SetBox(new CxBox3D[] { box }, Color.FromArgb(100, Color.Yellow), 1);
 
             //cxDisplay1.SetPoint(new CxPoint3D[] { new CxPoint3D(2, 3, 1), new CxPoint3D(5, 1, 1) }, Color.Green, 10f, PointShape.Sphere);
 
-            //Ìí¼ÓBox3D
+            //ï¿½ï¿½ï¿½ï¿½Box3D
             cxDisplay2.ResetView();
             cxDisplay2.SetBox(new CxBox3D[] { box }, Color.Yellow, 10);
         }
@@ -214,7 +214,7 @@ namespace DemoFrom
         {
             cxDisplay2.ResetView();
 
-            //Ìí¼ÓSegment3DÏß¶Î
+            //ï¿½ï¿½ï¿½ï¿½Segment3Dï¿½ß¶ï¿½
             cxDisplay2.SetSegment(new CxSegment3D[] { new CxSegment3D(new CxPoint3D(0, 0, 0), new CxPoint3D(1, 1, 1)) }, Color.Red);
             cxDisplay2.SetSegment(new CxSegment3D[] { new CxSegment3D(new CxPoint3D(0, 0, 0), new CxPoint3D(0, 1, 1)) }, Color.Yellow);
 
@@ -226,7 +226,7 @@ namespace DemoFrom
                 YAxis = new CxVector3D(0, 1, 0),
                 ZAxis = new CxVector3D(0, 0, -1)
             }, 50);
-            //Ìí¼Ó¶à±ßÐÎ
+            //ï¿½ï¿½ï¿½Ó¶ï¿½ï¿½ï¿½ï¿½
             List<CxPoint3D> pts = new List<CxPoint3D>();
             pts.Add(new CxPoint3D(0, 0, 0));
             pts.Add(new CxPoint3D(1, 0, 0));
@@ -235,19 +235,19 @@ namespace DemoFrom
             var polygon = new CxPolygon3D(pts.ToArray(), false);
             cxDisplay2.SetPolygon(new CxPolygon3D[] { polygon }, Color.Blue);
 
-            //Ìí¼ÓÆ½Ãæ Plane3D
+            //ï¿½ï¿½ï¿½ï¿½Æ½ï¿½ï¿½ Plane3D
             var plane = new CxPlane3D(new CxPoint3D(0, 0, 0), new CxVector3D(1, 1, 1));
             cxDisplay2.SetPlane(new CxPlane3D[] { plane }, Color.FromArgb(100, Color.Red));
 
-            //Ìí¼ÓBox3D
+            //ï¿½ï¿½ï¿½ï¿½Box3D
             var box = new CxBox3D(new CxPoint3D(0, 0, 0), new CxSize3D(10, 10, 10));
             cxDisplay2.SetBox(new CxBox3D[] { box }, Color.FromArgb(100, Color.Yellow));
 
-            //Ìí¼ÓTextInfo
-            var text = new CxTextInfo(new CxPoint3D(0, 0, 0), "this is a testÖÐÎÄ!", 50);
+            //ï¿½ï¿½ï¿½ï¿½TextInfo
+            var text = new CxTextInfo(new CxPoint3D(0, 0, 0), "this is a testï¿½ï¿½ï¿½ï¿½!", 50);
             cxDisplay2.SetTextInfo(new CxTextInfo[] { text }, Color.Yellow);
 
-            //Ìí¼ÓText2D
+            //ï¿½ï¿½ï¿½ï¿½Text2D
             var text2d = new CxText2D(new CxPoint2D(10, 50), "2D Labels", 10);
             cxDisplay2.SetText2D(new CxText2D[] { text2d }, Color.Green);
             cxDisplay2.ActivateAllItems();
@@ -257,21 +257,21 @@ namespace DemoFrom
         {
             cxDisplay2.ResetView();
 
-            // 1. ³ÌÐòÉú³ÉÆ½Ì¹²Î¿¼Ãæ£¨ÎªÉî¶È»º³åÌá¹©ÓÐÐ§Öµ£¬²¢´¥·¢ FitView£©
+            // 1. ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ½Ì¹ï¿½Î¿ï¿½ï¿½æ£¨Îªï¿½ï¿½È»ï¿½ï¿½ï¿½ï¿½á¹©ï¿½ï¿½Ð§Öµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ FitViewï¿½ï¿½
             const int W = 50, L = 50;
-            var flatData = new short[W * L]; // È«Áã = Z=0
+            var flatData = new short[W * L]; // È«ï¿½ï¿½ = Z=0
             var flatSurf = new CxSurface(W, L, flatData, null,
                 xOffset: 0, yOffset: 0, zOffset: 0,
                 xScale: 0.2f, yScale: 0.2f, zScale: 0.001f);
-            cxDisplay2.SetSurface(flatSurf); // 10¡Á10 Æ½Ãæ£¬FitView ×Ô¶¯¶ÔÆëÏà»ú
+            cxDisplay2.SetSurface(flatSurf); // 10ï¿½ï¿½10 Æ½ï¿½æ£¬FitView ï¿½Ô¶ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 
-            // 2. ·ÅÖÃ¿ÉÍÏ¶¯ MARK µã£¨Î»ÓÚÆ½ÃæÖÐÐÄ 5,5,0£©
+            // 2. ï¿½ï¿½ï¿½Ã¿ï¿½ï¿½Ï¶ï¿½ MARK ï¿½ã£¨Î»ï¿½ï¿½Æ½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ 5,5,0ï¿½ï¿½
             var mark = cxDisplay2.SetPoint(
                 new[] { new CxPoint3D(5.0f, 5.0f, 0f) }, Color.Red, 1f, PointShape.Sphere);
             mark.IsActiveObj = true;
             mark.HitThreshold = 2f;
 
-            // 3. ¶©ÔÄ OnChanged£¬ÊµÊ±¸üÐÂ×ø±ê±êÇ©
+            // 3. ï¿½ï¿½ï¿½ï¿½ OnChangedï¿½ï¿½ÊµÊ±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ç©
             mark.OnChanged += item =>
             {
                 var pos = ((CxPoint3DItem)item).Point3Ds[0];
@@ -283,21 +283,21 @@ namespace DemoFrom
         {
             cxDisplay2.ResetView();
 
-            // 1. Æ½Ì¹²Î¿¼Ãæ£¨ÎªÉî¶È»º³åÌá¹©ÓÐÐ§Öµ£¬´¥·¢ FitView£©
+            // 1. Æ½Ì¹ï¿½Î¿ï¿½ï¿½æ£¨Îªï¿½ï¿½È»ï¿½ï¿½ï¿½ï¿½á¹©ï¿½ï¿½Ð§Öµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ FitViewï¿½ï¿½
             const int W = 60, L = 60;
             var flatData = new short[W * L];
             var flatSurf = new CxSurface(W, L, flatData, null,
                 xOffset: 0, yOffset: 0, zOffset: 0,
                 xScale: 0.2f, yScale: 0.2f, zScale: 0.001f);
-            cxDisplay2.SetSurface(flatSurf);  // 12¡Á12 Æ½Ãæ
+            cxDisplay2.SetSurface(flatSurf);  // 12ï¿½ï¿½12 Æ½ï¿½ï¿½
 
-            // 2. ·ÅÖÃ¿ÉÍÏ×§ Box£¨Î»ÓÚÆ½ÃæÖÐÑë£©
+            // 2. ï¿½ï¿½ï¿½Ã¿ï¿½ï¿½ï¿½×§ Boxï¿½ï¿½Î»ï¿½ï¿½Æ½ï¿½ï¿½ï¿½ï¿½ï¿½ë£©
             var initBox = new CxBox3D(new CxPoint3D(6.0f, 6.0f, 0.5f), new CxSize3D(4.0f, 3.0f, 1.0f));
             var box = cxDisplay2.SetBox(new[] { initBox }, Color.FromArgb(80, Color.Cyan));
             box.IsActiveObj = true;
             box.HitThreshold = 1f;
 
-            // 3. ÊµÊ±ÏÔÊ¾ Box µÄ Center ºÍ Size
+            // 3. ÊµÊ±ï¿½ï¿½Ê¾ Box ï¿½ï¿½ Center ï¿½ï¿½ Size
             box.OnChanged += item =>
             {
                 var b = ((CxBox3DItem)item).Box3Ds[0];
@@ -311,13 +311,13 @@ namespace DemoFrom
         {
             cxDisplay2.ResetView();
 
-            // ²Î¿¼Æ½Ãæ£¨Éî¶È»º³å£©
+            // ï¿½Î¿ï¿½Æ½ï¿½æ£¨ï¿½ï¿½È»ï¿½ï¿½å£©
             const int W = 60, L = 60;
             var flatSurf = new CxSurface(W, L, new short[W * L], null,
                 xOffset: 0, yOffset: 0, zOffset: 0, xScale: 0.2f, yScale: 0.2f, zScale: 0.001f);
             cxDisplay2.SetSurface(flatSurf);
 
-            // ·ÅÖÃÈýÌõ¿ÉÍÏ×§Ïß¶Î
+            // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½×§ï¿½ß¶ï¿½
             var seg = cxDisplay2.SetSegment(new[]
             {
                 new CxSegment3D(new CxPoint3D(2f, 4f, 0f), new CxPoint3D(8f, 4f, 0f)),
@@ -339,13 +339,13 @@ namespace DemoFrom
         {
             cxDisplay2.ResetView();
 
-            // ²Î¿¼Æ½Ãæ£¨Éî¶È»º³å£©
+            // ï¿½Î¿ï¿½Æ½ï¿½æ£¨ï¿½ï¿½È»ï¿½ï¿½å£©
             const int W = 60, L = 60;
             var flatSurf = new CxSurface(W, L, new short[W * L], null,
                 xOffset: 0, yOffset: 0, zOffset: 0, xScale: 0.2f, yScale: 0.2f, zScale: 0.001f);
             cxDisplay2.SetSurface(flatSurf);
 
-            // ·ÅÖÃÒ»¸ö¾ØÐÎ¶à±ßÐÎ£¨±ÕºÏ£©ºÍÒ»ÌõÕÛÏß£¨¿ª·Å£©
+            // ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½ï¿½Î¶ï¿½ï¿½ï¿½Î£ï¿½ï¿½ÕºÏ£ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½ï¿½ß£ï¿½ï¿½ï¿½ï¿½Å£ï¿½
             var rect = new CxPolygon3D(new[]
             {
                 new CxPoint3D(2f, 3f, 0f), new CxPoint3D(8f, 3f, 0f),
@@ -445,7 +445,7 @@ namespace DemoFrom
                 {
                     cxDisplay2.ResetView();
                     cxDisplay2.SetSurfaceAdvancedItem(loaded);
-                    MessageBox.Show($"Surface saved ¡ú loaded\n{path}", "Save R/L");
+                    MessageBox.Show($"Surface saved ï¿½ï¿½ loaded\n{path}", "Save R/L");
                 }
             }
             else if (_currentMesh != null)
@@ -457,7 +457,7 @@ namespace DemoFrom
                 {
                     cxDisplay2.ResetView();
                     cxDisplay2.SetMesh(loaded);
-                    MessageBox.Show($"Mesh saved ¡ú loaded (OBJ)\n{path}", "Save R/L");
+                    MessageBox.Show($"Mesh saved ï¿½ï¿½ loaded (OBJ)\n{path}", "Save R/L");
                 }
             }
             else
@@ -486,7 +486,27 @@ namespace DemoFrom
             }
         }
 
-        // ©¤©¤ 2D Tab ©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤
+        private void btn_ioLoadSurface_Click(object sender, EventArgs e)
+        {
+            using (var dlg = new OpenFileDialog
+            {
+                Filter = "Surface files|*.cxsurface|All files|*.*"
+            })
+            {
+                if (dlg.ShowDialog() != DialogResult.OK) return;
+                var loaded = VisionOperator.LoadSurface(dlg.FileName);
+                if (loaded == null)
+                {
+                    MessageBox.Show("Failed to load surface.", "Load Surface");
+                    return;
+                }
+                surface = loaded;
+                cxDisplay2.ResetView();
+                cxDisplay2.SetSurfaceAdvancedItem(loaded);
+            }
+        }
+
+        // ï¿½ï¿½ï¿½ï¿½ 2D Tab ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 
         private CxDisplay2D _cxDisplay2D;
         private Label _lbl2DPos;
@@ -575,7 +595,7 @@ namespace DemoFrom
         }
 
 
-        // ©¤©¤ 2D Button Handlers ©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤
+        // ï¿½ï¿½ï¿½ï¿½ 2D Button Handlers ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 
         private void btn2D_loadImage_Click(object sender, EventArgs e)
         {
@@ -765,7 +785,7 @@ namespace DemoFrom
             item.OnChanged += i =>
             {
                 var b = ((CxBox2DItem)i).Boxes[0];
-                var text = $"C:({b.Center.X:F0},{b.Center.Y:F0})\nS:({b.Size.Width:F0}¡Á{b.Size.Height:F0})";
+                var text = $"C:({b.Center.X:F0},{b.Center.Y:F0})\nS:({b.Size.Width:F0}ï¿½ï¿½{b.Size.Height:F0})";
                 if (_lbl2DPos.InvokeRequired)
                     _lbl2DPos.Invoke(new Action(() => _lbl2DPos.Text = text));
                 else
@@ -1032,9 +1052,9 @@ namespace DemoFrom
             {
                 Vertices = verts,
                 Indices = indices,
-                UVs = uvs,
-                TextureWidth = w,
-                TextureHeight = h,
+                //UVs = new CxPoint2D[0],
+                //TextureWidth = 0,
+                //TextureHeight = 0,
                 Diff = diff,
             };
 
@@ -1042,10 +1062,10 @@ namespace DemoFrom
 
             cxDisplay2.SurfaceMode = SurfaceMode.Mesh;
             cxDisplay2.SetMeshAdvancedItem(mesh);
-            // ÈôÏë×Ô¶¯½øÈë Diff Ä£Ê½£¬È¡ÏûÏÂÐÐ×¢ÊÍ
+            // ï¿½ï¿½ï¿½ï¿½ï¿½Ô¶ï¿½ï¿½ï¿½ï¿½ï¿½ Diff Ä£Ê½ï¿½ï¿½È¡ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½×¢ï¿½ï¿½
             // cxDisplay2.SurfaceColorMode = SurfaceColorMode.Diff;
 
-            lbl_markPos.Text = "Diff Demo: ºÏ³ÉÕýÏÒ²¨ mesh\nÓÒ¼ü¡úSurfaceColorMode¡úDiff ÇÐ»»";
+            lbl_markPos.Text = "Diff Demo: ï¿½Ï³ï¿½ï¿½ï¿½ï¿½Ò²ï¿½ mesh\nï¿½Ò¼ï¿½ï¿½ï¿½SurfaceColorModeï¿½ï¿½Diff ï¿½Ð»ï¿½";
         }
 
         private void btn2D_regionDemo_Click(object sender, EventArgs e)
@@ -1119,7 +1139,7 @@ namespace DemoFrom
             _lbl2DPos.Text = "X: ---  Y: ---";
         }
 
-        // ©¤©¤ Image Loading Helper ©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤
+        // ï¿½ï¿½ï¿½ï¿½ Image Loading Helper ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 
         private CxImage LoadColorImage(string path)
         {
@@ -1143,7 +1163,7 @@ namespace DemoFrom
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Í¼Æ¬¼ÓÔØÊ§°Ü: {ex.Message}", "Load Image");
+                MessageBox.Show($"Í¼Æ¬ï¿½ï¿½ï¿½ï¿½Ê§ï¿½ï¿½: {ex.Message}", "Load Image");
                 return null;
             }
         }
