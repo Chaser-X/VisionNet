@@ -59,6 +59,18 @@ namespace VisionNet.Controls
         /// <summary>Gets the trackball camera controlling the 3D view.</summary>
         public CxAdvancedTrackBallCamera Camera => _camera;
 
+        /// <summary>
+        /// Gets or sets whether the right-click context menu is shown.
+        /// Default <c>true</c>. Set <c>false</c> to suppress the menu — the control still
+        /// receives right-click for camera / selection, but no menu pops up. The menu and its
+        /// event handlers are retained, so toggling back to <c>true</c> restores full behaviour.
+        /// </summary>
+        public bool IsMenuVisible
+        {
+            get => ContextMenuStrip != null;
+            set => ContextMenuStrip = value ? menu_right : null;
+        }
+
         /// <summary>Gets or sets the current view mode (Top, Front, Left, etc.).</summary>
         public ViewMode SurfaceViewMode
         {
