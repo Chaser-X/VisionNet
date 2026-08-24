@@ -1184,6 +1184,57 @@ namespace DemoFrom
         }
         private bool _diffRangeSet = false;
 
+        private void btn_mixedViewDemo_Click(object sender, EventArgs e)
+        {
+            cxDisplay2.ResetView();
+
+            // 1. Mesh：网格形式 + Color(Z 高度) 模式
+            const int mw = 60, mh = 60;
+            float spacing = 0.2f, freq = 0.3f, amp = 1.2f;
+            var mVerts = new CxPoint3D[mw * mh];
+            var mIdx = new uint[(mw - 1) * (mh - 1) * 6];
+            for (int y = 0; y < mh; y++)
+                for (int x = 0; x < mw; x++)
+                {
+                    float fx = x * spacing, fy = y * spacing;
+                    mVerts[y * mw + x] = new CxPoint3D(fx, fy,
+                        amp * (float)(Math.Sin(fx * freq) * Math.Cos(fy * freq)));
+                }
+            int ii = 0;
+            for (int y = 0; y < mh - 1; y++)
+                for (int x = 0; x < mw - 1; x++)
+                {
+                    uint tl = (uint)(y * mw + x), tr = tl + 1, bl = tl + (uint)mw, br = bl + 1;
+                    mIdx[ii++] = tl; mIdx[ii++] = bl; mIdx[ii++] = tr;
+                    mIdx[ii++] = tr; mIdx[ii++] = bl; mIdx[ii++] = br;
+                }
+            var mesh = new CxMesh { Vertices = mVerts, Indices = mIdx };
+            // Mesh 形式 + Color 模式（不取全局，显式指定）
+            cxDisplay2.AddMeshAdvancedItem(mesh, SurfaceMode.Mesh, SurfaceColorMode.Color);
+
+            // 2. PointCloud：点云形式 + Intensity 模式（与上面 Color 量纲不同）
+            const int pw = 60, pl = 60;
+            var pcData = new short[pw * pl * 3];
+            var pcIntensity = new byte[pw * pl];
+            for (int y = 0; y < pl; y++)
+                for (int x = 0; x < pw; x++)
+                {
+                    int idx = y * pw + x;
+                    pcData[idx * 3]     = (short)(x * 100);
+                    pcData[idx * 3 + 1] = (short)(y * 100);
+                    pcData[idx * 3 + 2] = (short)(80 + 60 * Math.Sin(x * 0.2));
+                    pcIntensity[idx] = (byte)((x + y) * 4 % 256);
+                }
+            var cloud = new CxPointCloud(pw, pl, pcData, pcIntensity,
+                xOffset: 15f, yOffset: 0f, zOffset: 0f,
+                xScale: 0.1f, yScale: 0.1f, zScale: 0.01f);
+            // 点云形式 + Intensity 模式
+            cxDisplay2.AddPointCloudAdvancedItem(cloud, SurfaceMode.PointCloud, SurfaceColorMode.Intensity);
+
+            // 两者量纲不同（Color=Z，Intensity=0-255）→ colorBar 自动隐藏
+            lbl_markPos.Text = "Mesh(Mesh+Color) + PointCloud(PC+Intensity)\nColorBar hidden: mixed magnitude classes";
+        }
+
         private void btn2D_regionDemo_Click(object sender, EventArgs e)
         {
             _cxDisplay2D.ClearOverlays();

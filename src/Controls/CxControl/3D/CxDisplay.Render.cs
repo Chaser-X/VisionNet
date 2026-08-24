@@ -117,30 +117,38 @@ namespace VisionNet.Controls
             lock (_resourceLock)
                 snapshot = new List<ICxObjRenderItem>(_surfaceItems);
 
-            // Phase 1 — compute global Z range and global diff range separately.
-            // Aggregate from each item's auto-computed BASE range (BaseZ/BaseDiff), NOT its
-            // active ColorMin/ColorMax — the latter may hold a manual override that would otherwise
-            // pollute the aggregate and prevent Clear*Range() from restoring the auto range.
+            // Phase 1 — aggregate global Z and diff ranges, and track whether all items share
+            // a single SurfaceColorMode (the colour bar is hidden when modes differ).
+            // Ranges aggregate from each item's auto-computed BASE range (BaseZ/BaseDiff), NOT
+            // its active ColorMin/ColorMax — the latter may hold a manual override that would
+            // otherwise pollute the aggregate and prevent Clear*Range() from restoring the auto range.
             float globalZMin = float.MaxValue, globalZMax = float.MinValue;
             float globalDiffMin = float.MaxValue, globalDiffMax = float.MinValue;
-            int zCount = 0, diffCount = 0;
+            SurfaceColorMode? singleMode = null;   // the only mode seen, if all items agree
+            bool mixedMode = false;                 // true once a second distinct mode appears
             foreach (var cur in snapshot)
             {
                 if (cur == null || cur.IsDisposed) continue;
-                if (cur.SurfaceColorMode == SurfaceColorMode.Diff)
+
+                var mode = cur.SurfaceColorMode;
+                if (!mixedMode)
+                {
+                    if (singleMode == null) singleMode = mode;
+                    else if (singleMode != mode) mixedMode = true;
+                }
+
+                if (mode == SurfaceColorMode.Diff)
                 {
                     if (cur.BaseDiffMin < globalDiffMin) globalDiffMin = cur.BaseDiffMin;
                     if (cur.BaseDiffMax > globalDiffMax) globalDiffMax = cur.BaseDiffMax;
-                    diffCount++;
                 }
-                else if (cur.SurfaceColorMode != SurfaceColorMode.Intensity &&
-                         cur.SurfaceColorMode != SurfaceColorMode.Lit)
+                else
                 {
                     if (cur.BaseZMin < globalZMin) globalZMin = cur.BaseZMin;
                     if (cur.BaseZMax > globalZMax) globalZMax = cur.BaseZMax;
-                    zCount++;
                 }
             }
+            bool uniformMode = !mixedMode && singleMode.HasValue;
 
             // Phase 2 — propagate unified Z range so all items share the same colour mapping.
             // A manually set colour range (_manualColorRange) overrides the auto-aggregated one.
@@ -193,26 +201,27 @@ namespace VisionNet.Controls
             }
 
             // Phase 4 — HUD overlays.
-            bool hybrid = zCount > 0 && diffCount > 0;
-            bool pureDiff = diffCount > 0 && zCount == 0;
-            if (anyDrawn && !hybrid)
+            // The colour bar is drawn only when every item shares the same SurfaceColorMode.
+            // Any mode mismatch (e.g. a Color mesh with a Diff point cloud) hides the bar — a
+            // single bar can't span mismatched magnitudes. Pure Intensity also hides (fixed 0–255).
+            if (anyDrawn && uniformMode && singleMode != SurfaceColorMode.Intensity)
             {
-                if (pureDiff && _manualDiffRange.HasValue)
+                if (singleMode == SurfaceColorMode.Diff && _manualDiffRange.HasValue)
                 {
                     _colorBarItem.SetRange(_manualDiffRange.Value.min, _manualDiffRange.Value.max);
                     _colorBarItem.Draw(gl);
                 }
-                else if (pureDiff && globalDiffMin < globalDiffMax)
+                else if (singleMode == SurfaceColorMode.Diff && globalDiffMin < globalDiffMax)
                 {
                     _colorBarItem.SetRange(globalDiffMin, globalDiffMax);
                     _colorBarItem.Draw(gl);
                 }
-                else if (_manualColorRange.HasValue)
+                else if (singleMode != SurfaceColorMode.Diff && _manualColorRange.HasValue)
                 {
                     _colorBarItem.SetRange(_manualColorRange.Value.min, _manualColorRange.Value.max);
                     _colorBarItem.Draw(gl);
                 }
-                else if (globalZMin < globalZMax)
+                else if (singleMode != SurfaceColorMode.Diff && globalZMin < globalZMax)
                 {
                     _colorBarItem.SetRange(globalZMin, globalZMax);
                     _colorBarItem.Draw(gl);

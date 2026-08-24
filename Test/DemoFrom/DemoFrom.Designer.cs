@@ -43,6 +43,7 @@ namespace DemoFrom
             this.btn_diffPointDemo = new System.Windows.Forms.Button();
             this.btn_colorRangeDemo = new System.Windows.Forms.Button();
             this.btn_diffRangeDemo = new System.Windows.Forms.Button();
+            this.btn_mixedViewDemo = new System.Windows.Forms.Button();
             this.lbl_markPos = new System.Windows.Forms.Label();
             this.tabPage2D = new System.Windows.Forms.TabPage();
             this.tabControl1.SuspendLayout();
@@ -116,6 +117,7 @@ namespace DemoFrom
             this.splitContainer1.Panel2.Controls.Add(this.btn_diffPointDemo);
             this.splitContainer1.Panel2.Controls.Add(this.btn_colorRangeDemo);
             this.splitContainer1.Panel2.Controls.Add(this.btn_diffRangeDemo);
+            this.splitContainer1.Panel2.Controls.Add(this.btn_mixedViewDemo);
             this.splitContainer1.Panel2.Controls.Add(this.lbl_markPos);
             this.splitContainer1.Size = new System.Drawing.Size(1441, 860);
             this.splitContainer1.SplitterDistance = 1277;
@@ -387,6 +389,17 @@ namespace DemoFrom
             this.btn_diffRangeDemo.Text = "Diff Range";
             this.btn_diffRangeDemo.UseVisualStyleBackColor = true;
             this.btn_diffRangeDemo.Click += new System.EventHandler(this.btn_diffRangeDemo_Click);
+            //
+            // btn_mixedViewDemo
+            //
+            this.btn_mixedViewDemo.Location = new System.Drawing.Point(29, 992);
+            this.btn_mixedViewDemo.Margin = new System.Windows.Forms.Padding(4, 4, 4, 4);
+            this.btn_mixedViewDemo.Name = "btn_mixedViewDemo";
+            this.btn_mixedViewDemo.Size = new System.Drawing.Size(123, 28);
+            this.btn_mixedViewDemo.TabIndex = 5;
+            this.btn_mixedViewDemo.Text = "Mesh+PC View";
+            this.btn_mixedViewDemo.UseVisualStyleBackColor = true;
+            this.btn_mixedViewDemo.Click += new System.EventHandler(this.btn_mixedViewDemo_Click);
             // 
             // lbl_markPos
             // 
@@ -464,6 +477,7 @@ namespace DemoFrom
         private System.Windows.Forms.Button btn_diffPointDemo;
         private System.Windows.Forms.Button btn_colorRangeDemo;
         private System.Windows.Forms.Button btn_diffRangeDemo;
+        private System.Windows.Forms.Button btn_mixedViewDemo;
         private System.Windows.Forms.Label lbl_markPos;
     }
 }

@@ -13,6 +13,19 @@ namespace VisionNet.Controls
         // ── Internal surface-item management ────────────────────────────────────
 
         /// <summary>
+        /// Resolves an optional per-item surface mode; <c>null</c> falls back to the display's
+        /// current <see cref="SurfaceMode"/>. Lets callers give individual items a mode different
+        /// from the global default (e.g. a Mesh as Mesh + a PointCloud as PointCloud in one view).
+        /// </summary>
+        private SurfaceMode ResolveMode(SurfaceMode? mode) => mode ?? SurfaceMode;
+
+        /// <summary>
+        /// Resolves an optional per-item colour mode; <c>null</c> falls back to the display's
+        /// current <see cref="SurfaceColorMode"/>.
+        /// </summary>
+        private SurfaceColorMode ResolveColorMode(SurfaceColorMode? colorMode) => colorMode ?? SurfaceColorMode;
+
+        /// <summary>
         /// Clears all existing surface items and replaces them with <paramref name="newItem"/>.
         /// Old GL resources are queued for deferred release.
         /// </summary>
@@ -82,14 +95,18 @@ namespace VisionNet.Controls
         // ── Surface: Set* (replace semantics) ───────────────────────────────────
 
         /// <summary>Replaces the current view with a structured surface (fixed pipeline).</summary>
-        public void SetSurface(CxSurface surface)
-            => ReplaceSurfaceItem(new CxSurfaceItem(surface, SurfaceMode, SurfaceColorMode));
+        /// <param name="mode">Optional surface mode; <c>null</c> uses the display's current mode.</param>
+        /// <param name="colorMode">Optional colour mode; <c>null</c> uses the display's current mode.</param>
+        public void SetSurface(CxSurface surface, SurfaceMode? mode = null, SurfaceColorMode? colorMode = null)
+            => ReplaceSurfaceItem(new CxSurfaceItem(surface, ResolveMode(mode), ResolveColorMode(colorMode)));
 
         /// <summary>
         /// Replaces the current view with a point cloud.
         /// Clouds larger than 100 M points are automatically down-sampled to ≤ 10 M.
         /// </summary>
-        public void SetPointCloud(CxPointCloud pointCloud)
+        /// <param name="mode">Optional surface mode; <c>null</c> uses the display's current mode.</param>
+        /// <param name="colorMode">Optional colour mode; <c>null</c> uses the display's current mode.</param>
+        public void SetPointCloud(CxPointCloud pointCloud, SurfaceMode? mode = null, SurfaceColorMode? colorMode = null)
         {
             if (pointCloud.Width * pointCloud.Length > 100_000_000)
             {
@@ -99,35 +116,43 @@ namespace VisionNet.Controls
                     (int)(pointCloud.Width  / ratio), (int)(pointCloud.Length / ratio),
                     pointCloud.XScale * ratio, pointCloud.YScale * ratio,
                     pointCloud.ZScale, pointCloud.XOffset, pointCloud.YOffset, pointCloud.ZOffset);
-                ReplaceSurfaceItem(new CxSurfaceItem(surface, SurfaceMode, SurfaceColorMode));
+                ReplaceSurfaceItem(new CxSurfaceItem(surface, ResolveMode(mode), ResolveColorMode(colorMode)));
             }
             else
             {
-                ReplaceSurfaceItem(new CxPointCloudItem(pointCloud, SurfaceMode, SurfaceColorMode));
+                ReplaceSurfaceItem(new CxPointCloudItem(pointCloud, ResolveMode(mode), ResolveColorMode(colorMode)));
             }
         }
 
         /// <summary>Replaces the current view with a single mesh.</summary>
-        public void SetMesh(CxMesh mesh)
-            => ReplaceSurfaceItem(new CxMeshItem(mesh, SurfaceMode, SurfaceColorMode));
+        /// <param name="mode">Optional surface mode; <c>null</c> uses the display's current mode.</param>
+        /// <param name="colorMode">Optional colour mode; <c>null</c> uses the display's current mode.</param>
+        public void SetMesh(CxMesh mesh, SurfaceMode? mode = null, SurfaceColorMode? colorMode = null)
+            => ReplaceSurfaceItem(new CxMeshItem(mesh, ResolveMode(mode), ResolveColorMode(colorMode)));
 
         /// <summary>
         /// Replaces the current view with a surface rendered via the high-performance shader path
         /// (VAO + GLSL, max 2 000 000 points).
         /// </summary>
-        public void SetSurfaceAdvancedItem(CxSurface surface)
-            => ReplaceSurfaceItem(new CxSurfaceAdvancedItem(surface, SurfaceMode, SurfaceColorMode, 2_000_000));
+        /// <param name="mode">Optional surface mode; <c>null</c> uses the display's current mode.</param>
+        /// <param name="colorMode">Optional colour mode; <c>null</c> uses the display's current mode.</param>
+        public void SetSurfaceAdvancedItem(CxSurface surface, SurfaceMode? mode = null, SurfaceColorMode? colorMode = null)
+            => ReplaceSurfaceItem(new CxSurfaceAdvancedItem(surface, ResolveMode(mode), ResolveColorMode(colorMode), 2_000_000));
 
         /// <summary>
         /// Replaces the current view with a point cloud rendered via the high-performance shader path
         /// (VAO + GLSL, max 2 000 000 points).
         /// </summary>
-        public void SetPointCloudAdvancedItem(CxPointCloud pointCloud)
-            => ReplaceSurfaceItem(new CxPointCloudAdvancedItem(pointCloud, SurfaceMode, SurfaceColorMode, 2_000_000));
+        /// <param name="mode">Optional surface mode; <c>null</c> uses the display's current mode.</param>
+        /// <param name="colorMode">Optional colour mode; <c>null</c> uses the display's current mode.</param>
+        public void SetPointCloudAdvancedItem(CxPointCloud pointCloud, SurfaceMode? mode = null, SurfaceColorMode? colorMode = null)
+            => ReplaceSurfaceItem(new CxPointCloudAdvancedItem(pointCloud, ResolveMode(mode), ResolveColorMode(colorMode), 2_000_000));
 
         /// <summary>Replaces the current view with a mesh rendered via the high-performance shader path.</summary>
-        public void SetMeshAdvancedItem(CxMesh mesh)
-            => ReplaceSurfaceItem(new CxMeshAdvancedItem(mesh, SurfaceMode, SurfaceColorMode));
+        /// <param name="mode">Optional surface mode; <c>null</c> uses the display's current mode.</param>
+        /// <param name="colorMode">Optional colour mode; <c>null</c> uses the display's current mode.</param>
+        public void SetMeshAdvancedItem(CxMesh mesh, SurfaceMode? mode = null, SurfaceColorMode? colorMode = null)
+            => ReplaceSurfaceItem(new CxMeshAdvancedItem(mesh, ResolveMode(mode), ResolveColorMode(colorMode)));
 
         // ── Surface: Set* with initial pose (replace semantics) ──────────────────
 
@@ -135,9 +160,12 @@ namespace VisionNet.Controls
         /// Replaces the current view with a surface rendered via the high-performance shader path,
         /// with an initial model matrix (pose).
         /// </summary>
-        public void SetSurfaceAdvancedItem(CxSurface surface, CxMatrix4X4 pose)
+        /// <param name="mode">Optional surface mode; <c>null</c> uses the display's current mode.</param>
+        /// <param name="colorMode">Optional colour mode; <c>null</c> uses the display's current mode.</param>
+        public void SetSurfaceAdvancedItem(CxSurface surface, CxMatrix4X4 pose,
+            SurfaceMode? mode = null, SurfaceColorMode? colorMode = null)
         {
-            var item = new CxSurfaceAdvancedItem(surface, SurfaceMode, SurfaceColorMode, 2_000_000)
+            var item = new CxSurfaceAdvancedItem(surface, ResolveMode(mode), ResolveColorMode(colorMode), 2_000_000)
                 { ModelMatrix = pose };
             ReplaceSurfaceItem(item);
         }
@@ -146,9 +174,12 @@ namespace VisionNet.Controls
         /// Replaces the current view with a point cloud rendered via the high-performance shader path,
         /// with an initial model matrix (pose).
         /// </summary>
-        public void SetPointCloudAdvancedItem(CxPointCloud cloud, CxMatrix4X4 pose)
+        /// <param name="mode">Optional surface mode; <c>null</c> uses the display's current mode.</param>
+        /// <param name="colorMode">Optional colour mode; <c>null</c> uses the display's current mode.</param>
+        public void SetPointCloudAdvancedItem(CxPointCloud cloud, CxMatrix4X4 pose,
+            SurfaceMode? mode = null, SurfaceColorMode? colorMode = null)
         {
-            var item = new CxPointCloudAdvancedItem(cloud, SurfaceMode, SurfaceColorMode, 2_000_000)
+            var item = new CxPointCloudAdvancedItem(cloud, ResolveMode(mode), ResolveColorMode(colorMode), 2_000_000)
                 { ModelMatrix = pose };
             ReplaceSurfaceItem(item);
         }
@@ -157,9 +188,12 @@ namespace VisionNet.Controls
         /// Replaces the current view with a mesh rendered via the high-performance shader path,
         /// with an initial model matrix (pose).
         /// </summary>
-        public void SetMeshAdvancedItem(CxMesh mesh, CxMatrix4X4 pose)
+        /// <param name="mode">Optional surface mode; <c>null</c> uses the display's current mode.</param>
+        /// <param name="colorMode">Optional colour mode; <c>null</c> uses the display's current mode.</param>
+        public void SetMeshAdvancedItem(CxMesh mesh, CxMatrix4X4 pose,
+            SurfaceMode? mode = null, SurfaceColorMode? colorMode = null)
         {
-            var item = new CxMeshAdvancedItem(mesh, SurfaceMode, SurfaceColorMode)
+            var item = new CxMeshAdvancedItem(mesh, ResolveMode(mode), ResolveColorMode(colorMode))
                 { ModelMatrix = pose };
             ReplaceSurfaceItem(item);
         }
@@ -263,9 +297,10 @@ namespace VisionNet.Controls
         /// <summary>
         /// Appends a surface via the high-performance shader path with an initial model matrix (pose).
         /// </summary>
-        public void AddSurfaceAdvancedItem(CxSurface surface, CxMatrix4X4 pose)
+        public void AddSurfaceAdvancedItem(CxSurface surface, CxMatrix4X4 pose,
+            SurfaceMode? mode = null, SurfaceColorMode? colorMode = null)
         {
-            var item = new CxSurfaceAdvancedItem(surface, SurfaceMode, SurfaceColorMode, 2_000_000)
+            var item = new CxSurfaceAdvancedItem(surface, ResolveMode(mode), ResolveColorMode(colorMode), 2_000_000)
                 { ModelMatrix = pose };
             AppendSurfaceItem(item);
         }
@@ -273,9 +308,12 @@ namespace VisionNet.Controls
         /// <summary>
         /// Appends a point cloud via the high-performance shader path with an initial model matrix (pose).
         /// </summary>
-        public void AddPointCloudAdvancedItem(CxPointCloud cloud, CxMatrix4X4 pose)
+        /// <param name="mode">Optional surface mode; <c>null</c> uses the display's current mode.</param>
+        /// <param name="colorMode">Optional colour mode; <c>null</c> uses the display's current mode.</param>
+        public void AddPointCloudAdvancedItem(CxPointCloud cloud, CxMatrix4X4 pose,
+            SurfaceMode? mode = null, SurfaceColorMode? colorMode = null)
         {
-            var item = new CxPointCloudAdvancedItem(cloud, SurfaceMode, SurfaceColorMode, 2_000_000)
+            var item = new CxPointCloudAdvancedItem(cloud, ResolveMode(mode), ResolveColorMode(colorMode), 2_000_000)
                 { ModelMatrix = pose };
             AppendSurfaceItem(item);
         }
@@ -283,9 +321,12 @@ namespace VisionNet.Controls
         /// <summary>
         /// Appends a mesh via the high-performance shader path with an initial model matrix (pose).
         /// </summary>
-        public void AddMeshAdvancedItem(CxMesh mesh, CxMatrix4X4 pose)
+        /// <param name="mode">Optional surface mode; <c>null</c> uses the display's current mode.</param>
+        /// <param name="colorMode">Optional colour mode; <c>null</c> uses the display's current mode.</param>
+        public void AddMeshAdvancedItem(CxMesh mesh, CxMatrix4X4 pose,
+            SurfaceMode? mode = null, SurfaceColorMode? colorMode = null)
         {
-            var item = new CxMeshAdvancedItem(mesh, SurfaceMode, SurfaceColorMode)
+            var item = new CxMeshAdvancedItem(mesh, ResolveMode(mode), ResolveColorMode(colorMode))
                 { ModelMatrix = pose };
             AppendSurfaceItem(item);
         }
@@ -293,14 +334,18 @@ namespace VisionNet.Controls
         // ── Surface: Add* (append semantics) ────────────────────────────────────
 
         /// <summary>Appends a structured surface without clearing existing items (fixed pipeline).</summary>
-        public void AddSurface(CxSurface surface)
-            => AppendSurfaceItem(new CxSurfaceItem(surface, SurfaceMode, SurfaceColorMode));
+        /// <param name="mode">Optional surface mode; <c>null</c> uses the display's current mode.</param>
+        /// <param name="colorMode">Optional colour mode; <c>null</c> uses the display's current mode.</param>
+        public void AddSurface(CxSurface surface, SurfaceMode? mode = null, SurfaceColorMode? colorMode = null)
+            => AppendSurfaceItem(new CxSurfaceItem(surface, ResolveMode(mode), ResolveColorMode(colorMode)));
 
         /// <summary>
         /// Appends a point cloud without clearing existing surface items.
         /// Clouds larger than 100 M points are automatically down-sampled to ≤ 10 M.
         /// </summary>
-        public void AddPointCloud(CxPointCloud pointCloud)
+        /// <param name="mode">Optional surface mode; <c>null</c> uses the display's current mode.</param>
+        /// <param name="colorMode">Optional colour mode; <c>null</c> uses the display's current mode.</param>
+        public void AddPointCloud(CxPointCloud pointCloud, SurfaceMode? mode = null, SurfaceColorMode? colorMode = null)
         {
             if (pointCloud.Width * pointCloud.Length > 100_000_000)
             {
@@ -310,29 +355,37 @@ namespace VisionNet.Controls
                     (int)(pointCloud.Width  / ratio), (int)(pointCloud.Length / ratio),
                     pointCloud.XScale * ratio, pointCloud.YScale * ratio,
                     pointCloud.ZScale, pointCloud.XOffset, pointCloud.YOffset, pointCloud.ZOffset);
-                AppendSurfaceItem(new CxSurfaceItem(surface, SurfaceMode, SurfaceColorMode));
+                AppendSurfaceItem(new CxSurfaceItem(surface, ResolveMode(mode), ResolveColorMode(colorMode)));
             }
             else
             {
-                AppendSurfaceItem(new CxPointCloudItem(pointCloud, SurfaceMode, SurfaceColorMode));
+                AppendSurfaceItem(new CxPointCloudItem(pointCloud, ResolveMode(mode), ResolveColorMode(colorMode)));
             }
         }
 
         /// <summary>Appends a mesh without clearing existing surface items.</summary>
-        public void AddMesh(CxMesh mesh)
-            => AppendSurfaceItem(new CxMeshItem(mesh, SurfaceMode, SurfaceColorMode));
+        /// <param name="mode">Optional surface mode; <c>null</c> uses the display's current mode.</param>
+        /// <param name="colorMode">Optional colour mode; <c>null</c> uses the display's current mode.</param>
+        public void AddMesh(CxMesh mesh, SurfaceMode? mode = null, SurfaceColorMode? colorMode = null)
+            => AppendSurfaceItem(new CxMeshItem(mesh, ResolveMode(mode), ResolveColorMode(colorMode)));
 
         /// <summary>Appends a surface via the high-performance shader path without clearing existing items.</summary>
-        public void AddSurfaceAdvancedItem(CxSurface surface)
-            => AppendSurfaceItem(new CxSurfaceAdvancedItem(surface, SurfaceMode, SurfaceColorMode, 2_000_000));
+        /// <param name="mode">Optional surface mode; <c>null</c> uses the display's current mode.</param>
+        /// <param name="colorMode">Optional colour mode; <c>null</c> uses the display's current mode.</param>
+        public void AddSurfaceAdvancedItem(CxSurface surface, SurfaceMode? mode = null, SurfaceColorMode? colorMode = null)
+            => AppendSurfaceItem(new CxSurfaceAdvancedItem(surface, ResolveMode(mode), ResolveColorMode(colorMode), 2_000_000));
 
         /// <summary>Appends a point cloud via the high-performance shader path without clearing existing items.</summary>
-        public void AddPointCloudAdvancedItem(CxPointCloud pointCloud)
-            => AppendSurfaceItem(new CxPointCloudAdvancedItem(pointCloud, SurfaceMode, SurfaceColorMode, 2_000_000));
+        /// <param name="mode">Optional surface mode; <c>null</c> uses the display's current mode.</param>
+        /// <param name="colorMode">Optional colour mode; <c>null</c> uses the display's current mode.</param>
+        public void AddPointCloudAdvancedItem(CxPointCloud pointCloud, SurfaceMode? mode = null, SurfaceColorMode? colorMode = null)
+            => AppendSurfaceItem(new CxPointCloudAdvancedItem(pointCloud, ResolveMode(mode), ResolveColorMode(colorMode), 2_000_000));
 
         /// <summary>Appends a mesh via the high-performance shader path without clearing existing items.</summary>
-        public void AddMeshAdvancedItem(CxMesh mesh)
-            => AppendSurfaceItem(new CxMeshAdvancedItem(mesh, SurfaceMode, SurfaceColorMode));
+        /// <param name="mode">Optional surface mode; <c>null</c> uses the display's current mode.</param>
+        /// <param name="colorMode">Optional colour mode; <c>null</c> uses the display's current mode.</param>
+        public void AddMeshAdvancedItem(CxMesh mesh, SurfaceMode? mode = null, SurfaceColorMode? colorMode = null)
+            => AppendSurfaceItem(new CxMeshAdvancedItem(mesh, ResolveMode(mode), ResolveColorMode(colorMode)));
 
         /// <summary>Appends an externally constructed render item without clearing existing items.</summary>
         public void AddSurfaceItem(ICxObjRenderItem item)
