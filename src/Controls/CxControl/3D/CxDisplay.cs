@@ -48,6 +48,12 @@ namespace VisionNet.Controls
         private SurfaceMode      _surfaceMode      = SurfaceMode.PointCloud;
         private SurfaceColorMode _surfaceColorMode = SurfaceColorMode.ColorWithIntensity;
 
+        // ── Manual colour / diff display ranges (override the per-frame auto-aggregated ranges) ──
+        // When non-null, the renderer propagates the range to every item instead of the
+        // auto-aggregated global range, and the colour bar uses it. null = auto.
+        private (float min, float max)? _manualColorRange = null;
+        private (float min, float max)? _manualDiffRange  = null;
+
         // ── Public properties ────────────────────────────────────────────────────
 
         /// <summary>Gets the trackball camera controlling the 3D view.</summary>

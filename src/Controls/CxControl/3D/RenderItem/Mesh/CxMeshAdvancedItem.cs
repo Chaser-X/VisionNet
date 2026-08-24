@@ -19,7 +19,60 @@ namespace VisionNet.Controls
         public bool IsDisposed { get; private set; } = false;
         public float ZMin { get; set; }
         public float ZMax { get; set; }
+        public float BaseZMin => _trueZMin;
+        public float BaseZMax => _trueZMax;
+        public float BaseDiffMin => _diffMin;
+        public float BaseDiffMax => _diffMax;
         public CxBox3D? BoundingBox { get; private set; }
+
+        /// <summary>
+        /// Per-vertex difference values (<c>float[Vertices.Length]</c>) for
+        /// <see cref="SurfaceColorMode.Diff"/>. <c>null</c>/insufficient → Diff falls back to Color.
+        /// Setting a new value invalidates cached render data.
+        /// </summary>
+        public float[] DiffValues
+        {
+            get => _diffValues;
+            set
+            {
+                _diffValues = value;
+                ComputeDiffRange(value);
+                if (_surfaceColorMode == SurfaceColorMode.Diff)
+                {
+                    ZMin = _diffMin; ZMax = _diffMax;
+                    if (_cachedRenderData?.Uniforms != null)
+                    {
+                        _cachedRenderData.Uniforms["zMin"] = ZMin;
+                        _cachedRenderData.Uniforms["zMax"] = ZMax;
+                    }
+                }
+                _cachedRenderData = null;
+                OnRenderDataChanged?.Invoke();
+            }
+        }
+        private float[] _diffValues;
+
+        /// <summary>
+        /// Overrides the diff value range used for colour mapping in Diff mode.
+        /// When not called, the range is auto-computed from <see cref="DiffValues"/>.
+        /// </summary>
+        /// <summary>
+        /// Per-frame diff range propagation from <see cref="CxDisplay"/>. Only applies in
+        /// Diff mode; lightweight uniform update (no cache rebuild, no auto-range reset).
+        /// </summary>
+        public void SetGlobalDiffRange(float min, float max)
+        {
+            if (_surfaceColorMode != SurfaceColorMode.Diff) return;
+            if (Math.Abs(ZMin - min) < 1e-6f && Math.Abs(ZMax - max) < 1e-6f) return;
+
+            ZMin = min;
+            ZMax = max;
+            if (_cachedRenderData?.Uniforms != null)
+            {
+                _cachedRenderData.Uniforms["zMin"] = min;
+                _cachedRenderData.Uniforms["zMax"] = max;
+            }
+        }
 
         /// <summary>
         /// Model matrix applied to this item's geometry before the camera transform.
@@ -61,7 +114,7 @@ namespace VisionNet.Controls
 
                 // ① 数据缺失回退（直接改 backing field，不递归事件）
                 bool wantDiff = value == SurfaceColorMode.Diff;
-                bool hasDiffData = Mesh?.Diff != null && Mesh.Diff.Length >= Mesh.Vertices.Length;
+                bool hasDiffData = _diffValues != null && _diffValues.Length >= Mesh.Vertices.Length;
                 if (wantDiff && !hasDiffData)
                 {
                     _surfaceColorMode = SurfaceColorMode.Color;
@@ -114,7 +167,7 @@ namespace VisionNet.Controls
 
         // 构造时一次性预计算的范围缓存（供 SurfaceColorMode 切换时快速赋值）
         private float _trueZMin, _trueZMax;   // BoundingBox Z 范围
-        private float _diffMin, _diffMax;     // Mesh.Diff 范围（null → 0,0）
+        private float _diffMin, _diffMax;     // DiffValues 范围（null → 0,0）
 
         #region Shader 源码（与 CxSurfaceAdvancedItem 内容一致，为解耦独立维护）
         internal static readonly string VertexShaderSource =
@@ -205,7 +258,8 @@ namespace VisionNet.Controls
 
         public CxMeshAdvancedItem(CxMesh mesh,
             SurfaceMode surfaceMode = SurfaceMode.PointCloud,
-            SurfaceColorMode surfaceColorMode = SurfaceColorMode.Color)
+            SurfaceColorMode surfaceColorMode = SurfaceColorMode.Color,
+            float[] diff = null)
         {
             Mesh = mesh;
             _surfaceMode = surfaceMode;
@@ -213,8 +267,10 @@ namespace VisionNet.Controls
 
             BoundingBox = CxExtension.CalculateBoundingBox(mesh?.Vertices);
 
-            // 预计算差分范围（UpdateWorldZRange 在 Diff 模式时引用 _diff 范围，须先算）
-            ComputeDiffRange(mesh?.Diff);
+            // 预计算差分范围（UpdateWorldZRange 在 Diff 模式时引用 _diff 范围，须先算）。
+            // 直接赋 backing field，绕过 DiffValues setter 的 invalidate（此时无缓存）。
+            _diffValues = diff;
+            ComputeDiffRange(diff);
             UpdateWorldZRange();
         }
 
@@ -320,10 +376,10 @@ namespace VisionNet.Controls
 
             // 惰性填充 DiffValues VBO（只在 Diff 模式且数据充足时）
             if (_surfaceColorMode == SurfaceColorMode.Diff
-                && Mesh?.Diff != null && Mesh.Diff.Length >= Mesh.Vertices.Length)
+                && _diffValues != null && _diffValues.Length >= Mesh.Vertices.Length)
             {
                 _cachedRenderData.DiffValues = new float[Mesh.Vertices.Length];
-                Array.Copy(Mesh.Diff, _cachedRenderData.DiffValues, _cachedRenderData.DiffValues.Length);
+                Array.Copy(_diffValues, _cachedRenderData.DiffValues, _cachedRenderData.DiffValues.Length);
             }
 
             return _cachedRenderData;

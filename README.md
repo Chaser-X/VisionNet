@@ -337,11 +337,17 @@ var mesh = new CxMesh
     Indices       = new uint[m * 3],   // 三角形索引（每三个为一个面片）
     UVs           = new CxPoint2D[n],  // 强度纹理 UV 坐标
     Intensity     = new byte[w * h],   // 强度纹理像素（W×H 网格）或逐顶点（压缩）
-    Diff          = new float[n],      // 每顶点差分值（可选），用于 SurfaceColorMode.Diff 模式
     TextureWidth  = w,
     TextureHeight = h,
 };
 ```
+
+> **差分伪彩（Diff 模式）**：差分数据不放在 `CxMesh` / `CxSurface` / `CxPointCloud`
+> 数据类型上，而是在渲染侧传入。`CxDisplay` 的 `Set*` / `Add*` 入口都带可选
+> `float[] diff` 参数（Mesh 为 `float[Vertices.Length]` 逐顶点；Surface / PointCloud
+> 为 `float[Width*Length]` 网格点）。设为 `SurfaceColorMode.Diff` 即按差分值伪彩；
+> 需要多对象对齐同一量程时，调用 `CxDisplay.SetColorRange` / `SetDiffRange`
+> （配合 `ClearColorRange` / `ClearDiffRange` 复位）。
 
 `SurfaceToMesh` 生成的 mesh：
 

@@ -28,6 +28,27 @@ namespace VisionNet.Controls
         /// <summary>Gets or sets the maximum Z value used for color mapping.</summary>
         float ZMax { get; set; }
 
+        /// <summary>
+        /// Gets the auto-computed base Z (height) range from the geometry, independent of
+        /// any manually set or propagated range. Used by <see cref="CxDisplay"/> to aggregate
+        /// the global colour range without being polluted by the active <see cref="ZMin"/>/
+        /// <see cref="ZMax"/> (which may hold a manual override).
+        /// </summary>
+        float BaseZMin { get; }
+
+        /// <summary>See <see cref="BaseZMin"/>.</summary>
+        float BaseZMax { get; }
+
+        /// <summary>
+        /// Gets the auto-computed base diff value range from <see cref="DiffValues"/>,
+        /// independent of any manually set or propagated range. Used by
+        /// <see cref="CxDisplay"/> to aggregate the global diff range.
+        /// </summary>
+        float BaseDiffMin { get; }
+
+        /// <summary>See <see cref="BaseDiffMin"/>.</summary>
+        float BaseDiffMax { get; }
+
         /// <summary>Gets the bounding box enclosing all geometry data.</summary>
         CxBox3D? BoundingBox { get; }
 
@@ -36,6 +57,24 @@ namespace VisionNet.Controls
 
         /// <summary>Gets or sets the surface rendering mode (PointCloud or Mesh).</summary>
         SurfaceMode SurfaceMode { get; set; }
+
+        /// <summary>
+        /// Gets or sets the per-vertex / per-grid-point difference values used by
+        /// <see cref="SurfaceColorMode.Diff"/>. Layout is per-vertex for meshes
+        /// (<c>float[Vertices.Length]</c>) and W×L grid-point for surfaces / point clouds
+        /// (<c>float[Width*Length]</c>). <c>null</c> or insufficient length makes
+        /// <see cref="SurfaceColorMode.Diff"/> fall back to <see cref="SurfaceColorMode.Color"/>.
+        /// Setting this invalidates cached render data.
+        /// </summary>
+        float[] DiffValues { get; set; }
+
+        /// <summary>
+        /// Called by <see cref="CxDisplay"/> before each frame with the global diff range
+        /// across all items (or the manually set diff range). Only items in
+        /// <see cref="SurfaceColorMode.Diff"/> apply it; others ignore it. Symmetric to
+        /// <see cref="SetGlobalZRange"/>: lightweight uniform / cache update only.
+        /// </summary>
+        void SetGlobalDiffRange(float min, float max);
 
         /// <summary>Prepares CPU-side render data. Does not make GL calls.</summary>
         RenderData PrepareRenderData();

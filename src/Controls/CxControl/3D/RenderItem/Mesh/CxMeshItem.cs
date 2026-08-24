@@ -18,7 +18,52 @@ namespace VisionNet.Controls
         public bool IsDisposed { get; private set; } = false;
         public float ZMin { get; set; }
         public float ZMax { get; set; }
+        public float BaseZMin => _trueZMin;
+        public float BaseZMax => _trueZMax;
+        public float BaseDiffMin => _diffMin;
+        public float BaseDiffMax => _diffMax;
         public CxBox3D? BoundingBox { get; private set; }
+
+        /// <summary>
+        /// Per-vertex difference values (<c>float[Vertices.Length]</c>) for
+        /// <see cref="SurfaceColorMode.Diff"/>. <c>null</c>/insufficient → Diff falls back to Color.
+        /// Setting a new value invalidates cached render data (colours are re-baked).
+        /// </summary>
+        public float[] DiffValues
+        {
+            get => _diffValues;
+            set
+            {
+                _diffValues = value;
+                ComputeDiffRange(value);
+                if (_surfaceColorMode == SurfaceColorMode.Diff)
+                {
+                    ZMin = _diffMin; ZMax = _diffMax;
+                }
+                _cachedRenderData = null;
+                OnRenderDataChanged?.Invoke();
+            }
+        }
+        private float[] _diffValues;
+
+        /// <summary>
+        /// Overrides the diff value range used for colour mapping in Diff mode.
+        /// When not called, the range is auto-computed from <see cref="DiffValues"/>.
+        /// </summary>
+        /// <summary>
+        /// Per-frame diff range propagation from <see cref="CxDisplay"/>. Only applies in
+        /// Diff mode; fixed-function path must re-bake colours.
+        /// </summary>
+        public void SetGlobalDiffRange(float min, float max)
+        {
+            if (_surfaceColorMode != SurfaceColorMode.Diff) return;
+            if (Math.Abs(ZMin - min) < 1e-6f && Math.Abs(ZMax - max) < 1e-6f) return;
+
+            ZMin = min;
+            ZMax = max;
+            _cachedRenderData = null;
+            OnRenderDataChanged?.Invoke();
+        }
 
         private SurfaceMode _surfaceMode;
         public SurfaceMode SurfaceMode
@@ -40,7 +85,7 @@ namespace VisionNet.Controls
 
                 // 数据缺失回退
                 if (value == SurfaceColorMode.Diff
-                    && (Mesh?.Diff == null || Mesh.Diff.Length < Mesh.Vertices.Length))
+                    && (_diffValues == null || _diffValues.Length < Mesh.Vertices.Length))
                 {
                     _surfaceColorMode = SurfaceColorMode.Color;
                     value = SurfaceColorMode.Color;
@@ -74,7 +119,8 @@ namespace VisionNet.Controls
 
         public CxMeshItem(CxMesh mesh,
             SurfaceMode surfaceMode = SurfaceMode.PointCloud,
-            SurfaceColorMode surfaceColorMode = SurfaceColorMode.Color)
+            SurfaceColorMode surfaceColorMode = SurfaceColorMode.Color,
+            float[] diff = null)
         {
             Mesh = mesh;
             _surfaceMode = surfaceMode;
@@ -87,7 +133,9 @@ namespace VisionNet.Controls
             _trueZMax = ZMax = (float)(BoundingBox?.Center.Z + BoundingBox?.Size.Depth / 2);
             _trueZMin = ZMin = (float)(BoundingBox?.Center.Z - BoundingBox?.Size.Depth / 2);
 
-            ComputeDiffRange(mesh?.Diff);
+            // 直接赋 backing field，绕过 DiffValues setter 的 invalidate（此时无缓存）。
+            _diffValues = diff;
+            ComputeDiffRange(diff);
         }
 
         private void ComputeDiffRange(float[] diffData)
@@ -145,8 +193,8 @@ namespace VisionNet.Controls
 
                 if (_surfaceColorMode == SurfaceColorMode.Diff)
                 {
-                    var c = Mesh.Diff != null && i < Mesh.Diff.Length
-                        ? CxExtension.GetColorByHeight(Mesh.Diff[i], ZMin, ZMax)
+                    var c = _diffValues != null && i < _diffValues.Length
+                        ? CxExtension.GetColorByHeight(_diffValues[i], ZMin, ZMax)
                         : CxExtension.GetColorByHeight(Mesh.Vertices[i].Z, ZMin, ZMax);
                     colors[i * 3]     = c.r;
                     colors[i * 3 + 1] = c.g;

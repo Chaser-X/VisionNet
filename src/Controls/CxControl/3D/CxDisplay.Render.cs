@@ -118,6 +118,9 @@ namespace VisionNet.Controls
                 snapshot = new List<ICxObjRenderItem>(_surfaceItems);
 
             // Phase 1 — compute global Z range and global diff range separately.
+            // Aggregate from each item's auto-computed BASE range (BaseZ/BaseDiff), NOT its
+            // active ZMin/ZMax — the latter may hold a manual override that would otherwise
+            // pollute the aggregate and prevent Clear*Range() from restoring the auto range.
             float globalZMin = float.MaxValue, globalZMax = float.MinValue;
             float globalDiffMin = float.MaxValue, globalDiffMax = float.MinValue;
             int zCount = 0, diffCount = 0;
@@ -126,25 +129,51 @@ namespace VisionNet.Controls
                 if (cur == null || cur.IsDisposed) continue;
                 if (cur.SurfaceColorMode == SurfaceColorMode.Diff)
                 {
-                    if (cur.ZMin < globalDiffMin) globalDiffMin = cur.ZMin;
-                    if (cur.ZMax > globalDiffMax) globalDiffMax = cur.ZMax;
+                    if (cur.BaseDiffMin < globalDiffMin) globalDiffMin = cur.BaseDiffMin;
+                    if (cur.BaseDiffMax > globalDiffMax) globalDiffMax = cur.BaseDiffMax;
                     diffCount++;
                 }
                 else if (cur.SurfaceColorMode != SurfaceColorMode.Intensity &&
                          cur.SurfaceColorMode != SurfaceColorMode.Lit)
                 {
-                    if (cur.ZMin < globalZMin) globalZMin = cur.ZMin;
-                    if (cur.ZMax > globalZMax) globalZMax = cur.ZMax;
+                    if (cur.BaseZMin < globalZMin) globalZMin = cur.BaseZMin;
+                    if (cur.BaseZMax > globalZMax) globalZMax = cur.BaseZMax;
                     zCount++;
                 }
             }
 
             // Phase 2 — propagate unified Z range so all items share the same colour mapping.
-            if (globalZMin < globalZMax)
+            // A manually set colour range (_manualColorRange) overrides the auto-aggregated one.
+            if (_manualColorRange.HasValue)
+            {
+                float mMin = _manualColorRange.Value.min;
+                float mMax = _manualColorRange.Value.max;
+                foreach (var cur in snapshot)
+                    if (cur != null && !cur.IsDisposed)
+                        cur.SetGlobalZRange(mMin, mMax);
+            }
+            else if (globalZMin < globalZMax)
             {
                 foreach (var cur in snapshot)
                     if (cur != null && !cur.IsDisposed)
                         cur.SetGlobalZRange(globalZMin, globalZMax);
+            }
+
+            // Phase 2b — propagate the unified diff range to Diff-mode items.
+            // A manually set diff range (_manualDiffRange) overrides the auto-aggregated one.
+            if (_manualDiffRange.HasValue)
+            {
+                float dMin = _manualDiffRange.Value.min;
+                float dMax = _manualDiffRange.Value.max;
+                foreach (var cur in snapshot)
+                    if (cur != null && !cur.IsDisposed)
+                        cur.SetGlobalDiffRange(dMin, dMax);
+            }
+            else if (globalDiffMin < globalDiffMax)
+            {
+                foreach (var cur in snapshot)
+                    if (cur != null && !cur.IsDisposed)
+                        cur.SetGlobalDiffRange(globalDiffMin, globalDiffMax);
             }
 
             // Phase 3 — draw surface items.
@@ -168,9 +197,19 @@ namespace VisionNet.Controls
             bool pureDiff = diffCount > 0 && zCount == 0;
             if (anyDrawn && !hybrid)
             {
-                if (pureDiff && globalDiffMin < globalDiffMax)
+                if (pureDiff && _manualDiffRange.HasValue)
+                {
+                    _colorBarItem.SetRange(_manualDiffRange.Value.min, _manualDiffRange.Value.max);
+                    _colorBarItem.Draw(gl);
+                }
+                else if (pureDiff && globalDiffMin < globalDiffMax)
                 {
                     _colorBarItem.SetRange(globalDiffMin, globalDiffMax);
+                    _colorBarItem.Draw(gl);
+                }
+                else if (_manualColorRange.HasValue)
+                {
+                    _colorBarItem.SetRange(_manualColorRange.Value.min, _manualColorRange.Value.max);
                     _colorBarItem.Draw(gl);
                 }
                 else if (globalZMin < globalZMax)

@@ -1055,18 +1055,131 @@ namespace DemoFrom
                 //UVs = new CxPoint2D[0],
                 //TextureWidth = 0,
                 //TextureHeight = 0,
-                Diff = diff,
             };
 
             _currentMesh = mesh;
 
             cxDisplay2.SurfaceMode = SurfaceMode.Mesh;
-            cxDisplay2.SetMeshAdvancedItem(mesh);
+            cxDisplay2.SetMeshAdvancedItem(mesh, diff);
             // �����Զ����� Diff ģʽ��ȡ������ע��
             // cxDisplay2.SurfaceColorMode = SurfaceColorMode.Diff;
 
             lbl_markPos.Text = "Diff Demo: �ϳ����Ҳ� mesh\n�Ҽ���SurfaceColorMode��Diff �л�";
         }
+
+        private void btn_diffSurfaceDemo_Click(object sender, EventArgs e)
+        {
+            cxDisplay2.ResetView();
+
+            // CxSurface: 高度图（Data = W*L shorts，每个 = Z 高度）。Diff 同为 W*L 网格点。
+            const int W = 90, L = 90;
+            const float xScale = 0.15f, yScale = 0.15f, zScale = 0.002f;
+            float freq = 0.35f;
+            float amp = 1500f;
+
+            var data = new short[W * L];
+            var diff = new float[W * L];
+
+            for (int y = 0; y < L; y++)
+            {
+                for (int x = 0; x < W; x++)
+                {
+                    int idx = y * W + x;
+                    float fx = x * xScale;
+                    float fy = y * yScale;
+                    float z = 0;
+                    data[idx] = (short)z;
+                    diff[idx] = amp * (float)(Math.Sin(fx * freq) * Math.Cos(fy * freq)) * zScale;
+                }
+            }
+
+            var surface = new CxSurface(W, L, data, null,
+                xOffset: 0, yOffset: 0, zOffset: 0,
+                xScale: xScale, yScale: yScale, zScale: zScale);
+
+            cxDisplay2.SurfaceMode = SurfaceMode.Mesh;
+            cxDisplay2.SetSurfaceAdvancedItem(surface, diff);
+            // cxDisplay2.SurfaceColorMode = SurfaceColorMode.Diff;
+
+            lbl_markPos.Text = "Diff Surface Demo: right-click SurfaceColorMode->Diff";
+        }
+
+        private void btn_diffPointDemo_Click(object sender, EventArgs e)
+        {
+            cxDisplay2.ResetView();
+
+            // CxPointCloud: Data = W*L*3 shorts（每 3 个 = X,Y,Z）。Diff 为 W*L 网格点。
+            const int W = 90, L = 90;
+            const float xScale = 0.15f, yScale = 0.15f, zScale = 0.002f;
+            float freq = 0.35f;
+            float amp = 1500f;
+
+            var data = new short[W * L * 3];
+            var diff = new float[W * L];
+
+            for (int y = 0; y < L; y++)
+            {
+                for (int x = 0; x < W; x++)
+                {
+                    int idx = y * W + x;
+                    float fx = x * xScale;
+                    float fy = y * yScale;
+                    float z = 0;
+                    data[idx * 3]     = (short)(x);
+                    data[idx * 3 + 1] = (short)(y);
+                    data[idx * 3 + 2] = (short)z;
+                    diff[idx] = amp * (float)(Math.Sin(fx * freq) * Math.Cos(fy * freq)) * zScale;
+                }
+            }
+
+            var cloud = new CxPointCloud(W, L, data, null,
+                xOffset: 0, yOffset: 0, zOffset: 0,
+                xScale: xScale, yScale: yScale, zScale: zScale);
+
+            cxDisplay2.SurfaceMode = SurfaceMode.PointCloud;
+            cxDisplay2.SetPointCloudAdvancedItem(cloud, diff);
+            // cxDisplay2.SurfaceColorMode = SurfaceColorMode.Diff;
+
+            lbl_markPos.Text = "Diff PointCloud Demo: right-click SurfaceColorMode->Diff";
+        }
+
+        private void btn_colorRangeDemo_Click(object sender, EventArgs e)
+        {
+            // 切换式：首次点击设固定 Color(Z) 范围，再次点击复位为自动。
+            cxDisplay2.SurfaceColorMode = SurfaceColorMode.Color;
+            if (_colorRangeSet)
+            {
+                cxDisplay2.ClearColorRange();
+                _colorRangeSet = false;
+                lbl_markPos.Text = "Color Range cleared -> auto";
+            }
+            else
+            {
+                cxDisplay2.SetColorRange(-1.0f, 1.0f);
+                _colorRangeSet = true;
+                lbl_markPos.Text = "Color Range set to [-1, 1] (click again to clear)";
+            }
+        }
+        private bool _colorRangeSet = false;
+
+        private void btn_diffRangeDemo_Click(object sender, EventArgs e)
+        {
+            // 切换式：首次点击设固定 Diff 范围，再次点击复位为自动。
+            cxDisplay2.SurfaceColorMode = SurfaceColorMode.Diff;
+            if (_diffRangeSet)
+            {
+                cxDisplay2.ClearDiffRange();
+                _diffRangeSet = false;
+                lbl_markPos.Text = "Diff Range cleared -> auto";
+            }
+            else
+            {
+                cxDisplay2.SetDiffRange(-0.5f, 0.5f);
+                _diffRangeSet = true;
+                lbl_markPos.Text = "Diff Range set to [-0.5, 0.5] (click again to clear)";
+            }
+        }
+        private bool _diffRangeSet = false;
 
         private void btn2D_regionDemo_Click(object sender, EventArgs e)
         {

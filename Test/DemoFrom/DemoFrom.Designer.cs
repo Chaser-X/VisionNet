@@ -39,6 +39,10 @@ namespace DemoFrom
             this.btn_segDemo = new System.Windows.Forms.Button();
             this.btn_polyDemo = new System.Windows.Forms.Button();
             this.btn_diffDemo = new System.Windows.Forms.Button();
+            this.btn_diffSurfaceDemo = new System.Windows.Forms.Button();
+            this.btn_diffPointDemo = new System.Windows.Forms.Button();
+            this.btn_colorRangeDemo = new System.Windows.Forms.Button();
+            this.btn_diffRangeDemo = new System.Windows.Forms.Button();
             this.lbl_markPos = new System.Windows.Forms.Label();
             this.tabPage2D = new System.Windows.Forms.TabPage();
             this.tabControl1.SuspendLayout();
@@ -108,6 +112,10 @@ namespace DemoFrom
             this.splitContainer1.Panel2.Controls.Add(this.btn_segDemo);
             this.splitContainer1.Panel2.Controls.Add(this.btn_polyDemo);
             this.splitContainer1.Panel2.Controls.Add(this.btn_diffDemo);
+            this.splitContainer1.Panel2.Controls.Add(this.btn_diffSurfaceDemo);
+            this.splitContainer1.Panel2.Controls.Add(this.btn_diffPointDemo);
+            this.splitContainer1.Panel2.Controls.Add(this.btn_colorRangeDemo);
+            this.splitContainer1.Panel2.Controls.Add(this.btn_diffRangeDemo);
             this.splitContainer1.Panel2.Controls.Add(this.lbl_markPos);
             this.splitContainer1.Size = new System.Drawing.Size(1441, 860);
             this.splitContainer1.SplitterDistance = 1277;
@@ -335,6 +343,50 @@ namespace DemoFrom
             this.btn_diffDemo.Text = "Diff Demo";
             this.btn_diffDemo.UseVisualStyleBackColor = true;
             this.btn_diffDemo.Click += new System.EventHandler(this.btn_diffDemo_Click);
+            //
+            // btn_diffSurfaceDemo
+            //
+            this.btn_diffSurfaceDemo.Location = new System.Drawing.Point(29, 864);
+            this.btn_diffSurfaceDemo.Margin = new System.Windows.Forms.Padding(4, 4, 4, 4);
+            this.btn_diffSurfaceDemo.Name = "btn_diffSurfaceDemo";
+            this.btn_diffSurfaceDemo.Size = new System.Drawing.Size(123, 28);
+            this.btn_diffSurfaceDemo.TabIndex = 1;
+            this.btn_diffSurfaceDemo.Text = "Diff Surface";
+            this.btn_diffSurfaceDemo.UseVisualStyleBackColor = true;
+            this.btn_diffSurfaceDemo.Click += new System.EventHandler(this.btn_diffSurfaceDemo_Click);
+            //
+            // btn_diffPointDemo
+            //
+            this.btn_diffPointDemo.Location = new System.Drawing.Point(29, 896);
+            this.btn_diffPointDemo.Margin = new System.Windows.Forms.Padding(4, 4, 4, 4);
+            this.btn_diffPointDemo.Name = "btn_diffPointDemo";
+            this.btn_diffPointDemo.Size = new System.Drawing.Size(123, 28);
+            this.btn_diffPointDemo.TabIndex = 2;
+            this.btn_diffPointDemo.Text = "Diff PointCloud";
+            this.btn_diffPointDemo.UseVisualStyleBackColor = true;
+            this.btn_diffPointDemo.Click += new System.EventHandler(this.btn_diffPointDemo_Click);
+            //
+            // btn_colorRangeDemo
+            //
+            this.btn_colorRangeDemo.Location = new System.Drawing.Point(29, 928);
+            this.btn_colorRangeDemo.Margin = new System.Windows.Forms.Padding(4, 4, 4, 4);
+            this.btn_colorRangeDemo.Name = "btn_colorRangeDemo";
+            this.btn_colorRangeDemo.Size = new System.Drawing.Size(123, 28);
+            this.btn_colorRangeDemo.TabIndex = 3;
+            this.btn_colorRangeDemo.Text = "Color Range";
+            this.btn_colorRangeDemo.UseVisualStyleBackColor = true;
+            this.btn_colorRangeDemo.Click += new System.EventHandler(this.btn_colorRangeDemo_Click);
+            //
+            // btn_diffRangeDemo
+            //
+            this.btn_diffRangeDemo.Location = new System.Drawing.Point(29, 960);
+            this.btn_diffRangeDemo.Margin = new System.Windows.Forms.Padding(4, 4, 4, 4);
+            this.btn_diffRangeDemo.Name = "btn_diffRangeDemo";
+            this.btn_diffRangeDemo.Size = new System.Drawing.Size(123, 28);
+            this.btn_diffRangeDemo.TabIndex = 4;
+            this.btn_diffRangeDemo.Text = "Diff Range";
+            this.btn_diffRangeDemo.UseVisualStyleBackColor = true;
+            this.btn_diffRangeDemo.Click += new System.EventHandler(this.btn_diffRangeDemo_Click);
             // 
             // lbl_markPos
             // 
@@ -408,6 +460,10 @@ namespace DemoFrom
         private System.Windows.Forms.Button btn_segDemo;
         private System.Windows.Forms.Button btn_polyDemo;
         private System.Windows.Forms.Button btn_diffDemo;
+        private System.Windows.Forms.Button btn_diffSurfaceDemo;
+        private System.Windows.Forms.Button btn_diffPointDemo;
+        private System.Windows.Forms.Button btn_colorRangeDemo;
+        private System.Windows.Forms.Button btn_diffRangeDemo;
         private System.Windows.Forms.Label lbl_markPos;
     }
 }
