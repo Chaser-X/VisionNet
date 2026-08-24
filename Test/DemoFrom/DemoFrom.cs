@@ -1055,12 +1055,13 @@ namespace DemoFrom
                 //UVs = new CxPoint2D[0],
                 //TextureWidth = 0,
                 //TextureHeight = 0,
+                Diff = diff,
             };
 
             _currentMesh = mesh;
 
             cxDisplay2.SurfaceMode = SurfaceMode.Mesh;
-            cxDisplay2.SetMeshAdvancedItem(mesh, diff);
+            cxDisplay2.SetMeshAdvancedItem(mesh);
             // �����Զ����� Diff ģʽ��ȡ������ע��
             // cxDisplay2.SurfaceColorMode = SurfaceColorMode.Diff;
 
@@ -1095,10 +1096,11 @@ namespace DemoFrom
 
             var surface = new CxSurface(W, L, data, null,
                 xOffset: 0, yOffset: 0, zOffset: 0,
-                xScale: xScale, yScale: yScale, zScale: zScale);
+                xScale: xScale, yScale: yScale, zScale: zScale)
+            { Diff = diff };
 
             cxDisplay2.SurfaceMode = SurfaceMode.Mesh;
-            cxDisplay2.SetSurfaceAdvancedItem(surface, diff);
+            cxDisplay2.SetSurfaceAdvancedItem(surface);
             // cxDisplay2.SurfaceColorMode = SurfaceColorMode.Diff;
 
             lbl_markPos.Text = "Diff Surface Demo: right-click SurfaceColorMode->Diff";
@@ -1134,10 +1136,11 @@ namespace DemoFrom
 
             var cloud = new CxPointCloud(W, L, data, null,
                 xOffset: 0, yOffset: 0, zOffset: 0,
-                xScale: xScale, yScale: yScale, zScale: zScale);
+                xScale: xScale, yScale: yScale, zScale: zScale)
+            { Diff = diff };
 
             cxDisplay2.SurfaceMode = SurfaceMode.PointCloud;
-            cxDisplay2.SetPointCloudAdvancedItem(cloud, diff);
+            cxDisplay2.SetPointCloudAdvancedItem(cloud);
             // cxDisplay2.SurfaceColorMode = SurfaceColorMode.Diff;
 
             lbl_markPos.Text = "Diff PointCloud Demo: right-click SurfaceColorMode->Diff";

@@ -25,28 +25,9 @@ namespace VisionNet.Controls
         public CxBox3D? BoundingBox { get; private set; }
 
         /// <summary>
-        /// Per-vertex difference values (<c>float[Vertices.Length]</c>) for
-        /// <see cref="SurfaceColorMode.Diff"/>. <c>null</c>/insufficient → Diff falls back to Color.
-        /// Setting a new value invalidates cached render data (colours are re-baked).
+        /// Per-frame diff range propagation from <see cref="CxDisplay"/>. Only applies in
+        /// Diff mode; fixed-function path must re-bake colours.
         /// </summary>
-        public float[] DiffValues
-        {
-            get => _diffValues;
-            set
-            {
-                _diffValues = value;
-                ComputeDiffRange(value);
-                if (_surfaceColorMode == SurfaceColorMode.Diff)
-                {
-                    ColorMin = _baseDiffMin; ColorMax = _baseDiffMax;
-                }
-                _cachedRenderData = null;
-                OnRenderDataChanged?.Invoke();
-            }
-        }
-        private float[] _diffValues;
-
-        /// <summary>
         /// Overrides the diff value range used for colour mapping in Diff mode.
         /// When not called, the range is auto-computed from <see cref="DiffValues"/>.
         /// </summary>
@@ -85,7 +66,7 @@ namespace VisionNet.Controls
 
                 // 数据缺失回退
                 if (value == SurfaceColorMode.Diff
-                    && (_diffValues == null || _diffValues.Length < Mesh.Vertices.Length))
+                    && (Mesh?.Diff == null || Mesh.Diff.Length < Mesh.Vertices.Length))
                 {
                     _surfaceColorMode = SurfaceColorMode.Color;
                     value = SurfaceColorMode.Color;
@@ -119,8 +100,7 @@ namespace VisionNet.Controls
 
         public CxMeshItem(CxMesh mesh,
             SurfaceMode surfaceMode = SurfaceMode.PointCloud,
-            SurfaceColorMode surfaceColorMode = SurfaceColorMode.Color,
-            float[] diff = null)
+            SurfaceColorMode surfaceColorMode = SurfaceColorMode.Color)
         {
             Mesh = mesh;
             _surfaceMode = surfaceMode;
@@ -133,9 +113,7 @@ namespace VisionNet.Controls
             _baseZMax = ColorMax = (float)(BoundingBox?.Center.Z + BoundingBox?.Size.Depth / 2);
             _baseZMin = ColorMin = (float)(BoundingBox?.Center.Z - BoundingBox?.Size.Depth / 2);
 
-            // 直接赋 backing field，绕过 DiffValues setter 的 invalidate（此时无缓存）。
-            _diffValues = diff;
-            ComputeDiffRange(diff);
+            ComputeDiffRange(mesh?.Diff);
         }
 
         private void ComputeDiffRange(float[] diffData)
@@ -193,8 +171,9 @@ namespace VisionNet.Controls
 
                 if (_surfaceColorMode == SurfaceColorMode.Diff)
                 {
-                    var c = _diffValues != null && i < _diffValues.Length
-                        ? CxExtension.GetColorByHeight(_diffValues[i], ColorMin, ColorMax)
+                    var diff = Mesh.Diff;
+                    var c = diff != null && i < diff.Length
+                        ? CxExtension.GetColorByHeight(diff[i], ColorMin, ColorMax)
                         : CxExtension.GetColorByHeight(Mesh.Vertices[i].Z, ColorMin, ColorMax);
                     colors[i * 3]     = c.r;
                     colors[i * 3 + 1] = c.g;

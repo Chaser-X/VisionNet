@@ -28,35 +28,8 @@ namespace VisionNet.Controls
         public int MaxPointCount { get; set; } = int.MaxValue;
 
         /// <summary>
-        /// Per-grid-point difference values (<c>float[Width*Length]</c>) for
-        /// <see cref="SurfaceColorMode.Diff"/>. <c>null</c>/insufficient → Diff falls back to Color.
-        /// Setting a new value invalidates cached render data.
-        /// </summary>
-        public float[] DiffValues
-        {
-            get => _diffValues;
-            set
-            {
-                _diffValues = value;
-                ComputeDiffRange(value);
-                if (_surfaceColorMode == SurfaceColorMode.Diff)
-                {
-                    ColorMin = _baseDiffMin; ColorMax = _baseDiffMax;
-                    if (_cachedRenderData?.Uniforms != null)
-                    {
-                        _cachedRenderData.Uniforms["colorMin"] = ColorMin;
-                        _cachedRenderData.Uniforms["colorMax"] = ColorMax;
-                    }
-                }
-                _cachedRenderData = null;
-                OnRenderDataChanged?.Invoke();
-            }
-        }
-        private float[] _diffValues;
-
-        /// <summary>
-        /// Overrides the diff value range used for colour mapping in Diff mode.
-        /// When not called, the range is auto-computed from <see cref="DiffValues"/>.
+        /// Per-frame diff range propagation from <see cref="CxDisplay"/>. Only applies in
+        /// Diff mode; lightweight uniform update (no cache rebuild, no auto-range reset).
         /// </summary>
         /// <summary>
         /// Per-frame diff range propagation from <see cref="CxDisplay"/>. Only applies in
@@ -120,7 +93,8 @@ namespace VisionNet.Controls
                 // ① 数据缺失回退（直接改 backing field，不递归事件）
                 bool wantDiff = value == SurfaceColorMode.Diff;
                 int gridCount = Surface?.Width * Surface?.Length ?? 0;
-                bool hasDiffData = _diffValues != null && _diffValues.Length >= gridCount && gridCount > 0;
+                var diff = Surface?.Diff;
+                bool hasDiffData = diff != null && diff.Length >= gridCount && gridCount > 0;
                 if (wantDiff && !hasDiffData)
                 {
                     _surfaceColorMode = SurfaceColorMode.Color;
@@ -265,8 +239,7 @@ namespace VisionNet.Controls
         public CxSurfaceAdvancedItem(CxSurface surface,
             SurfaceMode surfaceMode = SurfaceMode.PointCloud,
             SurfaceColorMode surfaceColorMode = SurfaceColorMode.Color,
-            int maxPointCount = int.MaxValue,
-            float[] diff = null)
+            int maxPointCount = int.MaxValue)
         {
             Surface = surface;
             _surfaceMode = surfaceMode;
@@ -279,9 +252,7 @@ namespace VisionNet.Controls
                 ? CxExtension.CalculateBoundingBox(surface.ToPoints())
                 : null;
 
-            // 直接赋 backing field，绕过 DiffValues setter 的 invalidate（此时无缓存）。
-            _diffValues = diff;
-            ComputeDiffRange(diff);
+            ComputeDiffRange(surface?.Diff);
             UpdateWorldZRange();
         }
 
@@ -349,9 +320,10 @@ namespace VisionNet.Controls
             var vertices = new float[totalVertices * 3];
             var uvCoords = new float[totalVertices * 2];
 
-            // Diff 模式下按同一采样步长抽样 DiffValues（W×L 网格 → 采样顶点 1:1）
+            // Diff 模式下按同一采样步长抽样 Surface.Diff（W×L 网格 → 采样顶点 1:1）
+            var srcDiff = Surface.Diff;
             bool useDiff = _surfaceColorMode == SurfaceColorMode.Diff
-                && _diffValues != null && _diffValues.Length >= Surface.Width * Surface.Length;
+                && srcDiff != null && srcDiff.Length >= Surface.Width * Surface.Length;
             float[] diffOut = useDiff ? new float[totalVertices] : null;
 
             int vi = 0;
@@ -376,7 +348,7 @@ namespace VisionNet.Controls
                     if (diffOut != null)
                         diffOut[vi] = Surface.Data[si] == -32768
                             ? float.NegativeInfinity
-                            : _diffValues[si];
+                            : srcDiff[si];
 
                     vi++;
                 }

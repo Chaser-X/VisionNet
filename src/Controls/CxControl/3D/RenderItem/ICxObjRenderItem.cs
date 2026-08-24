@@ -50,7 +50,7 @@ namespace VisionNet.Controls
         float BaseZMax { get; }
 
         /// <summary>
-        /// Gets the auto-computed base diff value range from <see cref="DiffValues"/>,
+        /// Gets the auto-computed base diff value range from the data object's diff channel,
         /// independent of any manually set or propagated range. Used by
         /// <see cref="CxDisplay"/> to aggregate the global diff range.
         /// </summary>
@@ -67,16 +67,6 @@ namespace VisionNet.Controls
 
         /// <summary>Gets or sets the surface rendering mode (PointCloud or Mesh).</summary>
         SurfaceMode SurfaceMode { get; set; }
-
-        /// <summary>
-        /// Gets or sets the per-vertex / per-grid-point difference values used by
-        /// <see cref="SurfaceColorMode.Diff"/>. Layout is per-vertex for meshes
-        /// (<c>float[Vertices.Length]</c>) and W×L grid-point for surfaces / point clouds
-        /// (<c>float[Width*Length]</c>). <c>null</c> or insufficient length makes
-        /// <see cref="SurfaceColorMode.Diff"/> fall back to <see cref="SurfaceColorMode.Color"/>.
-        /// Setting this invalidates cached render data.
-        /// </summary>
-        float[] DiffValues { get; set; }
 
         /// <summary>
         /// Called by <see cref="CxDisplay"/> before each frame with the global diff range

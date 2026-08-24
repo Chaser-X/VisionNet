@@ -26,32 +26,6 @@ namespace VisionNet.Controls
         public CxBox3D? BoundingBox { get; private set; }
 
         /// <summary>
-        /// Per-grid-point difference values (<c>float[Width*Length]</c>) for
-        /// <see cref="SurfaceColorMode.Diff"/>. <c>null</c>/insufficient → Diff falls back to Color.
-        /// Setting a new value invalidates cached render data (colours are re-baked).
-        /// </summary>
-        public float[] DiffValues
-        {
-            get => _diffValues;
-            set
-            {
-                _diffValues = value;
-                ComputeDiffRange(value);
-                if (_surfaceColorMode == SurfaceColorMode.Diff)
-                {
-                    ColorMin = _baseDiffMin; ColorMax = _baseDiffMax;
-                }
-                _cachedRenderData = null;
-                OnRenderDataChanged?.Invoke();
-            }
-        }
-        private float[] _diffValues;
-
-        /// <summary>
-        /// Overrides the diff value range used for colour mapping in Diff mode.
-        /// When not called, the range is auto-computed from <see cref="DiffValues"/>.
-        /// </summary>
-        /// <summary>
         /// Per-frame diff range propagation from <see cref="CxDisplay"/>. Only applies in
         /// Diff mode; fixed-function path must re-bake colours.
         /// </summary>
@@ -85,8 +59,9 @@ namespace VisionNet.Controls
 
                 // 数据缺失回退
                 int gridCount = PointCloud?.Width * PointCloud?.Length ?? 0;
+                var pcDiff = PointCloud?.Diff;
                 if (value == SurfaceColorMode.Diff
-                    && (_diffValues == null || _diffValues.Length < gridCount || gridCount == 0))
+                    && (pcDiff == null || pcDiff.Length < gridCount || gridCount == 0))
                 {
                     _surfaceColorMode = SurfaceColorMode.Color;
                     value = SurfaceColorMode.Color;
@@ -120,8 +95,7 @@ namespace VisionNet.Controls
 
         public CxPointCloudItem(CxPointCloud pointCloud,
             SurfaceMode surfaceMode = SurfaceMode.PointCloud,
-            SurfaceColorMode surfaceColorMode = SurfaceColorMode.Color,
-            float[] diff = null)
+            SurfaceColorMode surfaceColorMode = SurfaceColorMode.Color)
         {
             PointCloud = pointCloud;
             _surfaceMode = surfaceMode;
@@ -136,9 +110,7 @@ namespace VisionNet.Controls
             _baseZMax = ColorMax = (float)(BoundingBox?.Center.Z + BoundingBox?.Size.Depth / 2);
             _baseZMin = ColorMin = (float)(BoundingBox?.Center.Z - BoundingBox?.Size.Depth / 2);
 
-            // 直接赋 backing field，绕过 DiffValues setter 的 invalidate（此时无缓存）。
-            _diffValues = diff;
-            ComputeDiffRange(diff);
+            ComputeDiffRange(pointCloud?.Diff);
         }
 
         private void ComputeDiffRange(float[] diffData)
@@ -182,9 +154,10 @@ namespace VisionNet.Controls
 
                 if (_surfaceColorMode == SurfaceColorMode.Diff)
                 {
-                    // DiffValues 与 ToPoints() 均为 W×L 顺序，1:1 对齐
-                    float dv = _diffValues != null && i < _diffValues.Length
-                        ? _diffValues[i]
+                    // PointCloud.Diff 与 ToPoints() 均为 W×L 顺序，1:1 对齐
+                    var diff = PointCloud.Diff;
+                    float dv = diff != null && i < diff.Length
+                        ? diff[i]
                         : points[i].Z;
                     var c = CxExtension.GetColorByHeight(dv, ColorMin, ColorMax);
                     colors[i * 3]     = c.r;

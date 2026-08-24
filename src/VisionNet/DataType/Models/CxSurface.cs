@@ -53,6 +53,11 @@ namespace VisionNet.DataType
         /// <summary>Gets or sets per-point intensity values (0–255), or <c>null</c> if not available.</summary>
         public byte[] Intensity { get; set; }
 
+        /// <summary>Gets or sets per-grid-point difference values (float, may be negative) used by
+        /// <c>SurfaceColorMode.Diff</c> (<c>Width*Length</c>, aligned with <see cref="Data"/>),
+        /// or <c>null</c> if differential coloring is not used.</summary>
+        public float[] Diff { get; set; }
+
         /// <summary>Gets or sets the world-space X origin of the grid.</summary>
         public float XOffset { get; set; }
 
@@ -143,6 +148,7 @@ namespace VisionNet.DataType
             Length = 0;
             Data = null;
             Intensity = null;
+            Diff = null;
             XOffset = 0;
             YOffset = 0;
             ZOffset = 0;

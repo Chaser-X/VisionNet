@@ -27,37 +27,6 @@ namespace VisionNet.Controls
         public int MaxPointCount { get; set; } = int.MaxValue;
 
         /// <summary>
-        /// Per-grid-point difference values (<c>float[Width*Length]</c>) for
-        /// <see cref="SurfaceColorMode.Diff"/>. <c>null</c>/insufficient → Diff falls back to Color.
-        /// Setting a new value invalidates cached render data.
-        /// </summary>
-        public float[] DiffValues
-        {
-            get => _diffValues;
-            set
-            {
-                _diffValues = value;
-                ComputeDiffRange(value);
-                if (_surfaceColorMode == SurfaceColorMode.Diff)
-                {
-                    ColorMin = _baseDiffMin; ColorMax = _baseDiffMax;
-                    if (_cachedRenderData?.Uniforms != null)
-                    {
-                        _cachedRenderData.Uniforms["colorMin"] = ColorMin;
-                        _cachedRenderData.Uniforms["colorMax"] = ColorMax;
-                    }
-                }
-                _cachedRenderData = null;
-                OnRenderDataChanged?.Invoke();
-            }
-        }
-        private float[] _diffValues;
-
-        /// <summary>
-        /// Overrides the diff value range used for colour mapping in Diff mode.
-        /// When not called, the range is auto-computed from <see cref="DiffValues"/>.
-        /// </summary>
-        /// <summary>
         /// Per-frame diff range propagation from <see cref="CxDisplay"/>. Only applies in
         /// Diff mode; lightweight uniform update (no cache rebuild, no auto-range reset).
         /// </summary>
@@ -119,7 +88,8 @@ namespace VisionNet.Controls
                 // ① 数据缺失回退（直接改 backing field，不递归事件）
                 bool wantDiff = value == SurfaceColorMode.Diff;
                 int gridCount = PointCloud?.Width * PointCloud?.Length ?? 0;
-                bool hasDiffData = _diffValues != null && _diffValues.Length >= gridCount && gridCount > 0;
+                var pcDiff = PointCloud?.Diff;
+                bool hasDiffData = pcDiff != null && pcDiff.Length >= gridCount && gridCount > 0;
                 if (wantDiff && !hasDiffData)
                 {
                     _surfaceColorMode = SurfaceColorMode.Color;
@@ -264,8 +234,7 @@ namespace VisionNet.Controls
         public CxPointCloudAdvancedItem(CxPointCloud pointCloud,
             SurfaceMode surfaceMode = SurfaceMode.PointCloud,
             SurfaceColorMode surfaceColorMode = SurfaceColorMode.Color,
-            int maxPointCount = int.MaxValue,
-            float[] diff = null)
+            int maxPointCount = int.MaxValue)
         {
             PointCloud = pointCloud;
             _surfaceMode = surfaceMode;
@@ -278,9 +247,7 @@ namespace VisionNet.Controls
                 ? CxExtension.CalculateBoundingBox(pointCloud.ToPoints())
                 : null;
 
-            // 直接赋 backing field，绕过 DiffValues setter 的 invalidate（此时无缓存）。
-            _diffValues = diff;
-            ComputeDiffRange(diff);
+            ComputeDiffRange(pointCloud?.Diff);
             UpdateWorldZRange();
         }
 
@@ -348,9 +315,10 @@ namespace VisionNet.Controls
             var vertices = new float[totalVertices * 3];
             var uvCoords = new float[totalVertices * 2];
 
-            // Diff 模式下按同一采样步长抽样 DiffValues（W×L 网格 → 采样顶点 1:1）
+            // Diff 模式下按同一采样步长抽样 PointCloud.Diff（W×L 网格 → 采样顶点 1:1）
+            var srcDiff = PointCloud.Diff;
             bool useDiff = _surfaceColorMode == SurfaceColorMode.Diff
-                && _diffValues != null && _diffValues.Length >= PointCloud.Width * PointCloud.Length;
+                && srcDiff != null && srcDiff.Length >= PointCloud.Width * PointCloud.Length;
             float[] diffOut = useDiff ? new float[totalVertices] : null;
 
             int vi = 0;
@@ -380,7 +348,7 @@ namespace VisionNet.Controls
                     uvCoords[vi * 2 + 1] = (float)y / Math.Max(PointCloud.Length - 1, 1);
 
                     if (diffOut != null)
-                        diffOut[vi] = invalid ? float.NegativeInfinity : _diffValues[si];
+                        diffOut[vi] = invalid ? float.NegativeInfinity : srcDiff[si];
 
                     vi++;
                 }

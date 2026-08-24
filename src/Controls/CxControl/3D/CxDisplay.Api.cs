@@ -82,14 +82,14 @@ namespace VisionNet.Controls
         // ── Surface: Set* (replace semantics) ───────────────────────────────────
 
         /// <summary>Replaces the current view with a structured surface (fixed pipeline).</summary>
-        public void SetSurface(CxSurface surface, float[] diff = null)
-            => ReplaceSurfaceItem(new CxSurfaceItem(surface, SurfaceMode, SurfaceColorMode, diff));
+        public void SetSurface(CxSurface surface)
+            => ReplaceSurfaceItem(new CxSurfaceItem(surface, SurfaceMode, SurfaceColorMode));
 
         /// <summary>
         /// Replaces the current view with a point cloud.
         /// Clouds larger than 100 M points are automatically down-sampled to ≤ 10 M.
         /// </summary>
-        public void SetPointCloud(CxPointCloud pointCloud, float[] diff = null)
+        public void SetPointCloud(CxPointCloud pointCloud)
         {
             if (pointCloud.Width * pointCloud.Length > 100_000_000)
             {
@@ -99,35 +99,35 @@ namespace VisionNet.Controls
                     (int)(pointCloud.Width  / ratio), (int)(pointCloud.Length / ratio),
                     pointCloud.XScale * ratio, pointCloud.YScale * ratio,
                     pointCloud.ZScale, pointCloud.XOffset, pointCloud.YOffset, pointCloud.ZOffset);
-                ReplaceSurfaceItem(new CxSurfaceItem(surface, SurfaceMode, SurfaceColorMode, diff));
+                ReplaceSurfaceItem(new CxSurfaceItem(surface, SurfaceMode, SurfaceColorMode));
             }
             else
             {
-                ReplaceSurfaceItem(new CxPointCloudItem(pointCloud, SurfaceMode, SurfaceColorMode, diff));
+                ReplaceSurfaceItem(new CxPointCloudItem(pointCloud, SurfaceMode, SurfaceColorMode));
             }
         }
 
         /// <summary>Replaces the current view with a single mesh.</summary>
-        public void SetMesh(CxMesh mesh, float[] diff = null)
-            => ReplaceSurfaceItem(new CxMeshItem(mesh, SurfaceMode, SurfaceColorMode, diff));
+        public void SetMesh(CxMesh mesh)
+            => ReplaceSurfaceItem(new CxMeshItem(mesh, SurfaceMode, SurfaceColorMode));
 
         /// <summary>
         /// Replaces the current view with a surface rendered via the high-performance shader path
         /// (VAO + GLSL, max 2 000 000 points).
         /// </summary>
-        public void SetSurfaceAdvancedItem(CxSurface surface, float[] diff = null)
-            => ReplaceSurfaceItem(new CxSurfaceAdvancedItem(surface, SurfaceMode, SurfaceColorMode, 2_000_000, diff));
+        public void SetSurfaceAdvancedItem(CxSurface surface)
+            => ReplaceSurfaceItem(new CxSurfaceAdvancedItem(surface, SurfaceMode, SurfaceColorMode, 2_000_000));
 
         /// <summary>
         /// Replaces the current view with a point cloud rendered via the high-performance shader path
         /// (VAO + GLSL, max 2 000 000 points).
         /// </summary>
-        public void SetPointCloudAdvancedItem(CxPointCloud pointCloud, float[] diff = null)
-            => ReplaceSurfaceItem(new CxPointCloudAdvancedItem(pointCloud, SurfaceMode, SurfaceColorMode, 2_000_000, diff));
+        public void SetPointCloudAdvancedItem(CxPointCloud pointCloud)
+            => ReplaceSurfaceItem(new CxPointCloudAdvancedItem(pointCloud, SurfaceMode, SurfaceColorMode, 2_000_000));
 
         /// <summary>Replaces the current view with a mesh rendered via the high-performance shader path.</summary>
-        public void SetMeshAdvancedItem(CxMesh mesh, float[] diff = null)
-            => ReplaceSurfaceItem(new CxMeshAdvancedItem(mesh, SurfaceMode, SurfaceColorMode, diff));
+        public void SetMeshAdvancedItem(CxMesh mesh)
+            => ReplaceSurfaceItem(new CxMeshAdvancedItem(mesh, SurfaceMode, SurfaceColorMode));
 
         // ── Surface: Set* with initial pose (replace semantics) ──────────────────
 
@@ -135,9 +135,9 @@ namespace VisionNet.Controls
         /// Replaces the current view with a surface rendered via the high-performance shader path,
         /// with an initial model matrix (pose).
         /// </summary>
-        public void SetSurfaceAdvancedItem(CxSurface surface, CxMatrix4X4 pose, float[] diff = null)
+        public void SetSurfaceAdvancedItem(CxSurface surface, CxMatrix4X4 pose)
         {
-            var item = new CxSurfaceAdvancedItem(surface, SurfaceMode, SurfaceColorMode, 2_000_000, diff)
+            var item = new CxSurfaceAdvancedItem(surface, SurfaceMode, SurfaceColorMode, 2_000_000)
                 { ModelMatrix = pose };
             ReplaceSurfaceItem(item);
         }
@@ -146,9 +146,9 @@ namespace VisionNet.Controls
         /// Replaces the current view with a point cloud rendered via the high-performance shader path,
         /// with an initial model matrix (pose).
         /// </summary>
-        public void SetPointCloudAdvancedItem(CxPointCloud cloud, CxMatrix4X4 pose, float[] diff = null)
+        public void SetPointCloudAdvancedItem(CxPointCloud cloud, CxMatrix4X4 pose)
         {
-            var item = new CxPointCloudAdvancedItem(cloud, SurfaceMode, SurfaceColorMode, 2_000_000, diff)
+            var item = new CxPointCloudAdvancedItem(cloud, SurfaceMode, SurfaceColorMode, 2_000_000)
                 { ModelMatrix = pose };
             ReplaceSurfaceItem(item);
         }
@@ -157,9 +157,9 @@ namespace VisionNet.Controls
         /// Replaces the current view with a mesh rendered via the high-performance shader path,
         /// with an initial model matrix (pose).
         /// </summary>
-        public void SetMeshAdvancedItem(CxMesh mesh, CxMatrix4X4 pose, float[] diff = null)
+        public void SetMeshAdvancedItem(CxMesh mesh, CxMatrix4X4 pose)
         {
-            var item = new CxMeshAdvancedItem(mesh, SurfaceMode, SurfaceColorMode, diff)
+            var item = new CxMeshAdvancedItem(mesh, SurfaceMode, SurfaceColorMode)
                 { ModelMatrix = pose };
             ReplaceSurfaceItem(item);
         }
@@ -263,9 +263,9 @@ namespace VisionNet.Controls
         /// <summary>
         /// Appends a surface via the high-performance shader path with an initial model matrix (pose).
         /// </summary>
-        public void AddSurfaceAdvancedItem(CxSurface surface, CxMatrix4X4 pose, float[] diff = null)
+        public void AddSurfaceAdvancedItem(CxSurface surface, CxMatrix4X4 pose)
         {
-            var item = new CxSurfaceAdvancedItem(surface, SurfaceMode, SurfaceColorMode, 2_000_000, diff)
+            var item = new CxSurfaceAdvancedItem(surface, SurfaceMode, SurfaceColorMode, 2_000_000)
                 { ModelMatrix = pose };
             AppendSurfaceItem(item);
         }
@@ -273,9 +273,9 @@ namespace VisionNet.Controls
         /// <summary>
         /// Appends a point cloud via the high-performance shader path with an initial model matrix (pose).
         /// </summary>
-        public void AddPointCloudAdvancedItem(CxPointCloud cloud, CxMatrix4X4 pose, float[] diff = null)
+        public void AddPointCloudAdvancedItem(CxPointCloud cloud, CxMatrix4X4 pose)
         {
-            var item = new CxPointCloudAdvancedItem(cloud, SurfaceMode, SurfaceColorMode, 2_000_000, diff)
+            var item = new CxPointCloudAdvancedItem(cloud, SurfaceMode, SurfaceColorMode, 2_000_000)
                 { ModelMatrix = pose };
             AppendSurfaceItem(item);
         }
@@ -283,9 +283,9 @@ namespace VisionNet.Controls
         /// <summary>
         /// Appends a mesh via the high-performance shader path with an initial model matrix (pose).
         /// </summary>
-        public void AddMeshAdvancedItem(CxMesh mesh, CxMatrix4X4 pose, float[] diff = null)
+        public void AddMeshAdvancedItem(CxMesh mesh, CxMatrix4X4 pose)
         {
-            var item = new CxMeshAdvancedItem(mesh, SurfaceMode, SurfaceColorMode, diff)
+            var item = new CxMeshAdvancedItem(mesh, SurfaceMode, SurfaceColorMode)
                 { ModelMatrix = pose };
             AppendSurfaceItem(item);
         }
@@ -293,14 +293,14 @@ namespace VisionNet.Controls
         // ── Surface: Add* (append semantics) ────────────────────────────────────
 
         /// <summary>Appends a structured surface without clearing existing items (fixed pipeline).</summary>
-        public void AddSurface(CxSurface surface, float[] diff = null)
-            => AppendSurfaceItem(new CxSurfaceItem(surface, SurfaceMode, SurfaceColorMode, diff));
+        public void AddSurface(CxSurface surface)
+            => AppendSurfaceItem(new CxSurfaceItem(surface, SurfaceMode, SurfaceColorMode));
 
         /// <summary>
         /// Appends a point cloud without clearing existing surface items.
         /// Clouds larger than 100 M points are automatically down-sampled to ≤ 10 M.
         /// </summary>
-        public void AddPointCloud(CxPointCloud pointCloud, float[] diff = null)
+        public void AddPointCloud(CxPointCloud pointCloud)
         {
             if (pointCloud.Width * pointCloud.Length > 100_000_000)
             {
@@ -310,29 +310,29 @@ namespace VisionNet.Controls
                     (int)(pointCloud.Width  / ratio), (int)(pointCloud.Length / ratio),
                     pointCloud.XScale * ratio, pointCloud.YScale * ratio,
                     pointCloud.ZScale, pointCloud.XOffset, pointCloud.YOffset, pointCloud.ZOffset);
-                AppendSurfaceItem(new CxSurfaceItem(surface, SurfaceMode, SurfaceColorMode, diff));
+                AppendSurfaceItem(new CxSurfaceItem(surface, SurfaceMode, SurfaceColorMode));
             }
             else
             {
-                AppendSurfaceItem(new CxPointCloudItem(pointCloud, SurfaceMode, SurfaceColorMode, diff));
+                AppendSurfaceItem(new CxPointCloudItem(pointCloud, SurfaceMode, SurfaceColorMode));
             }
         }
 
         /// <summary>Appends a mesh without clearing existing surface items.</summary>
-        public void AddMesh(CxMesh mesh, float[] diff = null)
-            => AppendSurfaceItem(new CxMeshItem(mesh, SurfaceMode, SurfaceColorMode, diff));
+        public void AddMesh(CxMesh mesh)
+            => AppendSurfaceItem(new CxMeshItem(mesh, SurfaceMode, SurfaceColorMode));
 
         /// <summary>Appends a surface via the high-performance shader path without clearing existing items.</summary>
-        public void AddSurfaceAdvancedItem(CxSurface surface, float[] diff = null)
-            => AppendSurfaceItem(new CxSurfaceAdvancedItem(surface, SurfaceMode, SurfaceColorMode, 2_000_000, diff));
+        public void AddSurfaceAdvancedItem(CxSurface surface)
+            => AppendSurfaceItem(new CxSurfaceAdvancedItem(surface, SurfaceMode, SurfaceColorMode, 2_000_000));
 
         /// <summary>Appends a point cloud via the high-performance shader path without clearing existing items.</summary>
-        public void AddPointCloudAdvancedItem(CxPointCloud pointCloud, float[] diff = null)
-            => AppendSurfaceItem(new CxPointCloudAdvancedItem(pointCloud, SurfaceMode, SurfaceColorMode, 2_000_000, diff));
+        public void AddPointCloudAdvancedItem(CxPointCloud pointCloud)
+            => AppendSurfaceItem(new CxPointCloudAdvancedItem(pointCloud, SurfaceMode, SurfaceColorMode, 2_000_000));
 
         /// <summary>Appends a mesh via the high-performance shader path without clearing existing items.</summary>
-        public void AddMeshAdvancedItem(CxMesh mesh, float[] diff = null)
-            => AppendSurfaceItem(new CxMeshAdvancedItem(mesh, SurfaceMode, SurfaceColorMode, diff));
+        public void AddMeshAdvancedItem(CxMesh mesh)
+            => AppendSurfaceItem(new CxMeshAdvancedItem(mesh, SurfaceMode, SurfaceColorMode));
 
         /// <summary>Appends an externally constructed render item without clearing existing items.</summary>
         public void AddSurfaceItem(ICxObjRenderItem item)
