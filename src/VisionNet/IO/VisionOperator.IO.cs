@@ -30,6 +30,8 @@ namespace VisionNet
         /// <summary>Serializes a <see cref="CxSurface"/> to a binary file.</summary>
         /// <param name="surface">The surface to save. Must not be null.</param>
         /// <param name="filePath">Destination file path.</param>
+        /// <remarks>Optional <see cref="CxSurface.Intensity"/> and <see cref="CxSurface.Diff"/>
+        /// channels are embedded when present.</remarks>
         /// <exception cref="ArgumentNullException"><paramref name="surface"/> is null.</exception>
         /// <exception cref="IOException">An I/O error occurred while writing the file.</exception>
         public static void SaveSurface(CxSurface surface, string filePath)
@@ -63,6 +65,15 @@ namespace VisionNet
                 {
                     writer.Write(surface.Intensity.Length);
                     writer.Write(surface.Intensity);
+                }
+
+                bool hasDiff = surface.Diff != null && surface.Diff.Length > 0;
+                writer.Write(hasDiff ? (byte)1 : (byte)0);
+                if (hasDiff)
+                {
+                    writer.Write(surface.Diff.Length);
+                    foreach (var d in surface.Diff)
+                        writer.Write(d);
                 }
             }
         }
@@ -108,8 +119,24 @@ namespace VisionNet
                     intensity = reader.ReadBytes(intensityCount);
                 }
 
-                return new CxSurface(width, length, data, intensity,
+                float[] diff = null;
+                // Diff 是可选尾部字段（旧文件无此段）；仅当流仍有数据时读取。
+                if (reader.BaseStream.Position < reader.BaseStream.Length)
+                {
+                    bool hasDiff = reader.ReadByte() != 0;
+                    if (hasDiff)
+                    {
+                        int diffCount = reader.ReadInt32();
+                        diff = new float[diffCount];
+                        for (int i = 0; i < diffCount; i++)
+                            diff[i] = reader.ReadSingle();
+                    }
+                }
+
+                var surface = new CxSurface(width, length, data, intensity,
                     xOffset, yOffset, zOffset, xScale, yScale, zScale);
+                surface.Diff = diff;
+                return surface;
             }
         }
 
@@ -120,6 +147,9 @@ namespace VisionNet
         /// The format is chosen based on the file extension.</summary>
         /// <param name="cloud">The point cloud to save. Must not be null.</param>
         /// <param name="filePath">Destination file path.</param>
+        /// <remarks>In <c>.cxpc</c> format, optional <see cref="CxPointCloud.Intensity"/> and
+        /// <see cref="CxPointCloud.Diff"/> channels are embedded when present. The <c>.pcd</c>
+        /// format writes geometry and intensity only (Diff is not exported).</remarks>
         /// <exception cref="ArgumentNullException"><paramref name="cloud"/> is null.</exception>
         /// <exception cref="IOException">An I/O error occurred while writing the file.</exception>
         public static void SavePointCloud(CxPointCloud cloud, string filePath)
@@ -159,6 +189,15 @@ namespace VisionNet
                 {
                     writer.Write(cloud.Intensity.Length);
                     writer.Write(cloud.Intensity);
+                }
+
+                bool hasDiff = cloud.Diff != null && cloud.Diff.Length > 0;
+                writer.Write(hasDiff ? (byte)1 : (byte)0);
+                if (hasDiff)
+                {
+                    writer.Write(cloud.Diff.Length);
+                    foreach (var d in cloud.Diff)
+                        writer.Write(d);
                 }
             }
         }
@@ -209,8 +248,24 @@ namespace VisionNet
                     intensity = reader.ReadBytes(intensityCount);
                 }
 
-                return new CxPointCloud(width, length, data, intensity,
+                float[] diff = null;
+                // Diff 是可选尾部字段（旧文件无此段）；仅当流仍有数据时读取。
+                if (reader.BaseStream.Position < reader.BaseStream.Length)
+                {
+                    bool hasDiff = reader.ReadByte() != 0;
+                    if (hasDiff)
+                    {
+                        int diffCount = reader.ReadInt32();
+                        diff = new float[diffCount];
+                        for (int i = 0; i < diffCount; i++)
+                            diff[i] = reader.ReadSingle();
+                    }
+                }
+
+                var cloud = new CxPointCloud(width, length, data, intensity,
                     xOffset, yOffset, zOffset, xScale, yScale, zScale);
+                cloud.Diff = diff;
+                return cloud;
             }
         }
 
@@ -477,10 +532,14 @@ namespace VisionNet
         // ── CxMesh ───────────────────────────────────────────────────────────────
 
         /// <summary>Serializes a <see cref="CxMesh"/> to a file.
-        /// Supports <c>.cxmesh</c> (binary) and <c>.obj</c> (Wavefront) formats.
+        /// Supports <c>.cxmesh</c> (binary), <c>.obj</c>, <c>.stl</c>, and <c>.stla</c> formats.
         /// The format is chosen based on the file extension.</summary>
         /// <param name="mesh">The mesh to save. Must not be null.</param>
         /// <param name="filePath">Destination file path.</param>
+        /// <remarks>In <c>.cxmesh</c> format, optional <see cref="CxMesh.Intensity"/>,
+        /// <see cref="CxMesh.UVs"/>, and <see cref="CxMesh.Diff"/> channels are embedded when
+        /// present. The interchange formats (<c>.obj</c>/<c>.stl</c>/<c>.stla</c>) write geometry
+        /// only (intensity/UV/diff are not exported).</remarks>
         /// <exception cref="ArgumentNullException"><paramref name="mesh"/> is null.</exception>
         /// <exception cref="IOException">An I/O error occurred while writing the file.</exception>
         public static void SaveMesh(CxMesh mesh, string filePath)
@@ -550,6 +609,15 @@ namespace VisionNet
                         writer.Write(uv.X);
                         writer.Write(uv.Y);
                     }
+                }
+
+                bool hasDiff = mesh.Diff != null && mesh.Diff.Length > 0;
+                writer.Write(hasDiff ? (byte)1 : (byte)0);
+                if (hasDiff)
+                {
+                    writer.Write(mesh.Diff.Length);
+                    foreach (var d in mesh.Diff)
+                        writer.Write(d);
                 }
             }
         }
@@ -622,6 +690,20 @@ namespace VisionNet
                             reader.ReadSingle(),
                             reader.ReadSingle());
                     mesh.UVs = uvs;
+                }
+
+                // Diff 是可选尾部字段（旧文件无此段）；仅当流仍有数据时读取。
+                if (reader.BaseStream.Position < reader.BaseStream.Length)
+                {
+                    bool hasDiff = reader.ReadByte() != 0;
+                    if (hasDiff)
+                    {
+                        int diffCount = reader.ReadInt32();
+                        var diff = new float[diffCount];
+                        for (int i = 0; i < diffCount; i++)
+                            diff[i] = reader.ReadSingle();
+                        mesh.Diff = diff;
+                    }
                 }
 
                 return mesh;
