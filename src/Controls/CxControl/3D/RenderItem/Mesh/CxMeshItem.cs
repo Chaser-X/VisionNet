@@ -16,12 +16,12 @@ namespace VisionNet.Controls
 
         public CxMesh Mesh { get; private set; }
         public bool IsDisposed { get; private set; } = false;
-        public float ZMin { get; set; }
-        public float ZMax { get; set; }
-        public float BaseZMin => _trueZMin;
-        public float BaseZMax => _trueZMax;
-        public float BaseDiffMin => _diffMin;
-        public float BaseDiffMax => _diffMax;
+        public float ColorMin { get; set; }
+        public float ColorMax { get; set; }
+        public float BaseZMin => _baseZMin;
+        public float BaseZMax => _baseZMax;
+        public float BaseDiffMin => _baseDiffMin;
+        public float BaseDiffMax => _baseDiffMax;
         public CxBox3D? BoundingBox { get; private set; }
 
         /// <summary>
@@ -38,7 +38,7 @@ namespace VisionNet.Controls
                 ComputeDiffRange(value);
                 if (_surfaceColorMode == SurfaceColorMode.Diff)
                 {
-                    ZMin = _diffMin; ZMax = _diffMax;
+                    ColorMin = _baseDiffMin; ColorMax = _baseDiffMax;
                 }
                 _cachedRenderData = null;
                 OnRenderDataChanged?.Invoke();
@@ -57,10 +57,10 @@ namespace VisionNet.Controls
         public void SetGlobalDiffRange(float min, float max)
         {
             if (_surfaceColorMode != SurfaceColorMode.Diff) return;
-            if (Math.Abs(ZMin - min) < 1e-6f && Math.Abs(ZMax - max) < 1e-6f) return;
+            if (Math.Abs(ColorMin - min) < 1e-6f && Math.Abs(ColorMax - max) < 1e-6f) return;
 
-            ZMin = min;
-            ZMax = max;
+            ColorMin = min;
+            ColorMax = max;
             _cachedRenderData = null;
             OnRenderDataChanged?.Invoke();
         }
@@ -98,11 +98,11 @@ namespace VisionNet.Controls
                 // 范围切换
                 if (value == SurfaceColorMode.Diff)
                 {
-                    ZMin = _diffMin; ZMax = _diffMax;
+                    ColorMin = _baseDiffMin; ColorMax = _baseDiffMax;
                 }
                 else if (old == SurfaceColorMode.Diff)
                 {
-                    ZMin = _trueZMin; ZMax = _trueZMax;
+                    ColorMin = _baseZMin; ColorMax = _baseZMax;
                 }
 
                 // 固定管线一律重建缓存（CPU 颜色烘焙）
@@ -114,8 +114,8 @@ namespace VisionNet.Controls
         private RenderData _cachedRenderData;
 
         // 构造时一次性预计算的范围缓存
-        private float _trueZMin, _trueZMax;
-        private float _diffMin, _diffMax;
+        private float _baseZMin, _baseZMax;
+        private float _baseDiffMin, _baseDiffMax;
 
         public CxMeshItem(CxMesh mesh,
             SurfaceMode surfaceMode = SurfaceMode.PointCloud,
@@ -130,8 +130,8 @@ namespace VisionNet.Controls
                 : surfaceColorMode;
 
             BoundingBox = CxExtension.CalculateBoundingBox(mesh?.Vertices);
-            _trueZMax = ZMax = (float)(BoundingBox?.Center.Z + BoundingBox?.Size.Depth / 2);
-            _trueZMin = ZMin = (float)(BoundingBox?.Center.Z - BoundingBox?.Size.Depth / 2);
+            _baseZMax = ColorMax = (float)(BoundingBox?.Center.Z + BoundingBox?.Size.Depth / 2);
+            _baseZMin = ColorMin = (float)(BoundingBox?.Center.Z - BoundingBox?.Size.Depth / 2);
 
             // 直接赋 backing field，绕过 DiffValues setter 的 invalidate（此时无缓存）。
             _diffValues = diff;
@@ -142,7 +142,7 @@ namespace VisionNet.Controls
         {
             if (diffData == null || diffData.Length == 0)
             {
-                _diffMin = 0f; _diffMax = 0f;
+                _baseDiffMin = 0f; _baseDiffMax = 0f;
                 return;
             }
             float dmin = float.MaxValue, dmax = float.MinValue;
@@ -153,7 +153,7 @@ namespace VisionNet.Controls
                 if (d > dmax) dmax = d;
             }
             if (dmax - dmin < 1e-6f) dmax = dmin + 1e-6f;
-            _diffMin = dmin; _diffMax = dmax;
+            _baseDiffMin = dmin; _baseDiffMax = dmax;
         }
 
         public RenderData PrepareRenderData()
@@ -194,8 +194,8 @@ namespace VisionNet.Controls
                 if (_surfaceColorMode == SurfaceColorMode.Diff)
                 {
                     var c = _diffValues != null && i < _diffValues.Length
-                        ? CxExtension.GetColorByHeight(_diffValues[i], ZMin, ZMax)
-                        : CxExtension.GetColorByHeight(Mesh.Vertices[i].Z, ZMin, ZMax);
+                        ? CxExtension.GetColorByHeight(_diffValues[i], ColorMin, ColorMax)
+                        : CxExtension.GetColorByHeight(Mesh.Vertices[i].Z, ColorMin, ColorMax);
                     colors[i * 3]     = c.r;
                     colors[i * 3 + 1] = c.g;
                     colors[i * 3 + 2] = c.b;
@@ -208,7 +208,7 @@ namespace VisionNet.Controls
                 }
                 else
                 {
-                    var c = CxExtension.GetColorByHeight(Mesh.Vertices[i].Z, ZMin, ZMax);
+                    var c = CxExtension.GetColorByHeight(Mesh.Vertices[i].Z, ColorMin, ColorMax);
                     float factor = (_surfaceColorMode == SurfaceColorMode.Color) ? 1f : intensity;
                     colors[i * 3]     = Math.Min(c.r * factor, 1f);
                     colors[i * 3 + 1] = Math.Min(c.g * factor, 1f);
@@ -263,10 +263,10 @@ namespace VisionNet.Controls
         {
             if (_surfaceColorMode == SurfaceColorMode.Intensity) return;
             if (_surfaceColorMode == SurfaceColorMode.Diff) return;
-            if (Math.Abs(ZMin - zMin) < 1e-6f && Math.Abs(ZMax - zMax) < 1e-6f) return;
+            if (Math.Abs(ColorMin - zMin) < 1e-6f && Math.Abs(ColorMax - zMax) < 1e-6f) return;
 
-            ZMin = zMin;
-            ZMax = zMax;
+            ColorMin = zMin;
+            ColorMax = zMax;
             _cachedRenderData = null;
             OnRenderDataChanged?.Invoke();
         }

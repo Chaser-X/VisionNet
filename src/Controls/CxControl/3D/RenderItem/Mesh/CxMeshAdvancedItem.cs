@@ -7,7 +7,7 @@ namespace VisionNet.Controls
 {
     /// <summary>
     /// High-performance mesh renderer using a VAO + GLSL shader pipeline.
-    /// Colour is computed per-fragment in the GPU using the <c>zMin</c>/<c>zMax</c> uniforms,
+    /// Colour is computed per-fragment in the GPU using the <c>colorMin</c>/<c>colorMax</c> uniforms,
     /// so switching colour mode costs only a uniform update — no VBO rebuild required.
     /// </summary>
     public class CxMeshAdvancedItem : ICxObjRenderItem
@@ -17,12 +17,12 @@ namespace VisionNet.Controls
 
         public CxMesh Mesh { get; private set; }
         public bool IsDisposed { get; private set; } = false;
-        public float ZMin { get; set; }
-        public float ZMax { get; set; }
-        public float BaseZMin => _trueZMin;
-        public float BaseZMax => _trueZMax;
-        public float BaseDiffMin => _diffMin;
-        public float BaseDiffMax => _diffMax;
+        public float ColorMin { get; set; }
+        public float ColorMax { get; set; }
+        public float BaseZMin => _baseZMin;
+        public float BaseZMax => _baseZMax;
+        public float BaseDiffMin => _baseDiffMin;
+        public float BaseDiffMax => _baseDiffMax;
         public CxBox3D? BoundingBox { get; private set; }
 
         /// <summary>
@@ -39,11 +39,11 @@ namespace VisionNet.Controls
                 ComputeDiffRange(value);
                 if (_surfaceColorMode == SurfaceColorMode.Diff)
                 {
-                    ZMin = _diffMin; ZMax = _diffMax;
+                    ColorMin = _baseDiffMin; ColorMax = _baseDiffMax;
                     if (_cachedRenderData?.Uniforms != null)
                     {
-                        _cachedRenderData.Uniforms["zMin"] = ZMin;
-                        _cachedRenderData.Uniforms["zMax"] = ZMax;
+                        _cachedRenderData.Uniforms["colorMin"] = ColorMin;
+                        _cachedRenderData.Uniforms["colorMax"] = ColorMax;
                     }
                 }
                 _cachedRenderData = null;
@@ -63,14 +63,14 @@ namespace VisionNet.Controls
         public void SetGlobalDiffRange(float min, float max)
         {
             if (_surfaceColorMode != SurfaceColorMode.Diff) return;
-            if (Math.Abs(ZMin - min) < 1e-6f && Math.Abs(ZMax - max) < 1e-6f) return;
+            if (Math.Abs(ColorMin - min) < 1e-6f && Math.Abs(ColorMax - max) < 1e-6f) return;
 
-            ZMin = min;
-            ZMax = max;
+            ColorMin = min;
+            ColorMax = max;
             if (_cachedRenderData?.Uniforms != null)
             {
-                _cachedRenderData.Uniforms["zMin"] = min;
-                _cachedRenderData.Uniforms["zMax"] = max;
+                _cachedRenderData.Uniforms["colorMin"] = min;
+                _cachedRenderData.Uniforms["colorMax"] = max;
             }
         }
 
@@ -129,13 +129,13 @@ namespace VisionNet.Controls
                 // ② 重新设定活跃映射范围
                 if (value == SurfaceColorMode.Diff)
                 {
-                    ZMin = _diffMin; ZMax = _diffMax;
+                    ColorMin = _baseDiffMin; ColorMax = _baseDiffMax;
                 }
                 else if (old == SurfaceColorMode.Diff)
                 {
-                    ZMin = _trueZMin; ZMax = _trueZMax;
+                    ColorMin = _baseZMin; ColorMax = _baseZMax;
                 }
-                // 其它切换不动 ZMin/ZMax
+                // 其它切换不动 ColorMin/ColorMax
 
                 // ③ 决定是否 invalidate 缓存
                 if (wantDiff)
@@ -146,8 +146,8 @@ namespace VisionNet.Controls
                 else if (_cachedRenderData?.Uniforms != null)
                 {
                     _cachedRenderData.Uniforms["colorMode"] = EffectiveColorMode;
-                    _cachedRenderData.Uniforms["zMin"] = ZMin;
-                    _cachedRenderData.Uniforms["zMax"] = ZMax;
+                    _cachedRenderData.Uniforms["colorMin"] = ColorMin;
+                    _cachedRenderData.Uniforms["colorMax"] = ColorMax;
                 }
             }
         }
@@ -166,8 +166,8 @@ namespace VisionNet.Controls
         private RenderData _cachedRenderData;
 
         // 构造时一次性预计算的范围缓存（供 SurfaceColorMode 切换时快速赋值）
-        private float _trueZMin, _trueZMax;   // BoundingBox Z 范围
-        private float _diffMin, _diffMax;     // DiffValues 范围（null → 0,0）
+        private float _baseZMin, _baseZMax;   // BoundingBox Z 范围
+        private float _baseDiffMin, _baseDiffMax;     // DiffValues 范围（null → 0,0）
 
         #region Shader 源码（与 CxSurfaceAdvancedItem 内容一致，为解耦独立维护）
         internal static readonly string VertexShaderSource =
@@ -206,16 +206,16 @@ namespace VisionNet.Controls
             in vec3 lightDirView;
             out vec4 FragColor;
 
-            uniform float zMin;
-            uniform float zMax;
+            uniform float colorMin;
+            uniform float colorMax;
             uniform int colorMode;
             uniform int surfaceMode;
             uniform sampler2D intensityTexture;
 
             vec3 getColorByHeight(float h)
             {
-                float span = max(zMax - zMin, 1e-6);
-                float n = clamp((h - zMin) / span, 0.0, 1.0);
+                float span = max(colorMax - colorMin, 1e-6);
+                float n = clamp((h - colorMin) / span, 0.0, 1.0);
                 if (n < 0.2) return mix(vec3(0,0,1), vec3(0,1,1), n * 5.0);
                 if (n < 0.4) return mix(vec3(0,1,1), vec3(0,1,0), (n-0.2)*5.0);
                 if (n < 0.6) return mix(vec3(0,1,0), vec3(1,1,0), (n-0.4)*5.0);
@@ -276,31 +276,31 @@ namespace VisionNet.Controls
 
         /// <summary>
         /// Recomputes the world-space Z range (after applying the model matrix) used for
-        /// height-based colour mapping. <see cref="_trueZMin"/>/<see cref="_trueZMax"/> always
+        /// height-based colour mapping. <see cref="_baseZMin"/>/<see cref="_baseZMax"/> always
         /// track the world range (used when leaving Diff mode); in Diff mode the active
-        /// <see cref="ZMin"/>/<see cref="ZMax"/> track the diff range instead.
+        /// <see cref="ColorMin"/>/<see cref="ColorMax"/> track the diff range instead.
         /// </summary>
         private void UpdateWorldZRange()
         {
             CxExtension.ComputeWorldZRange(BoundingBox, _modelMatrix, out float zMin, out float zMax);
-            _trueZMin = zMin;
-            _trueZMax = zMax;
+            _baseZMin = zMin;
+            _baseZMax = zMax;
 
             if (_surfaceColorMode == SurfaceColorMode.Diff)
             {
-                ZMin = _diffMin;
-                ZMax = _diffMax;
+                ColorMin = _baseDiffMin;
+                ColorMax = _baseDiffMax;
             }
             else
             {
-                ZMin = zMin;
-                ZMax = zMax;
+                ColorMin = zMin;
+                ColorMax = zMax;
             }
 
             if (_cachedRenderData?.Uniforms != null)
             {
-                _cachedRenderData.Uniforms["zMin"] = ZMin;
-                _cachedRenderData.Uniforms["zMax"] = ZMax;
+                _cachedRenderData.Uniforms["colorMin"] = ColorMin;
+                _cachedRenderData.Uniforms["colorMax"] = ColorMax;
             }
         }
 
@@ -308,7 +308,7 @@ namespace VisionNet.Controls
         {
             if (diffData == null || diffData.Length == 0)
             {
-                _diffMin = 0f; _diffMax = 0f;
+                _baseDiffMin = 0f; _baseDiffMax = 0f;
                 return;
             }
             float dmin = float.MaxValue, dmax = float.MinValue;
@@ -319,7 +319,7 @@ namespace VisionNet.Controls
                 if (d > dmax) dmax = d;
             }
             if (dmax - dmin < 1e-6f) dmax = dmin + 1e-6f;
-            _diffMin = dmin; _diffMax = dmax;
+            _baseDiffMin = dmin; _baseDiffMax = dmax;
         }
 
         public RenderData PrepareRenderData()
@@ -367,8 +367,8 @@ namespace VisionNet.Controls
                 },
                 Uniforms = new Dictionary<string, object>
                 {
-                    ["zMin"]      = ZMin,
-                    ["zMax"]      = ZMax,
+                    ["colorMin"]      = ColorMin,
+                    ["colorMax"]      = ColorMax,
                     ["colorMode"] = EffectiveColorMode,
                     ["surfaceMode"] = _surfaceMode == SurfaceMode.Mesh ? 1 : 0,
                 },
@@ -429,14 +429,14 @@ namespace VisionNet.Controls
             if (_surfaceColorMode == SurfaceColorMode.Intensity) return;
             if (_surfaceColorMode == SurfaceColorMode.Diff) return;
             if (_surfaceColorMode == SurfaceColorMode.Lit) return;
-            if (Math.Abs(ZMin - zMin) < 1e-6f && Math.Abs(ZMax - zMax) < 1e-6f) return;
+            if (Math.Abs(ColorMin - zMin) < 1e-6f && Math.Abs(ColorMax - zMax) < 1e-6f) return;
 
-            ZMin = zMin;
-            ZMax = zMax;
+            ColorMin = zMin;
+            ColorMax = zMax;
             if (_cachedRenderData?.Uniforms != null)
             {
-                _cachedRenderData.Uniforms["zMin"] = zMin;
-                _cachedRenderData.Uniforms["zMax"] = zMax;
+                _cachedRenderData.Uniforms["colorMin"] = zMin;
+                _cachedRenderData.Uniforms["colorMax"] = zMax;
             }
         }
 

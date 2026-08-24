@@ -648,7 +648,7 @@ VisionOperator.DestroyLib();
 | `ShowCoordinateSystem` | `bool`                                   | 显示世界坐标轴 |
 | `IsLeftHanded`         | `bool`                                   | 左手坐标系（默认 `false`） |
 
-`Diff` 模式复用 `getColorByHeight` 彩虹映射，`ZMin/ZMax`  自动切换为差分范围；SetGlobalZRange 早返回，不受外部 Z 同步影响。
+`Diff` 模式复用 `getColorByHeight` 彩虹映射，`ColorMin/ColorMax`  自动切换为差分范围；SetGlobalZRange 早返回，不受外部 Z 同步影响。
 
 颜色梯度（`Color` / `ColorWithIntensity` / `Diff` 模式）：
 

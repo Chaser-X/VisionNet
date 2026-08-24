@@ -119,7 +119,7 @@ namespace VisionNet.Controls
 
             // Phase 1 — compute global Z range and global diff range separately.
             // Aggregate from each item's auto-computed BASE range (BaseZ/BaseDiff), NOT its
-            // active ZMin/ZMax — the latter may hold a manual override that would otherwise
+            // active ColorMin/ColorMax — the latter may hold a manual override that would otherwise
             // pollute the aggregate and prevent Clear*Range() from restoring the auto range.
             float globalZMin = float.MaxValue, globalZMax = float.MinValue;
             float globalDiffMin = float.MaxValue, globalDiffMax = float.MinValue;
