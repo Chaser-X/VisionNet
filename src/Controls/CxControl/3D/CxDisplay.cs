@@ -68,7 +68,34 @@ namespace VisionNet.Controls
         public bool IsMenuVisible
         {
             get => ContextMenuStrip != null;
-            set => ContextMenuStrip = value ? menu_right : null;
+            set
+            {
+                ContextMenuStrip = value ? menu_right : null;
+                UpdateMenuVisibility();
+            }
+        }
+
+        private bool _enableSurfaceMode = true;
+        private bool _enableSurfaceColorMode = true;
+
+        /// <summary>
+        /// Gets or sets whether the "SurfaceMode" item in the right-click menu is visible.
+        /// Only effective while <see cref="IsMenuVisible"/> is true. Default <c>true</c>.
+        /// </summary>
+        public bool EnableSurfaceMode
+        {
+            get => _enableSurfaceMode;
+            set { _enableSurfaceMode = value; UpdateMenuVisibility(); }
+        }
+
+        /// <summary>
+        /// Gets or sets whether the "SurfaceColorMode" item in the right-click menu is visible.
+        /// Only effective while <see cref="IsMenuVisible"/> is true. Default <c>true</c>.
+        /// </summary>
+        public bool EnableSurfaceColorMode
+        {
+            get => _enableSurfaceColorMode;
+            set { _enableSurfaceColorMode = value; UpdateMenuVisibility(); }
         }
 
         /// <summary>Gets or sets the current view mode (Top, Front, Left, etc.).</summary>
@@ -155,6 +182,7 @@ namespace VisionNet.Controls
                 SurfaceMode      = surfaceMode;
                 SurfaceColorMode = surfaceColorMode;
                 UpdateMenuItems();
+                UpdateMenuVisibility();
             }
         }
 
@@ -180,6 +208,20 @@ namespace VisionNet.Controls
                 ((ToolStripMenuItem)item).Checked = ((ToolStripMenuItem)item).Text == _surfaceMode.ToString();
             foreach (var item in surfaceColorModeToolStripMenuItem.DropDownItems)
                 ((ToolStripMenuItem)item).Checked = ((ToolStripMenuItem)item).Text == _surfaceColorMode.ToString();
+        }
+
+        /// <summary>
+        /// Applies <see cref="EnableSurfaceMode"/> / <see cref="EnableSurfaceColorMode"/> to the
+        /// visibility of their corresponding menu items, gated by <see cref="IsMenuVisible"/>.
+        /// </summary>
+        private void UpdateMenuVisibility()
+        {
+            if (InvokeRequired) { BeginInvoke(new Action(UpdateMenuVisibility)); return; }
+
+            if (surfaceModeToolStripMenuItem != null)
+                surfaceModeToolStripMenuItem.Visible = IsMenuVisible && _enableSurfaceMode;
+            if (surfaceColorModeToolStripMenuItem != null)
+                surfaceColorModeToolStripMenuItem.Visible = IsMenuVisible && _enableSurfaceColorMode;
         }
 
         /// <summary>
