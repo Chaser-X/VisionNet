@@ -204,7 +204,7 @@ namespace VisionNet.Controls
             // The colour bar is drawn only when every item shares the same SurfaceColorMode.
             // Any mode mismatch (e.g. a Color mesh with a Diff point cloud) hides the bar — a
             // single bar can't span mismatched magnitudes. Pure Intensity also hides (fixed 0–255).
-            if (anyDrawn && uniformMode && singleMode != SurfaceColorMode.Intensity)
+            if (anyDrawn && uniformMode && singleMode != SurfaceColorMode.Intensity && IsColorBarVisible)
             {
                 if (singleMode == SurfaceColorMode.Diff && _manualDiffRange.HasValue)
                 {

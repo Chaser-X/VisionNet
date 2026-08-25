@@ -143,6 +143,24 @@ namespace VisionNet.Controls
         /// <summary>Gets or sets whether the 3D coordinate system axes are shown in world space.</summary>
         public bool ShowCoordinateSystem { get; set; }
 
+        private bool _isColorBarVisible = true;
+
+        /// <summary>
+        /// Gets or sets whether the colour bar HUD overlay is drawn.
+        /// Default <c>true</c>. When <c>false</c>, the bar is suppressed even if
+        /// surface items share a uniform colour mode.
+        /// </summary>
+        public bool IsColorBarVisible
+        {
+            get => _isColorBarVisible;
+            set
+            {
+                if (_isColorBarVisible == value) return;
+                _isColorBarVisible = value;
+                SafeInvalidate();
+            }
+        }
+
         /// <summary>
         /// Gets the currently selected geometry overlay item, or <c>null</c> if nothing is selected.
         /// Only one item can be selected at a time within this display.
