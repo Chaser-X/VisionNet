@@ -42,9 +42,11 @@ namespace VisionNet.DataType
         /// <summary>Returns a unit vector in the same direction. Behaviour is undefined if length is zero.</summary>
         public CxVector2D Normalize() => new CxVector2D(X / Length, Y / Length);
 
-        /// <summary>Creates a unit vector from an angle in radians (measured from +X axis).</summary>
-        public static CxVector2D FromPolar(float angleRad) =>
-            new CxVector2D((float)Math.Cos(angleRad), (float)Math.Sin(angleRad));
+        /// <summary>Creates a unit vector from an angle in degrees (measured from +X axis).</summary>
+        public static CxVector2D FromPolar(float angleDeg) =>
+            new CxVector2D(
+                (float)Math.Cos(angleDeg * Math.PI / 180f),
+                (float)Math.Sin(angleDeg * Math.PI / 180f));
 
         public override string ToString() =>
             string.Format(CultureInfo.InvariantCulture, "CxVector2D(X={0:G9}, Y={1:G9})", X, Y);

@@ -6,9 +6,18 @@ namespace VisionNet.DataType
     {
         public CxPoint2D Center;
         public float Radius;
+
+        /// <summary>Start angle of the arc, in degrees.</summary>
         public float StartAngle;
+
+        /// <summary>Sweep angle of the arc, in degrees (positive = counter-clockwise).</summary>
         public float SweepAngle;
 
+        /// <summary>Initializes an arc.</summary>
+        /// <param name="center">Centre of the arc.</param>
+        /// <param name="radius">Radius of the arc.</param>
+        /// <param name="startAngle">Start angle in degrees.</param>
+        /// <param name="sweepAngle">Sweep angle in degrees (positive = counter-clockwise).</param>
         public CxArc2D(CxPoint2D center, float radius, float startAngle, float sweepAngle)
         {
             Center = center;

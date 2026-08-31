@@ -110,6 +110,7 @@ namespace VisionNet.Controls
                 int dx = e.X - _lastMouseX;
                 int dy = e.Y - _lastMouseY;
 
+                // Incremental rotation angles, in degrees.
                 float angleX = -dy * 0.15f;
                 float angleY = -dx * 0.15f;
 

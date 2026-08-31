@@ -383,7 +383,10 @@ namespace VisionNet
             box = new CxBox2D(new CxPoint2D(cx, cy), new CxSize2D(maxX - minX, maxY - minY));
         }
 
-        /// <summary>Returns the minimum-area oriented bounding rectangle of a polygon.</summary>
+        /// <summary>
+        /// Returns the minimum-area oriented bounding rectangle of a polygon.
+        /// The rectangle's <see cref="CxRectangle2D.Angle"/> is in degrees.
+        /// </summary>
         public static void PolygonBoundingRectangle2D(CxPolygon2D polygon, out CxRectangle2D rect)
         {
             PointsBoundingRectangle2D(polygon.Points, out rect);
@@ -565,7 +568,10 @@ namespace VisionNet
             return true;
         }
 
-        /// <summary>Clips a circle against a polygon, returning the arc portion inside the polygon.</summary>
+        /// <summary>
+        /// Clips a circle against a polygon, returning the arc portion inside the polygon.
+        /// The output arc's <see cref="CxArc2D.StartAngle"/> / <see cref="CxArc2D.SweepAngle"/> are in degrees.
+        /// </summary>
         public static bool CropCircleToPolygon2D(CxCircle2D circle, CxPolygon2D polygon, out CxArc2D arc)
         {
             var pts = polygon.Points;
@@ -1029,7 +1035,10 @@ namespace VisionNet
             return inside;
         }
 
-        /// <summary>Tests whether a point lies inside an annular sector (radial band + angular sweep).</summary>
+        /// <summary>
+        /// Tests whether a point lies inside an annular sector (radial band + angular sweep).
+        /// <see cref="CxArc2D.StartAngle"/> / <see cref="CxArc2D.SweepAngle"/> are in degrees.
+        /// </summary>
         public static bool IsPointInAnnularSector2D(CxPoint2D p, CxArc2D arc, float width)
         {
             float dx = p.X - arc.Center.X;

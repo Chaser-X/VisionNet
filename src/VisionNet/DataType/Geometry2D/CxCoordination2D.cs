@@ -16,14 +16,14 @@ namespace VisionNet.DataType
         /// <summary>Rotation angle in degrees.</summary>
         public float Angle;
 
-        /// <summary>Initializes a coordinate frame with the given origin and angle.</summary>
+        /// <summary>Initializes a coordinate frame with the given origin and rotation angle (in degrees).</summary>
         public CxCoordination2D(CxPoint2D origin, float angleDeg = 0)
         {
             Origin = origin;
             Scale = new CxPoint2D(1, 1);
             Angle = angleDeg;
         }
-        /// <summary>Initializes a coordinate frame with the given origin and angle.</summary>
+        /// <summary>Initializes a coordinate frame with the given origin, scale, and rotation angle (in degrees).</summary>
         public CxCoordination2D(CxPoint2D origin, CxPoint2D scale, float angleDeg = 0)
         {
             Origin = origin;

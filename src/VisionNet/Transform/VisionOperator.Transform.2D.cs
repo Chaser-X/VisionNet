@@ -100,7 +100,7 @@ namespace VisionNet
 
         /// <summary>
         /// Aligns a 2D arc. Non-uniform scale throws <see cref="ArgumentException"/>.
-        /// Angles are rotated by ±<c>coord.Angle</c> (forward: −, reverse: +).
+        /// Angles are in degrees; they are rotated by ±<c>coord.Angle</c> (forward: −, reverse: +).
         /// SweepAngle is preserved.
         /// </summary>
         public static CxArc2D AlignArc2D(CxArc2D arc, CxCoordination2D coord, bool forward)
@@ -134,7 +134,7 @@ namespace VisionNet
 
         /// <summary>
         /// Aligns a 2D rectangle. Non-uniform scaling is applied independently
-        /// to Width (Scale.X) and Height (Scale.Y). Angle is rotated by ±Angle.
+        /// to Width (Scale.X) and Height (Scale.Y). Angle (in degrees) is rotated by ±Angle.
         /// </summary>
         public static CxRectangle2D AlignRectangle2D(CxRectangle2D rect, CxCoordination2D coord, bool forward)
         {

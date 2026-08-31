@@ -227,6 +227,7 @@ namespace VisionNet.Controls
             Vector3 screenRight = Vector3.Normalize(Vector3.Cross(_up, viewDir));
             Vector3 screenUp    = Vector3.Normalize(Vector3.Cross(viewDir, screenRight));
 
+            // _rotateSpeed is in degrees; convert to radians for CreateFromAxisAngle.
             float angleX = -deltaY * _rotateSpeed * (float)Math.PI / 180f;
             float angleY = -deltaX * _rotateSpeed * (float)Math.PI / 180f;
 

@@ -100,6 +100,7 @@ namespace VisionNet.Controls
         {
             for (int stack = 0; stack <= stacks; stack++)
             {
+                // Spherical tessellation; phi/theta are in radians.
                 float phi   = (float)(Math.PI / 2 - stack * Math.PI / stacks);
                 float y     = radius * (float)Math.Sin(phi);
                 float scale = radius * (float)Math.Cos(phi);

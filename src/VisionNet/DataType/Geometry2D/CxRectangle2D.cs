@@ -7,8 +7,14 @@ namespace VisionNet.DataType
     {
         public CxPoint2D Center;
         public CxSize2D Size;
+
+        /// <summary>Rotation angle in degrees.</summary>
         public float Angle;
 
+        /// <summary>Initializes a rectangle.</summary>
+        /// <param name="center">Centre of the rectangle.</param>
+        /// <param name="size">Width and height of the rectangle.</param>
+        /// <param name="angle">Rotation angle in degrees.</param>
         public CxRectangle2D(CxPoint2D center, CxSize2D size, float angle = 0f)
         {
             Center = center;
@@ -16,6 +22,12 @@ namespace VisionNet.DataType
             Angle = angle;
         }
 
+        /// <summary>Initializes a rectangle from raw values.</summary>
+        /// <param name="centerX">Centre X coordinate.</param>
+        /// <param name="centerY">Centre Y coordinate.</param>
+        /// <param name="width">Width of the rectangle.</param>
+        /// <param name="height">Height of the rectangle.</param>
+        /// <param name="angle">Rotation angle in degrees.</param>
         public CxRectangle2D(float centerX, float centerY, float width, float height, float angle = 0f)
         {
             Center = new CxPoint2D(centerX, centerY);
