@@ -783,6 +783,106 @@ namespace VisionNet
             dist = best;
         }
 
+        /// <summary>
+        /// Returns the closest point on a polygon's edges and the shortest distance to it
+        /// (works for open polylines and closed polygons).
+        /// </summary>
+        public static void ClosestPointOnPolygon2D(CxPoint2D p, CxPolygon2D polygon,
+            out CxPoint2D closest, out float dist)
+        {
+            closest = default;
+            dist = float.MaxValue;
+
+            var pts = polygon.Points;
+            if (pts == null || pts.Length < 2) return;
+
+            int edgeCount = polygon.IsClosed ? pts.Length : pts.Length - 1;
+            for (int i = 0; i < edgeCount; i++)
+            {
+                var a = pts[i];
+                var b = pts[(i + 1) % pts.Length];
+
+                float sx = a.X, sy = a.Y;
+                float dx = b.X - sx, dy = b.Y - sy;
+                float lenSq = dx * dx + dy * dy;
+                float t = 0f;
+                if (lenSq >= Eps)
+                {
+                    float vx = p.X - sx, vy = p.Y - sy;
+                    t = Math.Max(0f, Math.Min(1f, (vx * dx + vy * dy) / lenSq));
+                }
+                float cx = sx + t * dx, cy = sy + t * dy;
+                float ddx = p.X - cx, ddy = p.Y - cy;
+                float d = (float)Math.Sqrt(ddx * ddx + ddy * ddy);
+                if (d < dist)
+                {
+                    dist = d;
+                    closest = new CxPoint2D(cx, cy);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Returns the tangent angle and normal angle (in degrees) of the polygon edge
+        /// closest to <paramref name="p"/>. The normal is the tangent rotated +90°
+        /// (counter-clockwise side). Angles are normalised per <paramref name="mode"/>.
+        /// </summary>
+        public static void PolygonPointTangentNormal2D(CxPoint2D p, CxPolygon2D polygon,
+            AngleMode mode, out float tangentAngle, out float normalAngle)
+        {
+            tangentAngle = 0f;
+            normalAngle = 0f;
+
+            var pts = polygon.Points;
+            if (pts == null || pts.Length < 2) return;
+
+            int edgeCount = polygon.IsClosed ? pts.Length : pts.Length - 1;
+            float best = float.MaxValue;
+            int bestEdge = -1;
+
+            for (int i = 0; i < edgeCount; i++)
+            {
+                var a = pts[i];
+                var b = pts[(i + 1) % pts.Length];
+
+                float sx = a.X, sy = a.Y;
+                float dx = b.X - sx, dy = b.Y - sy;
+                float lenSq = dx * dx + dy * dy;
+                float t = 0f;
+                if (lenSq >= Eps)
+                {
+                    float vx = p.X - sx, vy = p.Y - sy;
+                    t = Math.Max(0f, Math.Min(1f, (vx * dx + vy * dy) / lenSq));
+                }
+                float cx = sx + t * dx, cy = sy + t * dy;
+                float ddx = p.X - cx, ddy = p.Y - cy;
+                float d = (float)Math.Sqrt(ddx * ddx + ddy * ddy);
+                if (d < best)
+                {
+                    best = d;
+                    bestEdge = i;
+                }
+            }
+
+            if (bestEdge < 0) return;
+
+            var ae = pts[bestEdge];
+            var be = pts[(bestEdge + 1) % pts.Length];
+
+            float raw = (float)(Math.Atan2(be.Y - ae.Y, be.X - ae.X) * 180.0 / Math.PI);
+            tangentAngle = mode == AngleMode.Signed180 ? raw : (raw < 0f ? raw + 360f : raw);
+
+            normalAngle = tangentAngle + 90f;
+            if (mode == AngleMode.Signed180)
+            {
+                if (normalAngle > 180f) normalAngle -= 360f;
+            }
+            else
+            {
+                if (normalAngle >= 360f) normalAngle -= 360f;
+            }
+        }
+
         /// <summary>Returns the shortest distance from a point to an arc (32-sample approximation).</summary>
         public static void DistancePointToArc2D(CxPoint2D p, CxArc2D arc, out float dist)
         {

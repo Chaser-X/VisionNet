@@ -22,6 +22,10 @@ namespace VisionNet.Controls
             // Create and register the 1:1+inverted-Y rule by default.
             _squareRule = new SquareWithInvertedY(plot.Axes.Bottom, plot.Axes.Left);
             plot.Axes.Rules.Add(_squareRule);
+
+            // Establish the persistent inverted-Y frame (Y=0 at screen top, image convention)
+            // for the control's lifetime; SquareWithInvertedY preserves it across pan/zoom.
+            plot.Axes.SetLimits(-100, 100, 100, -100);
         }
 
         /// <summary>
@@ -54,7 +58,6 @@ namespace VisionNet.Controls
                 bottom: cy + halfY,   // larger Y value → screen bottom
                 top:    cy - halfY);  // smaller Y value → screen top
 
-            _frameEstablished = true;
             RefreshDisplay();
         }
 
@@ -75,7 +78,6 @@ namespace VisionNet.Controls
                 bottom: box.Bottom + margin,
                 top:    box.Top    - margin);
 
-            _frameEstablished = true;
             RefreshDisplay();
         }
 

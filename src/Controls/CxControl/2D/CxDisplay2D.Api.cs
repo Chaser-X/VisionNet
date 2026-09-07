@@ -23,8 +23,6 @@ namespace VisionNet.Controls
                 if (_imageItem != null) _imageItem.UpdateWorldRect(GetImageWorldRect());
                 if (_displayMode != DisplayMode.None)
                     FitImage1to1();
-                else if (!_frameEstablished && _imageWidth > 0)
-                    FitToImage();   // first image in None mode: establish the inverted-Y frame
                 else
                     RefreshDisplay();
             });
@@ -125,8 +123,6 @@ namespace VisionNet.Controls
                 _imageItem.UpdateWorldRect(GetImageWorldRect());
                 if (_displayMode != DisplayMode.None)
                     FitImage1to1();
-                else if (!_frameEstablished)
-                    FitToImage();   // first image in None mode: establish the inverted-Y frame
                 else
                     RefreshDisplay();
             });
@@ -156,8 +152,6 @@ namespace VisionNet.Controls
                 _imageItem.UpdateWorldRect(GetImageWorldRect());
                 if (_displayMode != DisplayMode.None)
                     FitImage1to1();
-                else if (!_frameEstablished)
-                    FitToImage();   // first image in None mode: establish the inverted-Y frame
                 else
                     RefreshDisplay();
             });
@@ -176,7 +170,6 @@ namespace VisionNet.Controls
                 }
                 _imageWidth = 0;
                 _imageHeight = 0;
-                _frameEstablished = false;
                 HideCoordAnnotation();
                 RefreshDisplay();
             });
