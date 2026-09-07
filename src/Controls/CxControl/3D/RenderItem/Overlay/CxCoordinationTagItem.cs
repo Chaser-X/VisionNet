@@ -16,7 +16,7 @@ namespace VisionNet.Controls
         public CxPoint3D Point { get; set; } = new CxPoint3D();
 
         /// <summary>Gets or sets the intensity value shown in the tooltip, or <c>null</c> if unavailable.</summary>
-        public byte? Intensity { get; set; } = null;
+        public float? Intensity { get; set; } = null;
 
         /// <summary>Gets or sets whether the tooltip is rendered.</summary>
         public bool Visible { get; set; } = false;
@@ -29,7 +29,7 @@ namespace VisionNet.Controls
         /// </summary>
         /// <param name="point">World-space surface point.</param>
         /// <param name="intensity">Per-point intensity (0–255), or <c>null</c> if unavailable.</param>
-        public void SetCoordinates(CxPoint3D point, byte? intensity = null)
+        public void SetCoordinates(CxPoint3D point, float? intensity = null)
         {
             Point     = point;
             Intensity = intensity;

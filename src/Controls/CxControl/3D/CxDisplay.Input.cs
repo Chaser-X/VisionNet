@@ -141,7 +141,7 @@ namespace VisionNet.Controls
         /// rendered with a pose (model matrix) still report the correct grid cell and intensity.
         /// </summary>
         /// <returns>Nearest world-space location and its intensity, or <c>(null, null)</c> if no hit.</returns>
-        public (CxPoint3D? Location, byte? Intensity) GetNearestSurfacePoint(int mouseX, int mouseY)
+        public (CxPoint3D? Location, float? Intensity) GetNearestSurfacePoint(int mouseX, int mouseY)
         {
             var pos = ScreenToWorldCoordinate(mouseX, mouseY);
             if (!pos.HasValue) return (null, null);
@@ -154,7 +154,7 @@ namespace VisionNet.Controls
             if (snapshot.Count == 0) return (null, null);
 
             CxPoint3D? bestPoint    = null;
-            byte?      bestIntensity = null;
+            float?      bestIntensity = null;
             float      bestDist     = float.MaxValue;
 
             foreach (var cur in snapshot)
@@ -226,8 +226,9 @@ namespace VisionNet.Controls
                         {
                             bestDist      = d;
                             bestPoint     = worldCand;
-                            bestIntensity = (surface.Intensity != null && surface.Intensity.Length > idx)
-                                ? surface.Intensity[idx] : (byte?)null;
+                            bestIntensity = SurfaceColorMode != SurfaceColorMode.Diff ? (surface.Intensity != null && surface.Intensity.Length > idx)
+                                ? surface.Intensity[idx] : (float?)null : (surface.Diff != null && surface.Diff.Length > idx)
+                                ? surface.Diff[idx] : (float?)null;
                         }
                     }
                 }
