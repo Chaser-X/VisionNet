@@ -54,6 +54,7 @@ namespace VisionNet.Controls
                 bottom: cy + halfY,   // larger Y value → screen bottom
                 top:    cy - halfY);  // smaller Y value → screen top
 
+            _frameEstablished = true;
             RefreshDisplay();
         }
 
@@ -74,6 +75,7 @@ namespace VisionNet.Controls
                 bottom: box.Bottom + margin,
                 top:    box.Top    - margin);
 
+            _frameEstablished = true;
             RefreshDisplay();
         }
 

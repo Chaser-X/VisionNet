@@ -30,6 +30,9 @@ namespace VisionNet.Controls
         // ── Display mode ──────────────────────────────────────────────────────────
         private DisplayMode _displayMode = DisplayMode.Normal;
 
+        /// <summary>Whether the inverted-Y coordinate frame has been established for image/overlay alignment.</summary>
+        private bool _frameEstablished;
+
         /// <summary>
         /// Gets or sets the display mode. In <see cref="DisplayMode.None"/> mode,
         /// <see cref="SetImage(CxImage)"/> does NOT reset the view position or zoom.
