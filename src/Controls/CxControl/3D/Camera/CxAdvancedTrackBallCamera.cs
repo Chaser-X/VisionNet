@@ -287,15 +287,24 @@ namespace VisionNet.Controls
         }
 
         /// <summary>
-        /// Moves the camera target to <paramref name="point"/>, preserving the direction
-        /// and distance from the previous target.
+        /// Moves the camera so that <paramref name="point"/> ends up at the viewport centre,
+        /// preserving the direction and distance from the previous target.
         /// </summary>
-        /// <param name="point">New target / focus point in world space.</param>
+        /// <param name="point">World-space point to bring to the viewport centre.</param>
         internal void FocusOnPoint(Vector3 point)
         {
             Vector3 offset = _position - _target;
-            _target   = point;
-            _position = _target + offset;
+
+            // The modelview is built as LookAt * Scale(1,-1,1) * Scale(1,1,_zScale), so the
+            // world point actually rendered at the viewport centre is S * _target, not _target.
+            // Pre-apply the inverse of those view transforms to the requested point so that
+            // `point` itself is centred (mirrors the Y axis in left-handed mode, folds in ZScale).
+            Vector3 target = point;
+            if (_isLeftHanded) target.Y = -target.Y;
+            target.Z *= _zScale;
+
+            _target   = target;
+            _position = target + offset;
         }
 
         /// <summary>
