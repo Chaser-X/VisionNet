@@ -47,7 +47,9 @@ __kernel void RasterizeTriangles(
     int   textureWidth,
     int   textureHeight,
     int   intensityMode,
-    int   mode)
+    int   mode,
+    float zMin,
+    float zMax)
 {
     int gid = get_global_id(0);
     if (gid >= triangleCount) return;
@@ -85,6 +87,11 @@ __kernel void RasterizeTriangles(
             if (w0 < 0 || w1 < 0 || w2 < 0) continue;
 
             float zInterp = w0 * v0.z + w1 * v1.z + w2 * v2.z;
+
+            // Z-band clip: discard samples outside the box depth so an outer
+            // surface cannot shadow an inner surface at the same (X, Y) cell.
+            if (zInterp < zMin || zInterp > zMax) continue;
+
             int   idx     = py * width + px;
             int   scaledZ = (int)((zInterp - zOffset) / zScale);
             int   old;

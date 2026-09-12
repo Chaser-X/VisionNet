@@ -34,6 +34,13 @@ namespace VisionNet
         /// <summary>
         /// Projects a triangle mesh onto a uniform XY height map within a specified bounding box.
         /// </summary>
+        /// <remarks>
+        /// <paramref name="bounds"/> defines the XY extent of the grid and its
+        /// <c>Size.Depth</c> acts as a hard Z-band clip around <c>Center.Z</c>: samples with an
+        /// interpolated Z outside <c>[Center.Z − Depth/2, Center.Z + Depth/2]</c> are discarded
+        /// before Max/Min aggregation. This lets a narrower Depth exclude an outer surface and
+        /// recover the inner surface at the same (X, Y) cell. A non-positive Depth is invalid.
+        /// </remarks>
         public static CxSurface MeshToSurface(CxMesh mesh, CxMatrix4X4 matrix,
             CxBox3D bounds,
             float xScale = 0.01f, float yScale = 0.01f,
@@ -41,7 +48,8 @@ namespace VisionNet
         {
             if (mesh == null || matrix == null || mesh.Vertices == null || mesh.Indices == null)
                 return null;
-            if (xScale <= 0 || yScale <= 0 || bounds.Size.Width <= 0 || bounds.Size.Height <= 0)
+            if (xScale <= 0 || yScale <= 0
+                || bounds.Size.Width <= 0 || bounds.Size.Height <= 0 || bounds.Size.Depth <= 0)
                 return null;
 
             int width  = Math.Max(1, (int)Math.Ceiling(bounds.Size.Width  / xScale));
@@ -50,13 +58,15 @@ namespace VisionNet
             float yOffset = bounds.Center.Y - height * yScale / 2f;
             float zOffset = bounds.Center.Z;
             float zScale  = Math.Max(bounds.Size.Depth / ushort.MaxValue, 1e-6f);
+            float zMin    = bounds.Center.Z - bounds.Size.Depth * 0.5f;
+            float zMax    = bounds.Center.Z + bounds.Size.Depth * 0.5f;
 
             using (var projector = new CxMeshToSurface(mesh))
             {
                 return projector.Project(matrix,
                     xOffset, yOffset, zOffset,
                     xScale, yScale, zScale,
-                    width, height, mode);
+                    width, height, mode, zMin, zMax);
             }
         }
 
