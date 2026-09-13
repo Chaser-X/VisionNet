@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
+using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
@@ -44,6 +45,7 @@ namespace DemoFrom
             // cxDisplay1.SetViewUpDirection(new CxVector3D(0, 1, 0));
             cxDisplay1.SetCoordinateSystemLeftHanded(true);
             cxDisplay1.Camera.Enable2DView = false;
+            BuildGroupSimButton();
         }
         CxSurface surface = null;
         CxSurface surface2 = null;
@@ -1333,6 +1335,134 @@ namespace DemoFrom
                 MessageBox.Show($"ͼƬ����ʧ��: {ex.Message}", "Load Image");
                 return null;
             }
+        }
+
+        // ���� Group / Simulation Demo ��������������������������������������������������������������������������������������������������
+
+        private System.Windows.Forms.Timer _simTimer;
+        private Stopwatch _simWatch;
+        private CxGroup _platformGroup;
+        private CxGroup _vehicleGroup;
+        private Button _btnGroupSim;
+
+        private void BuildGroupSimButton()
+        {
+            _btnGroupSim = new Button
+            {
+                Text = "Group Sim",
+                Location = new Point(29, 430),
+                Size = new Size(123, 28),
+            };
+            _btnGroupSim.Click += btn_groupSim_Click;
+            splitContainer1.Panel2.Controls.Add(_btnGroupSim);
+        }
+
+        private void btn_groupSim_Click(object sender, EventArgs e)
+        {
+            if (_simTimer != null) { StopGroupSim(); return; }
+            StartGroupSim();
+        }
+
+        private void StartGroupSim()
+        {
+            cxDisplay1.ResetView();
+
+            // 1. 运动平台 + 载具（数字模型）与实物点云 mesh
+            var platformMesh = BuildBoxMesh(8f, 6f, 0.4f, new CxPoint3D(0f, 0f, 0f));
+            var vehicleMesh  = BuildBoxMesh(2.5f, 1.5f, 1.2f, new CxPoint3D(-1.5f, 0f, 0.8f));
+            var realMesh     = BuildBumpyMesh(24, 24, 0.4f, new CxPoint3D(-5f, -5f, 0.4f));
+
+            var platformItem = cxDisplay1.AddMeshAdvancedItem(platformMesh, SurfaceMode.Mesh, SurfaceColorMode.Color, autoFit: false);
+            var vehicleItem  = cxDisplay1.AddMeshAdvancedItem(vehicleMesh,  SurfaceMode.Mesh, SurfaceColorMode.Color, autoFit: false);
+            var realItem     = cxDisplay1.AddMeshAdvancedItem(realMesh,     SurfaceMode.Mesh, SurfaceColorMode.Color, autoFit: true);
+
+            // 层级：MotionPlatform（整体运动）→ Vehicle（相对平台运动）→ 实物随载具
+            _platformGroup = cxDisplay1.CreateGroup("MotionPlatform");
+            cxDisplay1.AddToGroup(_platformGroup, platformItem);
+
+            _vehicleGroup = cxDisplay1.CreateGroup("Vehicle", parent: _platformGroup);
+            cxDisplay1.AddToGroup(_vehicleGroup, vehicleItem);
+            cxDisplay1.AddToGroup(_vehicleGroup, realItem);
+
+            // 外部仿真循环：Demo 自己驱动，CxDisplay 只提供 SetGroupTransform
+            _simWatch = Stopwatch.StartNew();
+            _simTimer = new System.Windows.Forms.Timer { Interval = 16 };
+            _simTimer.Tick += SimTick;
+            _simTimer.Start();
+
+            _btnGroupSim.Text = "Stop Sim";
+        }
+
+        private void StopGroupSim()
+        {
+            _simTimer?.Stop();
+            _simTimer?.Dispose();
+            _simTimer = null;
+            _simWatch = null;
+            _btnGroupSim.Text = "Group Sim";
+        }
+
+        private void SimTick(object sender, EventArgs e)
+        {
+            if (_simWatch == null) return;
+            double t = _simWatch.Elapsed.TotalSeconds;
+
+            // 平台整体：沿 X 平移 + 绕 Z 摆动
+            cxDisplay1.SetGroupTransform(_platformGroup,
+                CxMatrix4X4.Translation((float)(3.0 * Math.Sin(t)), 0f, 0f) *
+                CxMatrix4X4.RotationZ((float)(25.0 * Math.Sin(t * 0.7))));
+
+            // 载具相对平台：上下浮动 + 绕 Y 摆动
+            cxDisplay1.SetGroupTransform(_vehicleGroup,
+                CxMatrix4X4.Translation(0f, 0f, (float)(0.6 * Math.Sin(t * 3.0))) *
+                CxMatrix4X4.RotationY((float)(20.0 * Math.Sin(t * 1.5))));
+        }
+
+        private static CxMesh BuildBoxMesh(float w, float d, float h, CxPoint3D origin)
+        {
+            float x0 = origin.X - w / 2, x1 = origin.X + w / 2;
+            float y0 = origin.Y - d / 2, y1 = origin.Y + d / 2;
+            float z0 = origin.Z, z1 = origin.Z + h;
+            var v = new[]
+            {
+                new CxPoint3D(x0, y0, z0), new CxPoint3D(x1, y0, z0),
+                new CxPoint3D(x1, y1, z0), new CxPoint3D(x0, y1, z0),
+                new CxPoint3D(x0, y0, z1), new CxPoint3D(x1, y0, z1),
+                new CxPoint3D(x1, y1, z1), new CxPoint3D(x0, y1, z1),
+            };
+            var idx = new uint[]
+            {
+                0, 1, 2, 0, 2, 3,
+                4, 6, 5, 4, 7, 6,
+                0, 4, 5, 0, 5, 1,
+                1, 5, 6, 1, 6, 2,
+                2, 6, 7, 2, 7, 3,
+                3, 7, 4, 3, 4, 0,
+            };
+            return new CxMesh { Vertices = v, Indices = idx };
+        }
+
+        private static CxMesh BuildBumpyMesh(int nx, int ny, float spacing, CxPoint3D origin)
+        {
+            var verts = new CxPoint3D[nx * ny];
+            for (int y = 0; y < ny; y++)
+                for (int x = 0; x < nx; x++)
+                {
+                    float fx = x * spacing, fy = y * spacing;
+                    verts[y * nx + x] = new CxPoint3D(
+                        origin.X + fx, origin.Y + fy,
+                        origin.Z + 0.35f * (float)(Math.Sin(fx) * Math.Cos(fy)));
+                }
+            var idx = new uint[(nx - 1) * (ny - 1) * 6];
+            int i = 0;
+            for (int y = 0; y < ny - 1; y++)
+                for (int x = 0; x < nx - 1; x++)
+                {
+                    uint tl = (uint)(y * nx + x), tr = tl + 1, bl = tl + (uint)nx, br = bl + 1;
+                    idx[i++] = tl; idx[i++] = bl; idx[i++] = tr;
+                    idx[i++] = tr; idx[i++] = bl; idx[i++] = br;
+                }
+            return new CxMesh { Vertices = verts, Indices = idx };
         }
     }
 }

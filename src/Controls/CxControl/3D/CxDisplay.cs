@@ -294,9 +294,8 @@ namespace VisionNet.Controls
         /// </summary>
         private static CxMatrix4X4 GetItemModelMatrix(ICxObjRenderItem item)
         {
-            if (item is CxSurfaceAdvancedItem s) return s.ModelMatrix;
-            if (item is CxMeshAdvancedItem m) return m.ModelMatrix;
-            if (item is CxPointCloudAdvancedItem p) return p.ModelMatrix;
+            if (item is ICxPoseable poseable)
+                return poseable.ModelMatrix ?? CxMatrix4X4.Identity();
             return CxMatrix4X4.Identity();
         }
 
@@ -311,6 +310,7 @@ namespace VisionNet.Controls
 
             lock (_resourceLock)
             {
+                ForgetGroups(_surfaceItems);
                 foreach (var item in _surfaceItems)
                 {
                     if (_resourcePool.TryGetValue(item, out var h))

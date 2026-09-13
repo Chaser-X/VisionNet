@@ -106,6 +106,10 @@
       <DependentUpon>CxDisplay.cs</DependentUpon>
       <SubType>UserControl</SubType>
     </Compile>
+    <Compile Include="3D\CxDisplay.Group.cs">
+      <DependentUpon>CxDisplay.cs</DependentUpon>
+      <SubType>UserControl</SubType>
+    </Compile>
     <Compile Include="3D\CxDisplay.Designer.cs">
       <DependentUpon>CxDisplay.cs</DependentUpon>
     </Compile>
@@ -118,6 +122,7 @@
     <Compile Include="3D\RenderItem\Enums.cs" />
     <Compile Include="3D\RenderItem\IRenderItem.cs" />
     <Compile Include="3D\RenderItem\ICxObjRenderItem.cs" />
+    <Compile Include="3D\RenderItem\ICxPoseable.cs" />
     <Compile Include="3D\RenderItem\RenderData.cs" />
     <Compile Include="3D\RenderItem\GLResourceHandle.cs" />
     <Compile Include="3D\RenderItem\Surface\CxSurfaceItem.cs" />
@@ -137,6 +142,7 @@
     <Compile Include="3D\RenderItem\Overlay\CxText2DItem.cs" />
     <Compile Include="3D\RenderItem\Overlay\CxTextInfoItem.cs" />
     <Compile Include="3D\CxExtension.cs" />
+    <Compile Include="3D\CxGroup.cs" />
     <!-- 2D display control -->
     <Compile Include="2D\CxDisplay2D.cs">
       <SubType>UserControl</SubType>
