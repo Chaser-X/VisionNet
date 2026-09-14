@@ -137,22 +137,12 @@ namespace VisionNet.Compute
         /// <summary>
         /// Projects the mesh onto a uniform XY grid with full control over grid parameters.
         /// </summary>
-        /// <param name="zMin">
-        /// World-space lower bound of the Z band. Samples with interpolated Z below this
-        /// are discarded before Max/Min aggregation, so an outer surface cannot shadow an
-        /// inner surface sharing the same (X, Y) cell. Defaults to negative infinity (no clip).
-        /// </param>
-        /// <param name="zMax">
-        /// World-space upper bound of the Z band (inclusive). Defaults to positive infinity (no clip).
-        /// </param>
         public CxSurface Project(
             CxMatrix4X4 matrix,
             float xOffset, float yOffset, float zOffset,
             float xScale,  float yScale,  float zScale,
             int   width,   int   height,
-            ProjectionMode mode = ProjectionMode.Max,
-            float zMin = float.NegativeInfinity,
-            float zMax = float.PositiveInfinity)
+            ProjectionMode mode = ProjectionMode.Max)
         {
             if (width <= 0 || height <= 0 || xScale <= 0 || yScale <= 0 || zScale <= 0)
                 throw new ArgumentException("Grid dimensions and scales must be positive.");
@@ -195,8 +185,7 @@ namespace VisionNet.Compute
                 heightBuf, intensMapBuf,
                 _intensityBuf, _uvBuf,
                 _mesh.TextureWidth, _mesh.TextureHeight,
-                _intensityMode, (int)mode,
-                zMin, zMax);
+                _intensityMode, (int)mode);
             ok &= ExecuteKernel(RasterizeKernel, new[] { new IntPtr(_triangleCount) });
 
             ok &= ReadBuffer(heightBuf, heightRaw);
@@ -234,11 +223,9 @@ namespace VisionNet.Compute
             float yOffset = b.Center.Y - height * yScale / 2f;
             float zOffset = b.Center.Z;
             float zScale  = Math.Max(b.Size.Depth / ushort.MaxValue, 1e-6f);
-            float zMin    = b.Center.Z - b.Size.Depth * 0.5f;
-            float zMax    = b.Center.Z + b.Size.Depth * 0.5f;
 
             return Project(matrix, xOffset, yOffset, zOffset,
-                xScale, yScale, zScale, width, height, mode, zMin, zMax);
+                xScale, yScale, zScale, width, height, mode);
         }
 
         private static CxSurface BuildSurface(

@@ -448,8 +448,6 @@ var (pts, intensities) = VisionOperator.TransformPointCloud(cloud, matrix);
 CxSurface heightMap = VisionOperator.MeshToSurface(mesh, matrix, 0.01f, 0.01f);
 
 // Mesh → Surface 高度图投影（指定固定 CxBox3D 范围，用于对齐多帧）
-// bounds.Size.Depth 同时作为 Z 裁剪带：仅 [Center.Z ± Depth/2] 内的 Z 参与 Max/Min 聚合，
-// 因此可用较窄的 Depth 排除外层表面、取到同一 (X,Y) 处的内侧表面。
 CxSurface heightMapFixed = VisionOperator.MeshToSurface(mesh, matrix, bounds, 0.01f, 0.01f);
 
 // Surface → Mesh 三角网格转换（结构化表面）
@@ -576,7 +574,7 @@ CxMesh m3 = VisionOperator.LoadMesh(@"C:\data.stl");            // 自动识别 
 | `CxUniformSurface`      | GPU 点云均匀重采样，支持 Max / Min / Average 聚合模式     |
 | `CxTransformSurface`    | GPU 结构化表面矩阵变换，返回变换后的点云                      |
 | `CxTransformPointCloud` | GPU 有序点云矩阵变换（复用 TransformVertices kernel）   |
-| `CxMeshToSurface`       | GPU 网格自动栅格化，将三角 mesh 投影到指定位姿和分辨率的 CxSurface，支持 Z 带裁剪（排除外层表面，取内侧表面） |
+| `CxMeshToSurface`       | GPU 网格自动栅格化，将三角 mesh 投影到指定位姿和分辨率的 CxSurface |
 
 ```csharp
 // 直接使用底层 GPU 采样（绕过 VisionOperator 包装）
