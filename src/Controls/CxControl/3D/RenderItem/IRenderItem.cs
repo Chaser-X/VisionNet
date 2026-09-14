@@ -26,11 +26,13 @@ namespace VisionNet.Controls
     /// Base class for simple overlay render items.
     /// Provides default implementations of <see cref="IDisposable"/> and common properties.
     /// </summary>
-    public abstract class AbstractRenderItem : IRenderItem
+    public abstract class AbstractRenderItem : IRenderItem, ICxGroupMember
     {
         /// <inheritdoc/>
         public void Dispose()
         {
+            if (IsDisposed) return;
+            IsDisposed = true;
             Dispose(true);
             GC.SuppressFinalize(this);
         }
@@ -46,6 +48,60 @@ namespace VisionNet.Controls
         {
             Color = color;
             Size  = size;
+        }
+
+        /// <inheritdoc/>
+        public bool IsDisposed { get; private set; }
+
+        // ── Group pose support ───────────────────────────────────────────────────
+
+        /// <summary>
+        /// Model matrix applied to this item's geometry before the camera transform.
+        /// Only honoured when <see cref="SupportsGroupTransform"/> is <c>true</c>;
+        /// world-space geometry items wrap their draw calls with this pose, screen-space
+        /// HUD items ignore it. Maintained by <see cref="CxDisplay"/> for group members.
+        /// </summary>
+        public CxMatrix4X4 ModelMatrix { get; set; } = CxMatrix4X4.Identity();
+
+        /// <summary>
+        /// Gets whether this item honours <see cref="ModelMatrix"/> in its <see cref="Draw"/>.
+        /// Default <c>false</c>; world-space geometry items override to <c>true</c>.
+        /// </summary>
+        public virtual bool SupportsGroupTransform => false;
+
+        /// <summary>
+        /// Gets whether a non-identity model matrix is currently applied (and supported).
+        /// </summary>
+        protected bool HasModelMatrix
+        {
+            get
+            {
+                var m = ModelMatrix;
+                if (!SupportsGroupTransform || m?.Data == null) return false;
+                var d = m.Data;
+                return !(d[0] == 1f && d[1] == 0f && d[2] == 0f && d[3] == 0f
+                      && d[4] == 0f && d[5] == 1f && d[6] == 0f && d[7] == 0f
+                      && d[8] == 0f && d[9] == 0f && d[10] == 1f && d[11] == 0f
+                      && d[12] == 0f && d[13] == 0f && d[14] == 0f && d[15] == 1f);
+            }
+        }
+
+        /// <summary>
+        /// Pushes the item's model matrix onto the fixed-function matrix stack.
+        /// Must be paired with <see cref="PopModelMatrix"/>. No-op when unsupported or identity.
+        /// </summary>
+        protected void PushModelMatrix(OpenGL gl)
+        {
+            if (!HasModelMatrix) return;
+            gl.PushMatrix();
+            gl.MultMatrix(ModelMatrix.Transpose().Data);
+        }
+
+        /// <summary>Pops a matrix pushed by <see cref="PushModelMatrix"/>.</summary>
+        protected void PopModelMatrix(OpenGL gl)
+        {
+            if (!HasModelMatrix) return;
+            gl.PopMatrix();
         }
 
         /// <inheritdoc/>

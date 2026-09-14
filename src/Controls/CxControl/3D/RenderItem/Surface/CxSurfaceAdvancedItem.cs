@@ -10,7 +10,7 @@ namespace VisionNet.Controls
     /// Supports automatic down-sampling when the point count exceeds <c>maxPointCount</c>.
     /// Colour mode changes update shader uniforms only — no VBO rebuild needed.
     /// </summary>
-    public class CxSurfaceAdvancedItem : ICxObjRenderItem, ICxPoseable
+    public class CxSurfaceAdvancedItem : ICxObjRenderItem, ICxGroupMember
     {
         public event Action OnDisposed;
         // colorMode 通过 Uniform 传入 Shader，不需要重建 GL 资源，不触发此事件
@@ -18,6 +18,9 @@ namespace VisionNet.Controls
 
         public CxSurface Surface { get; private set; }
         public bool IsDisposed { get; private set; } = false;
+
+        /// <inheritdoc/>
+        public bool SupportsGroupTransform => true;
         public float ColorMin { get; set; }
         public float ColorMax { get; set; }
         public float BaseZMin => _baseZMin;

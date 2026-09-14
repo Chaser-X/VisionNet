@@ -6,7 +6,8 @@ namespace VisionNet.Controls
 {
     /// <summary>
     /// Group / scene-graph API. Lets callers assemble composite models from multiple
-    /// Advanced render items and drive them with a shared, animatable transform.
+    /// Advanced render items and world-space geometry overlays, then drive them with a
+    /// shared, animatable transform.
     /// </summary>
     public partial class CxDisplay
     {
@@ -40,33 +41,36 @@ namespace VisionNet.Controls
         // ── Attach / detach items ────────────────────────────────────────────────
 
         /// <summary>
-        /// Attaches a render item to <paramref name="group"/>. The item's current pose is
-        /// captured as its local matrix, so attaching without changing the group's transform
-        /// does not move it. Only <see cref="ICxPoseable"/> (Advanced) items are supported.
+        /// Attaches an Advanced surface / point-cloud / mesh render item to
+        /// <paramref name="group"/>. The item's current pose is captured as its local matrix,
+        /// so attaching without changing the group's transform does not move it.
         /// </summary>
-        /// <exception cref="ArgumentNullException">When <paramref name="group"/> or <paramref name="item"/> is <c>null</c>.</exception>
-        /// <exception cref="NotSupportedException">When <paramref name="item"/> is not <see cref="ICxPoseable"/>.</exception>
+        /// <exception cref="ArgumentNullException">When <paramref name="item"/> is <c>null</c>.</exception>
+        /// <exception cref="NotSupportedException">When the item has no transform support (fixed-pipeline items).</exception>
         public void AddToGroup(CxGroup group, ICxObjRenderItem item)
         {
-            if (group == null) throw new ArgumentNullException(nameof(group));
             if (item == null) throw new ArgumentNullException(nameof(item));
-            if (!(item is ICxPoseable poseable))
-                throw new NotSupportedException(
-                    "Only ICxPoseable (Advanced) render items can participate in group motion.");
+            if (item is ICxGroupMember member && member.SupportsGroupTransform)
+            {
+                AddMemberToGroup(group, member);
+                return;
+            }
+            throw new NotSupportedException(
+                "Only ICxGroupMember render items with transform support can participate in group motion.");
+        }
 
-            if (InvokeRequired) { BeginInvoke(new Action(() => AddToGroup(group, item))); return; }
-
-            // Move the item out of any previous group first, keeping its current world pose.
-            RemoveItemFromAllGroups(item, restorePose: false);
-
-            // Convert the current world pose into the target group's local frame so attaching
-            // (or re-parenting) never makes the item jump.
-            var world = poseable.ModelMatrix ?? CxMatrix4X4.Identity();
-            var groupWorld = group.GetWorldMatrix();
-            var local = groupWorld.Inverse() * world;
-            group.AddLeaf(item, local);
-            group.ApplyWorldRecursive();
-            SafeInvalidate();
+        /// <summary>
+        /// Attaches a world-space geometry overlay item (segment / point / polygon / plane / box /
+        /// world text / world axes) to <paramref name="group"/>. Screen-space HUD items are rejected.
+        /// </summary>
+        /// <exception cref="ArgumentNullException">When <paramref name="item"/> is <c>null</c>.</exception>
+        /// <exception cref="NotSupportedException">When <paramref name="item"/> is a screen-space HUD item.</exception>
+        public void AddToGroup(CxGroup group, AbstractRenderItem item)
+        {
+            if (item == null) throw new ArgumentNullException(nameof(item));
+            if (!item.SupportsGroupTransform)
+                throw new NotSupportedException("Screen-space overlay items cannot participate in group motion.");
+            AddMemberToGroup(group, item);
         }
 
         /// <summary>
@@ -84,22 +88,51 @@ namespace VisionNet.Controls
             SafeInvalidate();
         }
 
+        private void AddMemberToGroup(CxGroup group, ICxGroupMember member)
+        {
+            if (group == null) throw new ArgumentNullException(nameof(group));
+            if (member == null) throw new ArgumentNullException(nameof(member));
+            if (InvokeRequired) { BeginInvoke(new Action(() => AddMemberToGroup(group, member))); return; }
+
+            // Move the item out of any previous group first, keeping its current world pose.
+            RemoveItemFromAllGroups(member, restorePose: false);
+
+            // Convert the current world pose into the target group's local frame so attaching
+            // (or re-parenting) never makes the item jump.
+            var world = member.ModelMatrix ?? CxMatrix4X4.Identity();
+            var groupWorld = group.GetWorldMatrix();
+            var local = groupWorld.Inverse() * world;
+            group.AddLeaf(member, local);
+            group.ApplyWorldRecursive();
+            SafeInvalidate();
+        }
+
         /// <summary>
-        /// Detaches an item from <paramref name="group"/>, restoring the pose it had before it
-        /// entered the group.
+        /// Detaches an Advanced render item from <paramref name="group"/>, restoring the pose
+        /// it had before it entered the group.
         /// </summary>
         /// <returns><c>true</c> when the item was attached to the group and removed.</returns>
         public bool RemoveFromGroup(CxGroup group, ICxObjRenderItem item)
-        {
-            if (group == null || item == null) return false;
-            if (InvokeRequired) { BeginInvoke(new Action(() => RemoveFromGroup(group, item))); return false; }
+            => item is ICxGroupMember member && RemoveMemberFromGroup(group, member);
 
-            var leaf = group.FindLeaf(item);
+        /// <summary>
+        /// Detaches a world-space geometry overlay item from <paramref name="group"/>, restoring
+        /// the pose it had before it entered the group.
+        /// </summary>
+        /// <returns><c>true</c> when the item was attached to the group and removed.</returns>
+        public bool RemoveFromGroup(CxGroup group, AbstractRenderItem item)
+            => RemoveMemberFromGroup(group, item);
+
+        private bool RemoveMemberFromGroup(CxGroup group, ICxGroupMember member)
+        {
+            if (group == null || member == null) return false;
+            if (InvokeRequired) { BeginInvoke(new Action(() => RemoveMemberFromGroup(group, member))); return false; }
+
+            var leaf = group.FindLeaf(member);
             if (leaf == null) return false;
 
-            group.RemoveLeaf(item);
-            if (item is ICxPoseable poseable)
-                poseable.ModelMatrix = leaf.LocalMatrix;
+            group.RemoveLeaf(member);
+            member.ModelMatrix = leaf.LocalMatrix;
             SafeInvalidate();
             return true;
         }
@@ -150,9 +183,17 @@ namespace VisionNet.Controls
 
         /// <summary>Gets the group that directly owns <paramref name="item"/>, or <c>null</c>.</summary>
         public CxGroup FindGroupOf(ICxObjRenderItem item)
+            => item is ICxGroupMember member ? FindGroupOfMember(member) : null;
+
+        /// <summary>Gets the group that directly owns <paramref name="item"/>, or <c>null</c>.</summary>
+        public CxGroup FindGroupOf(AbstractRenderItem item)
+            => FindGroupOfMember(item);
+
+        private CxGroup FindGroupOfMember(ICxGroupMember member)
         {
+            if (member == null) return null;
             foreach (var group in _groups)
-                if (group.Contains(item)) return group;
+                if (group.Contains(member)) return group;
             return null;
         }
 
@@ -160,26 +201,27 @@ namespace VisionNet.Controls
 
         /// <summary>
         /// Detaches the given items from every group without restoring their pose. Called when
-        /// the display disposes or replaces surface items so groups never retain stale entries.
+        /// the display disposes or replaces surface / overlay items so groups never retain
+        /// stale entries.
         /// </summary>
-        internal void ForgetGroups(IEnumerable<ICxObjRenderItem> items)
+        internal void ForgetGroups(IEnumerable<object> items)
         {
             if (items == null) return;
-            foreach (var item in items)
-                RemoveItemFromAllGroups(item, restorePose: false);
+            foreach (var obj in items)
+                if (obj is ICxGroupMember member)
+                    RemoveItemFromAllGroups(member, restorePose: false);
         }
 
         /// <summary>Removes a single item from any group it belongs to.</summary>
-        private void RemoveItemFromAllGroups(ICxObjRenderItem item, bool restorePose)
+        private void RemoveItemFromAllGroups(ICxGroupMember member, bool restorePose)
         {
             foreach (var group in _groups)
             {
-                var leaf = group.FindLeaf(item);
+                var leaf = group.FindLeaf(member);
                 if (leaf == null) continue;
 
-                group.RemoveLeaf(item);
-                if (restorePose && item is ICxPoseable poseable)
-                    poseable.ModelMatrix = leaf.LocalMatrix;
+                group.RemoveLeaf(member);
+                if (restorePose) member.ModelMatrix = leaf.LocalMatrix;
                 break;
             }
         }

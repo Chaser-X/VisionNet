@@ -123,6 +123,7 @@
     <Compile Include="3D\RenderItem\IRenderItem.cs" />
     <Compile Include="3D\RenderItem\ICxObjRenderItem.cs" />
     <Compile Include="3D\RenderItem\ICxPoseable.cs" />
+    <Compile Include="3D\RenderItem\ICxGroupMember.cs" />
     <Compile Include="3D\RenderItem\RenderData.cs" />
     <Compile Include="3D\RenderItem\GLResourceHandle.cs" />
     <Compile Include="3D\RenderItem\Surface\CxSurfaceItem.cs" />

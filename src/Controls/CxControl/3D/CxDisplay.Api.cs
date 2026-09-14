@@ -615,6 +615,7 @@ namespace VisionNet.Controls
         {
             lock (_resourceLock)
             {
+                ForgetGroups(_renderItems);
                 _renderItems.ForEach(item => item.Dispose());
                 _renderItems.Clear();
             }

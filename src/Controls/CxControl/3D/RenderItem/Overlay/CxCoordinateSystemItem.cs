@@ -50,8 +50,19 @@ namespace VisionNet.Controls
                 new CxVector3D(0, 0, 1));
         }
 
+        /// <inheritdoc/>
+        public override bool SupportsGroupTransform => true;
+
         /// <summary>Draws the three labelled axes at the configured world-space origin.</summary>
         public override void Draw(OpenGL gl)
+        {
+            PushModelMatrix(gl);
+            DrawAxes(gl);
+            PopModelMatrix(gl);
+        }
+
+        /// <summary>Draws the three axes in the current coordinate frame, without applying the group pose.</summary>
+        private void DrawAxes(OpenGL gl)
         {
             DrawAxisWithLabel(gl, _coordination.Origin, _coordination.XAxis, "X", 1f, 0f, 0f);
             DrawAxisWithLabel(gl, _coordination.Origin, _coordination.YAxis, "Y", 0f, 1f, 0f);
@@ -90,7 +101,7 @@ namespace VisionNet.Controls
             gl.Scale(10f, 10f, 10f);
             gl.MultMatrix(mvMatrix);
 
-            Draw(gl);
+            DrawAxes(gl);
 
             gl.MatrixMode(OpenGL.GL_PROJECTION);
             gl.PopMatrix();

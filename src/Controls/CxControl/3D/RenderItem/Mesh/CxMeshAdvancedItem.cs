@@ -10,13 +10,16 @@ namespace VisionNet.Controls
     /// Colour is computed per-fragment in the GPU using the <c>colorMin</c>/<c>colorMax</c> uniforms,
     /// so switching colour mode costs only a uniform update — no VBO rebuild required.
     /// </summary>
-    public class CxMeshAdvancedItem : ICxObjRenderItem, ICxPoseable
+    public class CxMeshAdvancedItem : ICxObjRenderItem, ICxGroupMember
     {
         public event Action OnDisposed;
         public event Action OnRenderDataChanged;
 
         public CxMesh Mesh { get; private set; }
         public bool IsDisposed { get; private set; } = false;
+
+        /// <inheritdoc/>
+        public bool SupportsGroupTransform => true;
         public float ColorMin { get; set; }
         public float ColorMax { get; set; }
         public float BaseZMin => _baseZMin;

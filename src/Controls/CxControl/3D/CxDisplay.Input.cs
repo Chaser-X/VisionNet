@@ -72,7 +72,22 @@ namespace VisionNet.Controls
                 var worldPos = ScreenToWorldCoordinate(e.X, e.Y);
                 if (worldPos.HasValue && _lastDragWorldPos.HasValue)
                 {
-                    _selectedItem.OnMouseMove(worldPos.Value, _lastDragWorldPos.Value);
+                    var cur  = worldPos.Value;
+                    var prev = _lastDragWorldPos.Value;
+
+                    // For posed items, convert the two world-space points into the item's local
+                    // frame so Translate() moves the stored (local) geometry by the correct delta.
+                    if (_selectedItem.SupportsGroupTransform)
+                    {
+                        var inv = _selectedItem.ModelMatrix?.Inverse();
+                        if (inv != null)
+                        {
+                            cur  = inv.TransformPoint3D(cur);
+                            prev = inv.TransformPoint3D(prev);
+                        }
+                    }
+
+                    _selectedItem.OnMouseMove(cur, prev);
                     _lastDragWorldPos = worldPos;
                     Invalidate();
                 }
@@ -103,8 +118,16 @@ namespace VisionNet.Controls
             IRenderItem[] snapshot;
             lock (_resourceLock) snapshot = _renderItems.ToArray();
             foreach (var item in snapshot)
-                if (item is AbstractRenderItem ar && ar.IsActiveObj && ar.HitTest(worldPos))
-                    return ar;
+            {
+                if (!(item is AbstractRenderItem ar) || !ar.IsActiveObj) continue;
+
+                // Posed items store local geometry: transform the query point into local space.
+                var testPos = worldPos;
+                if (ar.SupportsGroupTransform && ar.ModelMatrix != null)
+                    testPos = ar.ModelMatrix.Inverse().TransformPoint3D(worldPos);
+
+                if (ar.HitTest(testPos)) return ar;
+            }
             return null;
         }
 

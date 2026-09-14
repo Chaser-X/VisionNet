@@ -98,10 +98,10 @@ namespace VisionNet.Controls
                 child.RestoreLocalPosesRecursive();
         }
 
-        internal bool Contains(ICxObjRenderItem item)
+        internal bool Contains(ICxGroupMember item)
             => FindLeaf(item) != null;
 
-        internal CxGroupLeaf FindLeaf(ICxObjRenderItem item)
+        internal CxGroupLeaf FindLeaf(ICxGroupMember item)
         {
             foreach (var leaf in _leaves)
                 if (ReferenceEquals(leaf.Item, item)) return leaf;
@@ -113,12 +113,12 @@ namespace VisionNet.Controls
             return null;
         }
 
-        internal void AddLeaf(ICxObjRenderItem item, CxMatrix4X4 localMatrix)
+        internal void AddLeaf(ICxGroupMember item, CxMatrix4X4 localMatrix)
         {
             _leaves.Add(new CxGroupLeaf(item, localMatrix ?? CxMatrix4X4.Identity()));
         }
 
-        internal bool RemoveLeaf(ICxObjRenderItem item)
+        internal bool RemoveLeaf(ICxGroupMember item)
         {
             for (int i = 0; i < _leaves.Count; i++)
             {
@@ -193,14 +193,14 @@ namespace VisionNet.Controls
     /// </summary>
     public sealed class CxGroupLeaf
     {
-        internal CxGroupLeaf(ICxObjRenderItem item, CxMatrix4X4 localMatrix)
+        internal CxGroupLeaf(ICxGroupMember item, CxMatrix4X4 localMatrix)
         {
             Item = item;
             LocalMatrix = localMatrix;
         }
 
         /// <summary>Gets the attached render item.</summary>
-        public ICxObjRenderItem Item { get; }
+        public ICxGroupMember Item { get; }
 
         /// <summary>
         /// Gets or sets the item's pose relative to its owning group. Captured at attach time

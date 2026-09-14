@@ -1344,6 +1344,7 @@ namespace DemoFrom
         private CxGroup _platformGroup;
         private CxGroup _vehicleGroup;
         private Button _btnGroupSim;
+        private Button _btnStage3Axis;
 
         private void BuildGroupSimButton()
         {
@@ -1355,11 +1356,21 @@ namespace DemoFrom
             };
             _btnGroupSim.Click += btn_groupSim_Click;
             splitContainer1.Panel2.Controls.Add(_btnGroupSim);
+
+            _btnStage3Axis = new Button
+            {
+                Text = "3-Axis Stage",
+                Location = new Point(29, 460),
+                Size = new Size(123, 28),
+            };
+            _btnStage3Axis.Click += btn_stage3Axis_Click;
+            splitContainer1.Panel2.Controls.Add(_btnStage3Axis);
         }
 
         private void btn_groupSim_Click(object sender, EventArgs e)
         {
             if (_simTimer != null) { StopGroupSim(); return; }
+            StopStageSim();
             StartGroupSim();
         }
 
@@ -1416,6 +1427,153 @@ namespace DemoFrom
             cxDisplay1.SetGroupTransform(_vehicleGroup,
                 CxMatrix4X4.Translation(0f, 0f, (float)(0.6 * Math.Sin(t * 3.0))) *
                 CxMatrix4X4.RotationY((float)(20.0 * Math.Sin(t * 1.5))));
+        }
+
+        // ── Gantry 3-axis trace demo ─────────────────────────────────────────────
+
+        private System.Windows.Forms.Timer _stageTimer;
+        private Stopwatch _stageWatch;
+        private CxGroup _stageGroupX;
+        private CxGroup _stageGroupY;
+        private CxGroup _stageGroupZ;
+
+        private const float  StageLx          = 6f;    // 物料 X 尺寸
+        private const float  StageLy          = 4f;    // 物料 Y 尺寸
+        private const float  StageCarrierTop  = 0.9f;  // 载台顶面高度
+        private const float  StageClearance   = 0.15f; // 刀尖离面间隙
+        private const float  StageTipHomeZ    = 2.8f;  // 刀尖初始高度
+        private const double StageSideSeconds = 1.6;   // 每条边描边时长
+
+        /// <summary>物料起伏顶面在局部 (u,v) 处相对底面的高度（与 BuildBumpyMesh 的公式一致）。</summary>
+        private static float StageHeight(float u, float v)
+            => 0.35f * (float)(Math.Sin(u + 3.0) * Math.Cos(v + 2.0));
+
+        /// <summary>刀尖在世界 Y=0 平面内的描边轨迹点（贴合物料顶面）。</summary>
+        private static CxPoint3D StageTip(float u, float v)
+            => new CxPoint3D(u, 0f, StageCarrierTop + StageHeight(u, v) + StageClearance);
+
+        private void btn_stage3Axis_Click(object sender, EventArgs e)
+        {
+            if (_stageTimer != null) { StopStageSim(); return; }
+            StopGroupSim();
+            StartStageSim();
+        }
+
+        private void StartStageSim()
+        {
+            cxDisplay1.ResetView();
+
+            // 台面（mesh，兼作取景范围）
+            var table = BuildBoxMesh(26f, 18f, 0.2f, new CxPoint3D(0f, 0f, -0.2f));
+            cxDisplay1.AddMeshAdvancedItem(table, SurfaceMode.Mesh, SurfaceColorMode.Color, autoFit: true);
+
+            // 固定件（几何 box）：龙门（立柱+顶梁，不移动）、梁上 X 导轨、台面 Y 导轨
+            cxDisplay1.SetBox(new[]
+            {
+                new CxBox3D(new CxPoint3D(-4.5f, 0f, 4.5f), new CxSize3D(0.5f, 0.5f, 9f)),      // 立柱
+                new CxBox3D(new CxPoint3D( 4.5f, 0f, 4.5f), new CxSize3D(0.5f, 0.5f, 9f)),      // 立柱
+                new CxBox3D(new CxPoint3D( 0f,   0f, 8.8f), new CxSize3D(9.5f, 0.6f, 0.6f)),   // 顶梁
+                new CxBox3D(new CxPoint3D( 0f, -0.35f, 8.35f), new CxSize3D(9.0f, 0.2f, 0.2f)), // 梁上 X 导轨
+                new CxBox3D(new CxPoint3D( 0f,  0.35f, 8.35f), new CxSize3D(9.0f, 0.2f, 0.2f)),
+                new CxBox3D(new CxPoint3D(-1.6f, 0f, 0.35f), new CxSize3D(0.4f, 9f, 0.4f)),   // 台面 Y 导轨
+                new CxBox3D(new CxPoint3D( 1.6f, 0f, 0.35f), new CxSize3D(0.4f, 9f, 0.4f)),
+            }, Color.DimGray, 1f);
+
+            // 描边轨迹（世界 Y=0 平面内的 X-Z 轮廓，绕物料边框一圈）
+            const int n = 30;
+            var tipPts = new List<CxPoint3D>();
+            for (int i = 0; i < n; i++) { float s = i / (float)n; tipPts.Add(StageTip(-StageLx / 2 + StageLx * s,  StageLy / 2)); }
+            for (int i = 0; i < n; i++) { float s = i / (float)n; tipPts.Add(StageTip( StageLx / 2,                 StageLy / 2 - StageLy * s)); }
+            for (int i = 0; i < n; i++) { float s = i / (float)n; tipPts.Add(StageTip( StageLx / 2 - StageLx * s, -StageLy / 2)); }
+            for (int i = 0; i < n; i++) { float s = i / (float)n; tipPts.Add(StageTip(-StageLx / 2,                -StageLy / 2 + StageLy * s)); }
+            tipPts.Add(tipPts[0]);
+            var tipSegs = new CxSegment3D[tipPts.Count - 1];
+            for (int i = 0; i < tipSegs.Length; i++)
+                tipSegs[i] = new CxSegment3D(tipPts[i], tipPts[i + 1]);
+            cxDisplay1.SetSegment(tipSegs, Color.Orange, 2f);
+
+            // ── Y 轴（台面固定导轨）：Y 滑块 + 治具 + 物料 ──
+            var ySlider = cxDisplay1.SetBox(new[]
+            {
+                new CxBox3D(new CxPoint3D(0f, 0f, 0.45f), new CxSize3D(3.6f, 2.6f, 0.5f)),  // Y 滑块
+                new CxBox3D(new CxPoint3D(0f, 0f, 0.75f), new CxSize3D(7.5f, 5.5f, 0.3f)),  // 治具
+            }, Color.DodgerBlue, 1f);
+
+            var material = BuildBumpyMesh(30, 20, 0.2f, new CxPoint3D(-StageLx / 2, -StageLy / 2, 0f));
+            var materialItem = cxDisplay1.AddMeshAdvancedItem(material,
+                CxMatrix4X4.Translation(0f, 0f, StageCarrierTop),
+                SurfaceMode.Mesh, SurfaceColorMode.Color, autoFit: false);
+
+            _stageGroupY = cxDisplay1.CreateGroup("YSlider");
+            cxDisplay1.AddToGroup(_stageGroupY, ySlider);
+            cxDisplay1.AddToGroup(_stageGroupY, materialItem);
+
+            // ── X 轴（梁上滑块）：X 滑块 + Z 立柱（随 X 移动）──
+            var xSlider = cxDisplay1.SetBox(new[]
+            {
+                new CxBox3D(new CxPoint3D(0f, 0f, 8.1f), new CxSize3D(1.4f, 1.4f, 0.9f)),  // X 滑块
+                new CxBox3D(new CxPoint3D(0f, 0f, 5.5f), new CxSize3D(0.6f, 0.6f, 6.0f)),  // Z 立柱
+            }, Color.SeaGreen, 1f);
+
+            _stageGroupX = cxDisplay1.CreateGroup("XSlider");
+            cxDisplay1.AddToGroup(_stageGroupX, xSlider);
+
+            // ── Z 轴（立柱上滑块）：Z 滑块 + 工具头 + 刀尖标记 ──
+            var zSlider = cxDisplay1.SetBox(new[]
+            {
+                new CxBox3D(new CxPoint3D(0f, 0f, 5.5f),  new CxSize3D(1.2f, 1.2f, 0.8f)),  // Z 滑块
+                new CxBox3D(new CxPoint3D(0f, 0f, 3.95f), new CxSize3D(0.5f, 0.5f, 2.3f)),  // 主轴（下端＝刀尖）
+            }, Color.OrangeRed, 1f);
+
+            _stageGroupZ = cxDisplay1.CreateGroup("ZSlider", parent: _stageGroupX);
+            cxDisplay1.AddToGroup(_stageGroupZ, zSlider);
+
+            var tipMarker = cxDisplay1.SetPoint(new[] { new CxPoint3D(0f, 0f, StageTipHomeZ) },
+                Color.Yellow, 0.6f, PointShape.Sphere);
+            cxDisplay1.AddToGroup(_stageGroupZ, tipMarker);
+
+            // 外部仿真循环
+            _stageWatch = Stopwatch.StartNew();
+            _stageTimer = new System.Windows.Forms.Timer { Interval = 50 };
+            _stageTimer.Tick += StageTick;
+            _stageTimer.Start();
+
+            _btnStage3Axis.Text = "Stop Stage";
+        }
+
+        private void StopStageSim()
+        {
+            if (_stageTimer == null) return;
+            _stageTimer.Stop();
+            _stageTimer.Dispose();
+            _stageTimer = null;
+            _stageWatch = null;
+            _btnStage3Axis.Text = "3-Axis Stage";
+        }
+
+        private void StageTick(object sender, EventArgs e)
+        {
+            if (_stageWatch == null) return;
+
+            // 绕物料边框连续循环：0 前边 → 1 右边 → 2 后边 → 3 左边
+            double p = _stageWatch.Elapsed.TotalSeconds / StageSideSeconds % 4.0;
+            int side = (int)p;
+            float s = (float)(p - side);
+            float u, v;
+            switch (side)
+            {
+                case 0:  u = -StageLx / 2 + StageLx * s; v =  StageLy / 2;                 break;
+                case 1:  u =  StageLx / 2;               v =  StageLy / 2 - StageLy * s;  break;
+                case 2:  u =  StageLx / 2 - StageLx * s; v = -StageLy / 2;                 break;
+                default: u = -StageLx / 2;               v = -StageLy / 2 + StageLy * s;  break;
+            }
+
+            float tipZ = StageCarrierTop + StageHeight(u, v) + StageClearance;
+
+            // X 滑块、Y 滑块（治具/物料）、Z 滑块（工具头）三轴联动
+            cxDisplay1.SetGroupTransform(_stageGroupX, CxMatrix4X4.Translation(u, 0f, 0f));
+            cxDisplay1.SetGroupTransform(_stageGroupY, CxMatrix4X4.Translation(0f, -v, 0f));
+            cxDisplay1.SetGroupTransform(_stageGroupZ, CxMatrix4X4.Translation(0f, 0f, tipZ - StageTipHomeZ));
         }
 
         private static CxMesh BuildBoxMesh(float w, float d, float h, CxPoint3D origin)

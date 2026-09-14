@@ -124,10 +124,14 @@ namespace VisionNet.Controls
         // ── Rendering ────────────────────────────────────────────────────────────
 
         /// <inheritdoc/>
+        public override bool SupportsGroupTransform => true;
+
+        /// <inheritdoc/>
         public override void Draw(OpenGL gl)
         {
             if (Segment3Ds == null || Segment3Ds.Length == 0) return;
 
+            PushModelMatrix(gl);
             gl.Color(DrawColor.R / 255.0, DrawColor.G / 255.0, DrawColor.B / 255.0);
             gl.LineWidth(Size);
             gl.Begin(OpenGL.GL_LINES);
@@ -150,6 +154,7 @@ namespace VisionNet.Controls
                 gl.End();
                 gl.PointSize(1f);
             }
+            PopModelMatrix(gl);
         }
     }
 }

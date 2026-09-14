@@ -137,10 +137,14 @@ namespace VisionNet.Controls
         // ── Rendering ────────────────────────────────────────────────────────────
 
         /// <inheritdoc/>
+        public override bool SupportsGroupTransform => true;
+
+        /// <inheritdoc/>
         public override void Draw(OpenGL gl)
         {
             if (Box3Ds == null || Box3Ds.Length == 0) return;
 
+            PushModelMatrix(gl);
             foreach (var box in Box3Ds)
             {
                 float hx = box.Size.Width  / 2;
@@ -211,6 +215,7 @@ namespace VisionNet.Controls
                 gl.End();
                 gl.PointSize(1f);
             }
+            PopModelMatrix(gl);
         }
 
         /// <inheritdoc/>

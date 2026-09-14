@@ -43,18 +43,23 @@ namespace VisionNet.Controls
         }
 
         /// <inheritdoc/>
+        public override bool SupportsGroupTransform => true;
+
+        /// <inheritdoc/>
         public override void Draw(OpenGL gl)
         {
             if (Point3Ds == null || Point3Ds.Length == 0) return;
 
             if (Shape == PointShape.Point)
             {
+                PushModelMatrix(gl);
                 gl.Color(DrawColor.R / 255.0, DrawColor.G / 255.0, DrawColor.B / 255.0);
                 gl.PointSize(Size);
                 gl.Begin(OpenGL.GL_POINTS);
                 foreach (var p in Point3Ds)
                     gl.Vertex(p.X, p.Y, p.Z);
                 gl.End();
+                PopModelMatrix(gl);
             }
             else
             {
@@ -72,6 +77,8 @@ namespace VisionNet.Controls
 
                 gl.UniformMatrix4(gl.GetUniformLocation(shader, "view"),       1, false, view);
                 gl.UniformMatrix4(gl.GetUniformLocation(shader, "projection"), 1, false, proj);
+                var model = ModelMatrix ?? CxMatrix4X4.Identity();
+                gl.UniformMatrix4(gl.GetUniformLocation(shader, "groupModel"), 1, true, model.Data);
                 gl.Uniform4(gl.GetUniformLocation(shader, "aColor"),
                     DrawColor.R / 255.0f, DrawColor.G / 255.0f, DrawColor.B / 255.0f, 1f);
 
@@ -143,13 +150,14 @@ namespace VisionNet.Controls
                 + "layout (location = 1) in vec3 aInstancePos;\n"
                 + "uniform mat4 view;\n"
                 + "uniform mat4 projection;\n"
+                + "uniform mat4 groupModel;\n"
                 + "uniform vec4 aColor;\n"
                 + "out vec4 vertexColor;\n"
                 + "void main()\n"
                 + "{\n"
                 + "    mat4 model = mat4(1.0);\n"
                 + "    model[3] = vec4(aInstancePos, 1.0);\n"
-                + "    gl_Position = projection * view * model * vec4(aPos, 1.0);\n"
+                + "    gl_Position = projection * view * groupModel * model * vec4(aPos, 1.0);\n"
                 + "    vertexColor = aColor;\n"
                 + "}\n";
 

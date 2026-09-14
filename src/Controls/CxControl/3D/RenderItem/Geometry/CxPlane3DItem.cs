@@ -25,10 +25,14 @@ namespace VisionNet.Controls
         }
 
         /// <inheritdoc/>
+        public override bool SupportsGroupTransform => true;
+
+        /// <inheritdoc/>
         public override void Draw(OpenGL gl)
         {
             if (Planes == null || Planes.Length == 0) return;
 
+            PushModelMatrix(gl);
             gl.Color(DrawColor.R / 255.0, DrawColor.G / 255.0, DrawColor.B / 255.0, DrawColor.A / 255.0);
 
             foreach (var plane in Planes)
@@ -47,6 +51,7 @@ namespace VisionNet.Controls
                 gl.Vertex(plane.Point.X + u.X - v.X, plane.Point.Y + u.Y - v.Y, plane.Point.Z + u.Z - v.Z);
                 gl.End();
             }
+            PopModelMatrix(gl);
         }
     }
 }

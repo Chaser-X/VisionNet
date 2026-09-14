@@ -25,10 +25,14 @@ namespace VisionNet.Controls
         }
 
         /// <inheritdoc/>
+        public override bool SupportsGroupTransform => true;
+
+        /// <inheritdoc/>
         public override void Draw(OpenGL gl)
         {
             if (TextInfos == null || TextInfos.Length == 0) return;
 
+            PushModelMatrix(gl);
             float r = DrawColor.R / 255.0f;
             float g = DrawColor.G / 255.0f;
             float b = DrawColor.B / 255.0f;
@@ -47,6 +51,7 @@ namespace VisionNet.Controls
 
                 gl.DrawText((int)screenCoord.X, (int)screenCoord.Y, r, g, b, "Arial", info.Size, info.Text);
             }
+            PopModelMatrix(gl);
         }
 
         /// <inheritdoc/>
