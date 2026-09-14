@@ -189,11 +189,13 @@ namespace VisionNet.Controls
             {
                 float span = max(colorMax - colorMin, 1e-6);
                 float n = clamp((h - colorMin) / span, 0.0, 1.0);
-                if (n < 0.2) return mix(vec3(0,0,1), vec3(0,1,1), n * 5.0);
-                if (n < 0.4) return mix(vec3(0,1,1), vec3(0,1,0), (n-0.2)*5.0);
-                if (n < 0.6) return mix(vec3(0,1,0), vec3(1,1,0), (n-0.4)*5.0);
-                if (n < 0.8) return mix(vec3(1,1,0), vec3(1,0,0), (n-0.6)*5.0);
-                return mix(vec3(1,0,0), vec3(1,0,1), (n-0.8)*5.0);
+                if (n < 1.0/7.0) return mix(vec3(0,0,0.5), vec3(0,0,1), n * 7.0);
+                if (n < 2.0/7.0) return mix(vec3(0,0,1),   vec3(0,1,1), (n - 1.0/7.0) * 7.0);
+                if (n < 3.0/7.0) return mix(vec3(0,1,1),   vec3(0,1,0), (n - 2.0/7.0) * 7.0);
+                if (n < 4.0/7.0) return mix(vec3(0,1,0),   vec3(1,1,0), (n - 3.0/7.0) * 7.0);
+                if (n < 5.0/7.0) return mix(vec3(1,1,0),   vec3(1,0,0), (n - 4.0/7.0) * 7.0);
+                if (n < 6.0/7.0) return mix(vec3(1,0,0),   vec3(1,0,1), (n - 5.0/7.0) * 7.0);
+                return mix(vec3(1,0,1), vec3(1,1,1), (n - 6.0/7.0) * 7.0);
             }
 
             void main()
