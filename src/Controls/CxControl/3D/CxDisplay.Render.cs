@@ -12,7 +12,7 @@ namespace VisionNet.Controls
         protected override void DoOpenGLInitialized()
         {
             base.DoOpenGLInitialized();
-            OpenGL.ClearColor(0, 0, 0, 0);
+            OpenGL.ClearColor(_backColor.R / 255f, _backColor.G / 255f, _backColor.B / 255f, _backColor.A / 255f);
             OpenGL.PointSize(2.0f);
         }
 
@@ -33,6 +33,7 @@ namespace VisionNet.Controls
             }
 
             var gl = OpenGL;
+            gl.ClearColor(_backColor.R / 255f, _backColor.G / 255f, _backColor.B / 255f, _backColor.A / 255f);
             gl.Clear(OpenGL.GL_COLOR_BUFFER_BIT | OpenGL.GL_DEPTH_BUFFER_BIT);
 
             // 1. Release GL resources dequeued by Dispose/Replace on another thread.
