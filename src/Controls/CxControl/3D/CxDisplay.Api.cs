@@ -576,14 +576,12 @@ namespace VisionNet.Controls
 
         /// <summary>
         /// Sets the rendering background colour (OpenGL clear colour), preserving alpha.
-        /// Applied every frame so it survives GL context recreation.
+        /// The colour is applied on the GL render thread each frame, so it is safe to call
+        /// from any thread and survives GL context recreation.
         /// </summary>
         public void SetBackgroundColor(Color color)
         {
             _backColor = color;
-            var gl = OpenGL;
-            if (gl?.RenderContextProvider != null)
-                gl.ClearColor(color.R / 255f, color.G / 255f, color.B / 255f, color.A / 255f);
             SafeInvalidate();
         }
 
