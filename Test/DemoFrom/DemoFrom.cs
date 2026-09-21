@@ -582,6 +582,9 @@ namespace DemoFrom
             MakeBtn("Show Coord", btn2D_showCoord_Click);
             MakeBtn("Clear Overlays", btn2D_clearOverlays_Click);
             MakeBtn("Clear All", btn2D_clearAll_Click);
+            MakeBtn("Save Screenshot", btn2D_saveScreenshot_Click);
+            MakeBtn("Save Img Region", btn2D_saveImageRegion_Click);
+            MakeBtn("Show Img Region", btn2D_showImageRegion_Click);
 
             _lbl2DPos = new Label
             {
@@ -1305,6 +1308,82 @@ namespace DemoFrom
             _currentImage?.Dispose();
             _currentImage = null;
             _lbl2DPos.Text = "X: ---  Y: ---";
+        }
+
+        private void btn2D_saveScreenshot_Click(object sender, EventArgs e)
+        {
+            using (var dlg = new SaveFileDialog
+            {
+                Filter = "PNG 图像|*.png",
+                FileName = "screenshot.png",
+            })
+            {
+                if (dlg.ShowDialog() != DialogResult.OK) return;
+                try
+                {
+                    _cxDisplay2D.SaveScreenshot(dlg.FileName);
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show(ex.Message, "Save Screenshot");
+                }
+            }
+        }
+
+        private void btn2D_saveImageRegion_Click(object sender, EventArgs e)
+        {
+            using (var dlg = new SaveFileDialog
+            {
+                Filter = "PNG 图像|*.png",
+                FileName = "image_region.png",
+            })
+            {
+                if (dlg.ShowDialog() != DialogResult.OK) return;
+                try
+                {
+                    _cxDisplay2D.SaveImageRegion(dlg.FileName);
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show(ex.Message, "Save Image Region");
+                }
+            }
+        }
+
+        private void btn2D_showImageRegion_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                var bmp = _cxDisplay2D.RenderImageRegion();
+                if (bmp == null)
+                {
+                    MessageBox.Show("No image region rendered.", "Image Region");
+                    return;
+                }
+
+                var preview = new Form
+                {
+                    Text = $"Image Region ({bmp.Width}x{bmp.Height})",
+                    StartPosition = FormStartPosition.CenterParent,
+                    ClientSize = new Size(
+                        Math.Min(bmp.Width + 16, 1000),
+                        Math.Min(bmp.Height + 40, 780)),
+                };
+                var pb = new PictureBox
+                {
+                    Dock = DockStyle.Fill,
+                    SizeMode = PictureBoxSizeMode.Zoom,
+                    Image = bmp,
+                    BackColor = Color.Black,
+                };
+                preview.Controls.Add(pb);
+                preview.FormClosed += (s2, e2) => bmp.Dispose();
+                preview.Show(this);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message, "Image Region");
+            }
         }
 
         // ���� Image Loading Helper ����������������������������������������������������������������������������������������������������������

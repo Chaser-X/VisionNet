@@ -1,5 +1,7 @@
 using System;
 using System.Drawing;
+using System.Drawing.Imaging;
+using System.IO;
 using VisionNet.DataType;
 using Color = System.Drawing.Color;
 
@@ -317,6 +319,182 @@ namespace VisionNet.Controls
             {
                 foreach (var item in _overlayItems) item.IsActiveObj = false;
             });
+        }
+
+        #endregion
+
+        #region Export
+
+        /// <summary>
+        /// Saves the full image view as a PNG, independent of the current zoom/pan.
+        /// The output always contains the complete image layer plus all overlay
+        /// (element) render layers, and the on-screen view is left unchanged.
+        /// </summary>
+        /// <param name="path">Target file path (PNG).</param>
+        /// <param name="width">Output width in pixels; defaults to the control width.</param>
+        /// <param name="height">Output height in pixels; defaults to the control height.</param>
+        public void SaveScreenshot(string path, int? width = null, int? height = null)
+        {
+            OnUiThread(() =>
+            {
+                EnsureImage();
+                int w = width ?? (_formsPlot.Width  > 0 ? _formsPlot.Width  : 800);
+                int h = height ?? (_formsPlot.Height > 0 ? _formsPlot.Height : 600);
+
+                RenderAtFullImageExtent(w, h, () => _formsPlot.Plot.SavePng(path, w, h));
+            });
+        }
+
+        /// <summary>
+        /// Renders the full image view to an in-memory bitmap, independent of the
+        /// current zoom/pan. Equivalent to <see cref="SaveScreenshot"/> but returns
+        /// the image instead of writing a file.
+        /// </summary>
+        public Bitmap RenderScreenshot(int? width = null, int? height = null)
+        {
+            Bitmap result = null;
+            OnUiThread(() =>
+            {
+                EnsureImage();
+                int w = width ?? (_formsPlot.Width  > 0 ? _formsPlot.Width  : 800);
+                int h = height ?? (_formsPlot.Height > 0 ? _formsPlot.Height : 600);
+
+                RenderAtFullImageExtent(w, h, () =>
+                {
+                    byte[] bytes = _formsPlot.Plot.GetImageBytes(w, h, ScottPlot.ImageFormat.Png);
+                    result = new Bitmap(new MemoryStream(bytes));
+                });
+            });
+            return result;
+        }
+
+        /// <summary>
+        /// Saves only the image region (cropped to the image bounds, excluding axes,
+        /// ticks and background margins), independent of the current zoom/pan.
+        /// The image layer and all overlay elements are rendered together; overlay
+        /// content outside the image bounds is clipped. The on-screen view is unchanged.
+        /// </summary>
+        /// <param name="path">Target file path (PNG).</param>
+        /// <param name="width">Render canvas width in pixels; defaults to the control width.</param>
+        /// <param name="height">Render canvas height in pixels; defaults to the control height.</param>
+        public void SaveImageRegion(string path, int? width = null, int? height = null)
+        {
+            using (var bmp = RenderImageRegion(width, height))
+                bmp.Save(path, ImageFormat.Png);
+        }
+
+        /// <summary>
+        /// Renders only the image region (cropped to the image bounds) to an
+        /// in-memory bitmap. Equivalent to <see cref="SaveImageRegion"/> but returns
+        /// the image instead of writing a file.
+        /// </summary>
+        public Bitmap RenderImageRegion(int? width = null, int? height = null)
+        {
+            Bitmap result = null;
+            OnUiThread(() =>
+            {
+                EnsureImage();
+                int w = width ?? (_formsPlot.Width  > 0 ? _formsPlot.Width  : 800);
+                int h = height ?? (_formsPlot.Height > 0 ? _formsPlot.Height : 600);
+
+                result = RenderAtFullImageExtentCrop(w, h);
+            });
+            return result;
+        }
+
+        private void EnsureImage()
+        {
+            if (_imageItem == null || _imageWidth <= 0 || _imageHeight <= 0)
+                throw new InvalidOperationException("No image is set.");
+        }
+
+        /// <summary>
+        /// Temporarily sets the axis limits to the full image extent, invokes
+        /// <paramref name="render"/>, then restores the original view. The 1:1
+        /// aspect rule is enforced during the export so the output is never distorted.
+        /// Must be called on the UI thread.
+        /// </summary>
+        private void RenderAtFullImageExtent(int width, int height, Action render)
+        {
+            var plot = _formsPlot.Plot;
+
+            double l = plot.Axes.Bottom.Min, r = plot.Axes.Bottom.Max;
+            double b = plot.Axes.Left.Min,  t = plot.Axes.Left.Max;
+            bool hadRule = plot.Axes.Rules.Contains(_squareRule);
+
+            try
+            {
+                if (!hadRule) plot.Axes.Rules.Add(_squareRule);
+
+                var box = GetImageWorldRect();
+                plot.Axes.SetLimits(box.Left, box.Right, box.Bottom, box.Top);
+
+                _imageItem?.UpdatePlottable();
+                render();
+            }
+            finally
+            {
+                if (!hadRule) plot.Axes.Rules.Remove(_squareRule);
+
+                plot.Axes.SetLimits(l, r, b, t);
+                _imageItem?.UpdatePlottable();
+                _formsPlot.Refresh();
+            }
+        }
+
+        /// <summary>
+        /// Renders the full canvas at the full image extent, then crops to the pixel
+        /// rectangle covered by the image world bounds. Must be called on the UI thread.
+        /// </summary>
+        private Bitmap RenderAtFullImageExtentCrop(int width, int height)
+        {
+            var plot = _formsPlot.Plot;
+
+            double l = plot.Axes.Bottom.Min, r = plot.Axes.Bottom.Max;
+            double b = plot.Axes.Left.Min,  t = plot.Axes.Left.Max;
+            bool hadRule = plot.Axes.Rules.Contains(_squareRule);
+
+            Bitmap cropped = null;
+            try
+            {
+                if (!hadRule) plot.Axes.Rules.Add(_squareRule);
+
+                var box = GetImageWorldRect();
+                plot.Axes.SetLimits(box.Left, box.Right, box.Bottom, box.Top);
+                _imageItem?.UpdatePlottable();
+
+                byte[] bytes = plot.GetImageBytes(width, height, ScottPlot.ImageFormat.Png);
+                using (var full = new Bitmap(new MemoryStream(bytes)))
+                {
+                    var p0 = plot.GetPixel(new ScottPlot.Coordinates(box.Left,  box.Top));
+                    var p1 = plot.GetPixel(new ScottPlot.Coordinates(box.Right, box.Bottom));
+
+                    int x0 = (int)Math.Floor(Math.Min(p0.X, p1.X));
+                    int y0 = (int)Math.Floor(Math.Min(p0.Y, p1.Y));
+                    int x1 = (int)Math.Ceiling(Math.Max(p0.X, p1.X));
+                    int y1 = (int)Math.Ceiling(Math.Max(p0.Y, p1.Y));
+
+                    x0 = Math.Max(0, Math.Min(full.Width,  x0));
+                    y0 = Math.Max(0, Math.Min(full.Height, y0));
+                    x1 = Math.Max(0, Math.Min(full.Width,  x1));
+                    y1 = Math.Max(0, Math.Min(full.Height, y1));
+
+                    int cw = x1 - x0;
+                    int ch = y1 - y0;
+                    if (cw > 0 && ch > 0)
+                        cropped = full.Clone(new Rectangle(x0, y0, cw, ch), full.PixelFormat);
+                }
+            }
+            finally
+            {
+                if (!hadRule) plot.Axes.Rules.Remove(_squareRule);
+
+                plot.Axes.SetLimits(l, r, b, t);
+                _imageItem?.UpdatePlottable();
+                _formsPlot.Refresh();
+            }
+
+            return cropped;
         }
 
         #endregion
