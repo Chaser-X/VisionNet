@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Drawing;
 using ScottPlot;
 using VisionNet.DataType;
@@ -120,5 +121,75 @@ namespace VisionNet.Controls
         /// <summary>Converts a System.Drawing.Color to a ScottPlot.Color.</summary>
         protected static ScottPlot.Color ToSPColor(Color c) =>
             new ScottPlot.Color(c.R, c.G, c.B, c.A);
+
+        // ── Direction arrow (head only, fixed pixel size) ────────────────────────
+
+        /// <summary>Arrowhead length in pixels for fitting-field search direction indicators.</summary>
+        protected const float DirectionArrowHeadPixels = 14f;
+
+        /// <summary>Arrowhead width in pixels.</summary>
+        protected const float DirectionArrowHeadWidthPixels = 12f;
+
+        /// <summary>
+        /// Adds a solid triangular arrowhead (no shaft) of fixed pixel size, pointing from
+        /// <paramref name="baseCenter"/> along (<paramref name="dirX"/>, <paramref name="dirY"/>).
+        /// The base edge midpoint sits on <paramref name="baseCenter"/> (the field centre line).
+        /// The head is drawn in pixel space, so its size does not change with zoom and its
+        /// orientation is correct for any axis aspect ratio.
+        /// </summary>
+        protected void AddDirectionArrow(List<IPlottable> list, CxPoint2D baseCenter,
+                                         float dirX, float dirY, ScottPlot.Color color)
+        {
+            float len = (float)Math.Sqrt(dirX * dirX + dirY * dirY);
+            if (len <= 0f) return;
+            dirX /= len;
+            dirY /= len;
+
+            // The probe point only defines the arrow direction; its distance is irrelevant
+            // because the head geometry is computed in pixel space from ArrowheadLength/Width.
+            float probe = 20f * WorldPerPixel();
+            var tip = new CxPoint2D(baseCenter.X + dirX * probe, baseCenter.Y + dirY * probe);
+
+            var arrow = _plot.Add.Arrow(
+                new ScottPlot.Coordinates(baseCenter.X, baseCenter.Y),
+                new ScottPlot.Coordinates(tip.X, tip.Y));
+            arrow.ArrowShape = new DirectionArrowShape();
+            arrow.ArrowheadLength = DirectionArrowHeadPixels;
+            arrow.ArrowheadWidth = DirectionArrowHeadWidthPixels;
+            arrow.ArrowFillColor = color;
+            arrow.ArrowLineColor = color;
+            arrow.ArrowLineWidth = 1;
+            list.Add(arrow);
+        }
+    }
+
+    /// <summary>
+    /// ScottPlot arrow shape that draws only a solid triangular arrowhead. The base edge is
+    /// centred on the arrow's base pixel and the head extends toward the tip pixel, sized in
+    /// pixels so it is invariant under zoom and correct for non-square axis aspect ratios.
+    /// </summary>
+    internal sealed class DirectionArrowShape : ScottPlot.IArrowShape
+    {
+        public void Render(ScottPlot.RenderPack rp, ScottPlot.PixelLine arrowLine, ScottPlot.ArrowStyle arrowStyle)
+        {
+            float dx = arrowLine.DeltaX, dy = arrowLine.DeltaY;
+            float len = (float)Math.Sqrt(dx * dx + dy * dy);
+            if (len <= 0f) return;
+            dx /= len;
+            dy /= len;
+
+            float perpX = -dy, perpY = dx;
+            float headLen = arrowStyle.ArrowheadLength;
+            float halfW = arrowStyle.ArrowheadWidth / 2f;
+
+            var b = arrowLine.Pixel1;
+            var tip = new ScottPlot.Pixel(b.X + dx * headLen, b.Y + dy * headLen);
+            var left = new ScottPlot.Pixel(b.X + perpX * halfW, b.Y + perpY * halfW);
+            var right = new ScottPlot.Pixel(b.X - perpX * halfW, b.Y - perpY * halfW);
+
+            ScottPlot.Pixel[] pixels = { tip, left, right, tip };
+            ScottPlot.Drawing.FillPath(rp.Canvas, rp.Paint, pixels, arrowStyle.FillStyle);
+            ScottPlot.Drawing.DrawPath(rp.Canvas, rp.Paint, pixels, arrowStyle.LineStyle);
+        }
     }
 }
