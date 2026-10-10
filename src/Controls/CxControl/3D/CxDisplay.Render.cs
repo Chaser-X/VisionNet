@@ -204,8 +204,10 @@ namespace VisionNet.Controls
             // Phase 4 — HUD overlays.
             // The colour bar is drawn only when every item shares the same SurfaceColorMode.
             // Any mode mismatch (e.g. a Color mesh with a Diff point cloud) hides the bar — a
-            // single bar can't span mismatched magnitudes. Pure Intensity also hides (fixed 0–255).
-            if (anyDrawn && uniformMode && singleMode != SurfaceColorMode.Intensity && IsColorBarVisible)
+            // single bar can't span mismatched magnitudes. Pure Intensity (fixed 0–255) and
+            // Lit (physical shading, not data-mapped) also hide the bar.
+            if (anyDrawn && uniformMode && singleMode != SurfaceColorMode.Intensity
+                && singleMode != SurfaceColorMode.Lit && IsColorBarVisible)
             {
                 if (singleMode == SurfaceColorMode.Diff && _manualDiffRange.HasValue)
                 {
