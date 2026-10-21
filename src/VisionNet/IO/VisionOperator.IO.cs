@@ -21,7 +21,8 @@ namespace VisionNet
         /// <summary>
         /// Default file extension for <see cref="CxMesh"/> binary serialization.
         /// <see cref="LoadMesh"/> and <see cref="SaveMesh"/> also support
-        /// <c>.obj</c>, <c>.stl</c> (binary) and <c>.stla</c> (ASCII).
+        /// <c>.obj</c>, <c>.stl</c> (binary), <c>.stla</c> (ASCII) and <c>.ply</c>
+        /// (Stanford Polygon File Format, ASCII export / ASCII + binary import).
         /// </summary>
         public const string MeshFileExtension       = ".cxmesh";
 
@@ -532,14 +533,16 @@ namespace VisionNet
         // ── CxMesh ───────────────────────────────────────────────────────────────
 
         /// <summary>Serializes a <see cref="CxMesh"/> to a file.
-        /// Supports <c>.cxmesh</c> (binary), <c>.obj</c>, <c>.stl</c>, and <c>.stla</c> formats.
+        /// Supports <c>.cxmesh</c> (binary), <c>.obj</c>, <c>.stl</c>, <c>.stla</c>, and <c>.ply</c> formats.
         /// The format is chosen based on the file extension.</summary>
         /// <param name="mesh">The mesh to save. Must not be null.</param>
         /// <param name="filePath">Destination file path.</param>
         /// <remarks>In <c>.cxmesh</c> format, optional <see cref="CxMesh.Intensity"/>,
         /// <see cref="CxMesh.UVs"/>, and <see cref="CxMesh.Diff"/> channels are embedded when
         /// present. The interchange formats (<c>.obj</c>/<c>.stl</c>/<c>.stla</c>) write geometry
-        /// only (intensity/UV/diff are not exported).</remarks>
+        /// only (intensity/UV/diff are not exported). The <c>.ply</c> format writes geometry plus
+        /// optional <see cref="CxMesh.Intensity"/> and <see cref="CxMesh.UVs"/> when present
+        /// (<see cref="CxMesh.Diff"/> is not exported).</remarks>
         /// <exception cref="ArgumentNullException"><paramref name="mesh"/> is null.</exception>
         /// <exception cref="IOException">An I/O error occurred while writing the file.</exception>
         public static void SaveMesh(CxMesh mesh, string filePath)
@@ -560,6 +563,11 @@ namespace VisionNet
             if (string.Equals(ext, ".stla", StringComparison.OrdinalIgnoreCase))
             {
                 SaveMeshToStlAscii(mesh, filePath);
+                return;
+            }
+            if (string.Equals(ext, ".ply", StringComparison.OrdinalIgnoreCase))
+            {
+                SaveMeshToPly(mesh, filePath);
                 return;
             }
 
@@ -623,7 +631,8 @@ namespace VisionNet
         }
 
         /// <summary>Deserializes a <see cref="CxMesh"/> from a file.
-        /// Supports <c>.cxmesh</c> (binary) and <c>.obj</c> (Wavefront) formats.
+        /// Supports <c>.cxmesh</c> (binary), <c>.obj</c> (Wavefront), <c>.stl</c>/<c>.stla</c>
+        /// (STL binary/ASCII), and <c>.ply</c> (Stanford, ASCII and binary) formats.
         /// The format is chosen based on the file extension.</summary>
         /// <param name="filePath">Source file path.</param>
         /// <returns>The loaded mesh, or <c>null</c> if the file does not exist.</returns>
@@ -640,6 +649,8 @@ namespace VisionNet
                 return LoadMeshFromStlBinary(filePath);
             if (string.Equals(ext, ".stla", StringComparison.OrdinalIgnoreCase))
                 return LoadMeshFromStlAscii(filePath);
+            if (string.Equals(ext, ".ply", StringComparison.OrdinalIgnoreCase))
+                return LoadMeshFromPly(filePath);
 
             using (var reader = new BinaryReader(File.Open(filePath, FileMode.Open, FileAccess.Read, FileShare.Read)))
             {
@@ -1034,6 +1045,444 @@ namespace VisionNet
                 Vertices = vertList.ToArray(),
                 Indices  = idxList.ToArray(),
             };
+        }
+
+        // ── PLY (Stanford Polygon File Format) ───────────────────────────────────
+
+        private static void SaveMeshToPly(CxMesh mesh, string filePath)
+        {
+            if (mesh.Vertices == null || mesh.Vertices.Length == 0)
+                throw new ArgumentException("CxMesh has no vertices.", nameof(mesh));
+            if (mesh.Indices == null || mesh.Indices.Length < 3 || mesh.Indices.Length % 3 != 0)
+                throw new ArgumentException("CxMesh must have valid triangle indices (multiple of 3).", nameof(mesh));
+
+            var vertices = mesh.Vertices;
+            var indices  = mesh.Indices;
+            int vertexCount = vertices.Length;
+            int triCount    = indices.Length / 3;
+
+            bool hasIntensity = mesh.Intensity != null && mesh.Intensity.Length == vertexCount;
+            bool hasUVs       = mesh.UVs != null && mesh.UVs.Length == vertexCount;
+            var inv = CultureInfo.InvariantCulture;
+
+            using (var writer = new StreamWriter(filePath, append: false, new UTF8Encoding(false)))
+            {
+                writer.WriteLine("ply");
+                writer.WriteLine("format ascii 1.0");
+                writer.WriteLine("comment Exported by VisionNet");
+                writer.WriteLine($"element vertex {vertexCount}");
+                writer.WriteLine("property float x");
+                writer.WriteLine("property float y");
+                writer.WriteLine("property float z");
+                if (hasIntensity)
+                    writer.WriteLine("property uchar intensity");
+                if (hasUVs)
+                {
+                    writer.WriteLine("property float u");
+                    writer.WriteLine("property float v");
+                }
+                writer.WriteLine($"element face {triCount}");
+                writer.WriteLine("property list uchar uint vertex_indices");
+                writer.WriteLine("end_header");
+
+                for (int i = 0; i < vertexCount; i++)
+                {
+                    var v = vertices[i];
+                    var sb = new StringBuilder();
+                    sb.Append(v.X.ToString("G9", inv)).Append(' ');
+                    sb.Append(v.Y.ToString("G9", inv)).Append(' ');
+                    sb.Append(v.Z.ToString("G9", inv));
+                    if (hasIntensity)
+                        sb.Append(' ').Append(mesh.Intensity[i].ToString(inv));
+                    if (hasUVs)
+                    {
+                        sb.Append(' ').Append(mesh.UVs[i].X.ToString("G9", inv));
+                        sb.Append(' ').Append(mesh.UVs[i].Y.ToString("G9", inv));
+                    }
+                    writer.WriteLine(sb.ToString());
+                }
+
+                for (int t = 0; t < triCount; t++)
+                {
+                    writer.Write("3 ");
+                    writer.Write(indices[t * 3].ToString(inv));
+                    writer.Write(' ');
+                    writer.Write(indices[t * 3 + 1].ToString(inv));
+                    writer.Write(' ');
+                    writer.WriteLine(indices[t * 3 + 2].ToString(inv));
+                }
+            }
+        }
+
+        private static CxMesh LoadMeshFromPly(string filePath)
+        {
+            var inv = CultureInfo.InvariantCulture;
+
+            string formatLine = null;
+            var headerLines = new List<string>();
+            long dataOffset = 0;
+            bool headerEnded = false;
+
+            using (var fs = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read))
+            {
+                var lineBuf = new List<byte>(128);
+                bool first = true;
+                int b;
+                while ((b = fs.ReadByte()) != -1)
+                {
+                    if (b == '\n')
+                    {
+                        string line = Encoding.UTF8.GetString(lineBuf.ToArray()).Trim();
+                        lineBuf.Clear();
+                        headerLines.Add(line);
+
+                        if (first)
+                        {
+                            if (!string.Equals(line, "ply", StringComparison.OrdinalIgnoreCase))
+                                throw new InvalidDataException("Invalid PLY file: missing 'ply' magic.");
+                            first = false;
+                        }
+                        if (line.StartsWith("format", StringComparison.OrdinalIgnoreCase))
+                            formatLine = line;
+                        if (string.Equals(line, "end_header", StringComparison.OrdinalIgnoreCase))
+                        {
+                            dataOffset = fs.Position;
+                            headerEnded = true;
+                            break;
+                        }
+                    }
+                    else if (b != '\r')
+                    {
+                        lineBuf.Add((byte)b);
+                    }
+                }
+
+                // 头部最后一行可能没有换行符。
+                if (!headerEnded && lineBuf.Count > 0)
+                {
+                    string line = Encoding.UTF8.GetString(lineBuf.ToArray()).Trim();
+                    headerLines.Add(line);
+                    if (first)
+                    {
+                        if (!string.Equals(line, "ply", StringComparison.OrdinalIgnoreCase))
+                            throw new InvalidDataException("Invalid PLY file: missing 'ply' magic.");
+                    }
+                    if (line.StartsWith("format", StringComparison.OrdinalIgnoreCase))
+                        formatLine = line;
+                    if (string.Equals(line, "end_header", StringComparison.OrdinalIgnoreCase))
+                        headerEnded = true;
+                }
+            }
+
+            if (!headerEnded)
+                throw new InvalidDataException("Invalid PLY file: missing 'end_header'.");
+            if (formatLine == null)
+                throw new InvalidDataException("Invalid PLY header: missing 'format' line.");
+
+            string[] fmtParts = formatLine.Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+            string dataMode = fmtParts.Length > 1 ? fmtParts[1] : null;
+            bool ascii       = dataMode == "ascii";
+            bool littleEndian = dataMode == "binary_little_endian";
+            bool bigEndian    = dataMode == "binary_big_endian";
+            if (!ascii && !littleEndian && !bigEndian)
+                throw new NotSupportedException($"Unsupported PLY format: '{dataMode}'.");
+
+            // ── Parse elements / properties ──
+            var elements = new List<PlyElement>();
+            PlyElement current = null;
+            foreach (string raw in headerLines)
+            {
+                string line = raw.Trim();
+                if (line.Length == 0 || line[0] == '#') continue;
+
+                string[] p = line.Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+                if (p.Length == 0) continue;
+
+                if (p[0] == "element" && p.Length >= 3)
+                {
+                    current = new PlyElement
+                    {
+                        Name = p[1],
+                        Count = int.Parse(p[2], inv),
+                        Properties = new List<PlyProperty>(),
+                    };
+                    elements.Add(current);
+                }
+                else if (p[0] == "property" && current != null)
+                {
+                    if (p.Length >= 2 && p[1] == "list")
+                    {
+                        current.Properties.Add(new PlyProperty
+                        {
+                            Name = p.Length >= 5 ? p[4] : string.Empty,
+                            IsList = true,
+                            CountType = p[2],
+                            ItemType = p[3],
+                        });
+                    }
+                    else if (p.Length >= 3)
+                    {
+                        current.Properties.Add(new PlyProperty
+                        {
+                            Name = p[2],
+                            IsList = false,
+                            ItemType = p[1],
+                        });
+                    }
+                }
+            }
+
+            // ── Read element data ──
+            return ReadPlyData(filePath, dataOffset, elements, ascii, littleEndian, headerLines.Count);
+        }
+
+        private static CxMesh ReadPlyData(
+            string filePath, long dataOffset, List<PlyElement> elements,
+            bool ascii, bool littleEndian, int headerLineCount)
+        {
+            var inv = CultureInfo.InvariantCulture;
+
+            Func<string, double> readScalar;
+            if (ascii)
+            {
+                string[] allLines = File.ReadAllLines(filePath);
+                int lineIdx = headerLineCount;
+                var pending = new Queue<string>();
+                readScalar = t =>
+                {
+                    while (pending.Count == 0)
+                    {
+                        if (lineIdx >= allLines.Length)
+                            throw new InvalidDataException("Unexpected end of PLY ASCII data.");
+                        string line = allLines[lineIdx++].Trim();
+                        if (line.Length == 0 || line[0] == '#') continue;
+                        string[] parts = line.Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+                        for (int i = 0; i < parts.Length; i++)
+                            pending.Enqueue(parts[i]);
+                    }
+                    string tok = pending.Dequeue();
+                    double d;
+                    if (!double.TryParse(tok, NumberStyles.Float, inv, out d))
+                        throw new InvalidDataException($"Malformed PLY numeric token: '{tok}'.");
+                    return d;
+                };
+            }
+            else
+            {
+                var fs = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+                fs.Seek(dataOffset, SeekOrigin.Begin);
+                byte[] buf = new byte[8];
+                readScalar = t =>
+                {
+                    int size = PlyTypeSize(t);
+                    int read = 0;
+                    while (read < size)
+                    {
+                        int r = fs.Read(buf, read, size - read);
+                        if (r <= 0) throw new InvalidDataException("Unexpected end of PLY binary data.");
+                        read += r;
+                    }
+                    return PlyDecode(buf, 0, t, littleEndian);
+                };
+            }
+
+            var vertices = new List<CxPoint3D>();
+            var uvs = new List<CxPoint2D>();
+            var intensity = new List<byte>();
+            var indices = new List<uint>();
+            bool hasIntensity = false;
+            bool hasUVs = false;
+
+            foreach (var el in elements)
+            {
+                bool isVertex = string.Equals(el.Name, "vertex", StringComparison.OrdinalIgnoreCase);
+                bool isFace = string.Equals(el.Name, "face", StringComparison.OrdinalIgnoreCase);
+
+                int ix = -1, iy = -1, iz = -1, ii = -1, iu = -1, iv = -1;
+                int faceListIdx = -1;
+
+                if (isVertex)
+                {
+                    for (int k = 0; k < el.Properties.Count; k++)
+                    {
+                        var pr = el.Properties[k];
+                        if (pr.IsList) continue;
+                        string n = pr.Name.ToLowerInvariant();
+                        if (n == "x") ix = k;
+                        else if (n == "y") iy = k;
+                        else if (n == "z") iz = k;
+                        else if (n == "intensity") ii = k;
+                        else if (n == "u" || n == "s" || n == "texture_u") iu = k;
+                        else if (n == "v" || n == "t" || n == "texture_v") iv = k;
+                    }
+                    if (ix < 0 || iy < 0 || iz < 0)
+                        throw new InvalidDataException("PLY vertex element must contain x, y, z properties.");
+
+                    hasIntensity = ii >= 0;
+                    hasUVs = iu >= 0 && iv >= 0;
+                }
+                else if (isFace)
+                {
+                    for (int k = 0; k < el.Properties.Count; k++)
+                    {
+                        if (el.Properties[k].IsList) { faceListIdx = k; break; }
+                    }
+                    if (faceListIdx < 0) continue;
+                }
+
+                for (int r = 0; r < el.Count; r++)
+                {
+                    if (isVertex)
+                    {
+                        var vals = new double[el.Properties.Count];
+                        for (int k = 0; k < el.Properties.Count; k++)
+                        {
+                            var pr = el.Properties[k];
+                            if (pr.IsList)
+                            {
+                                int n = (int)readScalar(pr.CountType);
+                                for (int q = 0; q < n; q++)
+                                    readScalar(pr.ItemType);
+                                vals[k] = double.NaN;
+                            }
+                            else
+                            {
+                                vals[k] = readScalar(pr.ItemType);
+                            }
+                        }
+
+                        vertices.Add(new CxPoint3D((float)vals[ix], (float)vals[iy], (float)vals[iz]));
+                        if (hasIntensity)
+                            intensity.Add((byte)Math.Max(0, Math.Min(255, (int)Math.Round(vals[ii]))));
+                        if (hasUVs)
+                            uvs.Add(new CxPoint2D((float)vals[iu], (float)vals[iv]));
+                    }
+                    else
+                    {
+                        for (int k = 0; k < el.Properties.Count; k++)
+                        {
+                            var pr = el.Properties[k];
+                            if (pr.IsList)
+                            {
+                                int n = (int)readScalar(pr.CountType);
+                                if (isFace && k == faceListIdx)
+                                {
+                                    int[] poly = new int[n];
+                                    for (int q = 0; q < n; q++)
+                                        poly[q] = (int)readScalar(pr.ItemType);
+
+                                    for (int q = 2; q < n; q++)
+                                    {
+                                        indices.Add((uint)poly[0]);
+                                        indices.Add((uint)poly[q - 1]);
+                                        indices.Add((uint)poly[q]);
+                                    }
+                                }
+                                else
+                                {
+                                    for (int q = 0; q < n; q++)
+                                        readScalar(pr.ItemType);
+                                }
+                            }
+                            else
+                            {
+                                readScalar(pr.ItemType);
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (vertices.Count == 0) return null;
+
+            var mesh = new CxMesh
+            {
+                Vertices = vertices.ToArray(),
+                Indices = indices.ToArray(),
+            };
+            if (hasIntensity && intensity.Count == vertices.Count)
+                mesh.Intensity = intensity.ToArray();
+            if (hasUVs && uvs.Count == vertices.Count)
+                mesh.UVs = uvs.ToArray();
+            return mesh;
+        }
+
+        private static int PlyTypeSize(string t)
+        {
+            switch (t)
+            {
+                case "char": case "int8":
+                case "uchar": case "uint8":
+                    return 1;
+                case "short": case "int16":
+                case "ushort": case "uint16":
+                    return 2;
+                case "int": case "int32":
+                case "uint": case "uint32":
+                case "float": case "float32":
+                    return 4;
+                case "double": case "float64":
+                    return 8;
+                default:
+                    throw new NotSupportedException($"Unsupported PLY property type: '{t}'.");
+            }
+        }
+
+        private static double PlyDecode(byte[] buf, int off, string t, bool littleEndian)
+        {
+            switch (t)
+            {
+                case "char": case "int8":
+                    return (sbyte)buf[off];
+                case "uchar": case "uint8":
+                    return buf[off];
+                case "short": case "int16":
+                    return littleEndian
+                        ? BitConverter.ToInt16(buf, off)
+                        : (short)((buf[off] << 8) | buf[off + 1]);
+                case "ushort": case "uint16":
+                    return littleEndian
+                        ? BitConverter.ToUInt16(buf, off)
+                        : (ushort)((buf[off] << 8) | buf[off + 1]);
+                case "int": case "int32":
+                    return littleEndian
+                        ? BitConverter.ToInt32(buf, off)
+                        : (buf[off] << 24) | (buf[off + 1] << 16) | (buf[off + 2] << 8) | buf[off + 3];
+                case "uint": case "uint32":
+                    return littleEndian
+                        ? BitConverter.ToUInt32(buf, off)
+                        : (uint)((buf[off] << 24) | (buf[off + 1] << 16) | (buf[off + 2] << 8) | buf[off + 3]);
+                case "float": case "float32":
+                {
+                    if (littleEndian) return BitConverter.ToSingle(buf, off);
+                    byte[] f4 = { buf[off + 3], buf[off + 2], buf[off + 1], buf[off] };
+                    return BitConverter.ToSingle(f4, 0);
+                }
+                case "double": case "float64":
+                {
+                    if (littleEndian) return BitConverter.ToDouble(buf, off);
+                    byte[] f8 = { buf[off + 7], buf[off + 6], buf[off + 5], buf[off + 4],
+                                  buf[off + 3], buf[off + 2], buf[off + 1], buf[off] };
+                    return BitConverter.ToDouble(f8, 0);
+                }
+                default:
+                    throw new NotSupportedException($"Unsupported PLY property type: '{t}'.");
+            }
+        }
+
+        private sealed class PlyElement
+        {
+            public string Name;
+            public int Count;
+            public List<PlyProperty> Properties;
+        }
+
+        private struct PlyProperty
+        {
+            public string Name;
+            public bool IsList;
+            public string CountType;
+            public string ItemType;
         }
     }
 }

@@ -557,6 +557,7 @@ VisionOperator.SaveMesh(mesh, @"C:\data.cxmesh");               // 二进制 .cx
 VisionOperator.SaveMesh(mesh, @"C:\data.obj");                  // Wavefront OBJ
 VisionOperator.SaveMesh(mesh, @"C:\data.stl");                  // STL 二进制
 VisionOperator.SaveMesh(mesh, @"C:\data.stla");                 // STL ASCII
+VisionOperator.SaveMesh(mesh, @"C:\data.ply");                  // PLY ASCII（可选 intensity/UV）
 
 // 加载（文件不存在返回 null，格式错误抛 InvalidDataException）
 CxSurface s = VisionOperator.LoadSurface(@"C:\data.cxsurface");
@@ -565,6 +566,7 @@ CxPointCloud c2 = VisionOperator.LoadPointCloud(@"C:\data.pcd");// 自动识别 
 CxMesh m = VisionOperator.LoadMesh(@"C:\data.cxmesh");
 CxMesh m2 = VisionOperator.LoadMesh(@"C:\data.obj");            // 自动识别 .obj
 CxMesh m3 = VisionOperator.LoadMesh(@"C:\data.stl");            // 自动识别 .stl
+CxMesh m4 = VisionOperator.LoadMesh(@"C:\data.ply");            // 自动识别 .ply
 ```
 
 #### OpenCL GPU 计算模块（`VisionNet.Compute`）
@@ -795,6 +797,14 @@ VisionNet 使用自定义紧凑二进制格式和标准工业格式（OBJ / STL�
 - 法线由三角面片两条边的叉积自动计算，导出时自动归一化
 - 导入时顶点不共享（STL 规范），生成 3N 顶点 + 顺序索引 `[0,1,2, 3,4,5, ...]`
 - 仅支持三角形网格（`Indices` 长度须为 3 的倍数）
+
+### PLY 格式（Stanford 点云/网格互通）
+
+- 导出：`SaveMesh(mesh, "*.ply")` → ASCII 1.0；顶点属性 `x y z`，若 `Intensity` 存在则附 `uchar intensity`，若 `UVs` 存在则附 `float u` / `float v`（不导出 `Diff`）
+- 导入：`LoadMesh("*.ply")` → 支持 **ASCII**、**binary_little_endian**、**binary_big_endian** 三种编码
+- 类型自适应：`char/uchar/short/ushort/int/uint/float/double`（含 `int8`/`uint8` 等别名）
+- 面索引：`property list ... vertex_indices`，多边形按扇形三角化，索引直接复用（顶点天然共享）
+- 仅支持三角形输出网格
 
 ---
 

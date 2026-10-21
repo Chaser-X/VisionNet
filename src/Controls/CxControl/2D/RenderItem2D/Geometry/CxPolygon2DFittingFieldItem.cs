@@ -91,6 +91,28 @@ namespace VisionNet.Controls
                     as_.Color = fColor;
                     _plottables.Add(as_);
                 }
+
+                var aColor = ToSPColor(Color.Lime);
+                for (int i = 0; i < pts.Length - 1; i++)
+                {
+                    float ex = pts[i + 1].X - pts[i].X;
+                    float ey = pts[i + 1].Y - pts[i].Y;
+                    if (ex == 0f && ey == 0f) continue;
+                    AddDirectionArrow(_plottables,
+                        new CxPoint2D((pts[i].X + pts[i + 1].X) / 2f, (pts[i].Y + pts[i + 1].Y) / 2f),
+                        -ey, ex, aColor);
+                }
+                if (field.Axis.IsClosed && pts.Length >= 2)
+                {
+                    var a = pts[pts.Length - 1];
+                    var b = pts[0];
+                    float ex = b.X - a.X;
+                    float ey = b.Y - a.Y;
+                    if (ex != 0f || ey != 0f)
+                        AddDirectionArrow(_plottables,
+                            new CxPoint2D((a.X + b.X) / 2f, (a.Y + b.Y) / 2f),
+                            -ey, ex, aColor);
+                }
             }
             if (_activeIndex >= 0)
             {

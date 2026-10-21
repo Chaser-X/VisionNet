@@ -12,7 +12,7 @@ namespace VisionNet.Controls
         protected override void DoOpenGLInitialized()
         {
             base.DoOpenGLInitialized();
-            OpenGL.ClearColor(0, 0, 0, 0);
+            OpenGL.ClearColor(_backColor.R / 255f, _backColor.G / 255f, _backColor.B / 255f, _backColor.A / 255f);
             OpenGL.PointSize(2.0f);
         }
 
@@ -33,6 +33,7 @@ namespace VisionNet.Controls
             }
 
             var gl = OpenGL;
+            gl.ClearColor(_backColor.R / 255f, _backColor.G / 255f, _backColor.B / 255f, _backColor.A / 255f);
             gl.Clear(OpenGL.GL_COLOR_BUFFER_BIT | OpenGL.GL_DEPTH_BUFFER_BIT);
 
             // 1. Release GL resources dequeued by Dispose/Replace on another thread.
@@ -203,8 +204,10 @@ namespace VisionNet.Controls
             // Phase 4 — HUD overlays.
             // The colour bar is drawn only when every item shares the same SurfaceColorMode.
             // Any mode mismatch (e.g. a Color mesh with a Diff point cloud) hides the bar — a
-            // single bar can't span mismatched magnitudes. Pure Intensity also hides (fixed 0–255).
-            if (anyDrawn && uniformMode && singleMode != SurfaceColorMode.Intensity && IsColorBarVisible)
+            // single bar can't span mismatched magnitudes. Pure Intensity (fixed 0–255) and
+            // Lit (physical shading, not data-mapped) also hide the bar.
+            if (anyDrawn && uniformMode && singleMode != SurfaceColorMode.Intensity
+                && singleMode != SurfaceColorMode.Lit && IsColorBarVisible)
             {
                 if (singleMode == SurfaceColorMode.Diff && _manualDiffRange.HasValue)
                 {

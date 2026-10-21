@@ -48,6 +48,9 @@ namespace VisionNet.Controls
         private SurfaceMode      _surfaceMode      = SurfaceMode.PointCloud;
         private SurfaceColorMode _surfaceColorMode = SurfaceColorMode.ColorWithIntensity;
 
+        // ── Render background colour (OpenGL clear colour); default: transparent black ──
+        private Color _backColor = Color.FromArgb(0, 0, 0, 0);
+
         // ── Manual colour / diff display ranges (override the per-frame auto-aggregated ranges) ──
         // When non-null, the renderer propagates the range to every item instead of the
         // auto-aggregated global range, and the colour bar uses it. null = auto.

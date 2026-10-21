@@ -605,6 +605,19 @@ namespace VisionNet.Controls
                     ar.IsActiveObj = false;
         }
 
+        // ── Background ───────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Sets the rendering background colour (OpenGL clear colour), preserving alpha.
+        /// The colour is applied on the GL render thread each frame, so it is safe to call
+        /// from any thread and survives GL context recreation.
+        /// </summary>
+        public void SetBackgroundColor(Color color)
+        {
+            _backColor = color;
+            SafeInvalidate();
+        }
+
         // ── View management ──────────────────────────────────────────────────────
 
         /// <summary>
