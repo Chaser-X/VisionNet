@@ -630,6 +630,7 @@ VisionOperator.DestroyLib();
 | `SetMeshAdvancedItemPose(pose)`        | —    | 运行时更新所有 Mesh 位姿      |
 | `AddSurfaceItem(item)`                 | 追加  | 叠加自定义渲染 Item        |
 | `ClearSurfaceItems()`                  | —   | 清空所有表面对象            |
+| `RemoveSurfaceItem(item)`              | —   | 移除指定表面对象            |
 | `SetSegment(segs, color, size)`        | 追加  | 添加线段叠加层             |
 | `SetPoint(pts, color, size, shape)`    | 追加  | 添加点叠加层              |
 | `SetPolygon(polys, color, size)`       | 追加  | 添加多边形叠加层            |
