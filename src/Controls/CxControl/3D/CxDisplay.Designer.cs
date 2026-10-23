@@ -22,6 +22,7 @@ namespace VisionNet.Controls
         private ToolStripMenuItem itensityToolStripMenuItem;
         private ToolStripMenuItem colorWithIntensityToolStripMenuItem;
         private ToolStripMenuItem diffToolStripMenuItem;
+        private ToolStripMenuItem litToolStripMenuItem;
         private ToolStripMenuItem d2DToolStripMenuItem;
 
         // ── Dispose ──────────────────────────────────────────────────────────────
@@ -73,6 +74,7 @@ namespace VisionNet.Controls
             this.itensityToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.colorWithIntensityToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.diffToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.litToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.menu_right.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this)).BeginInit();
             this.SuspendLayout();
@@ -152,7 +154,8 @@ namespace VisionNet.Controls
                 this.colorMapToolStripMenuItem,
                 this.itensityToolStripMenuItem,
                 this.colorWithIntensityToolStripMenuItem,
-                this.diffToolStripMenuItem});
+                this.diffToolStripMenuItem,
+                this.litToolStripMenuItem});
             this.surfaceColorModeToolStripMenuItem.Name = "surfaceColorModeToolStripMenuItem";
             this.surfaceColorModeToolStripMenuItem.Size = new System.Drawing.Size(186, 22);
             this.surfaceColorModeToolStripMenuItem.Text = "SurfaceColorMode";
@@ -176,6 +179,11 @@ namespace VisionNet.Controls
             this.diffToolStripMenuItem.Size = new System.Drawing.Size(182, 22);
             this.diffToolStripMenuItem.Text = "Diff";
             this.diffToolStripMenuItem.Click += new System.EventHandler(this.toolStripMenuItem_SurfaceColorModeClick);
+
+            this.litToolStripMenuItem.Name = "litToolStripMenuItem";
+            this.litToolStripMenuItem.Size = new System.Drawing.Size(182, 22);
+            this.litToolStripMenuItem.Text = "Lit";
+            this.litToolStripMenuItem.Click += new System.EventHandler(this.toolStripMenuItem_SurfaceColorModeClick);
 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.BackColor = System.Drawing.SystemColors.ActiveCaptionText;

@@ -29,6 +29,7 @@ namespace VisionNet.Controls
         private readonly Dictionary<ICxObjRenderItem, GLResourceHandle> _resourcePool
             = new Dictionary<ICxObjRenderItem, GLResourceHandle>();
         private readonly object _resourceLock = new object();
+        private readonly object _cameraLock = new object();
 
         // Resources dequeued by Dispose/Replace that must be freed inside the GL thread.
         private readonly ConcurrentQueue<GLResourceHandle> _pendingRelease
@@ -47,10 +48,58 @@ namespace VisionNet.Controls
         private SurfaceMode      _surfaceMode      = SurfaceMode.PointCloud;
         private SurfaceColorMode _surfaceColorMode = SurfaceColorMode.ColorWithIntensity;
 
+        // ── Render background colour (OpenGL clear colour); default: transparent black ──
+        private Color _backColor = Color.FromArgb(0, 0, 0, 0);
+
+        // ── Manual colour / diff display ranges (override the per-frame auto-aggregated ranges) ──
+        // When non-null, the renderer propagates the range to every item instead of the
+        // auto-aggregated global range, and the colour bar uses it. null = auto.
+        private (float min, float max)? _manualColorRange = null;
+        private (float min, float max)? _manualDiffRange  = null;
+
         // ── Public properties ────────────────────────────────────────────────────
 
         /// <summary>Gets the trackball camera controlling the 3D view.</summary>
         public CxAdvancedTrackBallCamera Camera => _camera;
+
+        /// <summary>
+        /// Gets or sets whether the right-click context menu is shown.
+        /// Default <c>true</c>. Set <c>false</c> to suppress the menu — the control still
+        /// receives right-click for camera / selection, but no menu pops up. The menu and its
+        /// event handlers are retained, so toggling back to <c>true</c> restores full behaviour.
+        /// </summary>
+        public bool IsMenuVisible
+        {
+            get => ContextMenuStrip != null;
+            set
+            {
+                ContextMenuStrip = value ? menu_right : null;
+                UpdateMenuVisibility();
+            }
+        }
+
+        private bool _enableSurfaceMode = true;
+        private bool _enableSurfaceColorMode = true;
+
+        /// <summary>
+        /// Gets or sets whether the "SurfaceMode" item in the right-click menu is visible.
+        /// Only effective while <see cref="IsMenuVisible"/> is true. Default <c>true</c>.
+        /// </summary>
+        public bool EnableSurfaceMode
+        {
+            get => _enableSurfaceMode;
+            set { _enableSurfaceMode = value; UpdateMenuVisibility(); }
+        }
+
+        /// <summary>
+        /// Gets or sets whether the "SurfaceColorMode" item in the right-click menu is visible.
+        /// Only effective while <see cref="IsMenuVisible"/> is true. Default <c>true</c>.
+        /// </summary>
+        public bool EnableSurfaceColorMode
+        {
+            get => _enableSurfaceColorMode;
+            set { _enableSurfaceColorMode = value; UpdateMenuVisibility(); }
+        }
 
         /// <summary>Gets or sets the current view mode (Top, Front, Left, etc.).</summary>
         public ViewMode SurfaceViewMode
@@ -97,6 +146,24 @@ namespace VisionNet.Controls
         /// <summary>Gets or sets whether the 3D coordinate system axes are shown in world space.</summary>
         public bool ShowCoordinateSystem { get; set; }
 
+        private bool _isColorBarVisible = true;
+
+        /// <summary>
+        /// Gets or sets whether the colour bar HUD overlay is drawn.
+        /// Default <c>true</c>. When <c>false</c>, the bar is suppressed even if
+        /// surface items share a uniform colour mode.
+        /// </summary>
+        public bool IsColorBarVisible
+        {
+            get => _isColorBarVisible;
+            set
+            {
+                if (_isColorBarVisible == value) return;
+                _isColorBarVisible = value;
+                SafeInvalidate();
+            }
+        }
+
         /// <summary>
         /// Gets the currently selected geometry overlay item, or <c>null</c> if nothing is selected.
         /// Only one item can be selected at a time within this display.
@@ -136,10 +203,20 @@ namespace VisionNet.Controls
                 SurfaceMode      = surfaceMode;
                 SurfaceColorMode = surfaceColorMode;
                 UpdateMenuItems();
+                UpdateMenuVisibility();
             }
         }
 
         // ── Shared private helpers ───────────────────────────────────────────────
+
+        /// <summary>
+        /// Thread-safe invalidation: marshals to the UI thread when called from another thread.
+        /// </summary>
+        private void SafeInvalidate()
+        {
+            if (InvokeRequired) { BeginInvoke(new Action(Invalidate)); return; }
+            Invalidate();
+        }
 
         /// <summary>Synchronizes the context-menu check marks with the current mode settings.</summary>
         private void UpdateMenuItems()
@@ -152,6 +229,20 @@ namespace VisionNet.Controls
                 ((ToolStripMenuItem)item).Checked = ((ToolStripMenuItem)item).Text == _surfaceMode.ToString();
             foreach (var item in surfaceColorModeToolStripMenuItem.DropDownItems)
                 ((ToolStripMenuItem)item).Checked = ((ToolStripMenuItem)item).Text == _surfaceColorMode.ToString();
+        }
+
+        /// <summary>
+        /// Applies <see cref="EnableSurfaceMode"/> / <see cref="EnableSurfaceColorMode"/> to the
+        /// visibility of their corresponding menu items, gated by <see cref="IsMenuVisible"/>.
+        /// </summary>
+        private void UpdateMenuVisibility()
+        {
+            if (InvokeRequired) { BeginInvoke(new Action(UpdateMenuVisibility)); return; }
+
+            if (surfaceModeToolStripMenuItem != null)
+                surfaceModeToolStripMenuItem.Visible = IsMenuVisible && _enableSurfaceMode;
+            if (surfaceColorModeToolStripMenuItem != null)
+                surfaceColorModeToolStripMenuItem.Visible = IsMenuVisible && _enableSurfaceColorMode;
         }
 
         /// <summary>
@@ -236,10 +327,13 @@ namespace VisionNet.Controls
                 _surfaceItems.Clear();
             }
 
-            while (_renderItems.Count > 0)
+            lock (_resourceLock)
             {
-                _renderItems[0].Dispose();
-                _renderItems.RemoveAt(0);
+                while (_renderItems.Count > 0)
+                {
+                    _renderItems[0].Dispose();
+                    _renderItems.RemoveAt(0);
+                }
             }
         }
     }

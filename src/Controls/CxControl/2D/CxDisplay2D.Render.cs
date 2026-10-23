@@ -22,6 +22,10 @@ namespace VisionNet.Controls
             // Create and register the 1:1+inverted-Y rule by default.
             _squareRule = new SquareWithInvertedY(plot.Axes.Bottom, plot.Axes.Left);
             plot.Axes.Rules.Add(_squareRule);
+
+            // Establish the persistent inverted-Y frame (Y=0 at screen top, image convention)
+            // for the control's lifetime; SquareWithInvertedY preserves it across pan/zoom.
+            plot.Axes.SetLimits(-100, 100, 100, -100);
         }
 
         /// <summary>
@@ -108,13 +112,14 @@ namespace VisionNet.Controls
             }
         }
 
-        /// <summary>Forces an immediate redraw of the plot.</summary>
+        /// <summary>Forces an immediate redraw of the plot on the UI thread.</summary>
         public void RefreshDisplay()
         {
-            if (_formsPlot.InvokeRequired)
-                _formsPlot.Invoke(new Action(_formsPlot.Refresh));
-            else
+            OnUiThread(() =>
+            {
+                _imageItem?.UpdatePlottable();
                 _formsPlot.Refresh();
+            });
         }
     }
 

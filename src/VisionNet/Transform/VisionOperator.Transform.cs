@@ -10,18 +10,20 @@ namespace VisionNet
     public static partial class VisionOperator
     {
         /// <summary>
-        /// Transforms a 3D point by a 4×4 column-major matrix (OpenGL convention).
+        /// Transforms a 3D point by a 4×4 row-major transformation matrix.
         /// Performs perspective divide when the homogeneous <c>w</c> component is non-zero.
+        /// Semantics match <see cref="CxMatrix4X4.TransformPoint3D"/> and the OpenCL
+        /// transform kernels (<c>M · v</c>, translation in elements 3/7/11).
         /// </summary>
         public static CxPoint3D TransformPoint3D(CxPoint3D point, CxMatrix4X4 matrix)
         {
             float[] m = matrix.Data;
             float x = point.X, y = point.Y, z = point.Z;
 
-            float tx = m[0] * x + m[4] * y + m[8]  * z + m[12];
-            float ty = m[1] * x + m[5] * y + m[9]  * z + m[13];
-            float tz = m[2] * x + m[6] * y + m[10] * z + m[14];
-            float tw = m[3] * x + m[7] * y + m[11] * z + m[15];
+            float tx = m[0] * x + m[1] * y + m[2]  * z + m[3];
+            float ty = m[4] * x + m[5] * y + m[6]  * z + m[7];
+            float tz = m[8] * x + m[9] * y + m[10] * z + m[11];
+            float tw = m[12]* x + m[13]* y + m[14] * z + m[15];
 
             if (Math.Abs(tw) > 1e-6f) { tx /= tw; ty /= tw; tz /= tw; }
             return new CxPoint3D(tx, ty, tz);

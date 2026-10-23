@@ -10,38 +10,33 @@ namespace VisionNet
     public static partial class VisionOperator
     {
         /// <summary>
-        /// Resizes an image to fit within the specified dimensions while preserving aspect ratio.
-        /// Uses OpenCV linear interpolation. Returns the original image if already within bounds.
+        /// Resizes an image to the specified exact dimensions using OpenCV linear interpolation.
         /// </summary>
         /// <param name="image">Source image. Returns <c>null</c> if <c>null</c> or empty.</param>
-        /// <param name="maxWidth">Maximum width in pixels.</param>
-        /// <param name="maxHeight">Maximum height in pixels.</param>
+        /// <param name="newWidth">Target width in pixels.</param>
+        /// <param name="newHeight">Target height in pixels.</param>
         /// <returns>A new <see cref="CxImage"/> with the same pixel type and channel count.</returns>
-        public static CxImage ResizeImage(CxImage image, int maxWidth, int maxHeight)
+        public static CxImage ResizeImage(CxImage image, int newWidth, int newHeight)
         {
             if (image == null || image.Data == null) return null;
-            int w = image.Width, h = image.Height;
-            if (w <= maxWidth && h <= maxHeight) return image;
-
-            float scale = Math.Min((float)maxWidth / w, (float)maxHeight / h);
-            int newW = Math.Max(1, (int)(w * scale));
-            int newH = Math.Max(1, (int)(h * scale));
+            int newW = Math.Max(1, newWidth);
+            int newH = Math.Max(1, newHeight);
             int ch = image.Channel;
 
             MatType srcType;
             if (image.Type == PlainType.UInt8)
-                srcType = ch == 1 ? MatType.CV_8UC1 : MatType.CV_8UC4;
+                srcType = MatType.CV_8UC(ch);
             else if (image.Type == PlainType.Int16)
-                srcType = ch == 1 ? MatType.CV_16SC1 : MatType.CV_16SC4;
+                srcType = MatType.CV_16UC(ch);
             else if (image.Type == PlainType.Int32)
-                srcType = ch == 1 ? MatType.CV_32SC1 : MatType.CV_32SC4;
+                srcType = MatType.CV_32SC(ch);
             else
-                srcType = ch == 1 ? MatType.CV_32FC1 : MatType.CV_32FC4;
+                srcType = MatType.CV_32FC(ch);
 
             var handle = GCHandle.Alloc(image.Data, GCHandleType.Pinned);
             try
             {
-                using (var src = new Mat(h, w, srcType, handle.AddrOfPinnedObject()))
+                using (var src = new Mat(image.Height, image.Width, srcType, handle.AddrOfPinnedObject()))
                 using (var dst = new Mat())
                 {
                     Cv2.Resize(src, dst, new OpenCvSharp.Size(newW, newH),

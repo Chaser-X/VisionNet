@@ -1,3 +1,5 @@
+using System.Globalization;
+
 namespace VisionNet.DataType
 {
     /// <summary>Represents a 3D line segment defined by a start point and an end point.</summary>
@@ -11,5 +13,8 @@ namespace VisionNet.DataType
 
         /// <summary>Initializes a segment with the given start and end points.</summary>
         public CxSegment3D(CxPoint3D start, CxPoint3D end) { Start = start; End = end; }
+
+        public override string ToString() =>
+            string.Format(CultureInfo.InvariantCulture, "CxSegment3D(Start={0}, End={1})", Start, End);
     }
 }

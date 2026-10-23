@@ -38,7 +38,7 @@ namespace VisionNet
         /// </summary>
         private static void RequireUniformScale(CxCoordination2D coord, float tolerance = 1e-6f)
         {
-            if (Math.Abs(coord.Scale.X - coord.Scale.Y) > tolerance)
+            if (Math.Abs(Math.Abs(coord.Scale.X) - Math.Abs(coord.Scale.Y)) > tolerance)
                 throw new ArgumentException(
                     "非均匀缩放不支持圆/弧/拟合场类型对齐。请保证 Scale.X == Scale.Y。");
         }
@@ -93,14 +93,14 @@ namespace VisionNet
             var m = BuildMatrix(coord, forward);
             return new CxCircle2D(
                 m.TransformPoint2D(circle.Center),
-                forward ? circle.Radius / s : circle.Radius * s);
+                Math.Abs(forward ? circle.Radius / s : circle.Radius * s));
         }
 
         // ── Arcs ────────────────────────────────────────────────────────────────
 
         /// <summary>
         /// Aligns a 2D arc. Non-uniform scale throws <see cref="ArgumentException"/>.
-        /// Angles are rotated by ±<c>coord.Angle</c> (forward: −, reverse: +).
+        /// Angles are in degrees; they are rotated by ±<c>coord.Angle</c> (forward: −, reverse: +).
         /// SweepAngle is preserved.
         /// </summary>
         public static CxArc2D AlignArc2D(CxArc2D arc, CxCoordination2D coord, bool forward)
@@ -108,10 +108,12 @@ namespace VisionNet
             RequireUniformScale(coord);
             float s = coord.Scale.X;
             var m = BuildMatrix(coord, forward);
+            bool mirrored = s < 0f;
             return new CxArc2D(
                 m.TransformPoint2D(arc.Center),
-                forward ? arc.Radius / s : arc.Radius * s,
-                forward ? arc.StartAngle - coord.Angle : arc.StartAngle + coord.Angle,
+                Math.Abs(forward ? arc.Radius / s : arc.Radius * s),
+                (forward ? arc.StartAngle - coord.Angle : arc.StartAngle + coord.Angle)
+                    + (mirrored ? 180f : 0f),
                 arc.SweepAngle);
         }
 
@@ -132,17 +134,17 @@ namespace VisionNet
 
         /// <summary>
         /// Aligns a 2D rectangle. Non-uniform scaling is applied independently
-        /// to Width (Scale.X) and Height (Scale.Y). Angle is rotated by ±Angle.
+        /// to Width (Scale.X) and Height (Scale.Y). Angle (in degrees) is rotated by ±Angle.
         /// </summary>
         public static CxRectangle2D AlignRectangle2D(CxRectangle2D rect, CxCoordination2D coord, bool forward)
         {
-            var m = BuildMatrix(coord, forward);
+var m = BuildMatrix(coord, forward);
             float sx = coord.Scale.X, sy = coord.Scale.Y;
             return new CxRectangle2D(
                 m.TransformPoint2D(rect.Center),
                 new CxSize2D(
-                    forward ? rect.Size.Width  / sx : rect.Size.Width  * sx,
-                    forward ? rect.Size.Height / sy : rect.Size.Height * sy),
+                    Math.Abs(forward ? rect.Size.Width  / sx : rect.Size.Width  * sx),
+                    Math.Abs(forward ? rect.Size.Height / sy : rect.Size.Height * sy)),
                 forward ? rect.Angle - coord.Angle : rect.Angle + coord.Angle);
         }
 
@@ -156,7 +158,7 @@ namespace VisionNet
             float s = coord.Scale.X;
             return new CxSegment2DFittingField(
                 AlignSegment2D(field.Axis, coord, forward),
-                forward ? field.Width / s : field.Width * s);
+                Math.Abs(forward ? field.Width / s : field.Width * s));
         }
 
         /// <summary>Aligns an arc fitting field (uniform scale required).</summary>
@@ -167,7 +169,7 @@ namespace VisionNet
             float s = coord.Scale.X;
             return new CxArc2DFittingField(
                 AlignArc2D(field.Axis, coord, forward),
-                forward ? field.Width / s : field.Width * s);
+                Math.Abs(forward ? field.Width / s : field.Width * s));
         }
 
         /// <summary>Aligns a polygon fitting field (uniform scale required).</summary>
@@ -178,7 +180,7 @@ namespace VisionNet
             float s = coord.Scale.X;
             return new CxPolygon2DFittingField(
                 AlignPolygon2D(field.Axis, coord, forward),
-                forward ? field.Width / s : field.Width * s);
+                Math.Abs(forward ? field.Width / s : field.Width * s));
         }
 
         /// <summary>Aligns a circle fitting field (uniform scale required).</summary>
@@ -189,7 +191,7 @@ namespace VisionNet
             float s = coord.Scale.X;
             return new CxCircle2DFittingField(
                 AlignCircle2D(field.Axis, coord, forward),
-                forward ? field.Width / s : field.Width * s);
+                Math.Abs(forward ? field.Width / s : field.Width * s));
         }
 
         // ── Resize（原点缩放） ──────────────────────────────────────────────
@@ -228,7 +230,7 @@ namespace VisionNet
         {
             result = new CxSegment2D(
                 new CxPoint2D(seg.Start.X * scaleX, seg.Start.Y * scaleY),
-                new CxPoint2D(seg.End.X   * scaleX, seg.End.Y   * scaleY));
+                new CxPoint2D(seg.End.X * scaleX, seg.End.Y * scaleY));
         }
 
         /// <summary>Uniformly scales an arc by <paramref name="scale"/> around the origin.</summary>

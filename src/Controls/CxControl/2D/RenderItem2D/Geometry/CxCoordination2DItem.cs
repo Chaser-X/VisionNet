@@ -55,10 +55,15 @@ namespace VisionNet.Controls
                 float cos = (float)Math.Cos(rad);
                 float sin = (float)Math.Sin(rad);
 
-                float xTipX = frame.Origin.X + _xLength * cos;
-                float xTipY = frame.Origin.Y + _xLength * sin;
-                float yTipX = frame.Origin.X - _yLength * sin;
-                float yTipY = frame.Origin.Y + _yLength * cos;
+                float sx = frame.Scale.X;
+                float sy = frame.Scale.Y;
+                float xLen = _xLength * sx;
+                float yLen = _yLength * sy;
+
+                float xTipX = frame.Origin.X + xLen * cos;
+                float xTipY = frame.Origin.Y + xLen * sin;
+                float yTipX = frame.Origin.X - yLen * sin;
+                float yTipY = frame.Origin.Y + yLen * cos;
 
                 var xArrow = _plot.Add.Arrow(frame.Origin.X, frame.Origin.Y, xTipX, xTipY);
                 xArrow.ArrowLineColor = xColor;

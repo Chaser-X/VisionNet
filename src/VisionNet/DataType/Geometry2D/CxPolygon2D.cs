@@ -1,3 +1,5 @@
+using System.Globalization;
+
 namespace VisionNet.DataType
 {
     /// <summary>
@@ -21,5 +23,9 @@ namespace VisionNet.DataType
             Points   = points;
             IsClosed = isClosed;
         }
+
+        public override string ToString() =>
+            string.Format(CultureInfo.InvariantCulture,
+                "CxPolygon2D(Points=[{0}], IsClosed={1})", Points?.Length ?? 0, IsClosed);
     }
 }

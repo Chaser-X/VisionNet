@@ -82,6 +82,18 @@ namespace VisionNet.Controls
                 axis.LineStyle.Width = Size;
                 axis.FillStyle.IsVisible = false;
                 _plottables.Add(axis);
+
+                if (field.Width > 0f)
+                {
+                    float midAngle = arc.StartAngle + arc.SweepAngle * 0.5f;
+                    float midRad = midAngle * (float)Math.PI / 180f;
+                    float ux = (float)Math.Cos(midRad);
+                    float uy = (float)Math.Sin(midRad);
+
+                    AddDirectionArrow(_plottables,
+                        new CxPoint2D(arc.Center.X + arc.Radius * ux, arc.Center.Y + arc.Radius * uy),
+                        ux, uy, ToSPColor(Color.Lime));
+                }
             }
 
             if (_activeIndex >= 0)

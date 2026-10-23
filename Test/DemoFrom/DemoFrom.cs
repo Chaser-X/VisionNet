@@ -1,10 +1,11 @@
-﻿using Lmi3d.GoSdk;
+using Lmi3d.GoSdk;
 using Lmi3d.GoSdk.Messages;
 using SharpGL;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
+using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
@@ -37,7 +38,7 @@ namespace DemoFrom
             // MessageBox.Show(message);
             if (!state)
             {
-                //MessageBox.Show("OpenGL不可用，请检查您的系统配置。");
+                //MessageBox.Show("OpenGL�����ã���������ϵͳ���á�");
                 return;
             }
             VisionOperator.InitialLib();
@@ -80,7 +81,7 @@ namespace DemoFrom
                         break;
                 }
             }
-            //surfaceMsg和surfaceIntensityMsg都获取到了，转换到点云数据
+            //surfaceMsg��surfaceIntensityMsg����ȡ���ˣ�ת������������
             if (msg != null)
             {
                 if (msg.MessageType == GoDataMessageType.UniformSurface)
@@ -164,20 +165,20 @@ namespace DemoFrom
                 if (surface != null)
                     cxDisplay1.SetSurfaceAdvancedItem(surface);
                 if (surface2 != null)
-                    cxDisplay1.AddSurfaceAdvancedItem(surface2, CxMatrix4X4.RotationZ((float)Math.PI / 4) * CxMatrix4X4.Translation(5, 3, 2));
+                    cxDisplay1.AddSurfaceAdvancedItem(surface2, CxMatrix4X4.RotationZ(45f) * CxMatrix4X4.Translation(5, 3, 2));
             }
 
-            ////添加平面 Plane3D
+            ////����ƽ�� Plane3D
             //var plane = new CxPlane3D(new CxPoint3D(0, 0, 0), new CxVector3D(1, 1, 1));
             //cxDisplay1.SetPlane(plane, Color.FromArgb(100, Color.Blue));
 
-            //添加Box3D
+            //����Box3D
             var box = new CxBox3D(new CxPoint3D(0, 0, 0), new CxSize3D(10, 10, 10));
             //cxDisplay1.SetBox(new CxBox3D[] { box }, Color.FromArgb(100, Color.Yellow), 1);
 
             //cxDisplay1.SetPoint(new CxPoint3D[] { new CxPoint3D(2, 3, 1), new CxPoint3D(5, 1, 1) }, Color.Green, 10f, PointShape.Sphere);
 
-            //添加Box3D
+            //����Box3D
             cxDisplay2.ResetView();
             cxDisplay2.SetBox(new CxBox3D[] { box }, Color.Yellow, 10);
         }
@@ -214,7 +215,7 @@ namespace DemoFrom
         {
             cxDisplay2.ResetView();
 
-            //添加Segment3D线段
+            //����Segment3D�߶�
             cxDisplay2.SetSegment(new CxSegment3D[] { new CxSegment3D(new CxPoint3D(0, 0, 0), new CxPoint3D(1, 1, 1)) }, Color.Red);
             cxDisplay2.SetSegment(new CxSegment3D[] { new CxSegment3D(new CxPoint3D(0, 0, 0), new CxPoint3D(0, 1, 1)) }, Color.Yellow);
 
@@ -226,7 +227,7 @@ namespace DemoFrom
                 YAxis = new CxVector3D(0, 1, 0),
                 ZAxis = new CxVector3D(0, 0, -1)
             }, 50);
-            //添加多边形
+            //���Ӷ����
             List<CxPoint3D> pts = new List<CxPoint3D>();
             pts.Add(new CxPoint3D(0, 0, 0));
             pts.Add(new CxPoint3D(1, 0, 0));
@@ -235,19 +236,19 @@ namespace DemoFrom
             var polygon = new CxPolygon3D(pts.ToArray(), false);
             cxDisplay2.SetPolygon(new CxPolygon3D[] { polygon }, Color.Blue);
 
-            //添加平面 Plane3D
+            //����ƽ�� Plane3D
             var plane = new CxPlane3D(new CxPoint3D(0, 0, 0), new CxVector3D(1, 1, 1));
             cxDisplay2.SetPlane(new CxPlane3D[] { plane }, Color.FromArgb(100, Color.Red));
 
-            //添加Box3D
+            //����Box3D
             var box = new CxBox3D(new CxPoint3D(0, 0, 0), new CxSize3D(10, 10, 10));
             cxDisplay2.SetBox(new CxBox3D[] { box }, Color.FromArgb(100, Color.Yellow));
 
-            //添加TextInfo
-            var text = new CxTextInfo(new CxPoint3D(0, 0, 0), "this is a test中文!", 50);
+            //����TextInfo
+            var text = new CxTextInfo(new CxPoint3D(0, 0, 0), "this is a test����!", 50);
             cxDisplay2.SetTextInfo(new CxTextInfo[] { text }, Color.Yellow);
 
-            //添加Text2D
+            //����Text2D
             var text2d = new CxText2D(new CxPoint2D(10, 50), "2D Labels", 10);
             cxDisplay2.SetText2D(new CxText2D[] { text2d }, Color.Green);
             cxDisplay2.ActivateAllItems();
@@ -257,21 +258,21 @@ namespace DemoFrom
         {
             cxDisplay2.ResetView();
 
-            // 1. 程序生成平坦参考面（为深度缓冲提供有效值，并触发 FitView）
+            // 1. ��������ƽ̹�ο��棨Ϊ��Ȼ����ṩ��Чֵ�������� FitView��
             const int W = 50, L = 50;
-            var flatData = new short[W * L]; // 全零 = Z=0
+            var flatData = new short[W * L]; // ȫ�� = Z=0
             var flatSurf = new CxSurface(W, L, flatData, null,
                 xOffset: 0, yOffset: 0, zOffset: 0,
                 xScale: 0.2f, yScale: 0.2f, zScale: 0.001f);
-            cxDisplay2.SetSurface(flatSurf); // 10×10 平面，FitView 自动对齐相机
+            cxDisplay2.SetSurface(flatSurf); // 10��10 ƽ�棬FitView �Զ��������
 
-            // 2. 放置可拖动 MARK 点（位于平面中心 5,5,0）
+            // 2. ���ÿ��϶� MARK �㣨λ��ƽ������ 5,5,0��
             var mark = cxDisplay2.SetPoint(
                 new[] { new CxPoint3D(5.0f, 5.0f, 0f) }, Color.Red, 1f, PointShape.Sphere);
             mark.IsActiveObj = true;
             mark.HitThreshold = 2f;
 
-            // 3. 订阅 OnChanged，实时更新坐标标签
+            // 3. ���� OnChanged��ʵʱ���������ǩ
             mark.OnChanged += item =>
             {
                 var pos = ((CxPoint3DItem)item).Point3Ds[0];
@@ -283,21 +284,21 @@ namespace DemoFrom
         {
             cxDisplay2.ResetView();
 
-            // 1. 平坦参考面（为深度缓冲提供有效值，触发 FitView）
+            // 1. ƽ̹�ο��棨Ϊ��Ȼ����ṩ��Чֵ������ FitView��
             const int W = 60, L = 60;
             var flatData = new short[W * L];
             var flatSurf = new CxSurface(W, L, flatData, null,
                 xOffset: 0, yOffset: 0, zOffset: 0,
                 xScale: 0.2f, yScale: 0.2f, zScale: 0.001f);
-            cxDisplay2.SetSurface(flatSurf);  // 12×12 平面
+            cxDisplay2.SetSurface(flatSurf);  // 12��12 ƽ��
 
-            // 2. 放置可拖拽 Box（位于平面中央）
+            // 2. ���ÿ���ק Box��λ��ƽ�����룩
             var initBox = new CxBox3D(new CxPoint3D(6.0f, 6.0f, 0.5f), new CxSize3D(4.0f, 3.0f, 1.0f));
             var box = cxDisplay2.SetBox(new[] { initBox }, Color.FromArgb(80, Color.Cyan));
             box.IsActiveObj = true;
             box.HitThreshold = 1f;
 
-            // 3. 实时显示 Box 的 Center 和 Size
+            // 3. ʵʱ��ʾ Box �� Center �� Size
             box.OnChanged += item =>
             {
                 var b = ((CxBox3DItem)item).Box3Ds[0];
@@ -311,13 +312,13 @@ namespace DemoFrom
         {
             cxDisplay2.ResetView();
 
-            // 参考平面（深度缓冲）
+            // �ο�ƽ�棨��Ȼ��壩
             const int W = 60, L = 60;
             var flatSurf = new CxSurface(W, L, new short[W * L], null,
                 xOffset: 0, yOffset: 0, zOffset: 0, xScale: 0.2f, yScale: 0.2f, zScale: 0.001f);
             cxDisplay2.SetSurface(flatSurf);
 
-            // 放置三条可拖拽线段
+            // ������������ק�߶�
             var seg = cxDisplay2.SetSegment(new[]
             {
                 new CxSegment3D(new CxPoint3D(2f, 4f, 0f), new CxPoint3D(8f, 4f, 0f)),
@@ -339,13 +340,13 @@ namespace DemoFrom
         {
             cxDisplay2.ResetView();
 
-            // 参考平面（深度缓冲）
+            // �ο�ƽ�棨��Ȼ��壩
             const int W = 60, L = 60;
             var flatSurf = new CxSurface(W, L, new short[W * L], null,
                 xOffset: 0, yOffset: 0, zOffset: 0, xScale: 0.2f, yScale: 0.2f, zScale: 0.001f);
             cxDisplay2.SetSurface(flatSurf);
 
-            // 放置一个矩形多边形（闭合）和一条折线（开放）
+            // ����һ�����ζ���Σ��պϣ���һ�����ߣ����ţ�
             var rect = new CxPolygon3D(new[]
             {
                 new CxPoint3D(2f, 3f, 0f), new CxPoint3D(8f, 3f, 0f),
@@ -383,7 +384,7 @@ namespace DemoFrom
             //    0, 0, 1, 0,
             //    0, 0, 0, 1
             //});
-            var matrix = CxMatrix4X4.RotationY((float)Math.PI / 4);
+            var matrix = CxMatrix4X4.RotationY(45f);
             var points = VisionOperator.TransformSurface(surface, matrix, 0.01f, 0.01f, SampleMode.Average);
             cxDisplay2.ResetView();
             cxDisplay2.SetSurface(points);
@@ -408,7 +409,7 @@ namespace DemoFrom
         {
             if (_currentMesh == null) return;
 
-            var matrix = CxMatrix4X4.RotationY((float)Math.PI / 4);
+            var matrix = CxMatrix4X4.RotationY(45f);
             var result = VisionOperator.MeshToSurface(_currentMesh, matrix, new CxBox3D(new CxPoint3D(2, 4, 1.2f), new CxSize3D(15, 25, 2)), 0.01f, 0.01f);
             if (result == null) return;
 
@@ -422,7 +423,7 @@ namespace DemoFrom
         {
             _poseApplied = !_poseApplied;
             var pose = _poseApplied
-                ? CxMatrix4X4.RotationZ((float)Math.PI / 4) * CxMatrix4X4.Translation(5, 3, 2)
+                ? CxMatrix4X4.RotationZ(45f) * CxMatrix4X4.Translation(5, 3, 2)
                 : CxMatrix4X4.Identity();
 
             cxDisplay1.SetSurfaceAdvancedItemPose(pose);
@@ -445,7 +446,7 @@ namespace DemoFrom
                 {
                     cxDisplay2.ResetView();
                     cxDisplay2.SetSurfaceAdvancedItem(loaded);
-                    MessageBox.Show($"Surface saved → loaded\n{path}", "Save R/L");
+                    MessageBox.Show($"Surface saved �� loaded\n{path}", "Save R/L");
                 }
             }
             else if (_currentMesh != null)
@@ -457,7 +458,7 @@ namespace DemoFrom
                 {
                     cxDisplay2.ResetView();
                     cxDisplay2.SetMesh(loaded);
-                    MessageBox.Show($"Mesh saved → loaded (OBJ)\n{path}", "Save R/L");
+                    MessageBox.Show($"Mesh saved �� loaded (OBJ)\n{path}", "Save R/L");
                 }
             }
             else
@@ -482,11 +483,31 @@ namespace DemoFrom
                 }
                 _currentMesh = mesh;
                 cxDisplay2.ResetView();
-                cxDisplay2.SetMesh(mesh);
+                cxDisplay2.SetMeshAdvancedItem(mesh);
             }
         }
 
-        // ── 2D Tab ──────────────────────────────────────────────────────────────────
+        private void btn_ioLoadSurface_Click(object sender, EventArgs e)
+        {
+            using (var dlg = new OpenFileDialog
+            {
+                Filter = "Surface files|*.cxsurface|All files|*.*"
+            })
+            {
+                if (dlg.ShowDialog() != DialogResult.OK) return;
+                var loaded = VisionOperator.LoadSurface(dlg.FileName);
+                if (loaded == null)
+                {
+                    MessageBox.Show("Failed to load surface.", "Load Surface");
+                    return;
+                }
+                surface = loaded;
+                cxDisplay2.ResetView();
+                cxDisplay2.SetSurfaceAdvancedItem(loaded);
+            }
+        }
+
+        // ���� 2D Tab ������������������������������������������������������������������������������������������������������������������������������������
 
         private CxDisplay2D _cxDisplay2D;
         private Label _lbl2DPos;
@@ -561,6 +582,9 @@ namespace DemoFrom
             MakeBtn("Show Coord", btn2D_showCoord_Click);
             MakeBtn("Clear Overlays", btn2D_clearOverlays_Click);
             MakeBtn("Clear All", btn2D_clearAll_Click);
+            MakeBtn("Save Screenshot", btn2D_saveScreenshot_Click);
+            MakeBtn("Save Img Region", btn2D_saveImageRegion_Click);
+            MakeBtn("Show Img Region", btn2D_showImageRegion_Click);
 
             _lbl2DPos = new Label
             {
@@ -575,7 +599,7 @@ namespace DemoFrom
         }
 
 
-        // ── 2D Button Handlers ───────────────────────────────────────────────────────
+        // ���� 2D Button Handlers ��������������������������������������������������������������������������������������������������������������
 
         private void btn2D_loadImage_Click(object sender, EventArgs e)
         {
@@ -590,7 +614,8 @@ namespace DemoFrom
                 _currentImage?.Dispose();
                 _currentImage = img;
                 _cxDisplay2D.ClearOverlays();
-                _cxDisplay2D.SetImage(img);
+                _cxDisplay2D.SetScaleAndOffset(new CxPoint3D(1,1f,1), new CxPoint3D(0, 0, 0));
+                _cxDisplay2D.SetImageAdvance(img);
             }
         }
 
@@ -764,7 +789,7 @@ namespace DemoFrom
             item.OnChanged += i =>
             {
                 var b = ((CxBox2DItem)i).Boxes[0];
-                var text = $"C:({b.Center.X:F0},{b.Center.Y:F0})\nS:({b.Size.Width:F0}×{b.Size.Height:F0})";
+                var text = $"C:({b.Center.X:F0},{b.Center.Y:F0})\nS:({b.Size.Width:F0}��{b.Size.Height:F0})";
                 if (_lbl2DPos.InvokeRequired)
                     _lbl2DPos.Invoke(new Action(() => _lbl2DPos.Text = text));
                 else
@@ -1031,9 +1056,9 @@ namespace DemoFrom
             {
                 Vertices = verts,
                 Indices = indices,
-                UVs = uvs,
-                TextureWidth = w,
-                TextureHeight = h,
+                //UVs = new CxPoint2D[0],
+                //TextureWidth = 0,
+                //TextureHeight = 0,
                 Diff = diff,
             };
 
@@ -1041,10 +1066,177 @@ namespace DemoFrom
 
             cxDisplay2.SurfaceMode = SurfaceMode.Mesh;
             cxDisplay2.SetMeshAdvancedItem(mesh);
-            // 若想自动进入 Diff 模式，取消下行注释
+            // �����Զ����� Diff ģʽ��ȡ������ע��
             // cxDisplay2.SurfaceColorMode = SurfaceColorMode.Diff;
 
-            lbl_markPos.Text = "Diff Demo: 合成正弦波 mesh\n右键→SurfaceColorMode→Diff 切换";
+            lbl_markPos.Text = "Diff Demo: �ϳ����Ҳ� mesh\n�Ҽ���SurfaceColorMode��Diff �л�";
+        }
+
+        private void btn_diffSurfaceDemo_Click(object sender, EventArgs e)
+        {
+            cxDisplay2.ResetView();
+
+            // CxSurface: 高度图（Data = W*L shorts，每个 = Z 高度）。Diff 同为 W*L 网格点。
+            const int W = 90, L = 90;
+            const float xScale = 0.15f, yScale = 0.15f, zScale = 0.002f;
+            float freq = 0.35f;
+            float amp = 1500f;
+
+            var data = new short[W * L];
+            var diff = new float[W * L];
+
+            for (int y = 0; y < L; y++)
+            {
+                for (int x = 0; x < W; x++)
+                {
+                    int idx = y * W + x;
+                    float fx = x * xScale;
+                    float fy = y * yScale;
+                    float z = 0;
+                    data[idx] = (short)z;
+                    diff[idx] = amp * (float)(Math.Sin(fx * freq) * Math.Cos(fy * freq)) * zScale;
+                }
+            }
+
+            var surface = new CxSurface(W, L, data, null,
+                xOffset: 0, yOffset: 0, zOffset: 0,
+                xScale: xScale, yScale: yScale, zScale: zScale)
+            { Diff = diff };
+
+            cxDisplay2.SurfaceMode = SurfaceMode.Mesh;
+            cxDisplay2.SetSurfaceAdvancedItem(surface);
+            // cxDisplay2.SurfaceColorMode = SurfaceColorMode.Diff;
+
+            lbl_markPos.Text = "Diff Surface Demo: right-click SurfaceColorMode->Diff";
+        }
+
+        private void btn_diffPointDemo_Click(object sender, EventArgs e)
+        {
+            cxDisplay2.ResetView();
+
+            // CxPointCloud: Data = W*L*3 shorts（每 3 个 = X,Y,Z）。Diff 为 W*L 网格点。
+            const int W = 90, L = 90;
+            const float xScale = 0.15f, yScale = 0.15f, zScale = 0.002f;
+            float freq = 0.35f;
+            float amp = 1500f;
+
+            var data = new short[W * L * 3];
+            var diff = new float[W * L];
+
+            for (int y = 0; y < L; y++)
+            {
+                for (int x = 0; x < W; x++)
+                {
+                    int idx = y * W + x;
+                    float fx = x * xScale;
+                    float fy = y * yScale;
+                    float z = 0;
+                    data[idx * 3]     = (short)(x);
+                    data[idx * 3 + 1] = (short)(y);
+                    data[idx * 3 + 2] = (short)z;
+                    diff[idx] = amp * (float)(Math.Sin(fx * freq) * Math.Cos(fy * freq)) * zScale;
+                }
+            }
+
+            var cloud = new CxPointCloud(W, L, data, null,
+                xOffset: 0, yOffset: 0, zOffset: 0,
+                xScale: xScale, yScale: yScale, zScale: zScale)
+            { Diff = diff };
+
+            cxDisplay2.SurfaceMode = SurfaceMode.PointCloud;
+            cxDisplay2.SetPointCloudAdvancedItem(cloud);
+            // cxDisplay2.SurfaceColorMode = SurfaceColorMode.Diff;
+
+            lbl_markPos.Text = "Diff PointCloud Demo: right-click SurfaceColorMode->Diff";
+        }
+
+        private void btn_colorRangeDemo_Click(object sender, EventArgs e)
+        {
+            // 切换式：首次点击设固定 Color(Z) 范围，再次点击复位为自动。
+            cxDisplay2.SurfaceColorMode = SurfaceColorMode.Color;
+            if (_colorRangeSet)
+            {
+                cxDisplay2.ClearColorRange();
+                _colorRangeSet = false;
+                lbl_markPos.Text = "Color Range cleared -> auto";
+            }
+            else
+            {
+                cxDisplay2.SetColorRange(-1.0f, 1.0f);
+                _colorRangeSet = true;
+                lbl_markPos.Text = "Color Range set to [-1, 1] (click again to clear)";
+            }
+        }
+        private bool _colorRangeSet = false;
+
+        private void btn_diffRangeDemo_Click(object sender, EventArgs e)
+        {
+            // 切换式：首次点击设固定 Diff 范围，再次点击复位为自动。
+            cxDisplay2.SurfaceColorMode = SurfaceColorMode.Diff;
+            if (_diffRangeSet)
+            {
+                cxDisplay2.ClearDiffRange();
+                _diffRangeSet = false;
+                lbl_markPos.Text = "Diff Range cleared -> auto";
+            }
+            else
+            {
+                cxDisplay2.SetDiffRange(-0.5f, 0.5f);
+                _diffRangeSet = true;
+                lbl_markPos.Text = "Diff Range set to [-0.5, 0.5] (click again to clear)";
+            }
+        }
+        private bool _diffRangeSet = false;
+
+        private void btn_mixedViewDemo_Click(object sender, EventArgs e)
+        {
+            cxDisplay2.ResetView();
+
+            // 1. Mesh：网格形式 + Color(Z 高度) 模式
+            const int mw = 60, mh = 60;
+            float spacing = 0.2f, freq = 0.3f, amp = 1.2f;
+            var mVerts = new CxPoint3D[mw * mh];
+            var mIdx = new uint[(mw - 1) * (mh - 1) * 6];
+            for (int y = 0; y < mh; y++)
+                for (int x = 0; x < mw; x++)
+                {
+                    float fx = x * spacing, fy = y * spacing;
+                    mVerts[y * mw + x] = new CxPoint3D(fx, fy,
+                        amp * (float)(Math.Sin(fx * freq) * Math.Cos(fy * freq)));
+                }
+            int ii = 0;
+            for (int y = 0; y < mh - 1; y++)
+                for (int x = 0; x < mw - 1; x++)
+                {
+                    uint tl = (uint)(y * mw + x), tr = tl + 1, bl = tl + (uint)mw, br = bl + 1;
+                    mIdx[ii++] = tl; mIdx[ii++] = bl; mIdx[ii++] = tr;
+                    mIdx[ii++] = tr; mIdx[ii++] = bl; mIdx[ii++] = br;
+                }
+            var mesh = new CxMesh { Vertices = mVerts, Indices = mIdx };
+            // Mesh 形式 + Color 模式（不取全局，显式指定）
+            cxDisplay2.AddMeshAdvancedItem(mesh, SurfaceMode.Mesh, SurfaceColorMode.Color);
+
+            // 2. PointCloud：点云形式 + Intensity 模式（与上面 Color 量纲不同）
+            const int pw = 60, pl = 60;
+            var pcData = new short[pw * pl * 3];
+            var pcIntensity = new byte[pw * pl];
+            for (int y = 0; y < pl; y++)
+                for (int x = 0; x < pw; x++)
+                {
+                    int idx = y * pw + x;
+                    pcData[idx * 3]     = (short)(x * 100);
+                    pcData[idx * 3 + 1] = (short)(y * 100);
+                    pcData[idx * 3 + 2] = (short)(80 + 60 * Math.Sin(x * 0.2));
+                    pcIntensity[idx] = (byte)((x + y) * 4 % 256);
+                }
+            var cloud = new CxPointCloud(pw, pl, pcData, pcIntensity,
+                xOffset: 15f, yOffset: 0f, zOffset: 0f,
+                xScale: 0.1f, yScale: 0.1f, zScale: 0.01f);
+            // 点云形式 + Intensity 模式
+            cxDisplay2.AddPointCloudAdvancedItem(cloud, SurfaceMode.PointCloud, SurfaceColorMode.Intensity);
+
+            // 两者量纲不同（Color=Z，Intensity=0-255）→ colorBar 自动隐藏
+            lbl_markPos.Text = "Mesh(Mesh+Color) + PointCloud(PC+Intensity)\nColorBar hidden: mixed magnitude classes";
         }
 
         private void btn2D_regionDemo_Click(object sender, EventArgs e)
@@ -1118,7 +1310,83 @@ namespace DemoFrom
             _lbl2DPos.Text = "X: ---  Y: ---";
         }
 
-        // ── Image Loading Helper ─────────────────────────────────────────────────────
+        private void btn2D_saveScreenshot_Click(object sender, EventArgs e)
+        {
+            using (var dlg = new SaveFileDialog
+            {
+                Filter = "PNG 图像|*.png",
+                FileName = "screenshot.png",
+            })
+            {
+                if (dlg.ShowDialog() != DialogResult.OK) return;
+                try
+                {
+                    _cxDisplay2D.SaveScreenshot(dlg.FileName);
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show(ex.Message, "Save Screenshot");
+                }
+            }
+        }
+
+        private void btn2D_saveImageRegion_Click(object sender, EventArgs e)
+        {
+            using (var dlg = new SaveFileDialog
+            {
+                Filter = "PNG 图像|*.png",
+                FileName = "image_region.png",
+            })
+            {
+                if (dlg.ShowDialog() != DialogResult.OK) return;
+                try
+                {
+                    _cxDisplay2D.SaveImageRegion(dlg.FileName);
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show(ex.Message, "Save Image Region");
+                }
+            }
+        }
+
+        private void btn2D_showImageRegion_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                var bmp = _cxDisplay2D.RenderImageRegion();
+                if (bmp == null)
+                {
+                    MessageBox.Show("No image region rendered.", "Image Region");
+                    return;
+                }
+
+                var preview = new Form
+                {
+                    Text = $"Image Region ({bmp.Width}x{bmp.Height})",
+                    StartPosition = FormStartPosition.CenterParent,
+                    ClientSize = new Size(
+                        Math.Min(bmp.Width + 16, 1000),
+                        Math.Min(bmp.Height + 40, 780)),
+                };
+                var pb = new PictureBox
+                {
+                    Dock = DockStyle.Fill,
+                    SizeMode = PictureBoxSizeMode.Zoom,
+                    Image = bmp,
+                    BackColor = Color.Black,
+                };
+                preview.Controls.Add(pb);
+                preview.FormClosed += (s2, e2) => bmp.Dispose();
+                preview.Show(this);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message, "Image Region");
+            }
+        }
+
+        // ���� Image Loading Helper ����������������������������������������������������������������������������������������������������������
 
         private CxImage LoadColorImage(string path)
         {
@@ -1142,7 +1410,7 @@ namespace DemoFrom
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"图片加载失败: {ex.Message}", "Load Image");
+                MessageBox.Show($"ͼƬ����ʧ��: {ex.Message}", "Load Image");
                 return null;
             }
         }

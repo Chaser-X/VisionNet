@@ -18,7 +18,8 @@ namespace VisionNet.DataType
         /// <summary>Gets or sets per-vertex intensity values (0–255), or <c>null</c> if not available.</summary>
         public byte[] Intensity { get; set; } = new byte[0];
 
-        /// <summary>Gets or sets per-vertex difference values (float, may be negative), or <c>null</c> if differential coloring is not used.</summary>
+        /// <summary>Gets or sets per-vertex difference values (float, may be negative) used by
+        /// <c>SurfaceColorMode.Diff</c>, or <c>null</c> if differential coloring is not used.</summary>
         public float[] Diff { get; set; } = new float[0];
 
         /// <summary>Gets or sets the width (columns) of the intensity texture.</summary>

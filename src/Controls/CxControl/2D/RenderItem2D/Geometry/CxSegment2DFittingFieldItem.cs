@@ -78,6 +78,11 @@ namespace VisionNet.Controls
                 midLine.LineStyle.Width = Size;
                 midLine.LineStyle.Color = fColor;
                 _plottables.Add(midLine);
+
+                float dirX = field.Axis.End.X - field.Axis.Start.X;
+                float dirY = field.Axis.End.Y - field.Axis.Start.Y;
+                if (dirX != 0f || dirY != 0f)
+                    AddDirectionArrow(_plottables, new CxPoint2D(midX, midY), -dirY, dirX, ToSPColor(Color.Lime));
             }
 
             if (_activeIndex >= 0)

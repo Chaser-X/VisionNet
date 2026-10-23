@@ -334,6 +334,7 @@ namespace VisionNet.Controls
             return true;
         }
 
+        // Returns the angle in degrees from (cx, cy) to (px, py), matching CxArc2D angle units.
         private static float AngleTo(float px, float py, float cx, float cy)
             => (float)(Math.Atan2(py - cy, px - cx) * 180.0 / Math.PI);
 

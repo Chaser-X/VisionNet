@@ -1,3 +1,5 @@
+using System.Globalization;
+
 namespace VisionNet.DataType
 {
     /// <summary>
@@ -28,5 +30,9 @@ namespace VisionNet.DataType
             Text     = text;
             FontSize = fontSize;
         }
+
+        public override string ToString() =>
+            string.Format(CultureInfo.InvariantCulture,
+                "CxText2D(Location={0}, Text=\"{1}\", FontSize={2})", Location, Text, FontSize);
     }
 }

@@ -24,5 +24,12 @@ namespace VisionNet.Controls
 
         /// <summary>Colour is derived from the per-vertex difference value using the rainbow colour map.</summary>
         Diff,
+
+        /// <summary>
+        /// Physical lighting / material shading (Blinn-Phong). Only effective when
+        /// <see cref="SurfaceMode.Mesh"/> is active; the normal is evaluated per-fragment
+        /// in GLSL via screen-space derivatives of the view-space position.
+        /// </summary>
+        Lit,
     }
 }

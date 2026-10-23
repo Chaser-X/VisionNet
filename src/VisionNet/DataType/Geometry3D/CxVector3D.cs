@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 using System.Runtime.InteropServices;
 
 namespace VisionNet.DataType
@@ -50,16 +51,22 @@ namespace VisionNet.DataType
         /// <summary>
         /// Creates a unit direction vector from spherical coordinates (standard math convention).
         /// </summary>
-        /// <param name="pitch">Polar angle from the +Z axis, in radians. Range [0, π].</param>
-        /// <param name="roll">Azimuth angle from the +X axis in the XY plane, in radians.</param>
+        /// <param name="pitch">Polar angle from the +Z axis, in degrees. Range [0, 180].</param>
+        /// <param name="roll">Azimuth angle from the +X axis in the XY plane, in degrees.</param>
         /// <returns>A unit direction vector.</returns>
         public static CxVector3D FromSpherical(float pitch, float roll)
         {
-            float sp = (float)Math.Sin(pitch);
+            float pr = pitch * (float)Math.PI / 180f;
+            float rr = roll  * (float)Math.PI / 180f;
+            float sp = (float)Math.Sin(pr);
             return new CxVector3D(
-                sp * (float)Math.Cos(roll),
-                sp * (float)Math.Sin(roll),
-                (float)Math.Cos(pitch));
+                sp * (float)Math.Cos(rr),
+                sp * (float)Math.Sin(rr),
+                (float)Math.Cos(pr));
         }
+
+        public override string ToString() =>
+            string.Format(CultureInfo.InvariantCulture,
+                "CxVector3D(X={0:G9}, Y={1:G9}, Z={2:G9})", X, Y, Z);
     }
 }

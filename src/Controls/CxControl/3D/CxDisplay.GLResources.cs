@@ -13,94 +13,97 @@ namespace VisionNet.Controls
             var data = item.PrepareRenderData();
             if (data == null) return;
 
-            var tempId = new uint[1];
-
-            if (data.UseVAO)
+            if (data.VertexCount > 0)
             {
-                gl.GenVertexArrays(1, tempId);
-                handle.VaoId = tempId[0];
-                handle.HasVAO = true;
-                gl.BindVertexArray(handle.VaoId);
-            }
+                var tempId = new uint[1];
 
-            int vboIndex = 0;
-
-            if (data.Vertices != null)
-            {
-                gl.GenBuffers(1, tempId);
-                handle.VboIds[vboIndex] = tempId[0];
-                gl.BindBuffer(OpenGL.GL_ARRAY_BUFFER, handle.VboIds[vboIndex]);
-                gl.BufferData(OpenGL.GL_ARRAY_BUFFER, data.Vertices, OpenGL.GL_STATIC_DRAW);
                 if (data.UseVAO)
                 {
-                    gl.VertexAttribPointer(0, 3, OpenGL.GL_FLOAT, false, 3 * sizeof(float), IntPtr.Zero);
-                    gl.EnableVertexAttribArray(0);
+                    gl.GenVertexArrays(1, tempId);
+                    handle.VaoId = tempId[0];
+                    handle.HasVAO = true;
+                    gl.BindVertexArray(handle.VaoId);
                 }
-                vboIndex++;
-            }
 
-            if (data.Colors != null)
-            {
-                gl.GenBuffers(1, tempId);
-                handle.VboIds[vboIndex] = tempId[0];
-                gl.BindBuffer(OpenGL.GL_ARRAY_BUFFER, handle.VboIds[vboIndex]);
-                gl.BufferData(OpenGL.GL_ARRAY_BUFFER, data.Colors, OpenGL.GL_STATIC_DRAW);
-                if (data.UseVAO)
+                int vboIndex = 0;
+
+                if (data.Vertices != null && data.Vertices.Length >= data.VertexCount * 3)
                 {
-                    gl.VertexAttribPointer(1, 3, OpenGL.GL_FLOAT, false, 3 * sizeof(float), IntPtr.Zero);
-                    gl.EnableVertexAttribArray(1);
+                    gl.GenBuffers(1, tempId);
+                    handle.VboIds[vboIndex] = tempId[0];
+                    gl.BindBuffer(OpenGL.GL_ARRAY_BUFFER, handle.VboIds[vboIndex]);
+                    gl.BufferData(OpenGL.GL_ARRAY_BUFFER, data.Vertices, OpenGL.GL_STATIC_DRAW);
+                    if (data.UseVAO)
+                    {
+                        gl.VertexAttribPointer(0, 3, OpenGL.GL_FLOAT, false, 3 * sizeof(float), IntPtr.Zero);
+                        gl.EnableVertexAttribArray(0);
+                    }
+                    vboIndex++;
                 }
-                vboIndex++;
-            }
-            else if (data.UVCoords != null)
-            {
-                gl.GenBuffers(1, tempId);
-                handle.VboIds[vboIndex] = tempId[0];
-                gl.BindBuffer(OpenGL.GL_ARRAY_BUFFER, handle.VboIds[vboIndex]);
-                gl.BufferData(OpenGL.GL_ARRAY_BUFFER, data.UVCoords, OpenGL.GL_STATIC_DRAW);
-                if (data.UseVAO)
+
+                if (data.Colors != null && data.Colors.Length >= data.VertexCount * 3)
                 {
-                    gl.VertexAttribPointer(1, 2, OpenGL.GL_FLOAT, false, 2 * sizeof(float), IntPtr.Zero);
-                    gl.EnableVertexAttribArray(1);
+                    gl.GenBuffers(1, tempId);
+                    handle.VboIds[vboIndex] = tempId[0];
+                    gl.BindBuffer(OpenGL.GL_ARRAY_BUFFER, handle.VboIds[vboIndex]);
+                    gl.BufferData(OpenGL.GL_ARRAY_BUFFER, data.Colors, OpenGL.GL_STATIC_DRAW);
+                    if (data.UseVAO)
+                    {
+                        gl.VertexAttribPointer(1, 3, OpenGL.GL_FLOAT, false, 3 * sizeof(float), IntPtr.Zero);
+                        gl.EnableVertexAttribArray(1);
+                    }
+                    vboIndex++;
                 }
-                vboIndex++;
-            }
-
-            if (data.DiffValues != null)
-            {
-                gl.GenBuffers(1, tempId);
-                handle.VboIds[vboIndex] = tempId[0];
-                gl.BindBuffer(OpenGL.GL_ARRAY_BUFFER, handle.VboIds[vboIndex]);
-                gl.BufferData(OpenGL.GL_ARRAY_BUFFER, data.DiffValues, OpenGL.GL_STATIC_DRAW);
-                if (data.UseVAO)
+                else if (data.UVCoords != null && data.UVCoords.Length >= data.VertexCount * 2)
                 {
-                    gl.VertexAttribPointer(2, 1, OpenGL.GL_FLOAT, false, 0, IntPtr.Zero);
-                    gl.EnableVertexAttribArray(2);
+                    gl.GenBuffers(1, tempId);
+                    handle.VboIds[vboIndex] = tempId[0];
+                    gl.BindBuffer(OpenGL.GL_ARRAY_BUFFER, handle.VboIds[vboIndex]);
+                    gl.BufferData(OpenGL.GL_ARRAY_BUFFER, data.UVCoords, OpenGL.GL_STATIC_DRAW);
+                    if (data.UseVAO)
+                    {
+                        gl.VertexAttribPointer(1, 2, OpenGL.GL_FLOAT, false, 2 * sizeof(float), IntPtr.Zero);
+                        gl.EnableVertexAttribArray(1);
+                    }
+                    vboIndex++;
                 }
-                vboIndex++;
-            }
 
-            handle.VboCount = vboIndex;
-
-            if (data.Indices != null && data.Indices.Length > 0)
-            {
-                gl.GenBuffers(1, tempId);
-                handle.ElementBufferId = tempId[0];
-                handle.HasEBO = true;
-
-                gl.BindBuffer(OpenGL.GL_ELEMENT_ARRAY_BUFFER, handle.ElementBufferId);
-                int bytes = data.Indices.Length * sizeof(uint);
-                IntPtr ptr = Marshal.AllocHGlobal(bytes);
-                try
+                if (data.DiffValues != null && data.DiffValues.Length >= data.VertexCount)
                 {
-                    var indexBytes = new byte[bytes];
-                    Buffer.BlockCopy(data.Indices, 0, indexBytes, 0, bytes);
-                    Marshal.Copy(indexBytes, 0, ptr, bytes);
-                    gl.BufferData(OpenGL.GL_ELEMENT_ARRAY_BUFFER, bytes, ptr, OpenGL.GL_STATIC_DRAW);
+                    gl.GenBuffers(1, tempId);
+                    handle.VboIds[vboIndex] = tempId[0];
+                    gl.BindBuffer(OpenGL.GL_ARRAY_BUFFER, handle.VboIds[vboIndex]);
+                    gl.BufferData(OpenGL.GL_ARRAY_BUFFER, data.DiffValues, OpenGL.GL_STATIC_DRAW);
+                    if (data.UseVAO)
+                    {
+                        gl.VertexAttribPointer(2, 1, OpenGL.GL_FLOAT, false, 0, IntPtr.Zero);
+                        gl.EnableVertexAttribArray(2);
+                    }
+                    vboIndex++;
                 }
-                finally
+
+                handle.VboCount = vboIndex;
+
+                if (data.Indices != null && data.Indices.Length > 0)
                 {
-                    Marshal.FreeHGlobal(ptr);
+                    gl.GenBuffers(1, tempId);
+                    handle.ElementBufferId = tempId[0];
+                    handle.HasEBO = true;
+
+                    gl.BindBuffer(OpenGL.GL_ELEMENT_ARRAY_BUFFER, handle.ElementBufferId);
+                    int bytes = data.Indices.Length * sizeof(uint);
+                    IntPtr ptr = Marshal.AllocHGlobal(bytes);
+                    try
+                    {
+                        var indexBytes = new byte[bytes];
+                        Buffer.BlockCopy(data.Indices, 0, indexBytes, 0, bytes);
+                        Marshal.Copy(indexBytes, 0, ptr, bytes);
+                        gl.BufferData(OpenGL.GL_ELEMENT_ARRAY_BUFFER, bytes, ptr, OpenGL.GL_STATIC_DRAW);
+                    }
+                    finally
+                    {
+                        Marshal.FreeHGlobal(ptr);
+                    }
                 }
             }
 

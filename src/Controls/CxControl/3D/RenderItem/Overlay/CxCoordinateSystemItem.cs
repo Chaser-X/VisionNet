@@ -123,6 +123,7 @@ namespace VisionNet.Controls
                 else
                 {
                     var   axis  = defaultDir.Cross(dir);
+                    // angle in degrees (gl.Rotate expects degrees).
                     float angle = (float)(Math.Acos(dot) * 180.0 / Math.PI);
                     gl.Rotate(angle, axis.X, axis.Y, axis.Z);
                 }

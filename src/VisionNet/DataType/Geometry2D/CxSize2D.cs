@@ -1,3 +1,5 @@
+using System.Globalization;
+
 namespace VisionNet.DataType
 {
     /// <summary>Represents the dimensions of a 2D region: width (X) and height (Y).</summary>
@@ -11,5 +13,8 @@ namespace VisionNet.DataType
 
         /// <summary>Extent along the Y axis.</summary>
         public float Height;
+
+        public override string ToString() =>
+            string.Format(CultureInfo.InvariantCulture, "CxSize2D(Width={0:G9}, Height={1:G9})", Width, Height);
     }
 }

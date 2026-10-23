@@ -1,3 +1,5 @@
+using System.Globalization;
+
 namespace VisionNet.DataType
 {
     /// <summary>An axis-aligned bounding box in 2D space defined by its centre point and size.</summary>
@@ -23,5 +25,8 @@ namespace VisionNet.DataType
 
         /// <summary>Y coordinate of the bottom edge (larger Y in image convention).</summary>
         public float Bottom => Center.Y + Size.Height / 2f;
+
+        public override string ToString() =>
+            string.Format(CultureInfo.InvariantCulture, "CxBox2D(Center={0}, Size={1})", Center, Size);
     }
 }

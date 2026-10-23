@@ -1,3 +1,5 @@
+using System.Globalization;
+
 namespace VisionNet.DataType
 {
     /// <summary>Represents an infinite 3D line defined by a point and a direction vector.</summary>
@@ -27,5 +29,8 @@ namespace VisionNet.DataType
             new CxLine3D(
                 new CxPoint3D(xIntercept, 0, 0),
                 new CxVector3D(-xIntercept, yIntercept, zIntercept));
+
+        public override string ToString() =>
+            string.Format(CultureInfo.InvariantCulture, "CxLine3D(Point={0}, Direction={1})", Point, Direction);
     }
 }

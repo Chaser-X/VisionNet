@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 
 namespace VisionNet.DataType
 {
@@ -6,9 +7,9 @@ namespace VisionNet.DataType
     /// A 4×4 single-precision floating-point matrix stored in <b>row-major</b> order.
     /// Element at row <c>i</c>, column <c>j</c> is accessed as <c>Data[i * 4 + j]</c>.
     /// <para>
-    /// Note: OpenGL and <see cref="VisionOperator.TransformPoint3D"/> use <b>column-major</b>
-    /// convention. When passing a <see cref="CxMatrix4X4"/> to those APIs, transpose first
-    /// or construct the matrix accordingly.
+    /// Point/vector transforms use the row-major convention <c>M · v</c>
+    /// (see <see cref="TransformPoint3D"/>). When uploading <see cref="Data"/> to OpenGL/GLSL
+    /// shaders, pass <c>transpose = true</c> so GLSL receives the equivalent column-major matrix.
     /// </para>
     /// </summary>
     public class CxMatrix4X4
@@ -94,12 +95,12 @@ namespace VisionNet.DataType
             });
 
         /// <summary>
-        /// Creates a rotation matrix around the X axis by <paramref name="angle"/> radians.
+        /// Creates a rotation matrix around the X axis by <paramref name="angle"/> degrees.
         /// </summary>
         public static CxMatrix4X4 RotationX(float angle)
         {
-            float c = (float)Math.Cos(angle);
-            float s = (float)Math.Sin(angle);
+            float c = (float)Math.Cos(angle * (float)Math.PI / 180f);
+            float s = (float)Math.Sin(angle * (float)Math.PI / 180f);
             return new CxMatrix4X4(new float[]
             {
                 1,  0, 0, 0,
@@ -110,12 +111,12 @@ namespace VisionNet.DataType
         }
 
         /// <summary>
-        /// Creates a rotation matrix around the Y axis by <paramref name="angle"/> radians.
+        /// Creates a rotation matrix around the Y axis by <paramref name="angle"/> degrees.
         /// </summary>
         public static CxMatrix4X4 RotationY(float angle)
         {
-            float c = (float)Math.Cos(angle);
-            float s = (float)Math.Sin(angle);
+            float c = (float)Math.Cos(angle * (float)Math.PI / 180f);
+            float s = (float)Math.Sin(angle * (float)Math.PI / 180f);
             return new CxMatrix4X4(new float[]
             {
                  c, 0, s, 0,
@@ -126,12 +127,12 @@ namespace VisionNet.DataType
         }
 
         /// <summary>
-        /// Creates a rotation matrix around the Z axis by <paramref name="angle"/> radians.
+        /// Creates a rotation matrix around the Z axis by <paramref name="angle"/> degrees.
         /// </summary>
         public static CxMatrix4X4 RotationZ(float angle)
         {
-            float c = (float)Math.Cos(angle);
-            float s = (float)Math.Sin(angle);
+            float c = (float)Math.Cos(angle * (float)Math.PI / 180f);
+            float s = (float)Math.Sin(angle * (float)Math.PI / 180f);
             return new CxMatrix4X4(new float[]
             {
                 c, -s, 0, 0,
@@ -142,19 +143,20 @@ namespace VisionNet.DataType
         }
 
         /// <summary>
-        /// Creates a rotation matrix around an arbitrary unit axis by <paramref name="angle"/> radians
+        /// Creates a rotation matrix around an arbitrary unit axis by <paramref name="angle"/> degrees
         /// using Rodrigues' rotation formula.
         /// </summary>
         /// <param name="axis">Rotation axis (will be normalized to unit length).</param>
-        /// <param name="angle">Rotation angle in radians.</param>
+        /// <param name="angle">Rotation angle in degrees.</param>
         public static CxMatrix4X4 RotationAxis(CxVector3D axis, float angle)
         {
             float kx = axis.X, ky = axis.Y, kz = axis.Z;
             float len = (float)Math.Sqrt(kx * kx + ky * ky + kz * kz);
             if (len > 1e-6f) { kx /= len; ky /= len; kz /= len; }
 
-            float c = (float)Math.Cos(angle);
-            float s = (float)Math.Sin(angle);
+            float rad = angle * (float)Math.PI / 180f;
+            float c = (float)Math.Cos(rad);
+            float s = (float)Math.Sin(rad);
             float t = 1f - c;
 
             float txx = t * kx * kx;
@@ -386,5 +388,11 @@ namespace VisionNet.DataType
 
             return new CxVector3D(detX / det, detY / det, detZ / det);
         }
+
+        public override string ToString() =>
+            string.Format(CultureInfo.InvariantCulture,
+                "CxMatrix4X4([{0:G9}, {1:G9}, {2:G9}, {3:G9}, {4:G9}, {5:G9}, {6:G9}, {7:G9}, {8:G9}, {9:G9}, {10:G9}, {11:G9}, {12:G9}, {13:G9}, {14:G9}, {15:G9}])",
+                Data[0], Data[1], Data[2], Data[3], Data[4], Data[5], Data[6], Data[7],
+                Data[8], Data[9], Data[10], Data[11], Data[12], Data[13], Data[14], Data[15]);
     }
 }

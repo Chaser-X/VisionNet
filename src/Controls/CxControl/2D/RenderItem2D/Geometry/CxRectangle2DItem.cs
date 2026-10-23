@@ -191,6 +191,7 @@ namespace VisionNet.Controls
             if (hdx * hdx + hdy * hdy <= hT2)
             {
                 _dragMode = DragMode.Rotate;
+                // _rotateStartAngle is stored in RADIANS (rect.Angle itself is in degrees).
                 _rotateStartAngle = (float)Math.Atan2(plotPos.Y - rect.Center.Y, plotPos.X - rect.Center.X);
                 _rotateStartRectAngle = rect.Angle;
                 UpdatePlottable();
@@ -257,11 +258,11 @@ namespace VisionNet.Controls
                 }
                 case DragMode.Rotate:
                 {
-                    float currentAngle = (float)Math.Atan2(plotPos.Y - rect.Center.Y, plotPos.X - rect.Center.X);
-                    float deltaRad = currentAngle - _rotateStartAngle;
+                    float currentAngle = (float)Math.Atan2(plotPos.Y - rect.Center.Y, plotPos.X - rect.Center.X); // radians
+                    float deltaRad = currentAngle - _rotateStartAngle; // radians
                     while (deltaRad > Math.PI) deltaRad -= 2f * (float)Math.PI;
                     while (deltaRad < -Math.PI) deltaRad += 2f * (float)Math.PI;
-                    float deltaDeg = deltaRad * 180f / (float)Math.PI;
+                    float deltaDeg = deltaRad * 180f / (float)Math.PI; // convert to degrees to match rect.Angle
                     Rectangles[_activeIndex] = new CxRectangle2D(
                         rect.Center, rect.Size, _rotateStartRectAngle + deltaDeg);
                     UpdatePlottable();

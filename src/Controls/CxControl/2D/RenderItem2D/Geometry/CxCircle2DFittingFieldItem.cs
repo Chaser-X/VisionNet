@@ -77,6 +77,13 @@ namespace VisionNet.Controls
                 axis.LineStyle.Width = Size;
                 axis.FillStyle.IsVisible = false;
                 _plottables.Add(axis);
+
+                if (field.Width > 0f)
+                {
+                    AddDirectionArrow(_plottables,
+                        new CxPoint2D(circle.Center.X + circle.Radius, circle.Center.Y),
+                        1f, 0f, ToSPColor(Color.Lime));
+                }
             }
 
             if (_activeIndex >= 0)
@@ -287,5 +294,6 @@ namespace VisionNet.Controls
             foreach (var h in _handlePlottables) plot.PlottableList.Remove(h);
             _handlePlottables.Clear();
         }
+
     }
 }
