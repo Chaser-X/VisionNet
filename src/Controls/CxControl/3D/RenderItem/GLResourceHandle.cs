@@ -39,6 +39,13 @@ namespace VisionNet.Controls
         /// </summary>
         public bool NeedsUpdate { get; set; }
 
+        /// <summary>
+        /// <c>true</c> when the item's shader failed to compile for the current data.
+        /// Compilation failures are deterministic, so <see cref="CxDisplay"/> skips
+        /// further attempts until <see cref="NeedsUpdate"/> is raised again.
+        /// </summary>
+        internal bool ShaderFailed { get; set; }
+
         /// <summary>Whether a VAO was created for this handle.</summary>
         public bool HasVAO { get; set; }
 

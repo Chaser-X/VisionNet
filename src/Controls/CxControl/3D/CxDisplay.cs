@@ -41,6 +41,11 @@ namespace VisionNet.Controls
 
         // ── Render item lists ────────────────────────────────────────────────────
         private readonly List<ICxObjRenderItem> _surfaceItems = new List<ICxObjRenderItem>();
+        // Maps each caller-supplied key to the item currently stored under it. Kept in sync
+        // with _surfaceItems under _resourceLock; a key is unique across all three item types
+        // (Surface / PointCloud / Mesh), so setting an existing key replaces whatever is there.
+        private readonly Dictionary<string, ICxObjRenderItem> _surfaceKeys
+            = new Dictionary<string, ICxObjRenderItem>(StringComparer.Ordinal);
         private readonly List<IRenderItem>      _renderItems  = new List<IRenderItem>();
         // Render-thread snapshots are reused between frames. The lists are filled
         // under _resourceLock and then consumed after the lock is released, so a
@@ -336,6 +341,7 @@ namespace VisionNet.Controls
                         item.Dispose();
                     }
                     _surfaceItems.Clear();
+                    _surfaceKeys.Clear();
                 }
 
                 lock (_resourceLock)

@@ -110,6 +110,10 @@ namespace VisionNet.Controls
 
                     if (item.IsDisposed) continue;
 
+                    // A shader compile failure is deterministic: do not re-upload geometry
+                    // every frame. Retry only after the item reports new data.
+                    if (handle.ShaderFailed && !handle.NeedsUpdate) continue;
+
                     if (!handle.IsValid || handle.NeedsUpdate)
                     {
                         if (handle.IsValid)

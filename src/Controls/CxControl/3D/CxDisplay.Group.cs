@@ -14,7 +14,7 @@ namespace VisionNet.Controls
         // Flat registry of every group created through this display (nested groups included).
         private readonly List<CxGroup> _groups = new List<CxGroup>();
 
-        // ── Group creation ───────────────────────────────────────────────────────
+        #region Group creation (创建分组)
 
         /// <summary>
         /// Creates a new group and registers it with this display. Pass a non-null
@@ -37,8 +37,9 @@ namespace VisionNet.Controls
             }
             return group;
         }
+        #endregion Group creation (创建分组)
 
-        // ── Attach / detach items ────────────────────────────────────────────────
+        #region Attach / detach items (挂载/卸载 Item)
 
         /// <summary>
         /// Attaches a surface / point-cloud / mesh render item to
@@ -160,8 +161,9 @@ namespace VisionNet.Controls
             }
             SafeInvalidate();
         }
+        #endregion Attach / detach items (挂载/卸载 Item)
 
-        // ── Animation ────────────────────────────────────────────────────────────
+        #region Animation (分组动画)
 
         /// <summary>
         /// Sets a group's local transform and recomputes the world poses of its whole subtree.
@@ -178,8 +180,9 @@ namespace VisionNet.Controls
             group.ApplyWorldRecursive();
             SafeInvalidate();
         }
+        #endregion Animation (分组动画)
 
-        // ── Introspection ────────────────────────────────────────────────────────
+        #region Introspection (查询)
 
         /// <summary>Gets the group that directly owns <paramref name="item"/>, or <c>null</c>.</summary>
         public CxGroup FindGroupOf(ICxObjRenderItem item)
@@ -196,8 +199,9 @@ namespace VisionNet.Controls
                 if (group.Contains(member)) return group;
             return null;
         }
+        #endregion Introspection (查询)
 
-        // ── Internal lifecycle hooks ─────────────────────────────────────────────
+        #region Internal lifecycle hooks (内部生命周期)
 
         /// <summary>
         /// Detaches the given items from every group without restoring their pose. Called when
@@ -225,5 +229,6 @@ namespace VisionNet.Controls
                 break;
             }
         }
+        #endregion Internal lifecycle hooks (内部生命周期)
     }
 }

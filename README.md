@@ -112,17 +112,17 @@ var surface = new CxSurface(
     xOffset: 0f, yOffset: 0f, zOffset: 0f,
     xScale: 0.1f, yScale: 0.1f, zScale: 0.001f);
 
-cxDisplay1.SetSurface(surface);              // 结构化表面
+cxDisplay1.SetSurface(surface);              // 结构化表面（默认 key = "Surface"）
 // 或：有序点云
-cxDisplay1.SetPointCloud(cloud);            // CxPointCloud
-// 旧的 AdvancedItem 方法名仍保留为兼容别名
+cxDisplay1.SetPointCloud(cloud);            // CxPointCloud（默认 key = "PointCloud"）
+// Set* 按 key 做 upsert：同 key 重复 Set 为整体替换，不同 key / 不同类型的对象并存
 ```
 
 ### 4. 叠加多个对象
 
 ```csharp
-// 追加第二个结构化表面（不清空已有内容）
-cxDisplay1.AddSurface(surface2);
+// 叠加第二个结构化表面：显式传入不同的 key（不清空已有内容）
+cxDisplay1.SetSurface(surface2, key: "Surface2");
 
 // 叠加包围盒
 cxDisplay1.SetBox(new[] {
@@ -607,26 +607,17 @@ VisionOperator.DestroyLib();
 
 | 方法                                     | 语义  | 说明                  |
 | -------------------------------------- | --- | ------------------- |
-| `SetSurface(surface)`                  | 替换  | 显示结构化表面，清空原有内容 |
-| `SetSurfaceWithPose(surface, pose)`    | 替换  | 显示结构化表面并设置位姿 |
-| `SetPointCloud(cloud)`                 | 替换  | 显示有序点云，清空原有内容 |
-| `SetPointCloudWithPose(cloud, pose)`   | 替换  | 显示有序点云并设置位姿 |
-| `SetMesh(mesh)`                        | 替换  | 显示网格 |
-| `SetMeshWithPose(mesh, pose)`          | 替换  | 显示网格并设置位姿 |
-| `AddSurface(surface)`                  | 追加  | 叠加结构化表面（默认 ≤ 200 万点） |
-| `AddSurfaceWithPose(surface, pose)`    | 追加  | 叠加结构化表面并设置位姿 |
-| `AddPointCloud(cloud)`                 | 追加  | 叠加有序点云（默认 ≤ 200 万点） |
-| `AddPointCloudWithPose(cloud, pose)`   | 追加  | 叠加有序点云并设置位姿 |
-| `AddMesh(mesh)`                        | 追加  | 叠加网格 |
-| `AddMeshWithPose(mesh, pose)`          | 追加  | 叠加网格并设置位姿 |
-| `SetSurfacePose(pose)`                 | —    | 运行时更新所有 Surface 位姿        |
-| `SetPointCloudPose(pose)`              | —    | 运行时更新所有 PointCloud 位姿     |
-| `SetMeshPose(pose)`                    | —    | 运行时更新所有 Mesh 位姿           |
-| `Set*AdvancedItem` / `Add*AdvancedItem`| —    | 旧名称兼容别名 |
-| `Set*AdvancedItemPose`                 | —    | 旧名称兼容别名，对应 `Set*Pose` |
-| `AddSurfaceItem(item)`                 | 追加  | 叠加自定义渲染 Item        |
+| `SetSurface(s, key, pose, mode, colorMode, maxPointCount, autoFit)` | upsert | 结构化表面；key 不存在则追加、存在则整体替换（默认 key = `"Surface"`，默认 ≤ 200 万点） |
+| `SetPointCloud(c, key, pose, mode, colorMode, maxPointCount, autoFit)` | upsert | 有序点云（默认 key = `"PointCloud"`，默认 ≤ 200 万点） |
+| `SetMesh(m, key, pose, mode, colorMode, autoFit)` | upsert | 网格（默认 key = `"Mesh"`） |
+| `SetSurfaceItem(key, item, autoFit)`   | upsert | 通用入口：按 key 写入任意表面类渲染 Item |
+| `GetSurface(key)` / `GetPointCloud(key)` / `GetMesh(key)` | — | 按 key 取对应类型 Item；不存在或类型不符返回 `null` |
+| `GetSurfaceItem(key)`                  | —    | 按 key 取任意表面类 Item |
+| `SetSurfacePose(pose, key)`            | —    | 运行时更新 Surface 位姿（key 为 null 时更新全部） |
+| `SetPointCloudPose(pose, key)`         | —    | 运行时更新 PointCloud 位姿（key 为 null 时更新全部） |
+| `SetMeshPose(pose, key)`               | —    | 运行时更新 Mesh 位姿（key 为 null 时更新全部） |
 | `ClearSurfaceItems()`                  | —   | 清空所有表面对象            |
-| `RemoveSurfaceItem(item)`              | —   | 移除指定表面对象            |
+| `RemoveSurfaceItem(key)` / `RemoveSurfaceItem(item)` | — | 按 key 或按句柄移除表面对象 |
 | `SetSegment(segs, color, size)`        | 追加  | 添加线段叠加层             |
 | `SetPoint(pts, color, size, shape)`    | 追加  | 添加点叠加层              |
 | `SetPolygon(polys, color, size)`       | 追加  | 添加多边形叠加层            |
@@ -634,6 +625,7 @@ VisionOperator.DestroyLib();
 | `SetBox(boxes, color, size)`           | 追加  | 添加包围盒叠加层            |
 | `SetTextInfo(infos, color)`            | 追加  | 添加世界坐标文本标签          |
 | `SetText2D(texts, color)`              | 追加  | 添加屏幕空间文本            |
+| `ClearOverlayItems()`                  | —   | 清空所有叠加层对象，不影响表面与内置 HUD |
 | `SetCoordinate3DSystem(coord, length)` | 追加  | 添加坐标系指示器            |
 | `SetCoordinateSystemLeftHanded(bool)`  | —   | 切换左手 / 右手坐标系（默认右手）  |
 | `ResetView(resetAll)`                  | —   | 重置视图（可选是否清空表面）      |
@@ -736,9 +728,12 @@ display2D.SetBackgroundColor(Color.Black);
 > 不要在 `Dispose()` 中直接调用 GL 删除函数——`CxDisplay` 通过内部的 `_pendingRelease` 队列在下一渲染帧内统一回收。
 
 > **大数据采样预算**
-> `SetSurface` / `AddSurface` / `SetPointCloud` / `AddPointCloud` 默认将上传预算限制为 **200 万个顶点**，超出部分按采样因子降采样；可通过 `maxPointCount` 调整 Surface 和 PointCloud 的预算。
-> `Set*AdvancedItem` / `Add*AdvancedItem` 是保留的兼容名称，实际行为与统一 API 相同。
+> `SetSurface` / `SetPointCloud` 默认将上传预算限制为 **200 万个顶点**，超出部分按采样因子降采样；可通过 `maxPointCount` 调整 Surface 和 PointCloud 的预算。
+
 > GPU 纹理超过硬件最大尺寸时也会自动进行双线性下采样。
+
+> **按 key 的 upsert 语义**
+> `SetSurface` / `SetPointCloud` / `SetMesh` 按 key 整体替换：key 不存在时追加，存在时替换该 Item（保持绘制顺序）；默认 key 分别为 `"Surface"` / `"PointCloud"` / `"Mesh"`，因此同类型重复 Set 等价于替换，不同 key 或不同类型的对象互不影响。可用 `GetSurface` / `GetPointCloud` / `GetMesh` / `GetSurfaceItem` 按 key 查询，`RemoveSurfaceItem` 按 key 或句柄移除，`ClearSurfaceItems` 清空全部。
 
 > **多 Item 颜色一致性**
 > 叠加多个表面时，颜色条与每个 Item 的颜色映射统一采用**所有 Item 的全局 Z 范围**，无需手动同步。

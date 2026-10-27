@@ -187,14 +187,14 @@ namespace VisionNet.Controls
                 if (cur == null || cur.IsDisposed) continue;
 
                 // Mesh items: no per-point grid; use the world coordinate directly.
-                if (cur is CxMeshItem || cur is CxMeshAdvancedItem)
+                if (cur is CxMeshItem)
                 {
                     if (0f < bestDist) { bestDist = 0f; bestPoint = world; bestIntensity = null; }
                     continue;
                 }
 
                 // Point cloud items: no per-point grid; use world coordinate directly.
-                if (cur is CxPointCloudItem || cur is CxPointCloudAdvancedItem)
+                if (cur is CxPointCloudItem)
                 {
                     if (0f < bestDist) { bestDist = 0f; bestPoint = world; bestIntensity = null; }
                     continue;
@@ -202,8 +202,7 @@ namespace VisionNet.Controls
 
                 // Resolve the underlying CxSurface for structured surface search.
                 CxSurface surface = null;
-                if      (cur is CxSurfaceItem        si) surface = si.Surface;
-                else if (cur is CxSurfaceAdvancedItem ai) surface = ai.Surface;
+                if (cur is CxSurfaceItem si) surface = si.Surface;
                 if (surface == null) continue;
 
                 // Transform the world-space picking point into this item's local frame so that

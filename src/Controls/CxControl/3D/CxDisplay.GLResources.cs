@@ -11,6 +11,25 @@ namespace VisionNet.Controls
             var data = item.PrepareRenderData();
             if (data == null) return;
 
+            handle.ShaderFailed = false;
+
+            // Compile first: a failing shader aborts before any buffer or texture upload.
+            if (data.ShaderSource != null)
+            {
+                handle.ShaderProgram = ShaderProgramCompiler.CompileProgram(gl,
+                    data.ShaderSource.VertexSource, data.ShaderSource.FragmentSource);
+                handle.HasShader = handle.ShaderProgram != 0;
+                handle.UniformLocations.Clear();
+                if (!handle.HasShader)
+                {
+                    // Remember the failure so ProcessResourcePool does not retry every frame.
+                    handle.ShaderFailed = true;
+                    handle.IsValid = false;
+                    handle.NeedsUpdate = false;
+                    return;
+                }
+            }
+
             if (data.VertexCount > 0)
             {
                 var tempId = new uint[1];
@@ -100,14 +119,6 @@ namespace VisionNet.Controls
                 }
             }
 
-            if (data.ShaderSource != null)
-            {
-                handle.ShaderProgram = ShaderProgramCompiler.CompileProgram(gl,
-                    data.ShaderSource.VertexSource, data.ShaderSource.FragmentSource);
-                handle.HasShader = handle.ShaderProgram != 0;
-                handle.UniformLocations.Clear();
-            }
-
             if (data.TextureData?.Data != null)
             {
                 handle.TextureId = CreateTexture(gl, data.TextureData);
@@ -116,16 +127,6 @@ namespace VisionNet.Controls
 
             if (handle.HasVAO)
                 gl.BindVertexArray(0);
-
-            // A failed shader must not leave the handle looking ready.  Otherwise
-            // ProcessResourcePool will never retry and the item will draw with
-            // program 0 forever after a transient/context-specific compile error.
-            if (data.ShaderSource != null && !handle.HasShader)
-            {
-                ReleaseGLResources(gl, handle);
-                handle.NeedsUpdate = true;
-                return;
-            }
 
             handle.IsValid = true;
             handle.NeedsUpdate = false;

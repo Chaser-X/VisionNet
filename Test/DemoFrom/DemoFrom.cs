@@ -166,7 +166,7 @@ namespace DemoFrom
                 if (surface != null)
                     cxDisplay1.SetSurface(surface);
                 if (surface2 != null)
-                    cxDisplay1.AddSurfaceWithPose(surface2, CxMatrix4X4.RotationZ(45f) * CxMatrix4X4.Translation(5, 3, 2));
+                    cxDisplay1.SetSurface(surface2, "Surface2", pose: CxMatrix4X4.RotationZ(45f) * CxMatrix4X4.Translation(5, 3, 2));
             }
 
             ////����ƽ�� Plane3D
@@ -209,6 +209,7 @@ namespace DemoFrom
             var surfacemap = VisionOperator.UniformSurface(points, surface.Intensity, 200, 3500,
                 0.1f, 0.1f, surface.ZScale, -10, -175, surface.ZOffset);
 
+            cxDisplay1.ClearSurfaceItems();
             cxDisplay1.SetSurface(surfacemap);
         }
 
@@ -446,7 +447,7 @@ namespace DemoFrom
                 if (loaded != null)
                 {
                     cxDisplay2.ResetView();
-                    cxDisplay2.SetSurfaceAdvancedItem(loaded);
+                    cxDisplay2.SetSurface(loaded);
                     MessageBox.Show($"Surface saved �� loaded\n{path}", "Save R/L");
                 }
             }
@@ -484,7 +485,7 @@ namespace DemoFrom
                 }
                 _currentMesh = mesh;
                 cxDisplay2.ResetView();
-                cxDisplay2.SetMeshAdvancedItem(mesh);
+                cxDisplay2.SetMesh(mesh);
             }
         }
 
@@ -504,7 +505,7 @@ namespace DemoFrom
                 }
                 surface = loaded;
                 cxDisplay2.ResetView();
-                cxDisplay2.SetSurfaceAdvancedItem(loaded);
+                cxDisplay2.SetSurface(loaded);
             }
         }
 
@@ -1063,7 +1064,7 @@ namespace DemoFrom
             _currentMesh = mesh;
 
             cxDisplay2.SurfaceMode = SurfaceMode.Mesh;
-            cxDisplay2.SetMeshAdvancedItem(mesh);
+            cxDisplay2.SetMesh(mesh);
             // �����Զ����� Diff ģʽ��ȡ������ע��
             // cxDisplay2.SurfaceColorMode = SurfaceColorMode.Diff;
 
@@ -1102,7 +1103,7 @@ namespace DemoFrom
             { Diff = diff };
 
             cxDisplay2.SurfaceMode = SurfaceMode.Mesh;
-            cxDisplay2.SetSurfaceAdvancedItem(surface);
+            cxDisplay2.SetSurface(surface);
             // cxDisplay2.SurfaceColorMode = SurfaceColorMode.Diff;
 
             lbl_markPos.Text = "Diff Surface Demo: right-click SurfaceColorMode->Diff";
@@ -1142,7 +1143,7 @@ namespace DemoFrom
             { Diff = diff };
 
             cxDisplay2.SurfaceMode = SurfaceMode.PointCloud;
-            cxDisplay2.SetPointCloudAdvancedItem(cloud);
+            cxDisplay2.SetPointCloud(cloud);
             // cxDisplay2.SurfaceColorMode = SurfaceColorMode.Diff;
 
             lbl_markPos.Text = "Diff PointCloud Demo: right-click SurfaceColorMode->Diff";
@@ -1212,7 +1213,7 @@ namespace DemoFrom
                 }
             var mesh = new CxMesh { Vertices = mVerts, Indices = mIdx };
             // Mesh 形式 + Color 模式（不取全局，显式指定）
-            cxDisplay2.AddMeshAdvancedItem(mesh, SurfaceMode.Mesh, SurfaceColorMode.Color);
+            cxDisplay2.SetMesh(mesh, "MixedMesh", mode: SurfaceMode.Mesh, colorMode: SurfaceColorMode.Color);
 
             // 2. PointCloud：点云形式 + Intensity 模式（与上面 Color 量纲不同）
             const int pw = 60, pl = 60;
@@ -1231,7 +1232,7 @@ namespace DemoFrom
                 xOffset: 15f, yOffset: 0f, zOffset: 0f,
                 xScale: 0.1f, yScale: 0.1f, zScale: 0.01f);
             // 点云形式 + Intensity 模式
-            cxDisplay2.AddPointCloudAdvancedItem(cloud, SurfaceMode.PointCloud, SurfaceColorMode.Intensity);
+            cxDisplay2.SetPointCloud(cloud, "MixedPointCloud", mode: SurfaceMode.PointCloud, colorMode: SurfaceColorMode.Intensity);
 
             // 两者量纲不同（Color=Z，Intensity=0-255）→ colorBar 自动隐藏
             lbl_markPos.Text = "Mesh(Mesh+Color) + PointCloud(PC+Intensity)\nColorBar hidden: mixed magnitude classes";
@@ -1383,9 +1384,9 @@ namespace DemoFrom
             var vehicleMesh  = BuildBoxMesh(2.5f, 1.5f, 1.2f, new CxPoint3D(-1.5f, 0f, 0.8f));
             var realMesh     = BuildBumpyMesh(24, 24, 0.4f, new CxPoint3D(-5f, -5f, 0.4f));
 
-            var platformItem = cxDisplay1.AddMesh(platformMesh, SurfaceMode.Mesh, SurfaceColorMode.Color, autoFit: false);
-            var vehicleItem  = cxDisplay1.AddMesh(vehicleMesh,  SurfaceMode.Mesh, SurfaceColorMode.Color, autoFit: false);
-            var realItem     = cxDisplay1.AddMesh(realMesh,     SurfaceMode.Mesh, SurfaceColorMode.Color, autoFit: true);
+            var platformItem = cxDisplay1.SetMesh(platformMesh, "Platform", mode: SurfaceMode.Mesh, colorMode: SurfaceColorMode.Color, autoFit: false);
+            var vehicleItem  = cxDisplay1.SetMesh(vehicleMesh,  "Vehicle",  mode: SurfaceMode.Mesh, colorMode: SurfaceColorMode.Color, autoFit: false);
+            var realItem     = cxDisplay1.SetMesh(realMesh,     "Real",     mode: SurfaceMode.Mesh, colorMode: SurfaceColorMode.Color, autoFit: true);
 
             // 层级：MotionPlatform（整体运动）→ Vehicle（相对平台运动）→ 实物随载具
             _platformGroup = cxDisplay1.CreateGroup("MotionPlatform");
@@ -1465,7 +1466,7 @@ namespace DemoFrom
 
             // 台面（mesh，兼作取景范围）
             var table = BuildBoxMesh(26f, 18f, 0.2f, new CxPoint3D(0f, 0f, -0.2f));
-            cxDisplay1.AddMesh(table, SurfaceMode.Mesh, SurfaceColorMode.Color, autoFit: true);
+            cxDisplay1.SetMesh(table, "Table", mode: SurfaceMode.Mesh, colorMode: SurfaceColorMode.Color, autoFit: true);
 
             // 固定件（几何 box）：龙门（立柱+顶梁，不移动）、梁上 X 导轨、台面 Y 导轨
             cxDisplay1.SetBox(new[]
@@ -1500,9 +1501,9 @@ namespace DemoFrom
             }, Color.DodgerBlue, 1f);
 
             var material = BuildBumpyMesh(30, 20, 0.2f, new CxPoint3D(-StageLx / 2, -StageLy / 2, 0f));
-            var materialItem = cxDisplay1.AddMeshWithPose(material,
-                CxMatrix4X4.Translation(0f, 0f, StageCarrierTop),
-                SurfaceMode.Mesh, SurfaceColorMode.Color, false);
+            var materialItem = cxDisplay1.SetMesh(material, "Material",
+                pose: CxMatrix4X4.Translation(0f, 0f, StageCarrierTop),
+                mode: SurfaceMode.Mesh, colorMode: SurfaceColorMode.Color, autoFit: false);
 
             _stageGroupY = cxDisplay1.CreateGroup("YSlider");
             cxDisplay1.AddToGroup(_stageGroupY, ySlider);

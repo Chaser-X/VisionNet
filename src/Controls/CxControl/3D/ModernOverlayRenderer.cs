@@ -71,6 +71,9 @@ namespace VisionNet.Controls
         // the text path has a separate VAO/VBO because its attributes are vec2/UV.
         private uint _geometryProgram;
         private uint _textProgram;
+        // Set when a shader failed to compile so draws skip instead of recompiling each call.
+        private bool _geometryProgramFailed;
+        private bool _textProgramFailed;
         private uint _geometryVao;
         private uint _geometryVbo;
         private uint _textVao;
@@ -277,7 +280,7 @@ void main() { float alpha = texture(glyph, texCoord).r; FragColor = vec4(color.r
         {
             if (positions == null || positions.Length < 3) return;
             EnsureSceneMatrices(gl);
-            EnsureGeometryProgram(gl);
+            if (!EnsureGeometryProgram(gl)) return;
             EnsureGeometryBuffers(gl);
             RenderStateSnapshot previous = CaptureRenderState(gl);
             SetRenderState(gl, depthTest, color.A < 255);
@@ -315,7 +318,7 @@ void main() { float alpha = texture(glyph, texCoord).r; FragColor = vec4(color.r
             float width = 1f)
         {
             if (positions == null || positions.Length < 2) return;
-            EnsureGeometryProgram(gl);
+            if (!EnsureGeometryProgram(gl)) return;
             EnsureGeometryBuffers(gl);
             RenderStateSnapshot previous = CaptureRenderState(gl);
             SetRenderState(gl, false, color.A < 255);
@@ -354,7 +357,7 @@ void main() { float alpha = texture(glyph, texCoord).r; FragColor = vec4(color.r
             if (positions == null || positions.Length < 2 || colors == null
                 || colors.Length < (positions.Length / 2) * 4) return;
 
-            EnsureGeometryProgram(gl);
+            if (!EnsureGeometryProgram(gl)) return;
             EnsureGeometryBuffers(gl);
             RenderStateSnapshot previous = CaptureRenderState(gl);
             SetRenderState(gl, false, true);
@@ -551,7 +554,7 @@ void main() { float alpha = texture(glyph, texCoord).r; FragColor = vec4(color.r
         /// <summary>Uploads one screen quad and composites a cached text alpha mask.</summary>
         private void DrawTextQuad(OpenGL gl, float[] quad, uint texture, Color color)
         {
-            EnsureTextProgram(gl);
+            if (!EnsureTextProgram(gl)) return;
             EnsureTextBuffers(gl);
             RenderStateSnapshot previous = CaptureRenderState(gl);
             SetRenderState(gl, false, true);
@@ -652,18 +655,22 @@ void main() { float alpha = texture(glyph, texCoord).r; FragColor = vec4(color.r
         }
 
         /// <summary>Compiles the shared geometry program once per GL context.</summary>
-        private void EnsureGeometryProgram(OpenGL gl)
+        private bool EnsureGeometryProgram(OpenGL gl)
         {
-            if (_geometryProgram != 0) return;
+            if (_geometryProgram != 0) return true;
+            if (_geometryProgramFailed) return false;
             _geometryProgram = ShaderProgramCompiler.CompileProgram(gl, GeometryVertex, GeometryFragment);
-            if (_geometryProgram != 0)
+            if (_geometryProgram == 0)
             {
-                _geometryProjection = gl.GetUniformLocation(_geometryProgram, "projection");
-                _geometryView = gl.GetUniformLocation(_geometryProgram, "view");
-                _geometryModel = gl.GetUniformLocation(_geometryProgram, "model");
-                _geometryUseVertexColor = gl.GetUniformLocation(_geometryProgram, "useVertexColor");
-                _geometryColor = gl.GetUniformLocation(_geometryProgram, "color");
+                _geometryProgramFailed = true;
+                return false;
             }
+            _geometryProjection = gl.GetUniformLocation(_geometryProgram, "projection");
+            _geometryView = gl.GetUniformLocation(_geometryProgram, "view");
+            _geometryModel = gl.GetUniformLocation(_geometryProgram, "model");
+            _geometryUseVertexColor = gl.GetUniformLocation(_geometryProgram, "useVertexColor");
+            _geometryColor = gl.GetUniformLocation(_geometryProgram, "color");
+            return true;
         }
 
         /// <summary>Allocates the reusable geometry VAO/VBO on first use.</summary>
@@ -684,16 +691,20 @@ void main() { float alpha = texture(glyph, texCoord).r; FragColor = vec4(color.r
         }
 
         /// <summary>Compiles the screen-text program once per GL context.</summary>
-        private void EnsureTextProgram(OpenGL gl)
+        private bool EnsureTextProgram(OpenGL gl)
         {
-            if (_textProgram != 0) return;
+            if (_textProgram != 0) return true;
+            if (_textProgramFailed) return false;
             _textProgram = ShaderProgramCompiler.CompileProgram(gl, TextVertex, TextFragment);
-            if (_textProgram != 0)
+            if (_textProgram == 0)
             {
-                _textProjection = gl.GetUniformLocation(_textProgram, "projection");
-                _textColor = gl.GetUniformLocation(_textProgram, "color");
-                _textGlyph = gl.GetUniformLocation(_textProgram, "glyph");
+                _textProgramFailed = true;
+                return false;
             }
+            _textProjection = gl.GetUniformLocation(_textProgram, "projection");
+            _textColor = gl.GetUniformLocation(_textProgram, "color");
+            _textGlyph = gl.GetUniformLocation(_textProgram, "glyph");
+            return true;
         }
 
         /// <summary>Allocates the reusable text quad VAO/VBO on first use.</summary>
@@ -778,6 +789,8 @@ void main() { float alpha = texture(glyph, texCoord).r; FragColor = vec4(color.r
                 gl.DeleteProgram(_geometryProgram);
                 _geometryProgram = 0;
             }
+            _geometryProgramFailed = false;
+            _textProgramFailed = false;
             _geometryProjection = _geometryView = _geometryModel = -1;
             _geometryUseVertexColor = _geometryColor = -1;
             if (_textProgram != 0)
