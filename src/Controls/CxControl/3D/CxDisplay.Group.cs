@@ -6,7 +6,7 @@ namespace VisionNet.Controls
 {
     /// <summary>
     /// Group / scene-graph API. Lets callers assemble composite models from multiple
-    /// Advanced render items and world-space geometry overlays, then drive them with a
+    /// Modern shader-backed render items and world-space geometry overlays, then drive them with a
     /// shared, animatable transform.
     /// </summary>
     public partial class CxDisplay
@@ -41,12 +41,12 @@ namespace VisionNet.Controls
         // ── Attach / detach items ────────────────────────────────────────────────
 
         /// <summary>
-        /// Attaches an Advanced surface / point-cloud / mesh render item to
+        /// Attaches a surface / point-cloud / mesh render item to
         /// <paramref name="group"/>. The item's current pose is captured as its local matrix,
         /// so attaching without changing the group's transform does not move it.
         /// </summary>
         /// <exception cref="ArgumentNullException">When <paramref name="item"/> is <c>null</c>.</exception>
-        /// <exception cref="NotSupportedException">When the item has no transform support (fixed-pipeline items).</exception>
+        /// <exception cref="NotSupportedException">When the item has no transform support.</exception>
         public void AddToGroup(CxGroup group, ICxObjRenderItem item)
         {
             if (item == null) throw new ArgumentNullException(nameof(item));
@@ -108,7 +108,7 @@ namespace VisionNet.Controls
         }
 
         /// <summary>
-        /// Detaches an Advanced render item from <paramref name="group"/>, restoring the pose
+        /// Detaches a render item from <paramref name="group"/>, restoring the pose
         /// it had before it entered the group.
         /// </summary>
         /// <returns><c>true</c> when the item was attached to the group and removed.</returns>

@@ -16,7 +16,6 @@
   - `CxSegment3DItem.cs`：3D线段
   - `CxSurfaceItem.cs`：点云/表面
   - `CxMeshItem.cs`：三角网格
-  - `CxSurfaceAdvancedItem.cs`：大规模点云/表面
   - `CxColorBarItem.cs`：色条
   - `CxCoordinationTagItem.cs`：坐标标签
   - `CxCoordinateSystemItem.cs`：坐标系

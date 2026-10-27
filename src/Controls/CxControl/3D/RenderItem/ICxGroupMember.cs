@@ -7,7 +7,7 @@ namespace VisionNet.Controls
     /// lifetime flag and a settable model matrix (pose).
     /// </summary>
     /// <remarks>
-    /// Implemented by the Advanced surface items (mesh / point cloud / structured surface)
+    /// Implemented by the modern shader-backed surface items (mesh / point cloud / structured surface)
     /// and by the world-space geometry overlay items. Screen-space HUD overlays
     /// (colour bar, coordinate tag, 2D text) implement this interface but leave
     /// <see cref="SupportsGroupTransform"/> at <c>false</c> so <see cref="CxDisplay.AddToGroup(CxGroup, ICxGroupMember)"/>

@@ -1,3 +1,6 @@
+using System.Collections.Generic;
+using SharpGL;
+
 namespace VisionNet.Controls
 {
     /// <summary>
@@ -7,10 +10,11 @@ namespace VisionNet.Controls
     public class GLResourceHandle
     {
         /// <summary>
-        /// VBO IDs for vertex data. Index 0 = positions, 1 = colours or UVs, 2 = reserved.
+        /// VBO IDs for vertex data. Index 0 = positions, 1 = colours or UVs,
+        /// 2 = difference values, 3 = per-vertex intensity.
         /// Allocated count is stored in <see cref="VboCount"/>.
         /// </summary>
-        public uint[] VboIds { get; set; } = new uint[3];
+        public uint[] VboIds { get; set; } = new uint[4];
 
         /// <summary>Vertex Array Object ID. Valid only when <see cref="HasVAO"/> is <c>true</c>.</summary>
         public uint VaoId { get; set; }
@@ -54,5 +58,24 @@ namespace VisionNet.Controls
         /// <c>true</c> when the second VBO slot contains UV coordinates rather than RGB colours.
         /// </summary>
         public bool UseUVMode { get; set; }
+
+        /// <summary>
+        /// Caches uniform locations for the linked program. Locations are immutable
+        /// until the program is rebuilt, so render loops can avoid repeated driver
+        /// lookups.
+        /// </summary>
+        internal readonly Dictionary<string, int> UniformLocations
+            = new Dictionary<string, int>(System.StringComparer.Ordinal);
+
+        internal int GetUniformLocation(OpenGL gl, string name)
+        {
+            int location;
+            if (!UniformLocations.TryGetValue(name, out location))
+            {
+                location = gl.GetUniformLocation(ShaderProgram, name);
+                UniformLocations[name] = location;
+            }
+            return location;
+        }
     }
 }

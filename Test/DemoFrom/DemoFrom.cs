@@ -159,14 +159,14 @@ namespace DemoFrom
 
             if (_pointCloud != null)
             {
-                cxDisplay1.SetPointCloudAdvancedItem(_pointCloud);
+                cxDisplay1.SetPointCloud(_pointCloud);
             }
             else
             {
                 if (surface != null)
-                    cxDisplay1.SetSurfaceAdvancedItem(surface);
+                    cxDisplay1.SetSurface(surface);
                 if (surface2 != null)
-                    cxDisplay1.AddSurfaceAdvancedItem(surface2, CxMatrix4X4.RotationZ(45f) * CxMatrix4X4.Translation(5, 3, 2));
+                    cxDisplay1.AddSurfaceWithPose(surface2, CxMatrix4X4.RotationZ(45f) * CxMatrix4X4.Translation(5, 3, 2));
             }
 
             ////����ƽ�� Plane3D
@@ -415,7 +415,7 @@ namespace DemoFrom
             if (result == null) return;
 
             cxDisplay1.ResetView();
-            cxDisplay1.SetSurfaceAdvancedItem(result);
+            cxDisplay1.SetSurface(result);
         }
 
         private bool _poseApplied = false;
@@ -427,9 +427,9 @@ namespace DemoFrom
                 ? CxMatrix4X4.RotationZ(45f) * CxMatrix4X4.Translation(5, 3, 2)
                 : CxMatrix4X4.Identity();
 
-            cxDisplay1.SetSurfaceAdvancedItemPose(pose);
-            cxDisplay1.SetPointCloudAdvancedItemPose(pose);
-            cxDisplay1.SetMeshAdvancedItemPose(pose);
+            cxDisplay1.SetSurfacePose(pose);
+            cxDisplay1.SetPointCloudPose(pose);
+            cxDisplay1.SetMeshPose(pose);
 
             btn_testPose.Text = _poseApplied ? "Reset Pose" : "Test Pose";
         }
@@ -1383,9 +1383,9 @@ namespace DemoFrom
             var vehicleMesh  = BuildBoxMesh(2.5f, 1.5f, 1.2f, new CxPoint3D(-1.5f, 0f, 0.8f));
             var realMesh     = BuildBumpyMesh(24, 24, 0.4f, new CxPoint3D(-5f, -5f, 0.4f));
 
-            var platformItem = cxDisplay1.AddMeshAdvancedItem(platformMesh, SurfaceMode.Mesh, SurfaceColorMode.Color, autoFit: false);
-            var vehicleItem  = cxDisplay1.AddMeshAdvancedItem(vehicleMesh,  SurfaceMode.Mesh, SurfaceColorMode.Color, autoFit: false);
-            var realItem     = cxDisplay1.AddMeshAdvancedItem(realMesh,     SurfaceMode.Mesh, SurfaceColorMode.Color, autoFit: true);
+            var platformItem = cxDisplay1.AddMesh(platformMesh, SurfaceMode.Mesh, SurfaceColorMode.Color, autoFit: false);
+            var vehicleItem  = cxDisplay1.AddMesh(vehicleMesh,  SurfaceMode.Mesh, SurfaceColorMode.Color, autoFit: false);
+            var realItem     = cxDisplay1.AddMesh(realMesh,     SurfaceMode.Mesh, SurfaceColorMode.Color, autoFit: true);
 
             // 层级：MotionPlatform（整体运动）→ Vehicle（相对平台运动）→ 实物随载具
             _platformGroup = cxDisplay1.CreateGroup("MotionPlatform");
@@ -1465,7 +1465,7 @@ namespace DemoFrom
 
             // 台面（mesh，兼作取景范围）
             var table = BuildBoxMesh(26f, 18f, 0.2f, new CxPoint3D(0f, 0f, -0.2f));
-            cxDisplay1.AddMeshAdvancedItem(table, SurfaceMode.Mesh, SurfaceColorMode.Color, autoFit: true);
+            cxDisplay1.AddMesh(table, SurfaceMode.Mesh, SurfaceColorMode.Color, autoFit: true);
 
             // 固定件（几何 box）：龙门（立柱+顶梁，不移动）、梁上 X 导轨、台面 Y 导轨
             cxDisplay1.SetBox(new[]
@@ -1500,9 +1500,9 @@ namespace DemoFrom
             }, Color.DodgerBlue, 1f);
 
             var material = BuildBumpyMesh(30, 20, 0.2f, new CxPoint3D(-StageLx / 2, -StageLy / 2, 0f));
-            var materialItem = cxDisplay1.AddMeshAdvancedItem(material,
+            var materialItem = cxDisplay1.AddMeshWithPose(material,
                 CxMatrix4X4.Translation(0f, 0f, StageCarrierTop),
-                SurfaceMode.Mesh, SurfaceColorMode.Color, autoFit: false);
+                SurfaceMode.Mesh, SurfaceColorMode.Color, false);
 
             _stageGroupY = cxDisplay1.CreateGroup("YSlider");
             cxDisplay1.AddToGroup(_stageGroupY, ySlider);

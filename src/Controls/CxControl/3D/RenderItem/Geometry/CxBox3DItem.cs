@@ -31,6 +31,22 @@ namespace VisionNet.Controls
         private int _hitVertexIndex = -1;
 
         private static readonly int[] OppositeVertex = { 6, 7, 4, 5, 2, 3, 0, 1 };
+        private static readonly int[] TriangleVertexIndices =
+        {
+            2,3,0, 2,0,1, 6,4,7, 6,5,4,
+            6,2,5, 5,1,2, 7,0,3, 7,4,0,
+            6,3,2, 6,7,3, 4,5,1, 4,1,0
+        };
+        private static readonly int[] EdgeVertexIndices =
+        {
+            0,1, 1,2, 2,3, 3,0,
+            4,5, 5,6, 6,7, 7,4,
+            0,4, 1,5, 2,6, 3,7
+        };
+        private readonly float[] _vertexScratch = new float[24];
+        private float[] _trianglesBuffer = new float[0];
+        private float[] _edgesBuffer = new float[0];
+        private float[] _selectedBuffer = new float[24];
 
         /// <inheritdoc/>
         public override bool HitTest(CxPoint3D worldPos) => FindHit(worldPos).box >= 0;
@@ -145,84 +161,79 @@ namespace VisionNet.Controls
             if (Box3Ds == null || Box3Ds.Length == 0) return;
 
             PushModelMatrix(gl);
+            var renderer = ModernOverlayRenderer.For(gl);
+            int triangleLength = Box3Ds.Length * TriangleVertexIndices.Length * 3;
+            int edgeLength = Box3Ds.Length * EdgeVertexIndices.Length * 3;
+            if (_trianglesBuffer.Length != triangleLength)
+                _trianglesBuffer = new float[triangleLength];
+            if (_edgesBuffer.Length != edgeLength)
+                _edgesBuffer = new float[edgeLength];
+            int triangleOffset = 0;
+            int edgeOffset = 0;
             foreach (var box in Box3Ds)
             {
-                float hx = box.Size.Width  / 2;
-                float hy = box.Size.Height / 2;
-                float hz = box.Size.Depth  / 2;
-                float cx = box.Center.X, cy = box.Center.Y, cz = box.Center.Z;
-
-                // --- Semi-transparent filled faces ---
-                gl.Color(Color.R / 255.0, Color.G / 255.0, Color.B / 255.0, Color.A / 255.0);
-                gl.Begin(OpenGL.GL_QUADS);
-                // Front (+Z)
-                gl.Vertex(cx - hx, cy - hy, cz + hz); gl.Vertex(cx + hx, cy - hy, cz + hz);
-                gl.Vertex(cx + hx, cy + hy, cz + hz); gl.Vertex(cx - hx, cy + hy, cz + hz);
-                // Back (−Z)
-                gl.Vertex(cx - hx, cy - hy, cz - hz); gl.Vertex(cx + hx, cy - hy, cz - hz);
-                gl.Vertex(cx + hx, cy + hy, cz - hz); gl.Vertex(cx - hx, cy + hy, cz - hz);
-                // Left (−X)
-                gl.Vertex(cx - hx, cy - hy, cz - hz); gl.Vertex(cx - hx, cy - hy, cz + hz);
-                gl.Vertex(cx - hx, cy + hy, cz + hz); gl.Vertex(cx - hx, cy + hy, cz - hz);
-                // Right (+X)
-                gl.Vertex(cx + hx, cy - hy, cz - hz); gl.Vertex(cx + hx, cy - hy, cz + hz);
-                gl.Vertex(cx + hx, cy + hy, cz + hz); gl.Vertex(cx + hx, cy + hy, cz - hz);
-                // Top (+Y)
-                gl.Vertex(cx - hx, cy + hy, cz - hz); gl.Vertex(cx - hx, cy + hy, cz + hz);
-                gl.Vertex(cx + hx, cy + hy, cz + hz); gl.Vertex(cx + hx, cy + hy, cz - hz);
-                // Bottom (−Y)
-                gl.Vertex(cx - hx, cy - hy, cz - hz); gl.Vertex(cx - hx, cy - hy, cz + hz);
-                gl.Vertex(cx + hx, cy - hy, cz + hz); gl.Vertex(cx + hx, cy - hy, cz - hz);
-                gl.End();
-
-                // --- Opaque wireframe edges ---
-                gl.Color(DrawColor.R / 255.0, DrawColor.G / 255.0, DrawColor.B / 255.0, 1.0);
-                gl.LineWidth(Size);
-                gl.Begin(OpenGL.GL_LINES);
-                // Front face edges
-                gl.Vertex(cx - hx, cy - hy, cz + hz); gl.Vertex(cx + hx, cy - hy, cz + hz);
-                gl.Vertex(cx + hx, cy - hy, cz + hz); gl.Vertex(cx + hx, cy + hy, cz + hz);
-                gl.Vertex(cx + hx, cy + hy, cz + hz); gl.Vertex(cx - hx, cy + hy, cz + hz);
-                gl.Vertex(cx - hx, cy + hy, cz + hz); gl.Vertex(cx - hx, cy - hy, cz + hz);
-                // Back face edges
-                gl.Vertex(cx - hx, cy - hy, cz - hz); gl.Vertex(cx + hx, cy - hy, cz - hz);
-                gl.Vertex(cx + hx, cy - hy, cz - hz); gl.Vertex(cx + hx, cy + hy, cz - hz);
-                gl.Vertex(cx + hx, cy + hy, cz - hz); gl.Vertex(cx - hx, cy + hy, cz - hz);
-                gl.Vertex(cx - hx, cy + hy, cz - hz); gl.Vertex(cx - hx, cy - hy, cz - hz);
-                // Left pillar edges (−X)
-                gl.Vertex(cx - hx, cy - hy, cz - hz); gl.Vertex(cx - hx, cy - hy, cz + hz);
-                gl.Vertex(cx - hx, cy + hy, cz - hz); gl.Vertex(cx - hx, cy + hy, cz + hz);
-                // Right pillar edges (+X)
-                gl.Vertex(cx + hx, cy - hy, cz - hz); gl.Vertex(cx + hx, cy - hy, cz + hz);
-                gl.Vertex(cx + hx, cy + hy, cz - hz); gl.Vertex(cx + hx, cy + hy, cz + hz);
-                // Top horizontal edges (+Y)
-                gl.Vertex(cx - hx, cy + hy, cz - hz); gl.Vertex(cx + hx, cy + hy, cz - hz);
-                gl.Vertex(cx - hx, cy + hy, cz + hz); gl.Vertex(cx + hx, cy + hy, cz + hz);
-                // Bottom horizontal edges (−Y)
-                gl.Vertex(cx - hx, cy - hy, cz - hz); gl.Vertex(cx + hx, cy - hy, cz - hz);
-                gl.Vertex(cx - hx, cy - hy, cz + hz); gl.Vertex(cx + hx, cy - hy, cz + hz);
-                gl.End();
+                FillVertexScratch(box);
+                for (int i = 0; i < TriangleVertexIndices.Length; i++)
+                {
+                    int source = TriangleVertexIndices[i] * 3;
+                    _trianglesBuffer[triangleOffset++] = _vertexScratch[source];
+                    _trianglesBuffer[triangleOffset++] = _vertexScratch[source + 1];
+                    _trianglesBuffer[triangleOffset++] = _vertexScratch[source + 2];
+                }
+                for (int i = 0; i < EdgeVertexIndices.Length; i++)
+                {
+                    int source = EdgeVertexIndices[i] * 3;
+                    _edgesBuffer[edgeOffset++] = _vertexScratch[source];
+                    _edgesBuffer[edgeOffset++] = _vertexScratch[source + 1];
+                    _edgesBuffer[edgeOffset++] = _vertexScratch[source + 2];
+                }
             }
+            renderer.Draw(gl, OpenGL.GL_TRIANGLES, _trianglesBuffer,
+                Color.FromArgb(Color.A, Color.R, Color.G, Color.B));
+            renderer.Draw(gl, OpenGL.GL_LINES, _edgesBuffer, DrawColor, Size);
 
             // Vertex markers: show the 8 corners of the hit box when active and selected.
             if (IsActiveObj && IsSelected && _hitBoxIndex >= 0 && _hitBoxIndex < Box3Ds.Length)
             {
-                gl.PointSize(10f);
-                gl.Begin(OpenGL.GL_POINTS);
-                gl.Color(DrawColor.R / 255.0, DrawColor.G / 255.0, DrawColor.B / 255.0);
-                foreach (var v in GetVertices(Box3Ds[_hitBoxIndex]))
-                    gl.Vertex(v.X, v.Y, v.Z);
-                gl.End();
-                gl.PointSize(1f);
+                FillVertexScratch(Box3Ds[_hitBoxIndex]);
+                Array.Copy(_vertexScratch, _selectedBuffer, _vertexScratch.Length);
+                renderer.Draw(gl, OpenGL.GL_POINTS, _selectedBuffer, DrawColor, 10f);
             }
             PopModelMatrix(gl);
+        }
+
+        private void FillVertexScratch(CxBox3D box)
+        {
+            float hx = box.Size.Width / 2f, hy = box.Size.Height / 2f, hz = box.Size.Depth / 2f;
+            float cx = box.Center.X, cy = box.Center.Y, cz = box.Center.Z;
+            WriteVertex(0, cx + hx, cy + hy, cz + hz);
+            WriteVertex(1, cx - hx, cy + hy, cz + hz);
+            WriteVertex(2, cx - hx, cy - hy, cz + hz);
+            WriteVertex(3, cx + hx, cy - hy, cz + hz);
+            WriteVertex(4, cx + hx, cy + hy, cz - hz);
+            WriteVertex(5, cx - hx, cy + hy, cz - hz);
+            WriteVertex(6, cx - hx, cy - hy, cz - hz);
+            WriteVertex(7, cx + hx, cy - hy, cz - hz);
+        }
+
+        private void WriteVertex(int index, float x, float y, float z)
+        {
+            int offset = index * 3;
+            _vertexScratch[offset] = x;
+            _vertexScratch[offset + 1] = y;
+            _vertexScratch[offset + 2] = z;
         }
 
         /// <inheritdoc/>
         protected override void Dispose(bool disposing)
         {
             if (disposing)
+            {
                 Box3Ds = null;
+                _trianglesBuffer = null;
+                _edgesBuffer = null;
+                _selectedBuffer = null;
+            }
             base.Dispose(disposing);
         }
     }

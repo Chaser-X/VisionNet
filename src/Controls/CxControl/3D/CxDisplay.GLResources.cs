@@ -1,7 +1,5 @@
 using System;
-using System.Diagnostics;
 using System.Runtime.InteropServices;
-using System.Text;
 using SharpGL;
 
 namespace VisionNet.Controls
@@ -16,14 +14,10 @@ namespace VisionNet.Controls
             if (data.VertexCount > 0)
             {
                 var tempId = new uint[1];
-
-                if (data.UseVAO)
-                {
-                    gl.GenVertexArrays(1, tempId);
-                    handle.VaoId = tempId[0];
-                    handle.HasVAO = true;
-                    gl.BindVertexArray(handle.VaoId);
-                }
+                gl.GenVertexArrays(1, tempId);
+                handle.VaoId = tempId[0];
+                handle.HasVAO = true;
+                gl.BindVertexArray(handle.VaoId);
 
                 int vboIndex = 0;
 
@@ -33,11 +27,8 @@ namespace VisionNet.Controls
                     handle.VboIds[vboIndex] = tempId[0];
                     gl.BindBuffer(OpenGL.GL_ARRAY_BUFFER, handle.VboIds[vboIndex]);
                     gl.BufferData(OpenGL.GL_ARRAY_BUFFER, data.Vertices, OpenGL.GL_STATIC_DRAW);
-                    if (data.UseVAO)
-                    {
-                        gl.VertexAttribPointer(0, 3, OpenGL.GL_FLOAT, false, 3 * sizeof(float), IntPtr.Zero);
-                        gl.EnableVertexAttribArray(0);
-                    }
+                    gl.VertexAttribPointer(0, 3, OpenGL.GL_FLOAT, false, 3 * sizeof(float), IntPtr.Zero);
+                    gl.EnableVertexAttribArray(0);
                     vboIndex++;
                 }
 
@@ -47,11 +38,8 @@ namespace VisionNet.Controls
                     handle.VboIds[vboIndex] = tempId[0];
                     gl.BindBuffer(OpenGL.GL_ARRAY_BUFFER, handle.VboIds[vboIndex]);
                     gl.BufferData(OpenGL.GL_ARRAY_BUFFER, data.Colors, OpenGL.GL_STATIC_DRAW);
-                    if (data.UseVAO)
-                    {
-                        gl.VertexAttribPointer(1, 3, OpenGL.GL_FLOAT, false, 3 * sizeof(float), IntPtr.Zero);
-                        gl.EnableVertexAttribArray(1);
-                    }
+                    gl.VertexAttribPointer(1, 3, OpenGL.GL_FLOAT, false, 3 * sizeof(float), IntPtr.Zero);
+                    gl.EnableVertexAttribArray(1);
                     vboIndex++;
                 }
                 else if (data.UVCoords != null && data.UVCoords.Length >= data.VertexCount * 2)
@@ -60,11 +48,8 @@ namespace VisionNet.Controls
                     handle.VboIds[vboIndex] = tempId[0];
                     gl.BindBuffer(OpenGL.GL_ARRAY_BUFFER, handle.VboIds[vboIndex]);
                     gl.BufferData(OpenGL.GL_ARRAY_BUFFER, data.UVCoords, OpenGL.GL_STATIC_DRAW);
-                    if (data.UseVAO)
-                    {
-                        gl.VertexAttribPointer(1, 2, OpenGL.GL_FLOAT, false, 2 * sizeof(float), IntPtr.Zero);
-                        gl.EnableVertexAttribArray(1);
-                    }
+                    gl.VertexAttribPointer(1, 2, OpenGL.GL_FLOAT, false, 2 * sizeof(float), IntPtr.Zero);
+                    gl.EnableVertexAttribArray(1);
                     vboIndex++;
                 }
 
@@ -74,11 +59,19 @@ namespace VisionNet.Controls
                     handle.VboIds[vboIndex] = tempId[0];
                     gl.BindBuffer(OpenGL.GL_ARRAY_BUFFER, handle.VboIds[vboIndex]);
                     gl.BufferData(OpenGL.GL_ARRAY_BUFFER, data.DiffValues, OpenGL.GL_STATIC_DRAW);
-                    if (data.UseVAO)
-                    {
-                        gl.VertexAttribPointer(2, 1, OpenGL.GL_FLOAT, false, 0, IntPtr.Zero);
-                        gl.EnableVertexAttribArray(2);
-                    }
+                    gl.VertexAttribPointer(2, 1, OpenGL.GL_FLOAT, false, 0, IntPtr.Zero);
+                    gl.EnableVertexAttribArray(2);
+                    vboIndex++;
+                }
+
+                if (data.IntensityValues != null && data.IntensityValues.Length >= data.VertexCount)
+                {
+                    gl.GenBuffers(1, tempId);
+                    handle.VboIds[vboIndex] = tempId[0];
+                    gl.BindBuffer(OpenGL.GL_ARRAY_BUFFER, handle.VboIds[vboIndex]);
+                    gl.BufferData(OpenGL.GL_ARRAY_BUFFER, data.IntensityValues, OpenGL.GL_STATIC_DRAW);
+                    gl.VertexAttribPointer(3, 1, OpenGL.GL_FLOAT, false, sizeof(float), IntPtr.Zero);
+                    gl.EnableVertexAttribArray(3);
                     vboIndex++;
                 }
 
@@ -109,8 +102,10 @@ namespace VisionNet.Controls
 
             if (data.ShaderSource != null)
             {
-                handle.ShaderProgram = CompileShader(gl, data.ShaderSource);
-                handle.HasShader = true;
+                handle.ShaderProgram = ShaderProgramCompiler.CompileProgram(gl,
+                    data.ShaderSource.VertexSource, data.ShaderSource.FragmentSource);
+                handle.HasShader = handle.ShaderProgram != 0;
+                handle.UniformLocations.Clear();
             }
 
             if (data.TextureData?.Data != null)
@@ -121,6 +116,16 @@ namespace VisionNet.Controls
 
             if (handle.HasVAO)
                 gl.BindVertexArray(0);
+
+            // A failed shader must not leave the handle looking ready.  Otherwise
+            // ProcessResourcePool will never retry and the item will draw with
+            // program 0 forever after a transient/context-specific compile error.
+            if (data.ShaderSource != null && !handle.HasShader)
+            {
+                ReleaseGLResources(gl, handle);
+                handle.NeedsUpdate = true;
+                return;
+            }
 
             handle.IsValid = true;
             handle.NeedsUpdate = false;
@@ -155,6 +160,7 @@ namespace VisionNet.Controls
                 handle.ShaderProgram = 0;
                 handle.HasShader = false;
             }
+            handle.UniformLocations.Clear();
 
             if (handle.HasTexture && handle.TextureId != 0)
             {
@@ -164,51 +170,6 @@ namespace VisionNet.Controls
             }
 
             handle.IsValid = false;
-        }
-
-        private uint CompileShader(OpenGL gl, ShaderSource source)
-        {
-            uint vs = gl.CreateShader(OpenGL.GL_VERTEX_SHADER);
-            gl.ShaderSource(vs, source.VertexSource);
-            gl.CompileShader(vs);
-            LogShaderError(gl, vs, "vertex");
-
-            uint fs = gl.CreateShader(OpenGL.GL_FRAGMENT_SHADER);
-            gl.ShaderSource(fs, source.FragmentSource);
-            gl.CompileShader(fs);
-            LogShaderError(gl, fs, "fragment");
-
-            uint prog = gl.CreateProgram();
-            gl.AttachShader(prog, vs);
-            gl.AttachShader(prog, fs);
-            gl.LinkProgram(prog);
-
-            int[] status = new int[1];
-            gl.GetProgram(prog, OpenGL.GL_LINK_STATUS, status);
-            if (status[0] == OpenGL.GL_FALSE)
-            {
-                int[] len = new int[1];
-                gl.GetProgram(prog, OpenGL.GL_INFO_LOG_LENGTH, len);
-                var log = new StringBuilder(len[0]);
-                gl.GetProgramInfoLog(prog, len[0], IntPtr.Zero, log);
-                Debug.WriteLine("Shader link error: " + log);
-            }
-
-            gl.DeleteShader(vs);
-            gl.DeleteShader(fs);
-            return prog;
-        }
-
-        private void LogShaderError(OpenGL gl, uint shader, string stage)
-        {
-            int[] status = new int[1];
-            gl.GetShader(shader, OpenGL.GL_COMPILE_STATUS, status);
-            if (status[0] != OpenGL.GL_FALSE) return;
-            int[] len = new int[1];
-            gl.GetShader(shader, OpenGL.GL_INFO_LOG_LENGTH, len);
-            var log = new StringBuilder(len[0]);
-            gl.GetShaderInfoLog(shader, len[0], IntPtr.Zero, log);
-            Debug.WriteLine($"{stage} shader error: {log}");
         }
 
         private uint CreateTexture(OpenGL gl, TextureData tex)

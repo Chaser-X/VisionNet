@@ -1,5 +1,4 @@
 using SharpGL;
-using SharpGL.SceneGraph;
 using System.Drawing;
 using VisionNet.DataType;
 
@@ -24,6 +23,9 @@ namespace VisionNet.Controls
         /// <summary>Gets or sets the text colour used for coordinate labels.</summary>
         public Color TextColor { get; set; } = Color.White;
 
+        private readonly float[] _backgroundPositions = new float[12];
+        private readonly float[] _borderPositions = new float[8];
+
         /// <summary>
         /// Updates the coordinates and intensity value shown by the tooltip.
         /// </summary>
@@ -40,67 +42,36 @@ namespace VisionNet.Controls
         {
             if (!Visible) return;
 
-            var objCoord    = new Vertex(Point.X, Point.Y, Point.Z);
-            var screenCoord = gl.Project(objCoord);
-
-            // Skip if the point projects outside the viewport or behind the camera.
-            if (screenCoord.X < 0 || screenCoord.X > gl.RenderContextProvider.Width ||
-                screenCoord.Y < 0 || screenCoord.Y > gl.RenderContextProvider.Height)
-                return;
-            if (screenCoord.Z < 0 || screenCoord.Z > 1)
+            var renderer = ModernOverlayRenderer.For(gl);
+            float sx, sy, sz;
+            if (!renderer.Project(gl, Point.X, Point.Y, Point.Z, out sx, out sy, out sz)) return;
+            if (sx < 0 || sx > gl.RenderContextProvider.Width || sy < 0 || sy > gl.RenderContextProvider.Height)
                 return;
 
             int rectWidth  = 80;
             int rectHeight = Intensity.HasValue ? 90 : 80;
-            int startX     = (int)screenCoord.X;
-            int startY     = (int)screenCoord.Y - 10;
-
-            // Switch to 2D orthographic projection.
-            gl.Disable(OpenGL.GL_DEPTH_TEST);
-            gl.MatrixMode(OpenGL.GL_PROJECTION);
-            gl.PushMatrix();
-            gl.LoadIdentity();
-            gl.Ortho(0, gl.RenderContextProvider.Width, 0, gl.RenderContextProvider.Height, -1, 1);
-            gl.MatrixMode(OpenGL.GL_MODELVIEW);
-            gl.PushMatrix();
-            gl.LoadIdentity();
-
-            // Semi-transparent dark background.
-            gl.Color(0.0f, 0.0f, 0.0f, 0.5f);
-            gl.Begin(OpenGL.GL_QUADS);
-            gl.Vertex(startX,             startY);
-            gl.Vertex(startX + rectWidth, startY);
-            gl.Vertex(startX + rectWidth, startY - rectHeight);
-            gl.Vertex(startX,             startY - rectHeight);
-            gl.End();
-
-            // White border outline.
-            gl.Color(1.0f, 1.0f, 1.0f, 1.0f);
-            gl.LineWidth(1.0f);
-            gl.Begin(OpenGL.GL_LINE_LOOP);
-            gl.Vertex(startX - 1,             startY + 1);
-            gl.Vertex(startX + rectWidth + 1, startY + 1);
-            gl.Vertex(startX + rectWidth + 1, startY - rectHeight - 1);
-            gl.Vertex(startX - 1,             startY - rectHeight - 1);
-            gl.End();
+            int startX = (int)sx;
+            int startY = (int)sy - 10;
+            _backgroundPositions[0] = startX; _backgroundPositions[1] = startY;
+            _backgroundPositions[2] = startX + rectWidth; _backgroundPositions[3] = startY;
+            _backgroundPositions[4] = startX + rectWidth; _backgroundPositions[5] = startY - rectHeight;
+            _backgroundPositions[6] = startX; _backgroundPositions[7] = startY;
+            _backgroundPositions[8] = startX + rectWidth; _backgroundPositions[9] = startY - rectHeight;
+            _backgroundPositions[10] = startX; _backgroundPositions[11] = startY - rectHeight;
+            renderer.DrawScreenGeometry(gl, OpenGL.GL_TRIANGLES, _backgroundPositions, Color.FromArgb(128, 0, 0, 0));
+            _borderPositions[0] = startX - 1; _borderPositions[1] = startY + 1;
+            _borderPositions[2] = startX + rectWidth + 1; _borderPositions[3] = startY + 1;
+            _borderPositions[4] = startX + rectWidth + 1; _borderPositions[5] = startY - rectHeight - 1;
+            _borderPositions[6] = startX - 1; _borderPositions[7] = startY - rectHeight - 1;
+            renderer.DrawScreenGeometry(gl, OpenGL.GL_LINE_LOOP, _borderPositions, Color.White);
 
             // Coordinate text labels.
-            float r = TextColor.R / 255.0f;
-            float g = TextColor.G / 255.0f;
-            float b = TextColor.B / 255.0f;
             int   tx = startX + 10;
-            gl.DrawText(tx, startY - 20, r, g, b, "Helvetica", 12, $"X: {Point.X:F3}");
-            gl.DrawText(tx, startY - 40, r, g, b, "Helvetica", 12, $"Y: {Point.Y:F3}");
-            gl.DrawText(tx, startY - 60, r, g, b, "Helvetica", 12, $"Z: {Point.Z:F3}");
+            renderer.DrawText(gl, tx, startY - 20, TextColor, 12, $"X: {Point.X:F3}");
+            renderer.DrawText(gl, tx, startY - 40, TextColor, 12, $"Y: {Point.Y:F3}");
+            renderer.DrawText(gl, tx, startY - 60, TextColor, 12, $"Z: {Point.Z:F3}");
             if (Intensity.HasValue)
-                gl.DrawText(tx, startY - 80, r, g, b, "Helvetica", 12, $"I: {Intensity.Value}");
-
-            // Restore matrices and depth test.
-            gl.PopMatrix();
-            gl.MatrixMode(OpenGL.GL_PROJECTION);
-            gl.PopMatrix();
-            gl.MatrixMode(OpenGL.GL_MODELVIEW);
-            gl.Enable(OpenGL.GL_DEPTH_TEST);
+                renderer.DrawText(gl, tx, startY - 80, TextColor, 12, $"I: {Intensity.Value}");
         }
     }
 }

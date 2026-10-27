@@ -1,5 +1,4 @@
 using SharpGL;
-using SharpGL.SceneGraph;
 using System.Drawing;
 using VisionNet.DataType;
 
@@ -18,7 +17,7 @@ namespace VisionNet.Controls
         /// <summary>Initializes the item with the given text labels, colour, and size.</summary>
         /// <param name="textInfos">World-anchored text labels.</param>
         /// <param name="color">Text colour.</param>
-        /// <param name="size">Font size scale (passed to <c>gl.DrawText</c>).</param>
+        /// <param name="size">Font size scale used by the GLSL text overlay renderer.</param>
         public CxTextInfoItem(CxTextInfo[] textInfos, Color color, float size = 1.0f) : base(color, size)
         {
             TextInfos = textInfos;
@@ -33,23 +32,15 @@ namespace VisionNet.Controls
             if (TextInfos == null || TextInfos.Length == 0) return;
 
             PushModelMatrix(gl);
-            float r = DrawColor.R / 255.0f;
-            float g = DrawColor.G / 255.0f;
-            float b = DrawColor.B / 255.0f;
-
+            var renderer = ModernOverlayRenderer.For(gl);
             foreach (var info in TextInfos)
             {
-                var objCoord    = new Vertex(info.Location.X, info.Location.Y, info.Location.Z);
-                var screenCoord = gl.Project(objCoord);
-
-                // Skip labels that project outside the viewport or behind the camera.
-                if (screenCoord.X < 0 || screenCoord.X > gl.RenderContextProvider.Width ||
-                    screenCoord.Y < 0 || screenCoord.Y > gl.RenderContextProvider.Height)
+                float sx, sy, sz;
+                if (!renderer.Project(gl, info.Location.X, info.Location.Y, info.Location.Z,
+                    out sx, out sy, out sz)) continue;
+                if (sx < 0 || sx > gl.RenderContextProvider.Width || sy < 0 || sy > gl.RenderContextProvider.Height)
                     continue;
-                if (screenCoord.Z < 0 || screenCoord.Z > 1)
-                    continue;
-
-                gl.DrawText((int)screenCoord.X, (int)screenCoord.Y, r, g, b, "Arial", info.Size, info.Text);
+                renderer.DrawText(gl, (int)sx, (int)sy, DrawColor, info.Size, info.Text);
             }
             PopModelMatrix(gl);
         }

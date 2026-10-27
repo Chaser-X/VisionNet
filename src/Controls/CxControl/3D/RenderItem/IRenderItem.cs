@@ -7,7 +7,7 @@ namespace VisionNet.Controls
 {
     /// <summary>
     /// Minimal interface for simple overlay render items (segments, points, polygons, text, etc.).
-    /// Implementations draw directly via the fixed-function OpenGL pipeline.
+    /// Implementations draw through the modern GLSL overlay renderer.
     /// </summary>
     public interface IRenderItem : IDisposable
     {
@@ -87,21 +87,19 @@ namespace VisionNet.Controls
         }
 
         /// <summary>
-        /// Pushes the item's model matrix onto the fixed-function matrix stack.
-        /// Must be paired with <see cref="PopModelMatrix"/>. No-op when unsupported or identity.
+        /// Makes the item's model matrix available to the modern overlay renderer.
+        /// Must be paired with <see cref="PopModelMatrix"/>.
         /// </summary>
         protected void PushModelMatrix(OpenGL gl)
         {
-            if (!HasModelMatrix) return;
-            gl.PushMatrix();
-            gl.MultMatrix(ModelMatrix.Transpose().Data);
+            ModernOverlayRenderer.For(gl).PushModel(gl,
+                HasModelMatrix ? ModelMatrix : CxMatrix4X4.Identity());
         }
 
         /// <summary>Pops a matrix pushed by <see cref="PushModelMatrix"/>.</summary>
         protected void PopModelMatrix(OpenGL gl)
         {
-            if (!HasModelMatrix) return;
-            gl.PopMatrix();
+            ModernOverlayRenderer.For(gl).PopModel(gl);
         }
 
         /// <inheritdoc/>

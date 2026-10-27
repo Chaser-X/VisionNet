@@ -1,4 +1,3 @@
-using SharpGL.SceneGraph;
 using SharpGL;
 using System;
 using System.Collections.Generic;
@@ -150,25 +149,11 @@ namespace VisionNet.Controls
         /// <param name="text">Text string to draw.</param>
         public static void DrawTextLabel3D(OpenGL gl, float x, float y, float z, float size, string text)
         {
-            var objCoord    = new Vertex(x, y, z);
-            var screenCoord = gl.Project(objCoord);
-
-            if (screenCoord.X < 0 || screenCoord.X > gl.RenderContextProvider.Width ||
-                screenCoord.Y < 0 || screenCoord.Y > gl.RenderContextProvider.Height)
-                return;
-
-            if (screenCoord.Z < 0 || screenCoord.Z > 1)
-                return;
-
-            float scaledSize = size * (1 + screenCoord.Z);
-
-            gl.PushMatrix();
-            gl.Translate(x, y, z);
-            gl.Scale(scaledSize, scaledSize, scaledSize);
-            gl.Color(1.0f, 1.0f, 1.0f);
-            foreach (char c in text)
-                gl.DrawText3D("Arial", 0.1f, 0.0f, c.ToString());
-            gl.PopMatrix();
+            var renderer = ModernOverlayRenderer.For(gl);
+            float sx, sy, sz;
+            if (!renderer.Project(gl, x, y, z, out sx, out sy, out sz)) return;
+            renderer.DrawText(gl, (int)sx, (int)sy, System.Drawing.Color.White,
+                size * (1f + sz), text);
         }
 
         /// <summary>
@@ -183,17 +168,10 @@ namespace VisionNet.Controls
         /// <param name="text">Text string to draw.</param>
         public static void DrawTextLabel2D(OpenGL gl, float x, float y, float z, float size, string text)
         {
-            var objCoord    = new Vertex(x, y, z);
-            var screenCoord = gl.Project(objCoord);
-
-            if (screenCoord.X < 0 || screenCoord.X > gl.RenderContextProvider.Width ||
-                screenCoord.Y < 0 || screenCoord.Y > gl.RenderContextProvider.Height)
-                return;
-
-            if (screenCoord.Z < 0 || screenCoord.Z > 1)
-                return;
-
-            gl.DrawText((int)screenCoord.X, (int)screenCoord.Y, 1, 1, 1, "Arial", size, text);
+            var renderer = ModernOverlayRenderer.For(gl);
+            float sx, sy, sz;
+            if (!renderer.Project(gl, x, y, z, out sx, out sy, out sz)) return;
+            renderer.DrawText(gl, (int)sx, (int)sy, System.Drawing.Color.White, size, text);
         }
 
         /// <summary>

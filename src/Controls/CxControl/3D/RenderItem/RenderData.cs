@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 
 namespace VisionNet.Controls
@@ -35,16 +36,16 @@ namespace VisionNet.Controls
         /// <summary>Number of indices in <see cref="Indices"/>.</summary>
         public int IndexCount { get; set; }
 
-        /// <summary>Intensity texture for the shader path, or <c>null</c> for the fixed-function path.</summary>
+        /// <summary>Intensity texture used by a shader-backed render item.</summary>
         public TextureData TextureData { get; set; }
 
-        /// <summary>GLSL shader sources, or <c>null</c> to use the fixed-function pipeline.</summary>
+        /// <summary>GLSL shader sources for the render item.</summary>
         public ShaderSource ShaderSource { get; set; }
 
         /// <summary>
-        /// When <c>true</c>, <see cref="CxDisplay"/> creates a VAO and sets up vertex attribute pointers.
-        /// When <c>false</c>, the legacy <c>glVertexPointer</c> / <c>glColorPointer</c> path is used.
+        /// Retained for source compatibility. CxDisplay always uses a VAO for every render item.
         /// </summary>
+        [Obsolete("CxDisplay always uses VAOs; this property is retained for source compatibility.")]
         public bool UseVAO { get; set; }
 
         /// <summary>
@@ -53,6 +54,14 @@ namespace VisionNet.Controls
         /// When set, <see cref="CxDisplay"/> creates an additional VBO at attribute location 2.
         /// </summary>
         public float[] DiffValues { get; set; }
+
+        /// <summary>
+        /// Optional per-vertex intensity values in the normalized [0,1] range.
+        /// This is used when a mesh has no texture UVs, so intensity remains a
+        /// vertex attribute instead of being reconstructed through interpolated
+        /// texture coordinates.
+        /// </summary>
+        public float[] IntensityValues { get; set; }
 
         /// <summary>
         /// Named uniform values passed to the shader each frame.

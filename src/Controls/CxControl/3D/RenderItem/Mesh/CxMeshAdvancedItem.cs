@@ -6,7 +6,7 @@ using VisionNet.DataType;
 namespace VisionNet.Controls
 {
     /// <summary>
-    /// High-performance mesh renderer using a VAO + GLSL shader pipeline.
+    /// Shader-backed mesh renderer using VAO/VBO resources and GLSL.
     /// Colour is computed per-fragment in the GPU using the <c>colorMin</c>/<c>colorMax</c> uniforms,
     /// so switching colour mode costs only a uniform update — no VBO rebuild required.
     /// </summary>
@@ -145,12 +145,13 @@ namespace VisionNet.Controls
         private float _baseZMin, _baseZMax;   // BoundingBox Z 范围
         private float _baseDiffMin, _baseDiffMax;     // DiffValues 范围（null → 0,0）
 
-        #region Shader 源码（与 CxSurfaceAdvancedItem 内容一致，为解耦独立维护）
+        #region Shader 源码
         internal static readonly string VertexShaderSource =
             @"#version 330 core
             layout (location = 0) in vec3 aPos;
             layout (location = 1) in vec2 aTexCoord;
             layout (location = 2) in float aDiff;
+            layout (location = 3) in float aIntensity;
 
             uniform mat4 view;
             uniform mat4 projection;
@@ -159,6 +160,7 @@ namespace VisionNet.Controls
             out float height;
             out vec2 TexCoord;
             out float diffValue;
+            out float vertexIntensity;
             out vec3 viewPos;
             out vec3 lightDirView;
 
@@ -169,6 +171,7 @@ namespace VisionNet.Controls
                 height = worldPos.z;
                 TexCoord = aTexCoord;
                 diffValue = aDiff;
+                vertexIntensity = aIntensity;
                 viewPos = (view * worldPos).xyz;
                 lightDirView = normalize(vec3(0.3, 0.4, 0.85));
             }";
@@ -178,6 +181,7 @@ namespace VisionNet.Controls
             in float height;
             in vec2 TexCoord;
             in float diffValue;
+            in float vertexIntensity;
             in vec3 viewPos;
             in vec3 lightDirView;
             out vec4 FragColor;
@@ -187,6 +191,7 @@ namespace VisionNet.Controls
             uniform int colorMode;
             uniform int surfaceMode;
             uniform sampler2D intensityTexture;
+            uniform int useIntensityAttribute;
 
             vec3 getColorByHeight(float h)
             {
@@ -204,7 +209,8 @@ namespace VisionNet.Controls
             void main()
             {
                 if (isinf(height)) discard;
-                float intensity = texture(intensityTexture, TexCoord).r;
+                float intensity = useIntensityAttribute == 1
+                    ? vertexIntensity : texture(intensityTexture, TexCoord).r;
                 
                 vec3 lightFactor = vec3(1.0);
                 if(surfaceMode == 1)
@@ -217,7 +223,7 @@ namespace VisionNet.Controls
                     vec3 H = normalize(V + L);
                     float diff = max(dot(N, L), 0.0);
                     float spec = pow(max(dot(N, H), 0.0), 24.0) * 0.4;
-                    lightFactor = vec3((0.35f + 0.8f * diff) + 0.4f * spec);
+                    lightFactor = vec3((0.35 + 0.8 * diff) + 0.4 * spec);
                 }
                 if (colorMode == 3) {
                     if (isinf(diffValue)) discard;
@@ -312,14 +318,39 @@ namespace VisionNet.Controls
                 vertices[i * 3 + 2] = Mesh.Vertices[i].Z;
             }
 
-            var uvCoords = new float[Mesh.UVs.Length * 2];
-            for (int i = 0; i < Mesh.UVs.Length; i++)
+            int vertexCount = Mesh.Vertices.Length;
+            var meshUvs = Mesh.UVs ?? new CxPoint2D[0];
+            bool hasTextureUvs = Mesh.TextureWidth > 0 && Mesh.TextureHeight > 0
+                && meshUvs.Length >= vertexCount;
+            bool hasVertexIntensity = !hasTextureUvs && Mesh.Intensity != null
+                && Mesh.Intensity.Length >= vertexCount;
+            int textureWidth = hasTextureUvs ? Mesh.TextureWidth : 1;
+            int textureHeight = hasTextureUvs ? Mesh.TextureHeight : 1;
+            var uvCoords = new float[vertexCount * 2];
+            float[] intensityValues = hasVertexIntensity ? new float[vertexCount] : null;
+            for (int i = 0; i < vertexCount; i++)
             {
-                uvCoords[i * 2]     = Mesh.UVs[i].X;
-                uvCoords[i * 2 + 1] = Mesh.UVs[i].Y;
+                if (hasTextureUvs)
+                {
+                    uvCoords[i * 2] = meshUvs[i].X;
+                    uvCoords[i * 2 + 1] = meshUvs[i].Y;
+                }
+                else if (hasVertexIntensity)
+                {
+                    uvCoords[i * 2] = 0.5f;
+                    uvCoords[i * 2 + 1] = 0.5f;
+                    intensityValues[i] = Mesh.Intensity[i] / 255f;
+                }
+                else
+                {
+                    uvCoords[i * 2] = 0.5f;
+                    uvCoords[i * 2 + 1] = 0.5f;
+                }
             }
 
-            byte[] textureBytes = GenerateIntensityTextureData();
+            byte[] textureBytes = hasTextureUvs
+                ? GenerateIntensityTextureData(textureWidth, textureHeight)
+                : new byte[] { 255, 255, 255, 255 };
 
             _cachedRenderData = new RenderData
             {
@@ -328,7 +359,6 @@ namespace VisionNet.Controls
                 Indices     = Mesh.Indices,
                 VertexCount = Mesh.Vertices.Length,
                 IndexCount  = Mesh.Indices?.Length ?? 0,
-                UseVAO      = true,
                 ShaderSource = new ShaderSource
                 {
                     VertexSource   = VertexShaderSource,
@@ -336,8 +366,8 @@ namespace VisionNet.Controls
                 },
                 TextureData = new TextureData
                 {
-                    Width  = Mesh.TextureWidth,
-                    Height = Mesh.TextureHeight,
+                    Width  = textureWidth,
+                    Height = textureHeight,
                     Data   = textureBytes,
                 },
                 Uniforms = new Dictionary<string, object>
@@ -346,7 +376,9 @@ namespace VisionNet.Controls
                     ["colorMax"]      = ColorMax,
                     ["colorMode"] = EffectiveColorMode,
                     ["surfaceMode"] = _surfaceMode == SurfaceMode.Mesh ? 1 : 0,
+                    ["useIntensityAttribute"] = hasVertexIntensity ? 1 : 0,
                 },
+                IntensityValues = intensityValues,
             };
 
             // 惰性填充 DiffValues VBO（只在 Diff 模式且数据充足时）
@@ -369,25 +401,18 @@ namespace VisionNet.Controls
             gl.UseProgram(handle.ShaderProgram);
             gl.BindVertexArray(handle.VaoId);
 
-            float[] proj = new float[16];
-            float[] view = new float[16];
-            gl.GetFloat(OpenGL.GL_PROJECTION_MATRIX, proj);
-            gl.GetFloat(OpenGL.GL_MODELVIEW_MATRIX, view);
-            gl.UniformMatrix4(gl.GetUniformLocation(handle.ShaderProgram, "view"),       1, false, view);
-            gl.UniformMatrix4(gl.GetUniformLocation(handle.ShaderProgram, "projection"), 1, false, proj);
-            var modelData = (ModelMatrix ?? CxMatrix4X4.Identity()).Data;
-            gl.UniformMatrix4(gl.GetUniformLocation(handle.ShaderProgram, "model"), 1, true, modelData);
+            ModernOverlayRenderer.For(gl).UploadSceneMatrices(gl, handle, ModelMatrix);
 
             foreach (var kv in data.Uniforms)
             {
-                int loc = gl.GetUniformLocation(handle.ShaderProgram, kv.Key);
+                int loc = handle.GetUniformLocation(gl, kv.Key);
                 if (kv.Value is float f) gl.Uniform1(loc, f);
                 else if (kv.Value is int i) gl.Uniform1(loc, i);
             }
 
             gl.ActiveTexture(OpenGL.GL_TEXTURE0);
             gl.BindTexture(OpenGL.GL_TEXTURE_2D, handle.TextureId);
-            gl.Uniform1(gl.GetUniformLocation(handle.ShaderProgram, "intensityTexture"), 0);
+            gl.Uniform1(handle.GetUniformLocation(gl, "intensityTexture"), 0);
 
             if (_surfaceMode == SurfaceMode.PointCloud)
                 gl.DrawArrays(OpenGL.GL_POINTS, 0, data.VertexCount);
@@ -403,7 +428,7 @@ namespace VisionNet.Controls
         {
             if (_surfaceColorMode == SurfaceColorMode.Intensity) return;
             if (_surfaceColorMode == SurfaceColorMode.Diff) return;
-            if (_surfaceColorMode == SurfaceColorMode.Lit) return;
+            if (_surfaceColorMode == SurfaceColorMode.Lit && _surfaceMode == SurfaceMode.Mesh) return;
             if (Math.Abs(ColorMin - zMin) < 1e-6f && Math.Abs(ColorMax - zMax) < 1e-6f) return;
 
             ColorMin = zMin;
@@ -424,18 +449,16 @@ namespace VisionNet.Controls
             OnDisposed?.Invoke();
         }
 
-        private byte[] GenerateIntensityTextureData()
+        private byte[] GenerateIntensityTextureData(int width, int height)
         {
-            int w = Mesh.TextureWidth;
-            int h = Mesh.TextureHeight;
-            if (w <= 0 || h <= 0) return new byte[4] { 255, 255, 255, 255 };
+            if (width <= 0 || height <= 0) return new byte[4] { 255, 255, 255, 255 };
 
-            var data = new byte[w * h * 4];
-            for (int y = 0; y < h; y++)
+            var data = new byte[width * height * 4];
+            for (int y = 0; y < height; y++)
             {
-                for (int x = 0; x < w; x++)
+                for (int x = 0; x < width; x++)
                 {
-                    int si = y * w + x;
+                    int si = y * width + x;
                     byte v = 255;
                     if (Mesh.Intensity != null && Mesh.Intensity.Length > si)
                         v = Mesh.Intensity[si];

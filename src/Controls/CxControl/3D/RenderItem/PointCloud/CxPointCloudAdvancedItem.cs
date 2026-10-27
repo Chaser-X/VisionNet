@@ -6,7 +6,7 @@ using VisionNet.DataType;
 namespace VisionNet.Controls
 {
     /// <summary>
-    /// High-performance point cloud renderer using a VAO + GLSL shader pipeline with intensity texture.
+    /// Shader-backed point-cloud renderer using VAO/VBO resources and an intensity texture.
     /// Supports automatic down-sampling when the point count exceeds <c>maxPointCount</c>.
     /// Colour mode changes update shader uniforms only — no VBO rebuild needed.
     /// </summary>
@@ -27,7 +27,18 @@ namespace VisionNet.Controls
         public float BaseDiffMin => _baseDiffMin;
         public float BaseDiffMax => _baseDiffMax;
         public CxBox3D? BoundingBox { get; private set; }
-        public int MaxPointCount { get; set; } = int.MaxValue;
+        private int _maxPointCount = int.MaxValue;
+        public int MaxPointCount
+        {
+            get => _maxPointCount;
+            set
+            {
+                if (value <= 0)
+                    throw new ArgumentOutOfRangeException(nameof(MaxPointCount), value,
+                        "MaxPointCount must be greater than zero.");
+                _maxPointCount = value;
+            }
+        }
 
         /// <summary>
         /// Per-frame diff range propagation from <see cref="CxDisplay"/>. Only applies in
@@ -153,6 +164,7 @@ namespace VisionNet.Controls
             layout (location = 0) in vec3 aPos;
             layout (location = 1) in vec2 aTexCoord;
             layout (location = 2) in float aDiff;
+            layout (location = 3) in float aIntensity;
 
             uniform mat4 view;
             uniform mat4 projection;
@@ -161,6 +173,7 @@ namespace VisionNet.Controls
             out float height;
             out vec2 TexCoord;
             out float diffValue;
+            out float vertexIntensity;
             out vec3 viewPos;
             out vec3 lightDirView;
 
@@ -171,6 +184,7 @@ namespace VisionNet.Controls
                 height = worldPos.z;
                 TexCoord = aTexCoord;
                 diffValue = aDiff;
+                vertexIntensity = aIntensity;
                 viewPos = (view * worldPos).xyz;
                 lightDirView = normalize(vec3(0.3, 0.4, 0.85));
             }";
@@ -180,6 +194,7 @@ namespace VisionNet.Controls
             in float height;
             in vec2 TexCoord;
             in float diffValue;
+            in float vertexIntensity;
             in vec3 viewPos;
             in vec3 lightDirView;
             out vec4 FragColor;
@@ -189,6 +204,7 @@ namespace VisionNet.Controls
             uniform int colorMode;
             uniform int surfaceMode;
             uniform sampler2D intensityTexture;
+            uniform int useIntensityAttribute;
 
             vec3 getColorByHeight(float h)
             {
@@ -206,7 +222,8 @@ namespace VisionNet.Controls
             void main()
             {
                 if (isinf(height)) discard;
-                float intensity = texture(intensityTexture, TexCoord).r;
+                float intensity = useIntensityAttribute == 1
+                    ? vertexIntensity : texture(intensityTexture, TexCoord).r;
 
                 vec3 lightFactor = vec3(1.0);
                 if (surfaceMode == 1)
@@ -219,7 +236,7 @@ namespace VisionNet.Controls
                     vec3 H = normalize(V + L);
                     float diff = max(dot(N, L), 0.0);
                     float spec = pow(max(dot(N, H), 0.0), 24.0) * 0.4;
-                    lightFactor = vec3((0.35f + 0.8f * diff) + 0.4f * spec);
+                    lightFactor = vec3((0.35 + 0.8 * diff) + 0.4 * spec);
                 }
                 if (colorMode == 3) {
                     if (isinf(diffValue)) discard;
@@ -349,8 +366,13 @@ namespace VisionNet.Controls
                     vertices[vi * 3]     = xPos;
                     vertices[vi * 3 + 1] = yPos;
                     vertices[vi * 3 + 2] = zPos;
-                    uvCoords[vi * 2]     = (float)x / Math.Max(PointCloud.Width  - 1, 1);
-                    uvCoords[vi * 2 + 1] = (float)y / Math.Max(PointCloud.Length - 1, 1);
+                    // The intensity texture is sampled at the same reduced grid.
+                    // Use sampled-grid coordinates so downsampling does not shift
+                    // the texture lookup toward its first texel.
+                    int sampleX = x / _samplingFactorX;
+                    int sampleY = y / _samplingFactorY;
+                    uvCoords[vi * 2]     = (float)sampleX / Math.Max(sampledWidth  - 1, 1);
+                    uvCoords[vi * 2 + 1] = (float)sampleY / Math.Max(sampledLength - 1, 1);
 
                     if (diffOut != null)
                         diffOut[vi] = invalid ? float.NegativeInfinity : srcDiff[si];
@@ -369,7 +391,6 @@ namespace VisionNet.Controls
                 Indices     = indices,
                 VertexCount = totalVertices,
                 IndexCount  = indices.Length,
-                UseVAO      = true,
                 ShaderSource = new ShaderSource
                 {
                     VertexSource   = VertexShaderSource,
@@ -377,8 +398,8 @@ namespace VisionNet.Controls
                 },
                 TextureData = new TextureData
                 {
-                    Width  = PointCloud.Width,
-                    Height = PointCloud.Length,
+                    Width  = sampledWidth,
+                    Height = sampledLength,
                     Data   = textureBytes,
                 },
                 Uniforms = new Dictionary<string, object>
@@ -387,6 +408,7 @@ namespace VisionNet.Controls
                     ["colorMax"]      = ColorMax,
                     ["colorMode"] = EffectiveColorMode,
                     ["surfaceMode"] = _surfaceMode == SurfaceMode.Mesh ? 1 : 0,
+                    ["useIntensityAttribute"] = 0,
                 },
             };
 
@@ -405,25 +427,18 @@ namespace VisionNet.Controls
             gl.UseProgram(handle.ShaderProgram);
             gl.BindVertexArray(handle.VaoId);
 
-            float[] proj = new float[16];
-            float[] view = new float[16];
-            gl.GetFloat(OpenGL.GL_PROJECTION_MATRIX, proj);
-            gl.GetFloat(OpenGL.GL_MODELVIEW_MATRIX, view);
-            gl.UniformMatrix4(gl.GetUniformLocation(handle.ShaderProgram, "view"),       1, false, view);
-            gl.UniformMatrix4(gl.GetUniformLocation(handle.ShaderProgram, "projection"), 1, false, proj);
-            var modelData = (ModelMatrix ?? CxMatrix4X4.Identity()).Data;
-            gl.UniformMatrix4(gl.GetUniformLocation(handle.ShaderProgram, "model"), 1, true, modelData);
+            ModernOverlayRenderer.For(gl).UploadSceneMatrices(gl, handle, ModelMatrix);
 
             foreach (var kv in data.Uniforms)
             {
-                int loc = gl.GetUniformLocation(handle.ShaderProgram, kv.Key);
+                int loc = handle.GetUniformLocation(gl, kv.Key);
                 if (kv.Value is float f) gl.Uniform1(loc, f);
                 else if (kv.Value is int i) gl.Uniform1(loc, i);
             }
 
             gl.ActiveTexture(OpenGL.GL_TEXTURE0);
             gl.BindTexture(OpenGL.GL_TEXTURE_2D, handle.TextureId);
-            gl.Uniform1(gl.GetUniformLocation(handle.ShaderProgram, "intensityTexture"), 0);
+            gl.Uniform1(handle.GetUniformLocation(gl, "intensityTexture"), 0);
 
             if (_surfaceMode == SurfaceMode.PointCloud)
                 gl.DrawArrays(OpenGL.GL_POINTS, 0, data.VertexCount);
@@ -438,7 +453,7 @@ namespace VisionNet.Controls
         public void SetGlobalZRange(float zMin, float zMax)
         {
             if (_surfaceColorMode == SurfaceColorMode.Intensity) return;
-            if (_surfaceColorMode == SurfaceColorMode.Lit) return;
+            if (_surfaceColorMode == SurfaceColorMode.Lit && _surfaceMode == SurfaceMode.Mesh) return;
             if (_surfaceColorMode == SurfaceColorMode.Diff) return;
             if (Math.Abs(ColorMin - zMin) < 1e-6f && Math.Abs(ColorMax - zMax) < 1e-6f) return;
 
@@ -463,19 +478,21 @@ namespace VisionNet.Controls
 
         private byte[] GenerateIntensityTextureData()
         {
-            int w = PointCloud.Width;
-            int h = PointCloud.Length;
+            int w = (PointCloud.Width + _samplingFactorX - 1) / _samplingFactorX;
+            int h = (PointCloud.Length + _samplingFactorY - 1) / _samplingFactorY;
             var data = new byte[w * h * 4];
 
             for (int y = 0; y < h; y++)
             {
                 for (int x = 0; x < w; x++)
                 {
-                    int si = y * w + x;
+                    int sourceX = Math.Min(x * _samplingFactorX, PointCloud.Width - 1);
+                    int sourceY = Math.Min(y * _samplingFactorY, PointCloud.Length - 1);
+                    int si = sourceY * PointCloud.Width + sourceX;
                     byte v = 255;
                     if (PointCloud.Intensity != null && PointCloud.Intensity.Length > si)
                         v = PointCloud.Intensity[si];
-                    int di = si * 4;
+                    int di = (y * w + x) * 4;
                     data[di] = data[di + 1] = data[di + 2] = data[di + 3] = v;
                 }
             }
@@ -528,19 +545,12 @@ namespace VisionNet.Controls
             _samplingFactorX = Math.Max(1, (int)(1.0 / rate));
             _samplingFactorY = Math.Max(1, (int)(1.0 / rate));
 
-            while ((PointCloud.Width / _samplingFactorX) * (PointCloud.Length / _samplingFactorY) > MaxPointCount)
+            while ((((long)PointCloud.Width + _samplingFactorX - 1) / _samplingFactorX)
+                 * (((long)PointCloud.Length + _samplingFactorY - 1) / _samplingFactorY)
+                 > MaxPointCount)
             {
                 if (_samplingFactorX <= _samplingFactorY) _samplingFactorX++;
                 else _samplingFactorY++;
-            }
-
-            int sw = (PointCloud.Width  + _samplingFactorX - 1) / _samplingFactorX;
-            int sl = (PointCloud.Length + _samplingFactorY - 1) / _samplingFactorY;
-            if (sw * sl > MaxPointCount)
-            {
-                double ratio = Math.Sqrt((double)(sw * sl) / MaxPointCount);
-                _samplingFactorX = Math.Max(1, (int)(_samplingFactorX * ratio));
-                _samplingFactorY = Math.Max(1, (int)(_samplingFactorY * ratio));
             }
         }
     }

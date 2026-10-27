@@ -29,6 +29,10 @@ namespace VisionNet.Controls
         private readonly Dictionary<ICxObjRenderItem, GLResourceHandle> _resourcePool
             = new Dictionary<ICxObjRenderItem, GLResourceHandle>();
         private readonly object _resourceLock = new object();
+        // Serializes a frame with item disposal and snapshot cleanup. The render
+        // snapshots are intentionally reused, so clearing or disposing their
+        // members while the GL thread is iterating them is not safe.
+        private readonly object _renderLock = new object();
         private readonly object _cameraLock = new object();
 
         // Resources dequeued by Dispose/Replace that must be freed inside the GL thread.
@@ -38,6 +42,11 @@ namespace VisionNet.Controls
         // ── Render item lists ────────────────────────────────────────────────────
         private readonly List<ICxObjRenderItem> _surfaceItems = new List<ICxObjRenderItem>();
         private readonly List<IRenderItem>      _renderItems  = new List<IRenderItem>();
+        // Render-thread snapshots are reused between frames. The lists are filled
+        // under _resourceLock and then consumed after the lock is released, so a
+        // drag/resize does not allocate a new list or array on every paint.
+        private readonly List<ICxObjRenderItem> _surfaceSnapshot = new List<ICxObjRenderItem>();
+        private readonly List<IRenderItem> _overlaySnapshot = new List<IRenderItem>();
 
         // ── HUD overlay objects ──────────────────────────────────────────────────
         private CxCoordinateSystemItem _coordinationItem = new CxCoordinateSystemItem();
@@ -292,8 +301,8 @@ namespace VisionNet.Controls
         }
 
         /// <summary>
-        /// Returns the model matrix (pose) of an advanced render item, or identity for
-        /// fixed-pipeline items that do not support poses.
+        /// Returns the model matrix (pose) of a poseable render item, or identity for
+        /// items that do not support poses.
         /// </summary>
         private static CxMatrix4X4 GetItemModelMatrix(ICxObjRenderItem item)
         {
@@ -308,32 +317,39 @@ namespace VisionNet.Controls
         /// </summary>
         private void DisposeResources(OpenGL gl)
         {
-            if (gl != null)
-                while (_pendingRelease.TryDequeue(out var p)) ReleaseGLResources(gl, p);
-
-            lock (_resourceLock)
+            lock (_renderLock)
             {
-                ForgetGroups(_surfaceItems);
-                foreach (var item in _surfaceItems)
+                if (gl != null)
+                    while (_pendingRelease.TryDequeue(out var p)) ReleaseGLResources(gl, p);
+
+                lock (_resourceLock)
                 {
-                    if (_resourcePool.TryGetValue(item, out var h))
+                    ForgetGroups(_surfaceItems);
+                    foreach (var item in _surfaceItems)
                     {
-                        if (gl != null) ReleaseGLResources(gl, h);
-                        _resourcePool.Remove(item);
+                        if (_resourcePool.TryGetValue(item, out var h))
+                        {
+                            if (gl != null) ReleaseGLResources(gl, h);
+                            _resourcePool.Remove(item);
+                        }
+                        item.OnRenderDataChanged -= OnItemRenderDataChanged;
+                        item.Dispose();
                     }
-                    item.OnRenderDataChanged -= OnItemRenderDataChanged;
-                    item.Dispose();
+                    _surfaceItems.Clear();
                 }
-                _surfaceItems.Clear();
-            }
 
-            lock (_resourceLock)
-            {
-                while (_renderItems.Count > 0)
+                lock (_resourceLock)
                 {
-                    _renderItems[0].Dispose();
-                    _renderItems.RemoveAt(0);
+                    while (_renderItems.Count > 0)
+                    {
+                        _renderItems[0].Dispose();
+                        _renderItems.RemoveAt(0);
+                    }
+                    _surfaceSnapshot.Clear();
+                    _overlaySnapshot.Clear();
                 }
+
+                ModernOverlayRenderer.Release(gl);
             }
         }
     }

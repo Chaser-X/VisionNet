@@ -1,21 +1,12 @@
 using SharpGL;
-using SharpGL.SceneGraph;
-using SharpGL.SceneGraph.Primitives;
-using SharpGL.SceneGraph.Quadrics;
 using System;
+using System.Collections.Generic;
+using System.Drawing;
 using VisionNet.DataType;
 
 namespace VisionNet.Controls
 {
-    /// <summary>
-    /// Renders a 3D coordinate system with labelled X (red), Y (green), and Z (blue) axes.
-    /// Each axis is drawn as a cylinder capped with a cone arrow-head.
-    /// <para>
-    /// In addition to the world-space <see cref="Draw"/> call, <see cref="DrawScreenPositionedAxes"/>
-    /// renders a small orientation indicator fixed to the lower-left corner of the viewport
-    /// that rotates with the camera but is not affected by translation or zoom.
-    /// </para>
-    /// </summary>
+    /// <summary>Renders world and screen space coordinate axes with cached GLSL geometry.</summary>
     public class CxCoordinateSystemItem : AbstractRenderItem
     {
         private readonly float _axisLength;
@@ -23,200 +14,145 @@ namespace VisionNet.Controls
         private readonly float _coneHeight;
         private readonly float _coneRadius;
         private readonly CxCoordination3D _coordination;
+        private readonly float[] _xAxisMesh;
+        private readonly float[] _yAxisMesh;
+        private readonly float[] _zAxisMesh;
+        private readonly float[] _screenPositions = new float[12];
+        private readonly float[] _screenColors = new float[24];
 
-        /// <summary>
-        /// Initializes the coordinate system item.
-        /// </summary>
-        /// <param name="axisLength">Total length of each axis (cylinder + cone).</param>
-        /// <param name="axisRadius">Radius of the cylindrical shaft.</param>
-        /// <param name="coneHeight">Height of the arrow-head cone.</param>
-        /// <param name="coneRadius">Base radius of the arrow-head cone.</param>
-        /// <param name="coordination">
-        /// Coordinate frame to render. Defaults to the world origin with unit axes when <c>null</c>.
-        /// </param>
-        public CxCoordinateSystemItem(
-            float axisLength = 5.0f, float axisRadius = 0.1f,
-            float coneHeight = 0.5f, float coneRadius  = 0.2f,
-            CxCoordination3D? coordination = null)
+        public CxCoordinateSystemItem(float axisLength = 5f, float axisRadius = .1f,
+            float coneHeight = .5f, float coneRadius = .2f, CxCoordination3D? coordination = null)
         {
-            _axisLength  = axisLength;
-            _axisRadius  = axisRadius;
-            _coneHeight  = coneHeight;
-            _coneRadius  = coneRadius;
-            _coordination = coordination ?? new CxCoordination3D(
-                new CxPoint3D(0, 0, 0),
-                new CxVector3D(1, 0, 0),
-                new CxVector3D(0, 1, 0),
-                new CxVector3D(0, 0, 1));
+            _axisLength = axisLength;
+            _axisRadius = axisRadius;
+            _coneHeight = coneHeight;
+            _coneRadius = coneRadius;
+            _coordination = coordination ?? new CxCoordination3D(new CxPoint3D(0, 0, 0),
+                new CxVector3D(1, 0, 0), new CxVector3D(0, 1, 0), new CxVector3D(0, 0, 1));
+            _xAxisMesh = BuildAxisMesh(_coordination.Origin, _coordination.XAxis.Normalize(),
+                _axisLength, _axisRadius, _coneHeight, _coneRadius);
+            _yAxisMesh = BuildAxisMesh(_coordination.Origin, _coordination.YAxis.Normalize(),
+                _axisLength, _axisRadius, _coneHeight, _coneRadius);
+            _zAxisMesh = BuildAxisMesh(_coordination.Origin, _coordination.ZAxis.Normalize(),
+                _axisLength, _axisRadius, _coneHeight, _coneRadius);
         }
 
-        /// <inheritdoc/>
         public override bool SupportsGroupTransform => true;
 
-        /// <summary>Draws the three labelled axes at the configured world-space origin.</summary>
         public override void Draw(OpenGL gl)
         {
             PushModelMatrix(gl);
-            DrawAxes(gl);
+            DrawAxis(gl, _xAxisMesh, _coordination.XAxis, Color.Red, "X");
+            DrawAxis(gl, _yAxisMesh, _coordination.YAxis, Color.Lime, "Y");
+            DrawAxis(gl, _zAxisMesh, _coordination.ZAxis, Color.Blue, "Z");
             PopModelMatrix(gl);
         }
 
-        /// <summary>Draws the three axes in the current coordinate frame, without applying the group pose.</summary>
-        private void DrawAxes(OpenGL gl)
-        {
-            DrawAxisWithLabel(gl, _coordination.Origin, _coordination.XAxis, "X", 1f, 0f, 0f);
-            DrawAxisWithLabel(gl, _coordination.Origin, _coordination.YAxis, "Y", 0f, 1f, 0f);
-            DrawAxisWithLabel(gl, _coordination.Origin, _coordination.ZAxis, "Z", 0f, 0f, 1f);
-        }
-
-        /// <summary>
-        /// Draws a small orientation indicator in the lower-left corner of the viewport.
-        /// The indicator reflects the current camera rotation but ignores translation and zoom.
-        /// </summary>
         public void DrawScreenPositionedAxes(OpenGL gl)
         {
-            gl.Disable(OpenGL.GL_DEPTH_TEST);
-            gl.PushAttrib(OpenGL.GL_ALL_ATTRIB_BITS);
-
-            // Extract the rotation-only part of the modelview matrix.
-            float[] mvMatrix = new float[16];
-            gl.GetFloat(OpenGL.GL_MODELVIEW_MATRIX, mvMatrix);
-            mvMatrix[12] = 0f; mvMatrix[13] = 0f; mvMatrix[14] = 0f;
-            NormalizeColumn(mvMatrix, 0);
-            NormalizeColumn(mvMatrix, 1);
-            NormalizeColumn(mvMatrix, 2);
-
-            // Switch to screen-space orthographic projection.
-            gl.MatrixMode(OpenGL.GL_PROJECTION);
-            gl.PushMatrix();
-            gl.LoadIdentity();
-            gl.Ortho(0, gl.RenderContextProvider.Width, 0, gl.RenderContextProvider.Height, -100, 100);
-
-            gl.MatrixMode(OpenGL.GL_MODELVIEW);
-            gl.PushMatrix();
-            gl.LoadIdentity();
-
-            // Place the indicator 50 px from the lower-left corner and scale it up.
-            gl.Translate(50f, 50f, 0f);
-            gl.Scale(10f, 10f, 10f);
-            gl.MultMatrix(mvMatrix);
-
-            DrawAxes(gl);
-
-            gl.MatrixMode(OpenGL.GL_PROJECTION);
-            gl.PopMatrix();
-            gl.MatrixMode(OpenGL.GL_MODELVIEW);
-            gl.PopMatrix();
-
-            gl.PopAttrib();
-            gl.Enable(OpenGL.GL_DEPTH_TEST);
+            var renderer = ModernOverlayRenderer.For(gl);
+            renderer.EnsureSceneMatrices(gl);
+            float[] mv = renderer.SceneView;
+            const float ox = 50f, oy = 50f, length = 42f;
+            // SceneView is row-major. Transforming each world basis vector gives
+            // screen X from row 0 and screen Y from row 1 (the first two entries
+            // of each matrix column), rather than reading contiguous row entries.
+            float xX = mv[0], xY = mv[4];
+            float yX = mv[1], yY = mv[5];
+            float zX = mv[2], zY = mv[6];
+            float xZ = mv[8], yZ = mv[9], zZ = mv[10];
+            // Normalize the complete projected 3D basis vectors.  Normalizing only
+            // X/Y makes an axis pointing toward the camera look the same length as
+            // an edge-on axis, and the ZScale camera option would otherwise distort
+            // the screen indicator.  Keeping the Z component in the normalization
+            // preserves the expected foreshortening in screen space.
+            NormalizeDirection(ref xX, ref xY, ref xZ);
+            NormalizeDirection(ref yX, ref yY, ref yZ);
+            NormalizeDirection(ref zX, ref zY, ref zZ);
+            var positions = _screenPositions;
+            positions[0] = ox; positions[1] = oy; positions[2] = ox + xX * length; positions[3] = oy + xY * length;
+            positions[4] = ox; positions[5] = oy; positions[6] = ox + yX * length; positions[7] = oy + yY * length;
+            positions[8] = ox; positions[9] = oy; positions[10] = ox + zX * length; positions[11] = oy + zY * length;
+            var colors = _screenColors;
+            SetLineColor(colors, 0, Color.Red);
+            SetLineColor(colors, 1, Color.Red);
+            SetLineColor(colors, 2, Color.Lime);
+            SetLineColor(colors, 3, Color.Lime);
+            SetLineColor(colors, 4, Color.Blue);
+            SetLineColor(colors, 5, Color.Blue);
+            renderer.DrawScreenGeometryColored(gl, OpenGL.GL_LINES, positions, colors, 2f);
+            renderer.DrawText(gl, (int)(ox + xX * length), (int)(oy + xY * length), Color.Red, 14, "X");
+            renderer.DrawText(gl, (int)(ox + yX * length), (int)(oy + yY * length), Color.Lime, 14, "Y");
+            renderer.DrawText(gl, (int)(ox + zX * length), (int)(oy + zY * length), Color.Blue, 14, "Z");
         }
 
-        /// <summary>
-        /// Draws a single axis as a cylinder (shaft) followed by a cone (arrow-head) along <paramref name="direction"/>.
-        /// </summary>
-        private void DrawAxisWithLabel(OpenGL gl, CxPoint3D origin, CxVector3D direction,
-            string label, float r, float g, float b)
+        private static void SetLineColor(float[] colors, int vertex, Color color)
         {
-            var dir        = direction.Normalize();
-            var defaultDir = new CxVector3D(0, 0, 1);   // OpenGL default cylinder direction.
-            float dot      = defaultDir.Dot(dir);
+            int offset = vertex * 4;
+            colors[offset] = color.R / 255f;
+            colors[offset + 1] = color.G / 255f;
+            colors[offset + 2] = color.B / 255f;
+            colors[offset + 3] = color.A / 255f;
+        }
 
-            gl.PushMatrix();
-            gl.Translate(origin.X, origin.Y, origin.Z);
-
-            if (Math.Abs(dot - 1f) >= 1e-3f)
+        private static void NormalizeDirection(ref float x, ref float y, ref float z)
+        {
+            float length = (float)Math.Sqrt(x * x + y * y + z * z);
+            if (length > 1e-6f)
             {
-                if (Math.Abs(dot + 1f) < 1e-3f)
-                {
-                    gl.Rotate(180, 1, 0, 0);   // Anti-parallel: rotate 180° around X.
-                }
-                else
-                {
-                    var   axis  = defaultDir.Cross(dir);
-                    // angle in degrees (gl.Rotate expects degrees).
-                    float angle = (float)(Math.Acos(dot) * 180.0 / Math.PI);
-                    gl.Rotate(angle, axis.X, axis.Y, axis.Z);
-                }
+                x /= length;
+                y /= length;
+                z /= length;
             }
-
-            DrawAxis(gl, _axisLength, _axisRadius, _coneHeight, _coneRadius, r, g, b);
-            DrawLabel(gl, label, 0, 0, _axisLength, r, g, b);
-
-            gl.PopMatrix();
         }
 
-        /// <summary>Draws a cylinder shaft followed by a cone arrow-head along the local Z axis.</summary>
-        private void DrawAxis(OpenGL gl, float length, float radius,
-            float coneHeight, float coneRadius, float r, float g, float b)
+        private void DrawAxis(OpenGL gl, float[] mesh, CxVector3D direction, Color color, string label)
         {
-            gl.Color(r, g, b);
-
-            var cylinder = new Cylinder();
-            cylinder.BaseRadius = radius;
-            cylinder.TopRadius  = radius;
-            cylinder.Height     = length - coneHeight;
-            cylinder.CreateInContext(gl);
-            cylinder.Render(gl, SharpGL.SceneGraph.Core.RenderMode.Render);
-
-            gl.Translate(0f, 0f, length - coneHeight);
-            DrawCone(gl, coneHeight, coneRadius);
-            gl.Translate(0f, 0f, -(length - coneHeight));
+            var renderer = ModernOverlayRenderer.For(gl);
+            renderer.Draw(gl, OpenGL.GL_TRIANGLES,
+                mesh, color);
+            var tip = Add(_coordination.Origin, Scale(direction, _axisLength));
+            float sx, sy, sz;
+            if (renderer.Project(gl, tip.X, tip.Y, tip.Z, out sx, out sy, out sz))
+                renderer.DrawText(gl, (int)sx, (int)sy, color, 16, label);
         }
 
-        /// <summary>Draws a cone with its apex at <c>(0, 0, height)</c> and its base at the origin.</summary>
-        private void DrawCone(OpenGL gl, float height, float radius)
+        private static float[] BuildAxisMesh(CxPoint3D origin, CxVector3D direction,
+            float length, float radius, float coneHeight, float coneRadius)
         {
             const int slices = 20;
-
-            gl.Begin(OpenGL.GL_TRIANGLE_FAN);
-            gl.Vertex(0f, 0f, height);   // Apex.
-            for (int i = 0; i <= slices; i++)
+            var w = direction.Normalize();
+            var reference = Math.Abs(w.Z) < .9f ? new CxVector3D(0, 0, 1) : new CxVector3D(0, 1, 0);
+            var u = reference.Cross(w).Normalize();
+            var v = w.Cross(u).Normalize();
+            float shaftEnd = Math.Max(0, length - coneHeight);
+            var data = new List<float>(slices * 18);
+            for (int i = 0; i < slices; i++)
             {
-                double angle = 2 * Math.PI * i / slices;
-                gl.Vertex(radius * Math.Cos(angle), radius * Math.Sin(angle), 0f);
+                double a0 = i * 2 * Math.PI / slices;
+                double a1 = (i + 1) * 2 * Math.PI / slices;
+                var b0 = Add(origin, Add(Scale(u, (float)Math.Cos(a0) * radius), Scale(v, (float)Math.Sin(a0) * radius)));
+                var b1 = Add(origin, Add(Scale(u, (float)Math.Cos(a1) * radius), Scale(v, (float)Math.Sin(a1) * radius)));
+                var t0 = Add(b0, Scale(w, shaftEnd));
+                var t1 = Add(b1, Scale(w, shaftEnd));
+                var apex = Add(origin, Scale(w, length));
+                AddTriangle(data, b0, t0, t1); AddTriangle(data, b0, t1, b1);
+                var c0 = Add(origin, Add(Scale(u, (float)Math.Cos(a0) * coneRadius), Scale(v, (float)Math.Sin(a0) * coneRadius)));
+                var c1 = Add(origin, Add(Scale(u, (float)Math.Cos(a1) * coneRadius), Scale(v, (float)Math.Sin(a1) * coneRadius)));
+                c0 = Add(c0, Scale(w, shaftEnd)); c1 = Add(c1, Scale(w, shaftEnd));
+                AddTriangle(data, c0, apex, c1);
             }
-            gl.End();
-
-            gl.Begin(OpenGL.GL_TRIANGLE_FAN);
-            gl.Vertex(0f, 0f, 0f);   // Base centre.
-            for (int i = 0; i <= slices; i++)
-            {
-                double angle = 2 * Math.PI * i / slices;
-                gl.Vertex(radius * Math.Cos(angle), radius * Math.Sin(angle), 0f);
-            }
-            gl.End();
+            return data.ToArray();
         }
 
-        /// <summary>
-        /// Draws a 2D text label at the screen position corresponding to the given local 3D point.
-        /// The label is skipped if the point projects outside the viewport or behind the camera.
-        /// </summary>
-        private void DrawLabel(OpenGL gl, string label, float x, float y, float z,
-            float r, float g, float b)
+        private static CxPoint3D Add(CxPoint3D a, CxVector3D b) => new CxPoint3D(a.X + b.X, a.Y + b.Y, a.Z + b.Z);
+        private static CxVector3D Add(CxVector3D a, CxVector3D b) => new CxVector3D(a.X + b.X, a.Y + b.Y, a.Z + b.Z);
+        private static CxVector3D Scale(CxVector3D a, float s) => new CxVector3D(a.X * s, a.Y * s, a.Z * s);
+        private static void AddTriangle(List<float> data, CxPoint3D a, CxPoint3D b, CxPoint3D c)
         {
-            var screenCoord = gl.Project(new Vertex(x, y, z));
-
-            if (screenCoord.X < 0 || screenCoord.X > gl.RenderContextProvider.Width ||
-                screenCoord.Y < 0 || screenCoord.Y > gl.RenderContextProvider.Height)
-                return;
-            if (screenCoord.Z < 0 || screenCoord.Z > 1)
-                return;
-
-            gl.DrawText((int)screenCoord.X, (int)screenCoord.Y, r, g, b, "Arial", 20, label);
-        }
-
-        /// <summary>Normalises the specified column of a 4×4 column-major matrix in place.</summary>
-        private void NormalizeColumn(float[] matrix, int col)
-        {
-            float x = matrix[col], y = matrix[4 + col], z = matrix[8 + col];
-            float len = (float)Math.Sqrt(x * x + y * y + z * z);
-            if (len > 0f)
-            {
-                matrix[col]     /= len;
-                matrix[4 + col] /= len;
-                matrix[8 + col] /= len;
-            }
+            data.Add(a.X); data.Add(a.Y); data.Add(a.Z);
+            data.Add(b.X); data.Add(b.Y); data.Add(b.Z);
+            data.Add(c.X); data.Add(c.Y); data.Add(c.Z);
         }
     }
 }

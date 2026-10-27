@@ -25,6 +25,8 @@ namespace VisionNet.Controls
         // ── Interaction state ────────────────────────────────────────────────────
         private int _hitSegIndex = -1;
         private int _hitEndpoint = -1;  // -1 = line body, 0 = Start, 1 = End
+        private float[] _positionsBuffer = new float[0];
+        private readonly float[] _endpointBuffer = new float[6];
 
         /// <inheritdoc/>
         public override bool HitTest(CxPoint3D worldPos) => FindHit(worldPos).seg >= 0;
@@ -132,29 +134,39 @@ namespace VisionNet.Controls
             if (Segment3Ds == null || Segment3Ds.Length == 0) return;
 
             PushModelMatrix(gl);
-            gl.Color(DrawColor.R / 255.0, DrawColor.G / 255.0, DrawColor.B / 255.0);
-            gl.LineWidth(Size);
-            gl.Begin(OpenGL.GL_LINES);
+            int required = Segment3Ds.Length * 6;
+            if (_positionsBuffer.Length != required)
+                _positionsBuffer = new float[required];
+            var positions = _positionsBuffer;
+            int offset = 0;
             foreach (var seg in Segment3Ds)
             {
-                gl.Vertex(seg.Start.X, seg.Start.Y, seg.Start.Z);
-                gl.Vertex(seg.End.X,   seg.End.Y,   seg.End.Z);
+                positions[offset++] = seg.Start.X; positions[offset++] = seg.Start.Y; positions[offset++] = seg.Start.Z;
+                positions[offset++] = seg.End.X; positions[offset++] = seg.End.Y; positions[offset++] = seg.End.Z;
             }
-            gl.End();
+            var renderer = ModernOverlayRenderer.For(gl);
+            renderer.Draw(gl, OpenGL.GL_LINES, positions, DrawColor, Size);
 
             // Endpoint markers on the hit segment when active and selected.
             if (IsActiveObj && IsSelected && _hitSegIndex >= 0 && _hitSegIndex < Segment3Ds.Length)
             {
-                gl.PointSize(10f);
-                gl.Begin(OpenGL.GL_POINTS);
-                gl.Color(DrawColor.R / 255.0, DrawColor.G / 255.0, DrawColor.B / 255.0);
                 var s = Segment3Ds[_hitSegIndex];
-                gl.Vertex(s.Start.X, s.Start.Y, s.Start.Z);
-                gl.Vertex(s.End.X,   s.End.Y,   s.End.Z);
-                gl.End();
-                gl.PointSize(1f);
+                _endpointBuffer[0] = s.Start.X; _endpointBuffer[1] = s.Start.Y; _endpointBuffer[2] = s.Start.Z;
+                _endpointBuffer[3] = s.End.X; _endpointBuffer[4] = s.End.Y; _endpointBuffer[5] = s.End.Z;
+                renderer.Draw(gl, OpenGL.GL_POINTS, _endpointBuffer, DrawColor, 10f);
             }
             PopModelMatrix(gl);
+        }
+
+        /// <inheritdoc/>
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                Segment3Ds = null;
+                _positionsBuffer = null;
+            }
+            base.Dispose(disposing);
         }
     }
 }

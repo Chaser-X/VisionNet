@@ -7,10 +7,7 @@ namespace VisionNet.Controls
     /// driven by a <see cref="CxGroup"/> parent transform.
     /// </summary>
     /// <remarks>
-    /// Only the high-performance Advanced items
-    /// (<see cref="CxMeshAdvancedItem"/>, <see cref="CxPointCloudAdvancedItem"/>,
-    /// <see cref="CxSurfaceAdvancedItem"/>) implement this interface. Fixed-pipeline items
-    /// do not support poses and cannot participate in group motion.
+    /// Surface, point-cloud, mesh, and world-space overlay items implement this interface.
     /// </remarks>
     public interface ICxPoseable
     {

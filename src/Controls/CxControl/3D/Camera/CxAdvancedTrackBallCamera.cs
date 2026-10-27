@@ -55,6 +55,11 @@ namespace VisionNet.Controls
         private float    _zScale       = 1.0f;
         private ViewMode _viewMode     = ViewMode.Front;
 
+        // Reused by GetMatrices so camera updates do not allocate two 4x4 arrays
+        // on every paint while the user is rotating or zooming the view.
+        private readonly float[] _projectionMatrix = new float[16];
+        private readonly float[] _viewMatrix = new float[16];
+
         #endregion
 
         #region Public properties
@@ -404,18 +409,80 @@ namespace VisionNet.Controls
         }
 
         /// <summary>
-        /// Applies the viewport, projection matrix (perspective or orthographic),
-        /// and modelview matrix (via <c>gl.LookAt</c>) for the current frame.
+        /// Computes row-major projection and view matrices for the current frame.
+        /// The matrices are uploaded by the modern renderer, so camera math does not
+        /// depend on the legacy OpenGL matrix stack.
+        /// </summary>
+        public void GetMatrices(int width, int height, out float[] projection, out float[] view)
+        {
+            float aspect = height > 0 ? (float)width / height : 1f;
+            if (!Enable2DView)
+            {
+                float f = 1f / (float)Math.Tan(_fieldOfView * Math.PI / 360.0);
+                float nf = 1f / (_nearPlane - _farPlane);
+                projection = _projectionMatrix;
+                projection[0] = f / aspect; projection[1] = 0; projection[2] = 0; projection[3] = 0;
+                projection[4] = 0; projection[5] = f; projection[6] = 0; projection[7] = 0;
+                projection[8] = 0; projection[9] = 0;
+                projection[10] = (_farPlane + _nearPlane) * nf;
+                projection[11] = 2f * _farPlane * _nearPlane * nf;
+                projection[12] = 0; projection[13] = 0; projection[14] = -1f; projection[15] = 0;
+            }
+            else
+            {
+                float heightWorld = 2f * Math.Abs(_position.Z - _target.Z);
+                if (heightWorld < 1e-4f) heightWorld = 1f;
+                float widthWorld = heightWorld * aspect;
+                float left = -widthWorld / 2f, right = widthWorld / 2f;
+                float bottom = -heightWorld / 2f, top = heightWorld / 2f;
+                projection = _projectionMatrix;
+                projection[0] = 2f / (right - left); projection[1] = 0; projection[2] = 0;
+                projection[3] = -(right + left) / (right - left);
+                projection[4] = 0; projection[5] = 2f / (top - bottom); projection[6] = 0;
+                projection[7] = -(top + bottom) / (top - bottom);
+                projection[8] = 0; projection[9] = 0;
+                projection[10] = -2f / (_farPlane - _nearPlane);
+                projection[11] = -(_farPlane + _nearPlane) / (_farPlane - _nearPlane);
+                projection[12] = 0; projection[13] = 0; projection[14] = 0; projection[15] = 1f;
+            }
+
+            Vector3 forward = Vector3.Normalize(_target - _position);
+            Vector3 side = Vector3.Normalize(Vector3.Cross(forward, _up));
+            Vector3 up = Vector3.Cross(side, forward);
+            view = _viewMatrix;
+            view[0] = side.X; view[1] = side.Y; view[2] = side.Z; view[3] = -Vector3.Dot(side, _position);
+            view[4] = up.X; view[5] = up.Y; view[6] = up.Z; view[7] = -Vector3.Dot(up, _position);
+            view[8] = -forward.X; view[9] = -forward.Y; view[10] = -forward.Z;
+            view[11] = Vector3.Dot(forward, _position);
+            view[12] = 0; view[13] = 0; view[14] = 0; view[15] = 1f;
+            if (_isLeftHanded)
+            {
+                view[1] = -view[1]; view[5] = -view[5]; view[9] = -view[9]; view[13] = -view[13];
+            }
+            if (Math.Abs(_zScale - 1f) > 1e-6f)
+            {
+                view[2] *= _zScale; view[6] *= _zScale; view[10] *= _zScale; view[14] *= _zScale;
+            }
+        }
+
+        /// <summary>
+        /// Legacy matrix-stack adapter retained for callers outside CxDisplay.
         /// </summary>
         /// <param name="gl">Active OpenGL context.</param>
         public void LookAtMatrix(OpenGL gl)
         {
             gl.Viewport(0, 0, _glControl.Width, _glControl.Height);
+            float[] projection, view;
+            GetMatrices(_glControl.Width, _glControl.Height, out projection, out view);
+            ModernOverlayRenderer.For(gl).SetSceneMatrices(projection, view);
 
+            // Preserve the ICamera contract for callers that still issue fixed-
+            // function draw calls after applying the camera. CxDisplay itself uses
+            // GetMatrices and does not need this compatibility matrix stack path.
             gl.MatrixMode(OpenGL.GL_PROJECTION);
             gl.LoadIdentity();
-
-            double aspect = (double)_glControl.Width / _glControl.Height;
+            double aspect = _glControl.Height > 0
+                ? (double)_glControl.Width / _glControl.Height : 1.0;
             if (!Enable2DView)
             {
                 gl.Perspective(_fieldOfView, aspect, _nearPlane, _farPlane);
@@ -423,20 +490,21 @@ namespace VisionNet.Controls
             else
             {
                 double height = 2.0 * Math.Abs(_position.Z - _target.Z);
-                double width  = height * aspect;
-                gl.Ortho(-width / 2, width / 2, -height / 2, height / 2, _nearPlane, _farPlane);
+                if (height < 1e-4) height = 1.0;
+                double width = height * aspect;
+                gl.Ortho(-width / 2, width / 2, -height / 2, height / 2,
+                    _nearPlane, _farPlane);
             }
 
             gl.MatrixMode(OpenGL.GL_MODELVIEW);
             gl.LoadIdentity();
             gl.LookAt(
                 _position.X, _position.Y, _position.Z,
-                _target.X,   _target.Y,   _target.Z,
-                _up.X,       _up.Y,       _up.Z);
-
+                _target.X, _target.Y, _target.Z,
+                _up.X, _up.Y, _up.Z);
             if (_isLeftHanded)
                 gl.Scale(1.0f, -1.0f, 1.0f);
-            if (_zScale != 1.0f)
+            if (Math.Abs(_zScale - 1.0f) > 1e-6f)
                 gl.Scale(1.0f, 1.0f, _zScale);
         }
 
@@ -463,8 +531,13 @@ namespace VisionNet.Controls
 
             if (Math.Abs(depth - 1.0f) < 0.00001f) return null;
 
-            var obj = gl.UnProject((double)screenX, (double)adjustedY, (double)depth);
-            return new Vector3((float)obj[0], (float)obj[1], (float)obj[2]);
+            float[] projection, view;
+            GetMatrices(_glControl.Width, _glControl.Height, out projection, out view);
+            var renderer = ModernOverlayRenderer.For(gl);
+            renderer.SetSceneMatrices(projection, view);
+            CxPoint3D world;
+            if (!renderer.Unproject(gl, screenX, adjustedY, depth, out world)) return null;
+            return new Vector3(world.X, world.Y, world.Z);
         }
 
         #endregion

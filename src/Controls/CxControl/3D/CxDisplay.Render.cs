@@ -12,8 +12,14 @@ namespace VisionNet.Controls
         protected override void DoOpenGLInitialized()
         {
             base.DoOpenGLInitialized();
-            OpenGL.ClearColor(_backColor.R / 255f, _backColor.G / 255f, _backColor.B / 255f, _backColor.A / 255f);
-            OpenGL.PointSize(2.0f);
+            lock (_renderLock)
+            {
+                // A context can be recreated on the same OpenGL wrapper. Drop programs
+                // compiled for the previous context before the first draw.
+                ModernOverlayRenderer.Release(OpenGL);
+                OpenGL.ClearColor(_backColor.R / 255f, _backColor.G / 255f, _backColor.B / 255f, _backColor.A / 255f);
+                OpenGL.PointSize(2.0f);
+            }
         }
 
         /// <summary>
@@ -23,37 +29,50 @@ namespace VisionNet.Controls
         protected override void DoOpenGLDraw(RenderEventArgs e)
         {
             if (DesignMode) return;
-            base.DoOpenGLDraw(e);
-
-            var rcp = OpenGL.RenderContextProvider;
-            if (rcp != null && Width > 0 && Height > 0)
+            lock (_renderLock)
             {
-                OpenGL.SetDimensions(Width, Height);
-                OpenGL.Viewport(0, 0, Width, Height);
+                base.DoOpenGLDraw(e);
+
+                var rcp = OpenGL.RenderContextProvider;
+                if (rcp != null && Width > 0 && Height > 0)
+                {
+                    OpenGL.SetDimensions(Width, Height);
+                    OpenGL.Viewport(0, 0, Width, Height);
+                }
+
+                var gl = OpenGL;
+                gl.ClearColor(_backColor.R / 255f, _backColor.G / 255f, _backColor.B / 255f, _backColor.A / 255f);
+                gl.Clear(OpenGL.GL_COLOR_BUFFER_BIT | OpenGL.GL_DEPTH_BUFFER_BIT);
+
+                // 1. Release GL resources dequeued by Dispose/Replace on another thread.
+                ProcessPendingRelease(gl);
+
+                // 2. Create or update GL resources (full lock prevents concurrent Dispose).
+                ProcessResourcePool(gl);
+
+                gl.Enable(OpenGL.GL_DEPTH_TEST);
+                gl.DepthFunc(OpenGL.GL_LESS);
+                gl.Enable(OpenGL.GL_BLEND);
+                gl.BlendFunc(OpenGL.GL_SRC_ALPHA, OpenGL.GL_ONE_MINUS_SRC_ALPHA);
+                float[] projection;
+                float[] view;
+                lock (_cameraLock)
+                    _camera.GetMatrices(Width, Height, out projection, out view);
+                var overlayRenderer = ModernOverlayRenderer.For(gl);
+                overlayRenderer.SetSceneMatrices(projection, view);
+                overlayRenderer.BeginFrame(gl);
+                try
+                {
+                    Render(gl);
+                }
+                finally
+                {
+                    overlayRenderer.EndFrame(gl);
+                }
+
+                gl.Disable(OpenGL.GL_DEPTH_TEST);
+                gl.Disable(OpenGL.GL_BLEND);
             }
-
-            var gl = OpenGL;
-            gl.ClearColor(_backColor.R / 255f, _backColor.G / 255f, _backColor.B / 255f, _backColor.A / 255f);
-            gl.Clear(OpenGL.GL_COLOR_BUFFER_BIT | OpenGL.GL_DEPTH_BUFFER_BIT);
-
-            // 1. Release GL resources dequeued by Dispose/Replace on another thread.
-            ProcessPendingRelease(gl);
-
-            // 2. Create or update GL resources (full lock prevents concurrent Dispose).
-            ProcessResourcePool(gl);
-
-            gl.Enable(OpenGL.GL_DEPTH_TEST);
-            gl.DepthFunc(OpenGL.GL_LESS);
-            gl.Enable(OpenGL.GL_BLEND);
-            gl.BlendFunc(OpenGL.GL_SRC_ALPHA, OpenGL.GL_ONE_MINUS_SRC_ALPHA);
-            gl.LoadIdentity();
-
-            lock (_cameraLock)
-                _camera.LookAtMatrix(gl);
-            Render(gl);
-
-            gl.Disable(OpenGL.GL_DEPTH_TEST);
-            gl.Disable(OpenGL.GL_BLEND);
         }
 
         /// <inheritdoc/>
@@ -65,7 +84,6 @@ namespace VisionNet.Controls
             base.OnResize(e);
             if (IsHandleCreated && !IsDisposed && Width > 0 && Height > 0)
             {
-                _camera?.LookAtMatrix(OpenGL);
                 Invalidate();
             }
         }
@@ -116,7 +134,11 @@ namespace VisionNet.Controls
             // Snapshot under lock so GL calls are issued without holding it.
             List<ICxObjRenderItem> snapshot;
             lock (_resourceLock)
-                snapshot = new List<ICxObjRenderItem>(_surfaceItems);
+            {
+                _surfaceSnapshot.Clear();
+                _surfaceSnapshot.AddRange(_surfaceItems);
+                snapshot = _surfaceSnapshot;
+            }
 
             // Phase 1 — aggregate global Z and diff ranges, and track whether all items share
             // a single SurfaceColorMode (the colour bar is hidden when modes differ).
@@ -132,6 +154,8 @@ namespace VisionNet.Controls
                 if (cur == null || cur.IsDisposed) continue;
 
                 var mode = cur.SurfaceColorMode;
+                if (mode == SurfaceColorMode.Lit && cur.SurfaceMode != SurfaceMode.Mesh)
+                    mode = SurfaceColorMode.Color;
                 if (!mixedMode)
                 {
                     if (singleMode == null) singleMode = mode;
@@ -201,11 +225,22 @@ namespace VisionNet.Controls
                 anyDrawn = true;
             }
 
-            // Phase 4 — HUD overlays.
-            // The colour bar is drawn only when every item shares the same SurfaceColorMode.
-            // Any mode mismatch (e.g. a Color mesh with a Diff point cloud) hides the bar — a
-            // single bar can't span mismatched magnitudes. Pure Intensity (fixed 0–255) and
-            // Lit (physical shading, not data-mapped) also hide the bar.
+            // Phase 4 — overlay geometry (segments, points, polygons, etc.).
+            lock (_resourceLock)
+            {
+                _overlaySnapshot.Clear();
+                _overlaySnapshot.AddRange(_renderItems);
+            }
+            foreach (var item in _overlaySnapshot)
+                item.Draw(gl);
+
+            if (!_camera.Enable2DView)
+                _coordinationItem.DrawScreenPositionedAxes(gl);
+
+            // Phase 5 — screen-space HUD. The colour bar and coordinate tooltip are
+            // emitted after all scene and interactive geometry, so later depth-tested
+            // draws cannot cover their text or backgrounds.
+            // The colour bar is drawn only when every item shares one data-mapped mode.
             if (anyDrawn && uniformMode && singleMode != SurfaceColorMode.Intensity
                 && singleMode != SurfaceColorMode.Lit && IsColorBarVisible)
             {
@@ -232,16 +267,6 @@ namespace VisionNet.Controls
             }
             if (anyDrawn)
                 _coordTagItem.Draw(gl);
-
-            // Phase 5 — overlay geometry (segments, points, polygons, etc.).
-            IRenderItem[] overlaySnapshot;
-            lock (_resourceLock)
-                overlaySnapshot = _renderItems.ToArray();
-            foreach (var item in overlaySnapshot)
-                item.Draw(gl);
-
-            if (!_camera.Enable2DView)
-                _coordinationItem.DrawScreenPositionedAxes(gl);
         }
     }
 }

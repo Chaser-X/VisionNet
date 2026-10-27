@@ -3,7 +3,6 @@ using System.Drawing;
 using System.Numerics;
 using System.Windows.Forms;
 using SharpGL;
-using SharpGL.SceneGraph;
 using VisionNet.DataType;
 
 namespace VisionNet.Controls
@@ -28,6 +27,8 @@ namespace VisionNet.Controls
         private int   _lastMouseX;
         private int   _lastMouseY;
         private float[] _rotationMatrix = new float[16];
+        private readonly float[] _projectionMatrix = new float[16];
+        private readonly float[] _viewMatrix = new float[16];
         private float _translateSpeed  = 0.5f;
         private CxPoint3D _pointCloudCenter = new CxPoint3D();
 
@@ -225,38 +226,59 @@ namespace VisionNet.Controls
         public void LookAtMatrix(OpenGL gl)
         {
             gl.Viewport(0, 0, _glControl.Width, _glControl.Height);
+            float[] projection, view;
+            GetMatrices(_glControl.Width, _glControl.Height, out projection, out view);
+            ModernOverlayRenderer.For(gl).SetSceneMatrices(projection, view);
+        }
 
-            gl.MatrixMode(OpenGL.GL_PROJECTION);
-            gl.LoadIdentity();
-
+        /// <summary>Computes the modern row-major projection and view matrices.</summary>
+        public void GetMatrices(int width, int height, out float[] projection, out float[] view)
+        {
+            float aspect = height > 0 ? (float)width / height : 1f;
             if (!Enable2DView)
             {
-                double aspect = (double)_glControl.Width / _glControl.Height;
-                gl.Perspective(60.0, aspect, 0.01, 1000.0);
+                float f = 1f / (float)Math.Tan(60.0 * Math.PI / 360.0);
+                float near = 0.01f, far = 1000f;
+                float nf = 1f / (near - far);
+                projection = _projectionMatrix;
+                projection[0] = f / aspect; projection[1] = 0; projection[2] = 0; projection[3] = 0;
+                projection[4] = 0; projection[5] = f; projection[6] = 0; projection[7] = 0;
+                projection[8] = 0; projection[9] = 0; projection[10] = (far + near) * nf;
+                projection[11] = 2f * far * near * nf;
+                projection[12] = 0; projection[13] = 0; projection[14] = -1f; projection[15] = 0;
+                // The accumulated trackball matrix is kept in the layout used by
+                // the legacy OpenGL matrix stack (translation in the last four
+                // elements).  Convert it to CxMatrix4X4's row-major layout before
+                // composing the CPU-side view matrix; using it directly puts the
+                // camera translation in the last row and breaks rotated views.
+                view = _viewMatrix;
+                // Transpose the legacy column-major rotation into the row-major
+                // layout used by the modern shader, then apply the translation.
+                for (int row = 0; row < 4; row++)
+                    for (int col = 0; col < 4; col++)
+                        view[row * 4 + col] = _rotationMatrix[col * 4 + row];
+                for (int col = 0; col < 4; col++)
+                {
+                    view[col] += _translateX * view[12 + col];
+                    view[4 + col] += _translateY * view[12 + col];
+                    view[8 + col] += _translateZ * view[12 + col];
+                }
             }
             else
             {
-                double left   = -_glControl.Width  / 2.0;
-                double right  =  _glControl.Width  / 2.0;
-                double bottom = -_glControl.Height / 2.0;
-                double top    =  _glControl.Height / 2.0;
-                gl.Ortho(left, right, bottom, top, -1000.0, 1000.0);
+                float halfWidth = Math.Max(1f, width) / 2f;
+                float halfHeight = Math.Max(1f, height) / 2f;
+                projection = _projectionMatrix;
+                projection[0] = 1f / halfWidth; projection[1] = 0; projection[2] = 0; projection[3] = 0;
+                projection[4] = 0; projection[5] = 1f / halfHeight; projection[6] = 0; projection[7] = 0;
+                projection[8] = 0; projection[9] = 0; projection[10] = -2f / 2000f; projection[11] = 0;
+                projection[12] = 0; projection[13] = 0; projection[14] = 0; projection[15] = 1f;
+                view = _viewMatrix;
+                view[0] = _translateZ; view[1] = 0; view[2] = 0; view[3] = _translateX;
+                view[4] = 0; view[5] = -_translateZ; view[6] = 0; view[7] = _translateY;
+                view[8] = 0; view[9] = 0; view[10] = 1f; view[11] = 0;
+                view[12] = 0; view[13] = 0; view[14] = 0; view[15] = 1f;
             }
-
-            gl.MatrixMode(OpenGL.GL_MODELVIEW);
-            gl.LoadIdentity();
-
-            if (!Enable2DView)
-            {
-                gl.Translate(_translateX, _translateY, _translateZ);
-            }
-            else
-            {
-                gl.Translate(_translateX, _translateY, 0);
-                gl.Scale(_translateZ, -_translateZ, 1);
-            }
-
-            gl.MultMatrix(_rotationMatrix);
         }
 
         #endregion
@@ -348,8 +370,13 @@ namespace VisionNet.Controls
 
             if (Math.Abs(depth - 1.0f) < 0.00001f) return null;
 
-            var obj = gl.UnProject((double)mouseX, (double)adjustedY, (double)depth);
-            return new CxPoint3D((float)obj[0], (float)obj[1], (float)obj[2]);
+            float[] projection, view;
+            GetMatrices(_glControl.Width, _glControl.Height, out projection, out view);
+            var renderer = ModernOverlayRenderer.For(gl);
+            renderer.SetSceneMatrices(projection, view);
+            CxPoint3D world;
+            if (!renderer.Unproject(gl, mouseX, adjustedY, depth, out world)) return null;
+            return world;
         }
 
         /// <summary>

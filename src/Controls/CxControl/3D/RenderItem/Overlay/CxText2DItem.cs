@@ -18,7 +18,7 @@ namespace VisionNet.Controls
         /// <summary>Initializes the item with the given text items, colour, and font size scale.</summary>
         /// <param name="textItems">Text items to render. Must not be <c>null</c> or empty.</param>
         /// <param name="color">Text colour.</param>
-        /// <param name="size">Font size scale factor (passed directly to <c>gl.DrawText</c>).</param>
+        /// <param name="size">Font size scale factor used by the GLSL text overlay renderer.</param>
         /// <exception cref="ArgumentNullException">Thrown when <paramref name="textItems"/> is null or empty.</exception>
         public CxText2DItem(CxText2D[] textItems, Color color, float size = 1f) : base(color, size)
         {
@@ -33,34 +33,13 @@ namespace VisionNet.Controls
             if (TextItems == null || TextItems.Length == 0) return;
 
             int vpHeight = gl.RenderContextProvider.Height;
-
-            // Switch to 2D orthographic projection.
-            gl.Disable(OpenGL.GL_DEPTH_TEST);
-            gl.MatrixMode(OpenGL.GL_PROJECTION);
-            gl.PushMatrix();
-            gl.LoadIdentity();
-            gl.Ortho(0, gl.RenderContextProvider.Width, 0, vpHeight, -1, 1);
-            gl.MatrixMode(OpenGL.GL_MODELVIEW);
-            gl.PushMatrix();
-            gl.LoadIdentity();
-
-            float r = DrawColor.R / 255.0f;
-            float g = DrawColor.G / 255.0f;
-            float b = DrawColor.B / 255.0f;
-
+            var renderer = ModernOverlayRenderer.For(gl);
             foreach (var item in TextItems)
             {
                 // Convert Y from top-origin to bottom-origin (OpenGL convention).
                 int screenY = vpHeight - (int)item.Location.Y;
-                gl.DrawText((int)item.Location.X, screenY, r, g, b, "Arial", item.FontSize, item.Text);
+                renderer.DrawText(gl, (int)item.Location.X, screenY, DrawColor, item.FontSize, item.Text);
             }
-
-            // Restore matrices and depth test.
-            gl.PopMatrix();
-            gl.MatrixMode(OpenGL.GL_PROJECTION);
-            gl.PopMatrix();
-            gl.MatrixMode(OpenGL.GL_MODELVIEW);
-            gl.Enable(OpenGL.GL_DEPTH_TEST);
         }
 
         /// <inheritdoc/>

@@ -12,6 +12,10 @@ namespace VisionNet.Controls
     {
         private float _zMin;
         private float _zMax;
+        private float[] _barPositions = new float[0];
+        private float[] _barColors = new float[0];
+        private float[] _tickPositions = new float[0];
+        private int _cachedBarHeight = -1;
 
         /// <summary>Initializes the colour bar with the given Z range.</summary>
         /// <param name="zMin">Lower bound of the Z range (dark blue end).</param>
@@ -41,55 +45,58 @@ namespace VisionNet.Controls
             int startX    = gl.RenderContextProvider.Width - barWidth - 10;
             int startY    = (gl.RenderContextProvider.Height - barHeight) / 2;
 
-            // Switch to 2D orthographic projection for HUD rendering.
-            gl.Disable(OpenGL.GL_DEPTH_TEST);
-            gl.MatrixMode(OpenGL.GL_PROJECTION);
-            gl.PushMatrix();
-            gl.LoadIdentity();
-            gl.Ortho(0, gl.RenderContextProvider.Width, 0, gl.RenderContextProvider.Height, -1, 1);
-            gl.MatrixMode(OpenGL.GL_MODELVIEW);
-            gl.PushMatrix();
-            gl.LoadIdentity();
-
-            // Draw colour gradient quads.
-            gl.Begin(OpenGL.GL_QUADS);
-            for (int i = 0; i < barHeight; i++)
+            var renderer = ModernOverlayRenderer.For(gl);
+            if (_cachedBarHeight != barHeight)
             {
-                float normalised = (float)i / barHeight;
+                _barPositions = new float[(barHeight + 1) * 2 * 2];
+                _barColors = new float[(barHeight + 1) * 2 * 4];
+                _tickPositions = new float[(7 + 1) * 4];
+                _cachedBarHeight = barHeight;
+            }
+            var positions = _barPositions;
+            var colors = _barColors;
+            for (int i = 0; i <= barHeight; i++)
+            {
+                float normalised = barHeight == 0 ? 0f : (float)i / barHeight;
                 double z = _zMin + normalised * (_zMax - _zMin);
                 var (r, g, b) = CxExtension.GetColorByHeight(z, _zMin, _zMax);
-
-                gl.Color(r, g, b);
-                gl.Vertex(startX,            startY + i,     0);
-                gl.Vertex(startX + barWidth, startY + i,     0);
-                gl.Vertex(startX + barWidth, startY + i + 1, 0);
-                gl.Vertex(startX,            startY + i + 1, 0);
+                int vertex = i * 2;
+                positions[vertex * 2] = startX;
+                positions[vertex * 2 + 1] = startY + i;
+                positions[(vertex + 1) * 2] = startX + barWidth;
+                positions[(vertex + 1) * 2 + 1] = startY + i;
+                for (int side = 0; side < 2; side++)
+                {
+                    int color = (vertex + side) * 4;
+                    colors[color] = (float)r;
+                    colors[color + 1] = (float)g;
+                    colors[color + 2] = (float)b;
+                    colors[color + 3] = 1f;
+                }
             }
-            gl.End();
+            renderer.DrawScreenGeometryColored(gl, OpenGL.GL_TRIANGLE_STRIP, positions, colors);
 
             // Draw tick marks and Z-value labels.
             const int divisions = 7;
-            gl.Color(1.0f, 1.0f, 1.0f);
-            gl.LineWidth(1.0f);
+            var tickPositions = _tickPositions;
             for (int i = 0; i <= divisions; i++)
             {
-                int    tickY  = startY + (int)(i * (barHeight / (float)divisions));
-                double zValue = _zMin + i * (_zMax - _zMin) / divisions;
+                int tickY = startY + (int)(i * (barHeight / (float)divisions));
 
-                gl.Begin(OpenGL.GL_LINES);
-                gl.Vertex(startX - 5, tickY, 0);
-                gl.Vertex(startX,     tickY, 0);
-                gl.End();
-
-                gl.DrawText(startX - 45, tickY - 5, 1, 1, 1, "", 10, $"{zValue:F2}");
+                int offset = i * 4;
+                tickPositions[offset] = startX - 5;
+                tickPositions[offset + 1] = tickY;
+                tickPositions[offset + 2] = startX;
+                tickPositions[offset + 3] = tickY;
             }
+            renderer.DrawScreenGeometry(gl, OpenGL.GL_LINES, tickPositions, System.Drawing.Color.White);
 
-            // Restore matrices and depth test.
-            gl.PopMatrix();
-            gl.MatrixMode(OpenGL.GL_PROJECTION);
-            gl.PopMatrix();
-            gl.MatrixMode(OpenGL.GL_MODELVIEW);
-            gl.Enable(OpenGL.GL_DEPTH_TEST);
+            for (int i = 0; i <= divisions; i++)
+            {
+                int tickY = startY + (int)(i * (barHeight / (float)divisions));
+                double zValue = _zMin + i * (_zMax - _zMin) / divisions;
+                renderer.DrawText(gl, startX - 45, tickY - 5, System.Drawing.Color.White, 10, $"{zValue:F2}");
+            }
         }
     }
 }

@@ -14,6 +14,7 @@ namespace VisionNet.Controls
     {
         /// <summary>Gets the planes to be rendered.</summary>
         public CxPlane3D[] Planes { get; private set; }
+        private float[] _positionsBuffer = new float[0];
 
         /// <summary>Initializes the item with the given planes, colour, and half-extent size.</summary>
         /// <param name="planes">Planes to render.</param>
@@ -33,8 +34,11 @@ namespace VisionNet.Controls
             if (Planes == null || Planes.Length == 0) return;
 
             PushModelMatrix(gl);
-            gl.Color(DrawColor.R / 255.0, DrawColor.G / 255.0, DrawColor.B / 255.0, DrawColor.A / 255.0);
-
+            var renderer = ModernOverlayRenderer.For(gl);
+            int required = Planes.Length * 18;
+            if (_positionsBuffer.Length != required)
+                _positionsBuffer = new float[required];
+            int offset = 0;
             foreach (var plane in Planes)
             {
                 // Compute two orthogonal tangent vectors lying in the plane.
@@ -44,14 +48,33 @@ namespace VisionNet.Controls
 
                 CxVector3D v = plane.Normal.Cross(u).Normalize() * Size;
 
-                gl.Begin(OpenGL.GL_QUADS);
-                gl.Vertex(plane.Point.X + u.X + v.X, plane.Point.Y + u.Y + v.Y, plane.Point.Z + u.Z + v.Z);
-                gl.Vertex(plane.Point.X - u.X + v.X, plane.Point.Y - u.Y + v.Y, plane.Point.Z - u.Z + v.Z);
-                gl.Vertex(plane.Point.X - u.X - v.X, plane.Point.Y - u.Y - v.Y, plane.Point.Z - u.Z - v.Z);
-                gl.Vertex(plane.Point.X + u.X - v.X, plane.Point.Y + u.Y - v.Y, plane.Point.Z + u.Z - v.Z);
-                gl.End();
+                float p0x = (float)(plane.Point.X + u.X + v.X), p0y = (float)(plane.Point.Y + u.Y + v.Y), p0z = (float)(plane.Point.Z + u.Z + v.Z);
+                float p1x = (float)(plane.Point.X - u.X + v.X), p1y = (float)(plane.Point.Y - u.Y + v.Y), p1z = (float)(plane.Point.Z - u.Z + v.Z);
+                float p2x = (float)(plane.Point.X - u.X - v.X), p2y = (float)(plane.Point.Y - u.Y - v.Y), p2z = (float)(plane.Point.Z - u.Z - v.Z);
+                float p3x = (float)(plane.Point.X + u.X - v.X), p3y = (float)(plane.Point.Y + u.Y - v.Y), p3z = (float)(plane.Point.Z + u.Z - v.Z);
+                WritePoint(ref offset, p0x, p0y, p0z); WritePoint(ref offset, p1x, p1y, p1z); WritePoint(ref offset, p2x, p2y, p2z);
+                WritePoint(ref offset, p0x, p0y, p0z); WritePoint(ref offset, p2x, p2y, p2z); WritePoint(ref offset, p3x, p3y, p3z);
             }
+            renderer.Draw(gl, OpenGL.GL_TRIANGLES, _positionsBuffer, DrawColor);
             PopModelMatrix(gl);
+        }
+
+        private void WritePoint(ref int offset, float x, float y, float z)
+        {
+            _positionsBuffer[offset++] = x;
+            _positionsBuffer[offset++] = y;
+            _positionsBuffer[offset++] = z;
+        }
+
+        /// <inheritdoc/>
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                Planes = null;
+                _positionsBuffer = null;
+            }
+            base.Dispose(disposing);
         }
     }
 }

@@ -151,8 +151,10 @@ namespace VisionNet.Controls
 
             if (Math.Abs(depth - 1.0f) < 0.00001f) return null;
 
-            var obj = gl.UnProject(mouseX, adjustedY, depth);
-            return new CxPoint3D((float)obj[0], (float)obj[1], (float)obj[2]);
+            CxPoint3D world;
+            if (!ModernOverlayRenderer.For(gl).Unproject(gl, mouseX, adjustedY, depth, out world))
+                return null;
+            return world;
         }
 
         /// <summary>

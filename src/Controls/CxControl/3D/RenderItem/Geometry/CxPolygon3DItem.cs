@@ -26,6 +26,8 @@ namespace VisionNet.Controls
         // ── Interaction state ────────────────────────────────────────────────────
         private int _hitPolyIndex   = -1;
         private int _hitVertexIndex = -1;  // -1 = edge/body, ≥0 = vertex index
+        private float[][] _polygonBuffers = new float[0][];
+        private float[] _markerBuffer = new float[0];
 
         /// <inheritdoc/>
         public override bool HitTest(CxPoint3D worldPos) => FindHit(worldPos).poly >= 0;
@@ -134,20 +136,26 @@ namespace VisionNet.Controls
             if (Polygon3Ds == null || Polygon3Ds.Length == 0) return;
 
             PushModelMatrix(gl);
-            gl.Color(DrawColor.R / 255.0, DrawColor.G / 255.0, DrawColor.B / 255.0);
-            gl.LineWidth(Size);
-            gl.Enable(OpenGL.GL_LINE_SMOOTH);
-            gl.Hint(OpenGL.GL_LINE_SMOOTH_HINT, OpenGL.GL_NICEST);
-
-            foreach (var polygon in Polygon3Ds)
+            var renderer = ModernOverlayRenderer.For(gl);
+            if (_polygonBuffers.Length != Polygon3Ds.Length)
+                _polygonBuffers = new float[Polygon3Ds.Length][];
+            for (int polygonIndex = 0; polygonIndex < Polygon3Ds.Length; polygonIndex++)
             {
-                gl.Begin(polygon.IsClosed ? OpenGL.GL_LINE_LOOP : OpenGL.GL_LINE_STRIP);
-                foreach (var point in polygon.Points)
-                    gl.Vertex(point.X, point.Y, point.Z);
-                gl.End();
+                var polygon = Polygon3Ds[polygonIndex];
+                if (polygon.Points == null || polygon.Points.Length == 0) continue;
+                int required = polygon.Points.Length * 3;
+                if (_polygonBuffers[polygonIndex] == null || _polygonBuffers[polygonIndex].Length != required)
+                    _polygonBuffers[polygonIndex] = new float[required];
+                var positions = _polygonBuffers[polygonIndex];
+                for (int i = 0; i < polygon.Points.Length; i++)
+                {
+                    positions[i * 3] = polygon.Points[i].X;
+                    positions[i * 3 + 1] = polygon.Points[i].Y;
+                    positions[i * 3 + 2] = polygon.Points[i].Z;
+                }
+                renderer.Draw(gl, polygon.IsClosed ? OpenGL.GL_LINE_LOOP : OpenGL.GL_LINE_STRIP,
+                    positions, DrawColor, Size);
             }
-
-            gl.Disable(OpenGL.GL_LINE_SMOOTH);
 
             // Vertex markers on the hit polygon when active and selected.
             if (IsActiveObj && IsSelected && _hitPolyIndex >= 0 && _hitPolyIndex < Polygon3Ds.Length)
@@ -155,16 +163,32 @@ namespace VisionNet.Controls
                 var pts = Polygon3Ds[_hitPolyIndex].Points;
                 if (pts != null && pts.Length > 0)
                 {
-                    gl.PointSize(10f);
-                    gl.Begin(OpenGL.GL_POINTS);
-                    gl.Color(DrawColor.R / 255.0, DrawColor.G / 255.0, DrawColor.B / 255.0);
-                    foreach (var v in pts)
-                        gl.Vertex(v.X, v.Y, v.Z);
-                    gl.End();
-                    gl.PointSize(1f);
+                    int required = pts.Length * 3;
+                    if (_markerBuffer.Length != required)
+                        _markerBuffer = new float[required];
+                    var positions = _markerBuffer;
+                    for (int i = 0; i < pts.Length; i++)
+                    {
+                        positions[i * 3] = pts[i].X;
+                        positions[i * 3 + 1] = pts[i].Y;
+                        positions[i * 3 + 2] = pts[i].Z;
+                    }
+                    renderer.Draw(gl, OpenGL.GL_POINTS, positions, DrawColor, 10f);
                 }
             }
             PopModelMatrix(gl);
+        }
+
+        /// <inheritdoc/>
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                Polygon3Ds = null;
+                _polygonBuffers = null;
+                _markerBuffer = null;
+            }
+            base.Dispose(disposing);
         }
     }
 }

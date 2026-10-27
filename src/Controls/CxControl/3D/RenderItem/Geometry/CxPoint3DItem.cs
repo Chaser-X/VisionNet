@@ -1,9 +1,7 @@
 using SharpGL;
-using SharpGL.SceneGraph.Quadrics;
 using System;
 using System.Collections.Generic;
 using System.Drawing;
-using System.Text;
 using VisionNet.DataType;
 
 namespace VisionNet.Controls
@@ -30,6 +28,10 @@ namespace VisionNet.Controls
         /// <summary>Gets or sets the visual shape (point or sphere).</summary>
         public PointShape Shape { get; set; } = PointShape.Point;
 
+        // Reused by the flat-point path. Point data is updated in place each
+        // frame, avoiding a large managed allocation while the view is dragged.
+        private float[] _positionsBuffer = new float[0];
+
         /// <summary>Initializes the item with the given points, colour, size, and shape.</summary>
         /// <param name="points">World-space point positions.</param>
         /// <param name="color">Drawing colour.</param>
@@ -53,12 +55,17 @@ namespace VisionNet.Controls
             if (Shape == PointShape.Point)
             {
                 PushModelMatrix(gl);
-                gl.Color(DrawColor.R / 255.0, DrawColor.G / 255.0, DrawColor.B / 255.0);
-                gl.PointSize(Size);
-                gl.Begin(OpenGL.GL_POINTS);
-                foreach (var p in Point3Ds)
-                    gl.Vertex(p.X, p.Y, p.Z);
-                gl.End();
+                int required = Point3Ds.Length * 3;
+                if (_positionsBuffer.Length != required)
+                    _positionsBuffer = new float[required];
+                var positions = _positionsBuffer;
+                for (int i = 0; i < Point3Ds.Length; i++)
+                {
+                    positions[i * 3] = Point3Ds[i].X;
+                    positions[i * 3 + 1] = Point3Ds[i].Y;
+                    positions[i * 3 + 2] = Point3Ds[i].Z;
+                }
+                ModernOverlayRenderer.For(gl).Draw(gl, OpenGL.GL_POINTS, positions, DrawColor, Size);
                 PopModelMatrix(gl);
             }
             else
@@ -70,17 +77,10 @@ namespace VisionNet.Controls
                 uint shader = CreateShaderProgram(gl);
                 gl.UseProgram(shader);
 
-                float[] proj = new float[16];
-                float[] view = new float[16];
-                gl.GetFloat(OpenGL.GL_PROJECTION_MATRIX, proj);
-                gl.GetFloat(OpenGL.GL_MODELVIEW_MATRIX,  view);
-
-                gl.UniformMatrix4(gl.GetUniformLocation(shader, "view"),       1, false, view);
-                gl.UniformMatrix4(gl.GetUniformLocation(shader, "projection"), 1, false, proj);
-                var model = ModelMatrix ?? CxMatrix4X4.Identity();
-                gl.UniformMatrix4(gl.GetUniformLocation(shader, "groupModel"), 1, true, model.Data);
+                ModernOverlayRenderer.For(gl).UploadSceneMatrices(gl, shader, ModelMatrix);
                 gl.Uniform4(gl.GetUniformLocation(shader, "aColor"),
-                    DrawColor.R / 255.0f, DrawColor.G / 255.0f, DrawColor.B / 255.0f, 1f);
+                    DrawColor.R / 255.0f, DrawColor.G / 255.0f, DrawColor.B / 255.0f,
+                    DrawColor.A / 255.0f);
 
                 gl.BindVertexArray(vao[0]);
                 gl.DrawElementsInstanced(OpenGL.GL_TRIANGLES, indexCount,
@@ -150,14 +150,14 @@ namespace VisionNet.Controls
                 + "layout (location = 1) in vec3 aInstancePos;\n"
                 + "uniform mat4 view;\n"
                 + "uniform mat4 projection;\n"
-                + "uniform mat4 groupModel;\n"
+                + "uniform mat4 model;\n"
                 + "uniform vec4 aColor;\n"
                 + "out vec4 vertexColor;\n"
                 + "void main()\n"
                 + "{\n"
-                + "    mat4 model = mat4(1.0);\n"
-                + "    model[3] = vec4(aInstancePos, 1.0);\n"
-                + "    gl_Position = projection * view * groupModel * model * vec4(aPos, 1.0);\n"
+                + "    mat4 instanceModel = mat4(1.0);\n"
+                + "    instanceModel[3] = vec4(aInstancePos, 1.0);\n"
+                + "    gl_Position = projection * view * model * instanceModel * vec4(aPos, 1.0);\n"
                 + "    vertexColor = aColor;\n"
                 + "}\n";
 
@@ -167,47 +167,7 @@ namespace VisionNet.Controls
                 + "out vec4 FragColor;\n"
                 + "void main() { FragColor = vertexColor; }\n";
 
-            uint vert = CompileShader(gl, OpenGL.GL_VERTEX_SHADER,   vertSrc);
-            uint frag = CompileShader(gl, OpenGL.GL_FRAGMENT_SHADER, fragSrc);
-            if (vert == 0 || frag == 0) return 0;
-
-            uint prog = gl.CreateProgram();
-            gl.AttachShader(prog, vert);
-            gl.AttachShader(prog, frag);
-            gl.LinkProgram(prog);
-
-            int[] success = new int[1];
-            gl.GetProgram(prog, OpenGL.GL_LINK_STATUS, success);
-            if (success[0] == 0)
-            {
-                var log = new StringBuilder(512);
-                gl.GetProgramInfoLog(prog, 512, IntPtr.Zero, log);
-                Console.WriteLine("ERROR::SHADER::PROGRAM::LINKING_FAILED\n" + log);
-                return 0;
-            }
-
-            gl.DeleteShader(vert);
-            gl.DeleteShader(frag);
-            return prog;
-        }
-
-        private uint CompileShader(OpenGL gl, uint type, string source)
-        {
-            uint shader = gl.CreateShader(type);
-            gl.ShaderSource(shader, source);
-            gl.CompileShader(shader);
-
-            int[] success = new int[1];
-            gl.GetShader(shader, OpenGL.GL_COMPILE_STATUS, success);
-            if (success[0] == 0)
-            {
-                var log = new StringBuilder(512);
-                gl.GetShaderInfoLog(shader, 512, IntPtr.Zero, log);
-                string typeName = type == OpenGL.GL_VERTEX_SHADER ? "VERTEX" : "FRAGMENT";
-                Console.WriteLine($"ERROR::SHADER::{typeName}::COMPILATION_FAILED\n{log}");
-                return 0;
-            }
-            return shader;
+            return ShaderProgramCompiler.CompileProgram(gl, vertSrc, fragSrc);
         }
 
         /// <summary>
@@ -290,7 +250,10 @@ namespace VisionNet.Controls
         protected override void Dispose(bool disposing)
         {
             if (disposing)
+            {
                 Point3Ds = null;
+                _positionsBuffer = null;
+            }
             base.Dispose(disposing);
         }
     }

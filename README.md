@@ -115,9 +115,7 @@ var surface = new CxSurface(
 cxDisplay1.SetSurface(surface);              // 结构化表面
 // 或：有序点云
 cxDisplay1.SetPointCloud(cloud);            // CxPointCloud
-// 或：高性能 Shader 路径
-cxDisplay1.SetSurfaceAdvancedItem(surface); // 结构化
-cxDisplay1.SetPointCloudAdvancedItem(cloud);// 点云
+// 旧的 AdvancedItem 方法名仍保留为兼容别名
 ```
 
 ### 4. 叠加多个对象
@@ -192,9 +190,9 @@ VisionNet/
 │           ├── 3D/                 # 3D 渲染（OpenGL）
 │           │   ├── Camera/         # ICamera, CxAdvancedTrackBallCamera
 │           │   ├── RenderItem/
-│           │   │   ├── Surface/    # CxSurfaceItem, CxSurfaceAdvancedItem
-│           │   │   ├── PointCloud/ # CxPointCloudItem, CxPointCloudAdvancedItem
-│           │   │   ├── Mesh/       # CxMeshItem, CxMeshAdvancedItem
+│           │   │   ├── Surface/    # CxSurfaceItem
+│           │   │   ├── PointCloud/ # CxPointCloudItem
+│           │   │   ├── Mesh/       # CxMeshItem
 │           │   │   ├── Geometry/   # Point / Segment / Polygon / Plane / Box
 │           │   │   └── Overlay/    # ColorBar, CoordinateSystem, Tag, Text
 │           │   └── CxDisplay.cs   # 状态 / 初始化 / 框架
@@ -238,6 +236,8 @@ VisionNet/
 - **职责分离**：渲染 Item 只持有 CPU 数据，GL 对象由 `CxDisplay` 统一创建和释放
 - **延迟释放**：`Dispose` / 替换触发的 GL 资源回收推迟到下一渲染帧，避免跨线程 GL 调用
 - **线程安全**：`_resourceLock` 保护资源池；`Render()` 取快照遍历，不持锁执行 GL 调用
+- **现代 3D 管线**：`CxDisplay` 的 Surface、PointCloud、Mesh 及几何叠加层统一使用 VAO/VBO + GLSL，显式上传投影 / 视图 / 模型矩阵；`CxSurfaceItem`、`CxPointCloudItem`、`CxMeshItem` 是统一渲染入口。
+- **数据预算**：`Set*` / `Add*` 默认按最多 200 万个顶点采样后上传；可通过 `maxPointCount` 调整 Surface 和 PointCloud 的预算。
 
 #### CxDisplay2D（2D，ScottPlot）
 
@@ -352,8 +352,8 @@ var mesh = new CxMesh
 
 `SurfaceToMesh` 生成的 mesh：
 
-- `generateUVs=false`：`Intensity` 为压缩逐顶点格式（`length = validCount`），供 `CxMeshItem` 固定管线渲染
-- `generateUVs=true`：`Intensity` 为 W×H 网格格式（`length = W×H`，无效格填 0），供 `CxMeshAdvancedItem` Shader 路径渲染
+- `generateUVs=false`：`Intensity` 为压缩逐顶点格式（`length = validCount`），按顶点属性上传
+- `generateUVs=true`：`Intensity` 为 W×H 网格格式（`length = W×H`，无效格填 0），按纹理坐标采样
 
 **`CxImage`** — 2D 图像容器
 
@@ -607,27 +607,23 @@ VisionOperator.DestroyLib();
 
 | 方法                                     | 语义  | 说明                  |
 | -------------------------------------- | --- | ------------------- |
-| `SetSurface(surface)`                  | 替换  | 显示结构化表面，清空原有内容      |
-| `SetPointCloud(cloud)`                 | 替换  | 显示有序点云，清空原有内容       |
-| `SetSurfaceAdvancedItem(surface)`      | 替换  | 高性能结构化表面路径，≤ 200 万点 |
-| `SetSurfaceAdvancedItem(surface, pose)`| 替换  | 同上，带初始位姿（`ModelMatrix`） |
-| `SetPointCloudAdvancedItem(cloud)`     | 替换  | 高性能有序点云路径，≤ 200 万点  |
-| `SetPointCloudAdvancedItem(cloud, pose)`| 替换  | 同上，带初始位姿             |
-| `SetMesh(mesh)`                        | 替换  | 显示网格                |
-| `SetMeshAdvancedItem(mesh)`            | 替换  | 高性能 Shader 路径网格     |
-| `SetMeshAdvancedItem(mesh, pose)`      | 替换  | 同上，带初始位姿             |
-| `AddSurface(surface)`                  | 追加  | 叠加结构化表面             |
-| `AddPointCloud(cloud)`                 | 追加  | 叠加有序点云              |
-| `AddSurfaceAdvancedItem(surface)`      | 追加  | 叠加高性能结构化表面          |
-| `AddSurfaceAdvancedItem(surface, pose)`| 追加  | 同上，带初始位姿             |
-| `AddPointCloudAdvancedItem(cloud)`     | 追加  | 叠加高性能有序点云           |
-| `AddPointCloudAdvancedItem(cloud, pose)`| 追加  | 同上，带初始位姿             |
-| `AddMesh(mesh)`                        | 追加  | 叠加网格                |
-| `AddMeshAdvancedItem(mesh)`            | 追加  | 叠加高性能网格             |
-| `AddMeshAdvancedItem(mesh, pose)`      | 追加  | 同上，带初始位姿             |
-| `SetSurfaceAdvancedItemPose(pose)`     | —    | 运行时更新所有 Surface 位姿    |
-| `SetPointCloudAdvancedItemPose(pose)`  | —    | 运行时更新所有 PointCloud 位姿 |
-| `SetMeshAdvancedItemPose(pose)`        | —    | 运行时更新所有 Mesh 位姿      |
+| `SetSurface(surface)`                  | 替换  | 显示结构化表面，清空原有内容 |
+| `SetSurfaceWithPose(surface, pose)`    | 替换  | 显示结构化表面并设置位姿 |
+| `SetPointCloud(cloud)`                 | 替换  | 显示有序点云，清空原有内容 |
+| `SetPointCloudWithPose(cloud, pose)`   | 替换  | 显示有序点云并设置位姿 |
+| `SetMesh(mesh)`                        | 替换  | 显示网格 |
+| `SetMeshWithPose(mesh, pose)`          | 替换  | 显示网格并设置位姿 |
+| `AddSurface(surface)`                  | 追加  | 叠加结构化表面（默认 ≤ 200 万点） |
+| `AddSurfaceWithPose(surface, pose)`    | 追加  | 叠加结构化表面并设置位姿 |
+| `AddPointCloud(cloud)`                 | 追加  | 叠加有序点云（默认 ≤ 200 万点） |
+| `AddPointCloudWithPose(cloud, pose)`   | 追加  | 叠加有序点云并设置位姿 |
+| `AddMesh(mesh)`                        | 追加  | 叠加网格 |
+| `AddMeshWithPose(mesh, pose)`          | 追加  | 叠加网格并设置位姿 |
+| `SetSurfacePose(pose)`                 | —    | 运行时更新所有 Surface 位姿        |
+| `SetPointCloudPose(pose)`              | —    | 运行时更新所有 PointCloud 位姿     |
+| `SetMeshPose(pose)`                    | —    | 运行时更新所有 Mesh 位姿           |
+| `Set*AdvancedItem` / `Add*AdvancedItem`| —    | 旧名称兼容别名 |
+| `Set*AdvancedItemPose`                 | —    | 旧名称兼容别名，对应 `Set*Pose` |
 | `AddSurfaceItem(item)`                 | 追加  | 叠加自定义渲染 Item        |
 | `ClearSurfaceItems()`                  | —   | 清空所有表面对象            |
 | `RemoveSurfaceItem(item)`              | —   | 移除指定表面对象            |
@@ -699,22 +695,19 @@ display2D.SetBackgroundColor(Color.Black);
 
 | 类                          | 渲染路径                             | 适用场景                     |
 | -------------------------- | -------------------------------- | ------------------------ |
-| `CxSurfaceItem`            | 固定管线（VBO + 颜色数组）                 | 中小规模结构化表面                |
-| `CxSurfaceAdvancedItem`    | VAO + GLSL + 强度纹理                | 大规模结构化表面（自动降采样至 ≤ 200 万） |
-| `CxPointCloudItem`         | 固定管线（VBO + 颜色数组）                 | 中小规模有序点云                 |
-| `CxPointCloudAdvancedItem` | VAO + GLSL + 强度纹理                | 大规模有序点云（自动降采样至 ≤ 200 万）  |
-| `CxMeshItem`               | 固定管线（VBO + 颜色数组）                 | 中小规模三角网格                 |
-| `CxMeshAdvancedItem`       | VAO + GLSL + 强度纹理                | 高性能三角网格                  |
-| `CxPoint3DItem`            | 点精灵 / 实例化球体                      | 离散点集                     |
-| `CxSegment3DItem`          | `GL_LINES`                       | 线段集合                     |
-| `CxPolygon3DItem`          | `GL_LINE_LOOP` / `GL_LINE_STRIP` | 开放 / 闭合多边形               |
-| `CxPlane3DItem`            | `GL_QUADS`                       | 平面区域                     |
-| `CxBox3DItem`              | `GL_QUADS` + `GL_LINES`          | 半透明填充 + 线框包围盒            |
-| `CxColorBarItem`           | 2D 正交 HUD                        | Z 高度颜色条                  |
-| `CxCoordinateSystemItem`   | 圆柱 + 圆锥                          | 坐标轴（世界空间 + 屏幕左下角）        |
-| `CxCoordinationTagItem`    | 2D 正交 HUD                        | 鼠标悬停坐标标签                 |
-| `CxTextInfoItem`           | 世界坐标投影                           | 世界锚定文本                   |
-| `CxText2DItem`             | 2D 正交 HUD                        | 屏幕固定文本                   |
+| `CxSurfaceItem`            | VAO + VBO + GLSL + 强度纹理 | 结构化表面，预算 ≤ 200 万点 |
+| `CxPointCloudItem`         | VAO + VBO + GLSL + 强度纹理 | 有序点云，预算 ≤ 200 万点 |
+| `CxMeshItem`               | VAO + VBO + GLSL + 强度纹理 | 三角网格 |
+| `CxPoint3DItem`            | VAO + VBO + GLSL                  | 离散点集                     |
+| `CxSegment3DItem`          | VAO + VBO + GLSL (`GL_LINES`)     | 线段集合                     |
+| `CxPolygon3DItem`          | VAO + VBO + GLSL                  | 开放 / 闭合多边形               |
+| `CxPlane3DItem`            | VAO + VBO + GLSL (`GL_TRIANGLES`) | 平面区域                     |
+| `CxBox3DItem`              | VAO + VBO + GLSL                  | 半透明填充 + 线框包围盒            |
+| `CxColorBarItem`           | VAO + VBO + GLSL 正交 HUD          | Z 高度颜色条                  |
+| `CxCoordinateSystemItem`   | VAO + VBO + GLSL                  | 坐标轴（世界空间 + 屏幕左下角）        |
+| `CxCoordinationTagItem`    | VAO + VBO + GLSL 正交 HUD          | 鼠标悬停坐标标签                 |
+| `CxTextInfoItem`           | 文字纹理 + GLSL 世界坐标投影         | 世界锚定文本                   |
+| `CxText2DItem`             | 文字纹理 + GLSL 正交 HUD             | 屏幕固定文本                   |
 | `CxCoordination2DItem`    | X/Y 箭头 + 标签                      | 2D 坐标系指示器                  |
 | `CxImageItem`            | ScottPlot ImageRect                | 2D 图像（全局缩略图渲染）           |
 | `CxImageItemAdvance`     | 虚拟画布 + 视口裁剪（双层 ImageRect）       | 2D 大图高倍缩放（全局缩略图 + 视口高清瓦片） |
@@ -742,9 +735,9 @@ display2D.SetBackgroundColor(Color.Black);
 > 所有 OpenGL 对象（VBO / VAO / Shader / Texture）只能在创建它们的 GL 线程中释放。
 > 不要在 `Dispose()` 中直接调用 GL 删除函数——`CxDisplay` 通过内部的 `_pendingRelease` 队列在下一渲染帧内统一回收。
 
-> **大数据自动降采样**
-> `SetPointCloud` / `AddPointCloud`：点云点数超过 **1 亿** 时自动降采样至 1000 万结构化表面。
-> `SetSurfaceAdvancedItem` / `AddSurfaceAdvancedItem` / `SetPointCloudAdvancedItem` / `AddPointCloudAdvancedItem。
+> **大数据采样预算**
+> `SetSurface` / `AddSurface` / `SetPointCloud` / `AddPointCloud` 默认将上传预算限制为 **200 万个顶点**，超出部分按采样因子降采样；可通过 `maxPointCount` 调整 Surface 和 PointCloud 的预算。
+> `Set*AdvancedItem` / `Add*AdvancedItem` 是保留的兼容名称，实际行为与统一 API 相同。
 > GPU 纹理超过硬件最大尺寸时也会自动进行双线性下采样。
 
 > **多 Item 颜色一致性**
