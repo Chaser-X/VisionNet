@@ -618,19 +618,24 @@ VisionOperator.DestroyLib();
 | `SetMeshPose(pose, key)`               | —    | 运行时更新 Mesh 位姿（key 为 null 时更新全部） |
 | `ClearSurfaceItems()`                  | —   | 清空所有表面对象            |
 | `RemoveSurfaceItem(key)` / `RemoveSurfaceItem(item)` | — | 按 key 或按句柄移除表面对象 |
-| `SetSegment(segs, color, size)`        | 追加  | 添加线段叠加层             |
-| `SetPoint(pts, color, size, shape)`    | 追加  | 添加点叠加层              |
-| `SetPolygon(polys, color, size)`       | 追加  | 添加多边形叠加层            |
-| `SetPlane(planes, color, size)`        | 追加  | 添加平面叠加层             |
-| `SetBox(boxes, color, size)`           | 追加  | 添加包围盒叠加层            |
-| `SetTextInfo(infos, color)`            | 追加  | 添加世界坐标文本标签          |
-| `SetText2D(texts, color)`              | 追加  | 添加屏幕空间文本            |
+| `SetSegment(segs, color, size, key)`   | 追加 / upsert | 线段叠加层；`key == null` 追加，传 key 则按 key 原位替换 |
+| `SetPoint(pts, color, size, shape, key)` | 追加 / upsert | 点叠加层                |
+| `SetPolygon(polys, color, size, key)`  | 追加 / upsert | 多边形叠加层               |
+| `SetPlane(planes, color, size, key)`   | 追加 / upsert | 平面叠加层                |
+| `SetBox(boxes, color, size, key)`      | 追加 / upsert | 包围盒叠加层               |
+| `SetTextInfo(infos, color, key)`       | 追加 / upsert | 世界坐标文本标签             |
+| `SetText2D(texts, color, key)`         | 追加 / upsert | 屏幕空间文本               |
+| `SetCoordinate3DSystem(coord, length, key)` | 追加 / upsert | 坐标系指示器（可重复叠加）     |
+| `SetOverlayItem(key, item)`            | upsert | 通用入口：按 key 写入任意叠加层 Item |
+| `GetOverlayItem(key)`                  | —    | 按 key 取叠加层 Item；不存在返回 `null` |
+| `RemoveOverlayItem(key)` / `RemoveOverlayItem(item)` | — | 按 key 或按句柄移除并释放叠加层 Item |
 | `ClearOverlayItems()`                  | —   | 清空所有叠加层对象，不影响表面与内置 HUD |
-| `SetCoordinate3DSystem(coord, length)` | 追加  | 添加坐标系指示器            |
-| `SetCoordinateSystemLeftHanded(bool)`  | —   | 切换左手 / 右手坐标系（默认右手）  |
+| `Redraw()`                             | —   | 请求重绘（线程安全）；改姿态 / 颜色模式后调用即可生效 |
+| `FitView()` / `FitView(box)`           | —   | 适配全部表面对象的合并包围盒 / 指定包围盒 |
 | `ResetView(resetAll)`                  | —   | 重置视图（可选是否清空表面）      |
-| `SetViewCenter(point)`                 | —   | 设置相机旋转焦点            |
-| `SetViewUpDirection(dir)`              | —   | 设置相机上向量             |
+| `SurfaceViewMode` / `IsLeftHanded`（属性） | —   | ⚠ `[Obsolete]`，改用 `Camera.ViewMode` / `Camera.IsLeftHanded` |
+| `SetCoordinateSystemLeftHanded(bool)`  | —   | ⚠ `[Obsolete]`，改用 `Camera.IsLeftHanded` |
+| `SetZScale(scale)` / `SetViewCenter(point)` / `SetViewUpDirection(dir)` | — | ⚠ `[Obsolete]`，改用 `Camera.*` |
 
 #### 渲染模式
 
@@ -687,6 +692,7 @@ display2D.SetBackgroundColor(Color.Black);
 
 | 类                          | 渲染路径                             | 适用场景                     |
 | -------------------------- | -------------------------------- | ------------------------ |
+| `AbstractCxObjRenderItem`  | —（抽象基类）                        | 表面类渲染项的公共基类：姿态、颜色模式/范围、着色器、`Draw`/`Dispose` 骨架；派生 `CxSurfaceItem` / `CxPointCloudItem` / `CxMeshItem` |
 | `CxSurfaceItem`            | VAO + VBO + GLSL + 强度纹理 | 结构化表面，预算 ≤ 200 万点 |
 | `CxPointCloudItem`         | VAO + VBO + GLSL + 强度纹理 | 有序点云，预算 ≤ 200 万点 |
 | `CxMeshItem`               | VAO + VBO + GLSL + 强度纹理 | 三角网格 |
@@ -734,6 +740,12 @@ display2D.SetBackgroundColor(Color.Black);
 
 > **按 key 的 upsert 语义**
 > `SetSurface` / `SetPointCloud` / `SetMesh` 按 key 整体替换：key 不存在时追加，存在时替换该 Item（保持绘制顺序）；默认 key 分别为 `"Surface"` / `"PointCloud"` / `"Mesh"`，因此同类型重复 Set 等价于替换，不同 key 或不同类型的对象互不影响。可用 `GetSurface` / `GetPointCloud` / `GetMesh` / `GetSurfaceItem` 按 key 查询，`RemoveSurfaceItem` 按 key 或句柄移除，`ClearSurfaceItems` 清空全部。
+
+> **叠加层 key 与交互事件**
+> 叠加层的 `key` 与 surface 的 key 是**两个独立命名空间**：`key == null` 保持"追加"语义（向后兼容），传入 key 则按 key 原位替换并释放旧 Item；用 `GetOverlayItem` / `RemoveOverlayItem` 查询与移除，`ClearOverlayItems` 全清。
+> 同一实例只会登记一次：对已登记实例再次 `SetOverlayItem` / `SetSurfaceItem` 视为**改 key**（保持原队列位置），不会重复登记。
+> `SelectionChanged`（UI 线程）在选中项变化时触发（`null` = 取消选中）；`CoordinatesChanged`（UI 线程）随鼠标移动触发（`null` = 未命中几何）；`RenderItemFailed`（**渲染线程**，在资源锁释放后触发，可安全回调 display）在 Item 上传失败（如 shader 编译失败）时触发；WinForms 控件请用 `BeginInvoke` 更新（同步 `Invoke` 可能卡住渲染帧）。
+> `Get*` 返回的 Item 修改底层数据仍需重新 `Set*`；只改姿态 / 颜色模式后调用 `Redraw()` 即可看到效果。
 
 > **多 Item 颜色一致性**
 > 叠加多个表面时，颜色条与每个 Item 的颜色映射统一采用**所有 Item 的全局 Z 范围**，无需手动同步。

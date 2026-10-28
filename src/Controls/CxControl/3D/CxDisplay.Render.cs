@@ -101,6 +101,8 @@ namespace VisionNet.Controls
         /// </summary>
         private void ProcessResourcePool(OpenGL gl)
         {
+            _failedItems.Clear();
+
             lock (_resourceLock)
             {
                 foreach (var kv in _resourcePool)
@@ -123,6 +125,15 @@ namespace VisionNet.Controls
                     }
                 }
             }
+
+            // Report failures outside the lock and outside the pool enumeration: a handler may
+            // legitimately call back into the display (e.g. to drop the failing item), which would
+            // otherwise mutate _resourcePool while it is being iterated.
+            if (_failedItems.Count == 0) return;
+
+            foreach (var failed in _failedItems)
+                RenderItemFailed?.Invoke(failed);
+            _failedItems.Clear();
         }
 
         /// <summary>
@@ -141,6 +152,12 @@ namespace VisionNet.Controls
             {
                 _surfaceSnapshot.Clear();
                 _surfaceSnapshot.AddRange(_surfaceItems);
+
+                // Resolve every handle once per frame (index-aligned) instead of locking per item.
+                _handleSnapshot.Clear();
+                foreach (var item in _surfaceSnapshot)
+                    _handleSnapshot.Add(_resourcePool.TryGetValue(item, out var h) ? h : null);
+
                 snapshot = _surfaceSnapshot;
             }
 
@@ -215,14 +232,12 @@ namespace VisionNet.Controls
 
             // Phase 3 — draw surface items.
             bool anyDrawn = false;
-            foreach (var cur in snapshot)
+            for (int i = 0; i < snapshot.Count; i++)
             {
+                var cur = snapshot[i];
                 if (cur == null || cur.IsDisposed) continue;
 
-                GLResourceHandle handle;
-                lock (_resourceLock)
-                    _resourcePool.TryGetValue(cur, out handle);
-
+                var handle = _handleSnapshot[i];
                 if (handle?.IsValid != true) continue;
 
                 cur.Draw(gl, handle);

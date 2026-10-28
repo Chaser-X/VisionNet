@@ -39,6 +39,11 @@ namespace VisionNet.Controls
         private readonly ConcurrentQueue<GLResourceHandle> _pendingRelease
             = new ConcurrentQueue<GLResourceHandle>();
 
+        // Items whose shader failed while processing the resource pool this frame. Collected during
+        // the locked pass and reported through RenderItemFailed once the lock has been released, so
+        // handlers may safely call back into the display. Render-thread only.
+        private readonly List<ICxObjRenderItem> _failedItems = new List<ICxObjRenderItem>();
+
         // ── Render item lists ────────────────────────────────────────────────────
         private readonly List<ICxObjRenderItem> _surfaceItems = new List<ICxObjRenderItem>();
         // Maps each caller-supplied key to the item currently stored under it. Kept in sync
@@ -47,10 +52,16 @@ namespace VisionNet.Controls
         private readonly Dictionary<string, ICxObjRenderItem> _surfaceKeys
             = new Dictionary<string, ICxObjRenderItem>(StringComparer.Ordinal);
         private readonly List<IRenderItem>      _renderItems  = new List<IRenderItem>();
+        // Maps each overlay key to its item. A namespace of its own: overlay keys never collide
+        // with surface keys, and only items registered with a key appear here.
+        private readonly Dictionary<string, AbstractRenderItem> _overlayKeys
+            = new Dictionary<string, AbstractRenderItem>(StringComparer.Ordinal);
         // Render-thread snapshots are reused between frames. The lists are filled
         // under _resourceLock and then consumed after the lock is released, so a
         // drag/resize does not allocate a new list or array on every paint.
         private readonly List<ICxObjRenderItem> _surfaceSnapshot = new List<ICxObjRenderItem>();
+        // GL handles aligned by index with _surfaceSnapshot, so the draw loop needs no per-item lock.
+        private readonly List<GLResourceHandle> _handleSnapshot = new List<GLResourceHandle>();
         private readonly List<IRenderItem> _overlaySnapshot = new List<IRenderItem>();
 
         // ── HUD overlay objects ──────────────────────────────────────────────────
@@ -116,6 +127,7 @@ namespace VisionNet.Controls
         }
 
         /// <summary>Gets or sets the current view mode (Top, Front, Left, etc.).</summary>
+        [Obsolete("Use Camera.ViewMode instead.")]
         public ViewMode SurfaceViewMode
         {
             get => _camera.ViewMode;
@@ -188,6 +200,7 @@ namespace VisionNet.Controls
         /// Gets or sets whether the coordinate system is left-handed.
         /// Delegates to <see cref="CxAdvancedTrackBallCamera.IsLeftHanded"/>.
         /// </summary>
+        [Obsolete("Use Camera.IsLeftHanded instead.")]
         public bool IsLeftHanded
         {
             get => _camera.IsLeftHanded;
@@ -338,10 +351,12 @@ namespace VisionNet.Controls
                     {
                         if (_resourcePool.TryGetValue(item, out var h))
                         {
+                            if (h.RenderDataChangedHandler != null)
+                                item.OnRenderDataChanged -= h.RenderDataChangedHandler;
+
                             if (gl != null) ReleaseGLResources(gl, h);
                             _resourcePool.Remove(item);
                         }
-                        item.OnRenderDataChanged -= OnItemRenderDataChanged;
                         item.Dispose();
                     }
                     _surfaceItems.Clear();
@@ -350,12 +365,14 @@ namespace VisionNet.Controls
 
                 lock (_resourceLock)
                 {
+                    _overlayKeys.Clear();
                     while (_renderItems.Count > 0)
                     {
                         _renderItems[0].Dispose();
                         _renderItems.RemoveAt(0);
                     }
                     _surfaceSnapshot.Clear();
+                    _handleSnapshot.Clear();
                     _overlaySnapshot.Clear();
                 }
 

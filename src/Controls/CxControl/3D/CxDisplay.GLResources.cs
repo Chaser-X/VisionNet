@@ -26,6 +26,8 @@ namespace VisionNet.Controls
                     handle.ShaderFailed = true;
                     handle.IsValid = false;
                     handle.NeedsUpdate = false;
+                    // Reported by ProcessResourcePool after the resource lock is released.
+                    _failedItems.Add(item);
                     return;
                 }
             }

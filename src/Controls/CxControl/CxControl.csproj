@@ -122,6 +122,7 @@
     <Compile Include="3D\RenderItem\Enums.cs" />
     <Compile Include="3D\RenderItem\IRenderItem.cs" />
     <Compile Include="3D\RenderItem\ICxObjRenderItem.cs" />
+    <Compile Include="3D\RenderItem\AbstractCxObjRenderItem.cs" />
     <Compile Include="3D\RenderItem\ICxPoseable.cs" />
     <Compile Include="3D\RenderItem\ICxGroupMember.cs" />
     <Compile Include="3D\RenderItem\RenderData.cs" />

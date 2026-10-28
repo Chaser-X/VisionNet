@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using SharpGL;
 
@@ -57,6 +58,12 @@ namespace VisionNet.Controls
 
         /// <summary>Whether an Element Buffer Object (index buffer) was created for this handle.</summary>
         public bool HasEBO { get; set; }
+
+        /// <summary>
+        /// The delegate subscribed to the owning item's <c>OnRenderDataChanged</c> event, so the
+        /// display can unsubscribe exactly the same instance it subscribed.
+        /// </summary>
+        internal Action RenderDataChangedHandler { get; set; }
 
         /// <summary>Number of VBOs actually allocated in <see cref="VboIds"/>.</summary>
         public int VboCount { get; set; }

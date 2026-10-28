@@ -24,10 +24,13 @@ namespace VisionNet.Controls
                     var hit = FindActiveItemHit(worldPos.Value);
 
                     // Deselect previous if different from hit.
+                    var previousSelection = _selectedItem;
                     if (_selectedItem != null && _selectedItem != hit)
                         _selectedItem.OnDeselected();
 
                     _selectedItem = hit;
+                    if (!ReferenceEquals(previousSelection, hit))
+                        SelectionChanged?.Invoke(hit);
 
                     if (hit != null)
                     {
@@ -95,15 +98,12 @@ namespace VisionNet.Controls
             }
 
             var pos = GetNearestSurfacePoint(e.X, e.Y);
-            if (pos.Location.HasValue && !_isMouseDown)
-            {
-                _coordTagItem.Visible = true;
+            bool hasHit = pos.Location.HasValue && !_isMouseDown;
+            _coordTagItem.Visible = hasHit;
+            if (hasHit)
                 _coordTagItem.SetCoordinates(pos.Location.Value, pos.Intensity);
-            }
-            else
-            {
-                _coordTagItem.Visible = false;
-            }
+
+            CoordinatesChanged?.Invoke(hasHit ? pos.Location : null, hasHit ? pos.Intensity : null);
             base.OnMouseMove(e);
         }
 

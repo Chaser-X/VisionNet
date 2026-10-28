@@ -316,6 +316,33 @@ namespace VisionNet.Controls
             }
         }
 
+        /// <summary>
+        /// Re-points group leaves that reference <paramref name="oldItem"/> at
+        /// <paramref name="newItem"/> and re-applies their stored pose. Called by
+        /// <see cref="CxDisplay"/> when a keyed overlay item is replaced, because overlay members
+        /// are bound by direct reference and cannot re-bind on their own.
+        /// </summary>
+        internal void OnOverlayItemReplaced(AbstractRenderItem oldItem, AbstractRenderItem newItem)
+        {
+            if (oldItem == null || newItem == null) return;
+
+            bool touched = false;
+            foreach (var group in _groups)
+            {
+                var world = group.GetWorldMatrix();
+                foreach (var leaf in group.Leaves)
+                {
+                    if (!ReferenceEquals(leaf.Item, oldItem)) continue;
+
+                    leaf.Item = newItem;
+                    TryApplyWorldPose(leaf, world);
+                    touched = true;
+                }
+            }
+
+            if (touched) _display.SafeInvalidate();
+        }
+
         /// <summary>Removes every group from the registry (used on reset / disposal).</summary>
         internal void Clear() => _groups.Clear();
 

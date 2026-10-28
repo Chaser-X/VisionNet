@@ -148,7 +148,7 @@ namespace DemoFrom
             this.cxDisplay1.Dock = System.Windows.Forms.DockStyle.Fill;
             this.cxDisplay1.DrawFPS = false;
             this.cxDisplay1.FrameRate = 10;
-            this.cxDisplay1.IsLeftHanded = false;
+            this.cxDisplay1.Camera.IsLeftHanded = false;
             this.cxDisplay1.Location = new System.Drawing.Point(0, 0);
             this.cxDisplay1.Margin = new System.Windows.Forms.Padding(5, 5, 5, 5);
             this.cxDisplay1.Name = "cxDisplay1";
@@ -159,7 +159,7 @@ namespace DemoFrom
             this.cxDisplay1.Size = new System.Drawing.Size(628, 860);
             this.cxDisplay1.SurfaceColorMode = VisionNet.Controls.SurfaceColorMode.ColorWithIntensity;
             this.cxDisplay1.SurfaceMode = VisionNet.Controls.SurfaceMode.PointCloud;
-            this.cxDisplay1.SurfaceViewMode = VisionNet.Controls.ViewMode.None;
+            this.cxDisplay1.Camera.ViewMode = VisionNet.Controls.ViewMode.None;
             this.cxDisplay1.TabIndex = 1;
             // 
             // cxDisplay2
@@ -167,7 +167,7 @@ namespace DemoFrom
             this.cxDisplay2.Dock = System.Windows.Forms.DockStyle.Fill;
             this.cxDisplay2.DrawFPS = false;
             this.cxDisplay2.FrameRate = 10;
-            this.cxDisplay2.IsLeftHanded = false;
+            this.cxDisplay2.Camera.IsLeftHanded = false;
             this.cxDisplay2.Location = new System.Drawing.Point(0, 0);
             this.cxDisplay2.Margin = new System.Windows.Forms.Padding(5, 5, 5, 5);
             this.cxDisplay2.Name = "cxDisplay2";
@@ -178,7 +178,7 @@ namespace DemoFrom
             this.cxDisplay2.Size = new System.Drawing.Size(644, 860);
             this.cxDisplay2.SurfaceColorMode = VisionNet.Controls.SurfaceColorMode.ColorWithIntensity;
             this.cxDisplay2.SurfaceMode = VisionNet.Controls.SurfaceMode.PointCloud;
-            this.cxDisplay2.SurfaceViewMode = VisionNet.Controls.ViewMode.Top;
+            this.cxDisplay2.Camera.ViewMode = VisionNet.Controls.ViewMode.Top;
             this.cxDisplay2.TabIndex = 2;
             // 
             // btn_meshToSurface

@@ -43,7 +43,7 @@ namespace DemoFrom
             }
             VisionOperator.InitialLib();
             // cxDisplay1.SetViewUpDirection(new CxVector3D(0, 1, 0));
-            cxDisplay1.SetCoordinateSystemLeftHanded(true);
+            cxDisplay1.Camera.IsLeftHanded = true;
             cxDisplay1.Camera.Enable2DView = false;
             BuildGroupSimButton();
         }
@@ -1377,6 +1377,21 @@ namespace DemoFrom
             };
             _btnReplaceVehicle.Click += btn_replaceVehicle_Click;
             splitContainer1.Panel2.Controls.Add(_btnReplaceVehicle);
+
+            var btnOverlayKey = new Button
+            {
+                Text = "Overlay Key",
+                Location = new Point(160, 460),
+                Size = new Size(123, 28),
+            };
+            btnOverlayKey.Click += btn_overlayKeyDemo_Click;
+            splitContainer1.Panel2.Controls.Add(btnOverlayKey);
+
+            // 公开事件演示：选中变化直接写进状态标签
+            cxDisplay2.SelectionChanged += item =>
+                lbl_markPos.Text = item == null
+                    ? "Selection: (none)"
+                    : $"Selection: {item.GetType().Name}";
         }
 
         private void btn_groupSim_Click(object sender, EventArgs e)
@@ -1429,6 +1444,28 @@ namespace DemoFrom
             var replacement = BuildBoxMesh(3.0f, 1.8f, 1.4f, new CxPoint3D(-1.5f, 0f, 0.9f));
             _vehicleItem = cxDisplay1.SetMesh(replacement, "Vehicle",
                 mode: SurfaceMode.Mesh, colorMode: SurfaceColorMode.Color, autoFit: false);
+        }
+
+        /// <summary>
+        /// Overlay key demo: a keyed Set appends on first use, replaces the item in place on the
+        /// second call (the previous item is disposed) and RemoveOverlayItem releases the key.
+        /// </summary>
+        private void btn_overlayKeyDemo_Click(object sender, EventArgs e)
+        {
+            var first = cxDisplay2.SetBox(
+                new[] { new CxBox3D(new CxPoint3D(0f, 0f, 0f), new CxSize3D(6f, 6f, 3f)) },
+                Color.Cyan, 1f, key: "DemoBox");
+
+            var second = cxDisplay2.SetBox(
+                new[] { new CxBox3D(new CxPoint3D(1f, 1f, 1f), new CxSize3D(8f, 8f, 4f)) },
+                Color.Orange, 1f, key: "DemoBox");
+
+            bool replaced = ReferenceEquals(second, cxDisplay2.GetOverlayItem("DemoBox"));
+            bool removed = cxDisplay2.RemoveOverlayItem("DemoBox");
+
+            lbl_markPos.Text =
+                $"Overlay key: first.Disposed={first.IsDisposed}, replaced={replaced}\n" +
+                $"RemoveOverlayItem=\"{removed}\", GetOverlayItem={(cxDisplay2.GetOverlayItem("DemoBox") == null ? "null" : "item")}";
         }
 
         private void StopGroupSim()

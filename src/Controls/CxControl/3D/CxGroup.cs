@@ -157,7 +157,7 @@ namespace VisionNet.Controls
         /// Gets the directly referenced member (overlay items), or <c>null</c> for keyed
         /// (surface) leaves.
         /// </summary>
-        public ICxGroupMember Item { get; }
+        public ICxGroupMember Item { get; internal set; }
 
         /// <summary>
         /// Gets the key this leaf is bound to (surface items), or <c>null</c> for direct-reference
