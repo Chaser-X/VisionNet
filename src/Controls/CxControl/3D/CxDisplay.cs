@@ -209,6 +209,10 @@ namespace VisionNet.Controls
             SurfaceMode surfaceMode = SurfaceMode.PointCloud,
             SurfaceColorMode surfaceColorMode = SurfaceColorMode.ColorWithIntensity)
         {
+            // The group manager is independent of the GL context and must exist in every mode
+            // (including the WinForms designer).
+            _groupManager = new CxGroupManager(this);
+
             if (!DesignMode)
             {
                 InitializeComponent();
@@ -226,7 +230,7 @@ namespace VisionNet.Controls
         /// <summary>
         /// Thread-safe invalidation: marshals to the UI thread when called from another thread.
         /// </summary>
-        private void SafeInvalidate()
+        internal void SafeInvalidate()
         {
             if (InvokeRequired) { BeginInvoke(new Action(Invalidate)); return; }
             Invalidate();
@@ -329,7 +333,7 @@ namespace VisionNet.Controls
 
                 lock (_resourceLock)
                 {
-                    ForgetGroups(_surfaceItems);
+                    Groups.Clear();
                     foreach (var item in _surfaceItems)
                     {
                         if (_resourcePool.TryGetValue(item, out var h))

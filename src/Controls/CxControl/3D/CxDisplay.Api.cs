@@ -30,7 +30,7 @@ namespace VisionNet.Controls
         /// <param name="colorMode">Optional colour mode; <c>null</c> uses the display's current mode.</param>
         /// <param name="maxPointCount">Upload budget; larger data is down-sampled before upload.</param>
         /// <param name="autoFit">When <c>true</c> (default) the camera refits to the combined bounds.</param>
-        /// <returns>The created item, suitable for <see cref="AddToGroup(CxGroup, ICxObjRenderItem)"/>.</returns>
+        /// <returns>The created item, suitable for <see cref="CxGroupManager.Add(CxGroup, ICxObjRenderItem)"/>.</returns>
         public CxSurfaceItem SetSurface(CxSurface s, string key = null, CxMatrix4X4 pose = null,
             SurfaceMode? mode = null, SurfaceColorMode? colorMode = null,
             int maxPointCount = 2_000_000, bool autoFit = true)
@@ -52,7 +52,7 @@ namespace VisionNet.Controls
         /// <param name="colorMode">Optional colour mode; <c>null</c> uses the display's current mode.</param>
         /// <param name="maxPointCount">Upload budget; larger data is down-sampled before upload.</param>
         /// <param name="autoFit">When <c>true</c> (default) the camera refits to the combined bounds.</param>
-        /// <returns>The created item, suitable for <see cref="AddToGroup(CxGroup, ICxObjRenderItem)"/>.</returns>
+        /// <returns>The created item, suitable for <see cref="CxGroupManager.Add(CxGroup, ICxObjRenderItem)"/>.</returns>
         public CxPointCloudItem SetPointCloud(CxPointCloud c, string key = null, CxMatrix4X4 pose = null,
             SurfaceMode? mode = null, SurfaceColorMode? colorMode = null,
             int maxPointCount = 2_000_000, bool autoFit = true)
@@ -70,7 +70,7 @@ namespace VisionNet.Controls
         /// <param name="mode">Optional surface mode; <c>null</c> uses the display's current mode.</param>
         /// <param name="colorMode">Optional colour mode; <c>null</c> uses the display's current mode.</param>
         /// <param name="autoFit">When <c>true</c> (default) the camera refits to the combined bounds.</param>
-        /// <returns>The created item, suitable for <see cref="AddToGroup(CxGroup, ICxObjRenderItem)"/>.</returns>
+        /// <returns>The created item, suitable for <see cref="CxGroupManager.Add(CxGroup, ICxObjRenderItem)"/>.</returns>
         public CxMeshItem SetMesh(CxMesh m, string key = null, CxMatrix4X4 pose = null,
             SurfaceMode? mode = null, SurfaceColorMode? colorMode = null, bool autoFit = true)
         {
@@ -105,9 +105,10 @@ namespace VisionNet.Controls
                 {
                     if (_surfaceKeys.TryGetValue(key, out var old))
                     {
-                        // Replace in place so the draw order of the remaining items is kept.
+                        // Replace in place so the draw order of the remaining items is kept. Group
+                        // membership is deliberately left untouched: keyed group leaves keep their
+                        // slot and re-bind to this new item (see CxGroupManager.OnSurfaceKeyChanged).
                         int index = _surfaceItems.IndexOf(old);
-                        ForgetGroups(new[] { old });
                         ReleaseSurfaceItem(old);
                         if (index >= 0) _surfaceItems[index] = item;
                         else _surfaceItems.Add(item);
@@ -127,6 +128,9 @@ namespace VisionNet.Controls
             if (autoFit)
                 lock (_cameraLock)
                     _camera.FitView(combined);
+
+            // Keyed group members keep their slot: re-apply the stored local pose to the new resource.
+            Groups.OnSurfaceKeyChanged(key);
             SafeInvalidate();
         }
         #endregion Surface items - Set (表面对象：写入/替换)
@@ -188,7 +192,8 @@ namespace VisionNet.Controls
             {
                 lock (_resourceLock)
                 {
-                    ForgetGroups(_surfaceItems);
+                    // Keyed group leaves are intentionally kept: a later resource under the same key
+                    // re-binds to them (see CxGroupManager).
                     foreach (var old in _surfaceItems)
                         ReleaseSurfaceItem(old);
                     _surfaceItems.Clear();
@@ -214,7 +219,6 @@ namespace VisionNet.Controls
                     {
                         _surfaceKeys.Remove(key);
                         _surfaceItems.Remove(item);
-                        ForgetGroups(new[] { item });
                         ReleaseSurfaceItem(item);
                         removed = true;
                     }
@@ -239,7 +243,6 @@ namespace VisionNet.Controls
                     if (removed)
                     {
                         RemoveKeyForItem(item);
-                        ForgetGroups(new[] { item });
                         ReleaseSurfaceItem(item);
                     }
                 }
@@ -460,7 +463,7 @@ namespace VisionNet.Controls
             {
                 lock (_resourceLock)
                 {
-                    ForgetGroups(_renderItems);
+                    Groups.ForgetOverlayMembers(_renderItems);
                     foreach (var item in _renderItems)
                         item.Dispose();
                     _renderItems.Clear();
@@ -604,7 +607,7 @@ namespace VisionNet.Controls
             if (resetAll)
             {
                 ClearSurfaceItems();
-                _groups.Clear();
+                Groups.Clear();
             }
 
             SafeInvalidate();

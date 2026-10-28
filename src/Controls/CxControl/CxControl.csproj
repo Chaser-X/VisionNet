@@ -141,6 +141,7 @@
     <Compile Include="3D\RenderItem\Overlay\CxTextInfoItem.cs" />
     <Compile Include="3D\CxExtension.cs" />
     <Compile Include="3D\CxGroup.cs" />
+    <Compile Include="3D\CxGroupManager.cs" />
     <Compile Include="3D\ShaderProgramCompiler.cs" />
     <Compile Include="3D\ModernOverlayRenderer.cs" />
     <!-- 2D display control -->

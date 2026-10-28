@@ -1346,6 +1346,8 @@ namespace DemoFrom
         private CxGroup _vehicleGroup;
         private Button _btnGroupSim;
         private Button _btnStage3Axis;
+        private Button _btnReplaceVehicle;
+        private CxMeshItem _vehicleItem;
 
         private void BuildGroupSimButton()
         {
@@ -1366,6 +1368,15 @@ namespace DemoFrom
             };
             _btnStage3Axis.Click += btn_stage3Axis_Click;
             splitContainer1.Panel2.Controls.Add(_btnStage3Axis);
+
+            _btnReplaceVehicle = new Button
+            {
+                Text = "Replace Vehicle",
+                Location = new Point(160, 430),
+                Size = new Size(123, 28),
+            };
+            _btnReplaceVehicle.Click += btn_replaceVehicle_Click;
+            splitContainer1.Panel2.Controls.Add(_btnReplaceVehicle);
         }
 
         private void btn_groupSim_Click(object sender, EventArgs e)
@@ -1387,22 +1398,37 @@ namespace DemoFrom
             var platformItem = cxDisplay1.SetMesh(platformMesh, "Platform", mode: SurfaceMode.Mesh, colorMode: SurfaceColorMode.Color, autoFit: false);
             var vehicleItem  = cxDisplay1.SetMesh(vehicleMesh,  "Vehicle",  mode: SurfaceMode.Mesh, colorMode: SurfaceColorMode.Color, autoFit: false);
             var realItem     = cxDisplay1.SetMesh(realMesh,     "Real",     mode: SurfaceMode.Mesh, colorMode: SurfaceColorMode.Color, autoFit: true);
+            _vehicleItem = vehicleItem;
 
             // 层级：MotionPlatform（整体运动）→ Vehicle（相对平台运动）→ 实物随载具
-            _platformGroup = cxDisplay1.CreateGroup("MotionPlatform");
-            cxDisplay1.AddToGroup(_platformGroup, platformItem);
+            _platformGroup = cxDisplay1.Groups.Create("MotionPlatform");
+            cxDisplay1.Groups.Add(_platformGroup, platformItem);
 
-            _vehicleGroup = cxDisplay1.CreateGroup("Vehicle", parent: _platformGroup);
-            cxDisplay1.AddToGroup(_vehicleGroup, vehicleItem);
-            cxDisplay1.AddToGroup(_vehicleGroup, realItem);
+            _vehicleGroup = cxDisplay1.Groups.Create("Vehicle", parent: _platformGroup);
+            cxDisplay1.Groups.Add(_vehicleGroup, vehicleItem);
+            cxDisplay1.Groups.Add(_vehicleGroup, realItem);
 
-            // 外部仿真循环：Demo 自己驱动，CxDisplay 只提供 SetGroupTransform
+            // 外部仿真循环：Demo 自己驱动，CxDisplay 只提供 Groups.SetTransform
             _simWatch = Stopwatch.StartNew();
             _simTimer = new System.Windows.Forms.Timer { Interval = 16 };
             _simTimer.Tick += SimTick;
             _simTimer.Start();
 
             _btnGroupSim.Text = "Stop Sim";
+        }
+
+        /// <summary>
+        /// Replaces the vehicle mesh inside the running group simulation. A single keyed Set is
+        /// enough: the group member is bound by key, so the new resource takes over the stored
+        /// local pose automatically. autoFit stays off so the camera does not jump.
+        /// </summary>
+        private void btn_replaceVehicle_Click(object sender, EventArgs e)
+        {
+            if (_vehicleGroup == null || _vehicleItem == null) return;
+
+            var replacement = BuildBoxMesh(3.0f, 1.8f, 1.4f, new CxPoint3D(-1.5f, 0f, 0.9f));
+            _vehicleItem = cxDisplay1.SetMesh(replacement, "Vehicle",
+                mode: SurfaceMode.Mesh, colorMode: SurfaceColorMode.Color, autoFit: false);
         }
 
         private void StopGroupSim()
@@ -1420,12 +1446,12 @@ namespace DemoFrom
             double t = _simWatch.Elapsed.TotalSeconds;
 
             // 平台整体：沿 X 平移 + 绕 Z 摆动
-            cxDisplay1.SetGroupTransform(_platformGroup,
+            cxDisplay1.Groups.SetTransform(_platformGroup,
                 CxMatrix4X4.Translation((float)(3.0 * Math.Sin(t)), 0f, 0f) *
                 CxMatrix4X4.RotationZ((float)(25.0 * Math.Sin(t * 0.7))));
 
             // 载具相对平台：上下浮动 + 绕 Y 摆动
-            cxDisplay1.SetGroupTransform(_vehicleGroup,
+            cxDisplay1.Groups.SetTransform(_vehicleGroup,
                 CxMatrix4X4.Translation(0f, 0f, (float)(0.6 * Math.Sin(t * 3.0))) *
                 CxMatrix4X4.RotationY((float)(20.0 * Math.Sin(t * 1.5))));
         }
@@ -1505,9 +1531,9 @@ namespace DemoFrom
                 pose: CxMatrix4X4.Translation(0f, 0f, StageCarrierTop),
                 mode: SurfaceMode.Mesh, colorMode: SurfaceColorMode.Color, autoFit: false);
 
-            _stageGroupY = cxDisplay1.CreateGroup("YSlider");
-            cxDisplay1.AddToGroup(_stageGroupY, ySlider);
-            cxDisplay1.AddToGroup(_stageGroupY, materialItem);
+            _stageGroupY = cxDisplay1.Groups.Create("YSlider");
+            cxDisplay1.Groups.Add(_stageGroupY, ySlider);
+            cxDisplay1.Groups.Add(_stageGroupY, materialItem);
 
             // ── X 轴（梁上滑块）：X 滑块 + Z 立柱（随 X 移动）──
             var xSlider = cxDisplay1.SetBox(new[]
@@ -1516,8 +1542,8 @@ namespace DemoFrom
                 new CxBox3D(new CxPoint3D(0f, 0f, 5.5f), new CxSize3D(0.6f, 0.6f, 6.0f)),  // Z 立柱
             }, Color.SeaGreen, 1f);
 
-            _stageGroupX = cxDisplay1.CreateGroup("XSlider");
-            cxDisplay1.AddToGroup(_stageGroupX, xSlider);
+            _stageGroupX = cxDisplay1.Groups.Create("XSlider");
+            cxDisplay1.Groups.Add(_stageGroupX, xSlider);
 
             // ── Z 轴（立柱上滑块）：Z 滑块 + 工具头 + 刀尖标记 ──
             var zSlider = cxDisplay1.SetBox(new[]
@@ -1526,12 +1552,12 @@ namespace DemoFrom
                 new CxBox3D(new CxPoint3D(0f, 0f, 3.95f), new CxSize3D(0.5f, 0.5f, 2.3f)),  // 主轴（下端＝刀尖）
             }, Color.OrangeRed, 1f);
 
-            _stageGroupZ = cxDisplay1.CreateGroup("ZSlider", parent: _stageGroupX);
-            cxDisplay1.AddToGroup(_stageGroupZ, zSlider);
+            _stageGroupZ = cxDisplay1.Groups.Create("ZSlider", parent: _stageGroupX);
+            cxDisplay1.Groups.Add(_stageGroupZ, zSlider);
 
             var tipMarker = cxDisplay1.SetPoint(new[] { new CxPoint3D(0f, 0f, StageTipHomeZ) },
                 Color.Yellow, 0.6f, PointShape.Sphere);
-            cxDisplay1.AddToGroup(_stageGroupZ, tipMarker);
+            cxDisplay1.Groups.Add(_stageGroupZ, tipMarker);
 
             // 外部仿真循环
             _stageWatch = Stopwatch.StartNew();
@@ -1572,9 +1598,9 @@ namespace DemoFrom
             float tipZ = StageCarrierTop + StageHeight(u, v) + StageClearance;
 
             // X 滑块、Y 滑块（治具/物料）、Z 滑块（工具头）三轴联动
-            cxDisplay1.SetGroupTransform(_stageGroupX, CxMatrix4X4.Translation(u, 0f, 0f));
-            cxDisplay1.SetGroupTransform(_stageGroupY, CxMatrix4X4.Translation(0f, -v, 0f));
-            cxDisplay1.SetGroupTransform(_stageGroupZ, CxMatrix4X4.Translation(0f, 0f, tipZ - StageTipHomeZ));
+            cxDisplay1.Groups.SetTransform(_stageGroupX, CxMatrix4X4.Translation(u, 0f, 0f));
+            cxDisplay1.Groups.SetTransform(_stageGroupY, CxMatrix4X4.Translation(0f, -v, 0f));
+            cxDisplay1.Groups.SetTransform(_stageGroupZ, CxMatrix4X4.Translation(0f, 0f, tipZ - StageTipHomeZ));
         }
 
         private static CxMesh BuildBoxMesh(float w, float d, float h, CxPoint3D origin)

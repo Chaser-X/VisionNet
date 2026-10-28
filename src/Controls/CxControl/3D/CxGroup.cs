@@ -5,16 +5,16 @@ using VisionNet.DataType;
 namespace VisionNet.Controls
 {
     /// <summary>
-    /// A node in the lightweight scene graph managed by <see cref="CxDisplay"/>.
+    /// A node in the lightweight scene graph owned by <see cref="CxGroupManager"/>.
     /// Holds a local <see cref="Transform"/> (relative to its parent), optional child groups,
-    /// and leaf render items. Every leaf keeps the local pose it had when it was added; the
-    /// effective world pose is <c>WorldOfGroup(this) × LocalMatrix</c>.
+    /// and leaf members. Every leaf keeps the local pose it had when it was added; the effective
+    /// world pose is <c>WorldOfGroup(this) × LocalMatrix</c>.
     /// </summary>
     /// <remarks>
-    /// Only <see cref="ICxPoseable"/> (advanced) render items can be added as leaves.
-    /// Group membership is owned by <see cref="CxDisplay"/> — create groups via
-    /// <see cref="CxDisplay.CreateGroup(string, CxGroup, CxMatrix4X4)"/> and attach items via
-    /// <see cref="CxDisplay.AddToGroup(CxGroup, ICxObjRenderItem)"/>.
+    /// Relationships and poses are managed by <see cref="CxGroupManager"/> (available as
+    /// <see cref="CxDisplay.Groups"/>); this class only exposes the tree structure. Surface-class
+    /// members are bound by key (see <see cref="CxGroupLeaf.Key"/>) so that replacing the resource
+    /// with <c>Set*(..., key: sameKey)</c> automatically re-binds the member to the new object.
     /// </remarks>
     public class CxGroup
     {
@@ -35,17 +35,17 @@ namespace VisionNet.Controls
         private CxMatrix4X4 _transform = CxMatrix4X4.Identity();
 
         /// <summary>
-        /// Gets or sets the group's local transform, relative to its parent (or world space
-        /// when root). Animate this value (via <see cref="CxDisplay.SetGroupTransform"/>) to
-        /// move the group and everything beneath it.
+        /// Gets the group's local transform, relative to its parent (or world space when root).
+        /// Animate this value through <see cref="CxGroupManager.SetTransform(CxGroup, CxMatrix4X4)"/>
+        /// to move the group and everything beneath it.
         /// </summary>
         public CxMatrix4X4 Transform
         {
             get => _transform;
-            set => _transform = value ?? CxMatrix4X4.Identity();
+            internal set => _transform = value ?? CxMatrix4X4.Identity();
         }
 
-        /// <summary>Gets the leaf render items directly owned by this group.</summary>
+        /// <summary>Gets the leaf members directly owned by this group.</summary>
         public IReadOnlyList<CxGroupLeaf> Leaves => _leaves;
 
         /// <summary>Gets the nested child groups directly owned by this group.</summary>
@@ -64,84 +64,13 @@ namespace VisionNet.Controls
             return parentWorld * _transform;
         }
 
-        /// <summary>
-        /// Recomputes and writes the world pose of every leaf in this group's subtree:
-        /// <c>item.ModelMatrix = WorldOfGroup(owner) × LocalMatrix</c>.
-        /// Disposed leaves are skipped.
-        /// </summary>
-        internal void ApplyWorldRecursive()
+        internal void AddLeaf(CxGroupLeaf leaf)
         {
-            var world = GetWorldMatrix();
-            foreach (var leaf in _leaves)
-            {
-                if (leaf.Item == null || leaf.Item.IsDisposed) continue;
-                if (leaf.Item is ICxPoseable poseable)
-                    poseable.ModelMatrix = world * leaf.LocalMatrix;
-            }
-            foreach (var child in _childGroups)
-                child.ApplyWorldRecursive();
+            if (leaf != null) _leaves.Add(leaf);
         }
 
-        /// <summary>
-        /// Restores every leaf in the subtree to the local pose it had before entering the
-        /// group, and moves nested groups to root.
-        /// </summary>
-        internal void RestoreLocalPosesRecursive()
-        {
-            foreach (var leaf in _leaves)
-            {
-                if (leaf.Item == null || leaf.Item.IsDisposed) continue;
-                if (leaf.Item is ICxPoseable poseable)
-                    poseable.ModelMatrix = leaf.LocalMatrix;
-            }
-            foreach (var child in _childGroups)
-                child.RestoreLocalPosesRecursive();
-        }
-
-        internal bool Contains(ICxGroupMember item)
-            => FindLeaf(item) != null;
-
-        internal CxGroupLeaf FindLeaf(ICxGroupMember item)
-        {
-            foreach (var leaf in _leaves)
-                if (ReferenceEquals(leaf.Item, item)) return leaf;
-            foreach (var child in _childGroups)
-            {
-                var found = child.FindLeaf(item);
-                if (found != null) return found;
-            }
-            return null;
-        }
-
-        internal void AddLeaf(ICxGroupMember item, CxMatrix4X4 localMatrix)
-        {
-            _leaves.Add(new CxGroupLeaf(item, localMatrix ?? CxMatrix4X4.Identity()));
-        }
-
-        internal bool RemoveLeaf(ICxGroupMember item)
-        {
-            for (int i = 0; i < _leaves.Count; i++)
-            {
-                if (ReferenceEquals(_leaves[i].Item, item))
-                {
-                    _leaves.RemoveAt(i);
-                    return true;
-                }
-            }
-            foreach (var child in _childGroups)
-                if (child.RemoveLeaf(item)) return true;
-            return false;
-        }
-
-        /// <summary>Removes leaves whose item has been disposed.</summary>
-        internal void RemoveDisposedLeaves()
-        {
-            for (int i = _leaves.Count - 1; i >= 0; i--)
-                if (_leaves[i].Item == null || _leaves[i].Item.IsDisposed)
-                    _leaves.RemoveAt(i);
-            foreach (var child in _childGroups)
-                child.RemoveDisposedLeaves();
-        }
+        /// <summary>Removes a directly owned leaf; nested groups are not searched.</summary>
+        internal bool RemoveLeaf(CxGroupLeaf leaf) => _leaves.Remove(leaf);
 
         internal void AddChildGroup(CxGroup child)
         {
@@ -171,11 +100,22 @@ namespace VisionNet.Controls
                 child.CollectAllGroups(acc);
         }
 
-        internal void CollectAllLeaves(List<CxGroupLeaf> acc)
+        /// <summary>
+        /// Removes every directly owned leaf matching <paramref name="match"/> (nested groups are not
+        /// searched) and returns the number of leaves removed.
+        /// </summary>
+        internal int RemoveLeaves(Predicate<CxGroupLeaf> match)
         {
-            acc.AddRange(_leaves);
-            foreach (var child in _childGroups)
-                child.CollectAllLeaves(acc);
+            if (match == null) return 0;
+
+            int removed = 0;
+            for (int i = _leaves.Count - 1; i >= 0; i--)
+            {
+                if (!match(_leaves[i])) continue;
+                _leaves.RemoveAt(i);
+                removed++;
+            }
+            return removed;
         }
 
         private bool IsAncestorOf(CxGroup node)
@@ -187,25 +127,49 @@ namespace VisionNet.Controls
     }
 
     /// <summary>
-    /// A single render item attached to a <see cref="CxGroup"/>, together with the local pose
-    /// captured when it entered the group (<c>LocalMatrix</c>). The effective world pose is
+    /// A single member attached to a <see cref="CxGroup"/>, together with the local pose captured
+    /// when it entered the group (<c>LocalMatrix</c>). The effective world pose is
     /// <c>WorldOfGroup(owner) × LocalMatrix</c>.
     /// </summary>
+    /// <remarks>
+    /// Exactly one of <see cref="Key"/> / <see cref="Item"/> is set: surface-class members are
+    /// bound by key — the resource is resolved through the display's key registry on every group
+    /// operation, so a replacement under the same key is picked up automatically — while overlay
+    /// members are bound by direct reference.
+    /// </remarks>
     public sealed class CxGroupLeaf
     {
         internal CxGroupLeaf(ICxGroupMember item, CxMatrix4X4 localMatrix)
         {
             Item = item;
-            LocalMatrix = localMatrix;
+            Key = null;
+            LocalMatrix = localMatrix ?? CxMatrix4X4.Identity();
         }
 
-        /// <summary>Gets the attached render item.</summary>
+        internal CxGroupLeaf(string key, CxMatrix4X4 localMatrix)
+        {
+            Key = key;
+            Item = null;
+            LocalMatrix = localMatrix ?? CxMatrix4X4.Identity();
+        }
+
+        /// <summary>
+        /// Gets the directly referenced member (overlay items), or <c>null</c> for keyed
+        /// (surface) leaves.
+        /// </summary>
         public ICxGroupMember Item { get; }
 
         /// <summary>
-        /// Gets or sets the item's pose relative to its owning group. Captured at attach time
+        /// Gets the key this leaf is bound to (surface items), or <c>null</c> for direct-reference
+        /// leaves. The current resource is resolved through the display's key registry; while the
+        /// key has no live resource the leaf is skipped.
+        /// </summary>
+        public string Key { get; }
+
+        /// <summary>
+        /// Gets or sets the member's pose relative to its owning group. Captured at attach time
         /// and restored on detach.
         /// </summary>
-        public CxMatrix4X4 LocalMatrix { get; set; }
+        public CxMatrix4X4 LocalMatrix { get; internal set; }
     }
 }
