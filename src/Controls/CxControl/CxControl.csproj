@@ -119,17 +119,19 @@
     <Compile Include="3D\Camera\ICamera.cs" />
     <Compile Include="3D\Camera\CxAdvancedTrackBallCamera.cs" />
     <Compile Include="3D\Camera\CxTrackBallCamera.cs" />
-    <Compile Include="3D\RenderItem\Enums.cs" />
     <Compile Include="3D\RenderItem\IRenderItem.cs" />
-    <Compile Include="3D\RenderItem\ICxObjRenderItem.cs" />
-    <Compile Include="3D\RenderItem\AbstractCxObjRenderItem.cs" />
     <Compile Include="3D\RenderItem\ICxPoseable.cs" />
     <Compile Include="3D\RenderItem\ICxGroupMember.cs" />
-    <Compile Include="3D\RenderItem\RenderData.cs" />
-    <Compile Include="3D\RenderItem\GLResourceHandle.cs" />
-    <Compile Include="3D\RenderItem\Surface\CxSurfaceItem.cs" />
-    <Compile Include="3D\RenderItem\PointCloud\CxPointCloudItem.cs" />
-    <Compile Include="3D\RenderItem\Mesh\CxMeshItem.cs" />
+    <Compile Include="3D\RenderItem\ShaderProgramCompiler.cs" />
+    <Compile Include="3D\RenderItem\ModernOverlayRenderer.cs" />
+    <Compile Include="3D\RenderItem\ComplexGeometry\Enums.cs" />
+    <Compile Include="3D\RenderItem\ComplexGeometry\ICxObjRenderItem.cs" />
+    <Compile Include="3D\RenderItem\ComplexGeometry\AbstractCxObjRenderItem.cs" />
+    <Compile Include="3D\RenderItem\ComplexGeometry\RenderData.cs" />
+    <Compile Include="3D\RenderItem\ComplexGeometry\GLResourceHandle.cs" />
+    <Compile Include="3D\RenderItem\ComplexGeometry\CxSurfaceItem.cs" />
+    <Compile Include="3D\RenderItem\ComplexGeometry\CxPointCloudItem.cs" />
+    <Compile Include="3D\RenderItem\ComplexGeometry\CxMeshItem.cs" />
     <Compile Include="3D\RenderItem\Geometry\CxPoint3DItem.cs" />
     <Compile Include="3D\RenderItem\Geometry\CxSegment3DItem.cs" />
     <Compile Include="3D\RenderItem\Geometry\CxPolygon3DItem.cs" />
@@ -143,8 +145,6 @@
     <Compile Include="3D\CxExtension.cs" />
     <Compile Include="3D\CxGroup.cs" />
     <Compile Include="3D\CxGroupManager.cs" />
-    <Compile Include="3D\ShaderProgramCompiler.cs" />
-    <Compile Include="3D\ModernOverlayRenderer.cs" />
     <!-- 2D display control -->
     <Compile Include="2D\CxDisplay2D.cs">
       <SubType>UserControl</SubType>

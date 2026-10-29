@@ -189,10 +189,8 @@ VisionNet/
 │       └── CxControl/              # 渲染控件库
 │           ├── 3D/                 # 3D 渲染（OpenGL）
 │           │   ├── Camera/         # ICamera, CxAdvancedTrackBallCamera
-│           │   ├── RenderItem/
-│           │   │   ├── Surface/    # CxSurfaceItem
-│           │   │   ├── PointCloud/ # CxPointCloudItem
-│           │   │   ├── Mesh/       # CxMeshItem
+│           │   ├── RenderItem/     # 共享渲染管线：ModernOverlayRenderer / ShaderProgramCompiler
+│           │   │   ├── ComplexGeometry/  # ICxObjRenderItem / AbstractCxObjRenderItem / CxSurfaceItem / CxPointCloudItem / CxMeshItem / RenderData / GLResourceHandle / Enums
 │           │   │   ├── Geometry/   # Point / Segment / Polygon / Plane / Box
 │           │   │   └── Overlay/    # ColorBar, CoordinateSystem, Tag, Text
 │           │   └── CxDisplay.cs   # 状态 / 初始化 / 框架
