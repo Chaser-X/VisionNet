@@ -742,7 +742,7 @@ display2D.SetBackgroundColor(Color.Black);
 > **叠加层 key 与交互事件**
 > 叠加层的 `key` 与 surface 的 key 是**两个独立命名空间**：`key == null` 保持"追加"语义（向后兼容），传入 key 则按 key 原位替换并释放旧 Item；用 `GetOverlayItem` / `RemoveOverlayItem` 查询与移除，`ClearOverlayItems` 全清。
 > 同一实例只会登记一次：对已登记实例再次 `SetOverlayItem` / `SetSurfaceItem` 视为**改 key**（保持原队列位置），不会重复登记。
-> `SelectionChanged`（UI 线程）在选中项变化时触发（`null` = 取消选中）；`CoordinatesChanged`（UI 线程）随鼠标移动触发（`null` = 未命中几何）；`RenderItemFailed`（**渲染线程**，在资源锁释放后触发，可安全回调 display）在 Item 上传失败（如 shader 编译失败）时触发；WinForms 控件请用 `BeginInvoke` 更新（同步 `Invoke` 可能卡住渲染帧）。
+> `SelectionChanged`（UI 线程）在选中项变化时触发（`null` = 取消选中）；`CoordinatesChanged`（UI 线程）随鼠标移动触发（`null` = 未命中几何；同一像素的连续移动会被合并为一次）；`RenderItemFailed`（**渲染线程**，在资源锁释放后触发，可安全回调 display）在 Item 上传失败（如 shader 编译失败）时触发；WinForms 控件请用 `BeginInvoke` 更新（同步 `Invoke` 可能卡住渲染帧）。
 > `Get*` 返回的 Item 修改底层数据仍需重新 `Set*`；只改姿态 / 颜色模式后调用 `Redraw()` 即可看到效果。
 
 > **多 Item 颜色一致性**

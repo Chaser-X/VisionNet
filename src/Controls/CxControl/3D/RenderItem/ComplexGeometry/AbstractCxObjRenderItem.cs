@@ -93,9 +93,20 @@ namespace VisionNet.Controls
             get => _surfaceMode;
             set
             {
+                if (_surfaceMode == value) return;
+
                 _surfaceMode = value;
                 // Lit 仅在 Mesh 模式有效；模式切换时刷新 shader 的 colorMode / surfaceMode
-                if (_cachedRenderData?.Uniforms != null)
+                if (value == SurfaceMode.Mesh
+                    && (_cachedRenderData == null || _cachedRenderData.Indices == null))
+                {
+                    // PointCloud render data deliberately omits the mesh index buffer. Rebuild
+                    // lazily when the caller switches to Mesh; the existing GL handle is marked
+                    // dirty by CxDisplay through this event.
+                    _cachedRenderData = null;
+                    OnRenderDataChanged?.Invoke();
+                }
+                else if (_cachedRenderData?.Uniforms != null)
                 {
                     _cachedRenderData.Uniforms["colorMode"] = EffectiveColorMode;
                     _cachedRenderData.Uniforms["surfaceMode"] = value == SurfaceMode.Mesh ? 1 : 0;
@@ -269,6 +280,12 @@ namespace VisionNet.Controls
             }";
         #endregion Shader 源码
 
+        // CxDisplay shares this exact shader pair across all built-in surface items. Keep the
+        // protected fields for derived-item compatibility and expose internal read-only views for
+        // the context-owned program cache.
+        internal static string SharedVertexShaderSource => VertexShaderSource;
+        internal static string SharedFragmentShaderSource => FragmentShaderSource;
+
         /// <summary>
         /// Initializes the shared mode fields without running the property setters (they depend on
         /// the bounding box and diff range computed later by <see cref="Initialize"/>).
@@ -324,6 +341,10 @@ namespace VisionNet.Controls
             if (!handle.IsValid || IsDisposed) return;
             var data = _cachedRenderData;
             if (data == null) return;
+
+            // A PointCloud -> Mesh mode switch invalidates the CPU cache and may be observed
+            // before the render thread has rebuilt the GL handle. Do not issue DrawElements(0).
+            if (_surfaceMode == SurfaceMode.Mesh && data.IndexCount <= 0) return;
 
             gl.UseProgram(handle.ShaderProgram);
             gl.BindVertexArray(handle.VaoId);

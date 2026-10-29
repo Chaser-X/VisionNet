@@ -37,6 +37,7 @@ namespace VisionNet.Controls
         {
             var item = new CxSurfaceItem(s, ResolveMode(mode), ResolveColorMode(colorMode), maxPointCount)
                 { ModelMatrix = pose ?? CxMatrix4X4.Identity() };
+            item.PrepareRenderData();
             SetSurfaceItem(key ?? DefaultSurfaceKey, item, autoFit);
             return item;
         }
@@ -59,6 +60,7 @@ namespace VisionNet.Controls
         {
             var item = new CxPointCloudItem(c, ResolveMode(mode), ResolveColorMode(colorMode), maxPointCount)
                 { ModelMatrix = pose ?? CxMatrix4X4.Identity() };
+            item.PrepareRenderData();
             SetSurfaceItem(key ?? DefaultPointCloudKey, item, autoFit);
             return item;
         }
@@ -76,6 +78,7 @@ namespace VisionNet.Controls
         {
             var item = new CxMeshItem(m, ResolveMode(mode), ResolveColorMode(colorMode))
                 { ModelMatrix = pose ?? CxMatrix4X4.Identity() };
+            item.PrepareRenderData();
             SetSurfaceItem(key ?? DefaultMeshKey, item, autoFit);
             return item;
         }
@@ -713,9 +716,10 @@ namespace VisionNet.Controls
         public event Action<AbstractRenderItem> SelectionChanged;
 
         /// <summary>
-        /// Raised on every mouse move while hovering: the world-space location and the intensity (or
+        /// Raised on mouse move while hovering: the world-space location and the intensity (or
         /// diff value) under the cursor. A <c>null</c> location means the cursor is not over any
-        /// geometry (or a drag is in progress). Raised on the UI thread.
+        /// geometry (or a drag is in progress). Consecutive moves that land on the same pixel are
+        /// coalesced into a single notification. Raised on the UI thread.
         /// </summary>
         public event Action<CxPoint3D?, float?> CoordinatesChanged;
 

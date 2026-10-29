@@ -49,6 +49,88 @@ namespace VisionNet.Controls
         }
 
         /// <summary>
+        /// Computes a structured surface bounding box directly from its compact source array.
+        /// This avoids materializing a full <see cref="CxPoint3D"/> array just for the scan.
+        /// </summary>
+        public static CxBox3D? CalculateBoundingBox(CxSurface surface)
+        {
+            if (surface == null || surface.Data == null
+                || surface.Width <= 0 || surface.Length <= 0)
+                return null;
+
+            int width = surface.Width;
+            int rowCount = Math.Min(surface.Length, surface.Data.Length / width);
+            float minX = float.MaxValue, minY = float.MaxValue, minZ = float.MaxValue;
+            float maxX = float.MinValue, maxY = float.MinValue, maxZ = float.MinValue;
+            bool hasValidPoint = false;
+
+            for (int row = 0; row < rowCount; row++)
+            {
+                for (int col = 0; col < width; col++)
+                {
+                    short rawZ = surface.Data[row * width + col];
+                    if (rawZ == -32768) continue;
+
+                    float x = surface.XOffset + col * surface.XScale;
+                    float y = surface.YOffset + row * surface.YScale;
+                    float z = surface.ZOffset + rawZ * surface.ZScale;
+                    hasValidPoint = true;
+                    if (x < minX) minX = x;
+                    if (y < minY) minY = y;
+                    if (z < minZ) minZ = z;
+                    if (x > maxX) maxX = x;
+                    if (y > maxY) maxY = y;
+                    if (z > maxZ) maxZ = z;
+                }
+            }
+
+            if (!hasValidPoint) return null;
+            return new CxBox3D(
+                new CxPoint3D((minX + maxX) / 2, (minY + maxY) / 2, (minZ + maxZ) / 2),
+                new CxSize3D(maxX - minX, maxY - minY, maxZ - minZ));
+        }
+
+        /// <summary>
+        /// Computes an ordered point-cloud bounding box directly from its packed short array.
+        /// Invalid triples are skipped without allocating a temporary point array.
+        /// </summary>
+        public static CxBox3D? CalculateBoundingBox(CxPointCloud cloud)
+        {
+            if (cloud == null || cloud.Data == null
+                || cloud.Width <= 0 || cloud.Length <= 0)
+                return null;
+
+            int pointCount = Math.Min(cloud.Width * cloud.Length, cloud.Data.Length / 3);
+            float minX = float.MaxValue, minY = float.MaxValue, minZ = float.MaxValue;
+            float maxX = float.MinValue, maxY = float.MinValue, maxZ = float.MinValue;
+            bool hasValidPoint = false;
+
+            for (int i = 0; i < pointCount; i++)
+            {
+                short rawX = cloud.Data[i * 3];
+                short rawY = cloud.Data[i * 3 + 1];
+                short rawZ = cloud.Data[i * 3 + 2];
+                if (rawX == -32768 || rawY == -32768 || rawZ == -32768) continue;
+
+                float x = cloud.XOffset + rawX * cloud.XScale;
+                float y = cloud.YOffset + rawY * cloud.YScale;
+                float z = cloud.ZOffset + rawZ * cloud.ZScale;
+                hasValidPoint = true;
+                if (x < minX) minX = x;
+                if (y < minY) minY = y;
+                if (z < minZ) minZ = z;
+                if (x > maxX) maxX = x;
+                if (y > maxY) maxY = y;
+                if (z > maxZ) maxZ = z;
+            }
+
+            if (!hasValidPoint) return null;
+            return new CxBox3D(
+                new CxPoint3D((minX + maxX) / 2, (minY + maxY) / 2, (minZ + maxZ) / 2),
+                new CxSize3D(maxX - minX, maxY - minY, maxZ - minZ));
+        }
+
+        /// <summary>
         /// Computes the world-space Z range of an axis-aligned box transformed by an affine matrix.
         /// The eight corners of the box are transformed; the resulting min/max Z bounds every
         /// transformed point (conservative). When the box is <c>null</c> or the range collapses,

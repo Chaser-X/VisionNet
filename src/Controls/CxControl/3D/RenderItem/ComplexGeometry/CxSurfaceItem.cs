@@ -39,7 +39,7 @@ namespace VisionNet.Controls
         /// <summary>Computes the local bounding box of the surface (may be <c>null</c>).</summary>
         protected override CxBox3D? ComputeBoundingBox()
             => Surface?.Data != null && Surface.Data.Length > 0
-                ? CxExtension.CalculateBoundingBox(Surface.ToPoints())
+                ? CxExtension.CalculateBoundingBox(Surface)
                 : null;
 
         /// <inheritdoc/>
@@ -114,7 +114,9 @@ namespace VisionNet.Controls
                 }
             }
 
-            uint[] indices = GenerateMeshIndices(sampledWidth, sampledLength);
+            uint[] indices = CurrentSurfaceMode == SurfaceMode.Mesh
+                ? GenerateMeshIndices(sampledWidth, sampledLength)
+                : null;
             byte[] textureBytes = GenerateIntensityTextureData();
 
             _cachedRenderData = new RenderData
@@ -123,7 +125,7 @@ namespace VisionNet.Controls
                 UVCoords    = uvCoords,
                 Indices     = indices,
                 VertexCount = totalVertices,
-                IndexCount  = indices.Length,
+                IndexCount  = indices?.Length ?? 0,
                 ShaderSource = new ShaderSource
                 {
                     VertexSource   = VertexShaderSource,

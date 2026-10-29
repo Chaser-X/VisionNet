@@ -82,14 +82,15 @@ namespace VisionNet.Controls
             byte[] textureBytes = hasTextureUvs
                 ? GenerateIntensityTextureData(textureWidth, textureHeight)
                 : new byte[] { 255, 255, 255, 255 };
+            var indices = CurrentSurfaceMode == SurfaceMode.Mesh ? Mesh.Indices : null;
 
             _cachedRenderData = new RenderData
             {
                 Vertices    = vertices,
                 UVCoords    = uvCoords,
-                Indices     = Mesh.Indices,
+                Indices     = indices,
                 VertexCount = Mesh.Vertices.Length,
-                IndexCount  = Mesh.Indices?.Length ?? 0,
+                IndexCount  = indices?.Length ?? 0,
                 ShaderSource = new ShaderSource
                 {
                     VertexSource   = VertexShaderSource,

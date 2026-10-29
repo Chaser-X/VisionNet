@@ -6,24 +6,44 @@
 
 ## 未发布（工作区，尚未提交）
 
-### A 批：内部重构
+### A 批：交互/拾取、数据与颜色条性能修复
+- 拾取：`GetNearestSurfacePoint` 路径复用实例级视口/深度读回缓冲，避免每次鼠标移动分配短生命周期数组；同一像素的连续移动不再重复读回、也不再重复触发 `CoordinatesChanged`（`CxDisplay.Api.cs` 与 `README.md` 的契约说明已同步为"同一像素的连续移动会被合并"）。
+- 颜色条：`CxColorBarItem` 按 (Z 范围, 视口尺寸) 缓存几何，仅在变化时重算渐变色与刻度位置；**每帧仍会交错复制并流式上传**（约 800 顶点 / 22 KB），本轮未消除这部分。
+- 包围盒：新增 `CxExtension.CalculateBoundingBox(CxSurface)` / `CalculateBoundingBox(CxPointCloud)`，直接从紧凑源数组扫描，避免为求包围盒构造整份 `CxPoint3D[]`；不再经 `ToPoints()`（也不再持有 `CxSurface._lock`）。数值结果与旧路径逐点等价。
+- 模式切换：`SurfaceMode` setter 对相同值直接返回；PointCloud→Mesh 切换时惰性重建带索引的渲染数据，`Draw` 在 Mesh 模式且索引为空时跳过 `DrawElements(0)`。
+- 输入：拖拽期间不再逐帧做工具提示的深度读回；按下鼠标时隐藏工具提示。
+
+## 已提交
+
+### cfdab2b（2026-10-29）重组 3D 渲染项目录：表面类渲染项聚合为 `ComplexGeometry`
+
+- `3D\RenderItem` 下 `Mesh` / `PointCloud` / `Surface` 三个目录合并为 `ComplexGeometry`，并移入只服务表面类渲染项的 `ICxObjRenderItem` / `AbstractCxObjRenderItem` / `Enums` / `RenderData` / `GLResourceHandle`。
+- `ModernOverlayRenderer` / `ShaderProgramCompiler` 移入 `3D\RenderItem`（全部渲染项共用的 GLSL 管线与 shader 编译工具）。
+- `IRenderItem` / `ICxPoseable` / `ICxGroupMember` 留在 `RenderItem` 根级（与叠加层共用）。
+- 同步 `CxControl.csproj` 编译项与 `README.md` 架构树；纯文件移动，命名空间与公开 API 不变。
+- 验证：`CxControl` 与 `DemoFrom` MSBuild `/t:Rebuild` → 0 错误、0 C# 警告（仅预存在 MSB3270）。
+
+### ff08025（2026-10-28）CxDisplay 可用性与性能提升：公开事件、overlay key、渲染项基类抽取
+
+**内部重构（A 批）**
+
 - 性能：`SetSurfaceItem` 仅在 `autoFit` 时计算合并包围盒（批量加载由 O(n²) 降为 O(n)）；`Render` 每帧只取一次 `_resourceLock`（原先每个 Item 一次）。
 - 脏标记精确化：`GLResourceHandle` 记录订阅委托，单个 Item 数据失效只重建它自己的 GPU 资源（原先会标记全部 Item 重传）。
 
-### C 批：契约收敛（本轮只做 C5）
+**契约收敛（C 批，本轮只做 C5）**
+
 - C5（渲染项去重，方案 A：public 抽象基类）：新增 `AbstractCxObjRenderItem`（`public abstract`，承载 `ICxObjRenderItem` / `ICxGroupMember` 的共享实现：姿态、颜色模式与颜色范围、着色器、uniform、`Draw` / `Dispose` 骨架、采样预算 `MaxPointCountCore`）；`CxSurfaceItem` / `CxMeshItem` / `CxPointCloudItem` 改为派生类，只保留数据相关部分，行数由 553/469/557 降到 **233/148/238**（基类 427 行）。
 - 公开面变化：**+1 公开抽象类型**（`AbstractCxObjRenderItem`）；三个渲染项的**有效公开成员集合（含继承）与重构前完全一致**（反射核对 0 差异）；着色器文本、`Draw`、颜色模式与范围策略各只保留一份。
 - 说明：`CxSurfaceItem` / `CxPointCloudItem` 仍公开 `MaxPointCount`（基类提供 `protected MaxPointCountCore`），`CxMeshItem` 不暴露该属性；此前"internal 静态辅助类"方案（A1）已回撤，本方案取代它。
 
-### B 批：新增公开 API（向后兼容）
+**新增公开 API（B 批，向后兼容）**
+
 - 事件：`SelectionChanged`、`CoordinatesChanged`（均 UI 线程）、`RenderItemFailed`（渲染线程，每次上传失败触发一次）。
 - 叠加层 key：8 个 `Set*` 增加可选 `string key = null`（null 保持"追加"旧行为，非 null 为原位 upsert）；新增 `SetOverlayItem(key, item)` / `GetOverlayItem(key)` / `RemoveOverlayItem(key|item)`；overlay key 与 surface key 为独立命名空间。
 - 视图入口：`Redraw()`（线程安全重绘）、`FitView()` / `FitView(CxBox3D?)`。
 - 重复代理加 `[Obsolete]` 指引（未删除）：`SurfaceViewMode`、`IsLeftHanded`、`SetCoordinateSystemLeftHanded`、`SetZScale`、`SetViewCenter`、`SetViewUpDirection` → 统一指向 `Camera.*`；Demo 已迁到 `Camera.*`。
 - Demo：新增 "Overlay Key" 按钮（追加 → 同 key 替换 → 移除）与 `SelectionChanged` → `lbl_markPos`。
 - 评审修复：`RenderItemFailed` 改为在**资源锁释放、资源池遍历结束之后**触发（处理器可安全回调 display；WinForms 控件仍需 `BeginInvoke`，同步 `Invoke` 可能卡住渲染帧）；`SetOverlayItem` / `SetSurfaceItem` 现在保证**同一实例只登记一次**——对已登记实例再次 Set 视为改 key（保持原队列位置），避免重复绘制、GL 句柄泄漏与悬空的已释放条目。
-
-## 已提交
 
 ### 6943291（2026-10-28）组关系收归 `CxGroupManager`，组员按 key 绑定
 
@@ -49,8 +69,6 @@
 
 - `CxControl.csproj`、`DemoFrom.csproj`：MSBuild `/t:Rebuild` → 0 错误、0 C# 警告。
 - **未做运行时/OpenGL 验证**（见文末「待验证」）。
-
-## 已提交
 
 ### 8a7ec19（2026-10-27）重构表面项管理为按 key 的 Set/Get/Remove，并修复渲染问题
 

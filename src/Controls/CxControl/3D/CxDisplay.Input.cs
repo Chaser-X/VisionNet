@@ -9,12 +9,22 @@ namespace VisionNet.Controls
     /// <summary>Mouse interaction, coordinate picking, and context-menu event handlers.</summary>
     public partial class CxDisplay
     {
+        // Mouse hover is raised on the UI thread. Reuse the tiny readback buffers so the
+        // per-event path does not create short-lived arrays before the synchronous ReadPixels.
+        private readonly int[] _pickViewport = new int[4];
+        private readonly byte[] _pickDepthBytes = new byte[4];
+        private bool _hasHoverPixel;
+        private int _lastHoverX;
+        private int _lastHoverY;
+
         // ── Mouse events ─────────────────────────────────────────────────────────
 
         /// <inheritdoc/>
         protected override void OnMouseDown(MouseEventArgs e)
         {
             _isMouseDown = true;
+            _hasHoverPixel = false;
+            _coordTagItem.Visible = false;
 
             if (e.Button == MouseButtons.Left)
             {
@@ -64,6 +74,7 @@ namespace VisionNet.Controls
             _isDraggingItem   = false;
             _lastDragWorldPos = null;
             _isMouseDown      = false;
+            _hasHoverPixel    = false;
             base.OnMouseUp(e);
         }
 
@@ -72,6 +83,7 @@ namespace VisionNet.Controls
         {
             if (_isDraggingItem && _isMouseDown && _selectedItem != null)
             {
+                _coordTagItem.Visible = false;
                 var worldPos = ScreenToWorldCoordinate(e.X, e.Y);
                 if (worldPos.HasValue && _lastDragWorldPos.HasValue)
                 {
@@ -97,8 +109,28 @@ namespace VisionNet.Controls
                 return;
             }
 
+            // Camera rotation/panning already has its own mouse handler. Do not perform a
+            // depth readback for the tooltip while the button is held; the result is discarded
+            // by the _isMouseDown check below in the old path.
+            if (_isMouseDown)
+            {
+                _coordTagItem.Visible = false;
+                CoordinatesChanged?.Invoke(null, null);
+                base.OnMouseMove(e);
+                return;
+            }
+
+            if (_hasHoverPixel && _lastHoverX == e.X && _lastHoverY == e.Y)
+            {
+                base.OnMouseMove(e);
+                return;
+            }
+            _hasHoverPixel = true;
+            _lastHoverX = e.X;
+            _lastHoverY = e.Y;
+
             var pos = GetNearestSurfacePoint(e.X, e.Y);
-            bool hasHit = pos.Location.HasValue && !_isMouseDown;
+            bool hasHit = pos.Location.HasValue;
             _coordTagItem.Visible = hasHit;
             if (hasHit)
                 _coordTagItem.SetCoordinates(pos.Location.Value, pos.Intensity);
@@ -140,14 +172,12 @@ namespace VisionNet.Controls
         private CxPoint3D? ScreenToWorldCoordinate(int mouseX, int mouseY)
         {
             var gl = OpenGL;
-            int[] viewport = new int[4];
-            gl.GetInteger(OpenGL.GL_VIEWPORT, viewport);
-            int adjustedY = viewport[3] - mouseY;   // OpenGL Y is bottom-up.
+            gl.GetInteger(OpenGL.GL_VIEWPORT, _pickViewport);
+            int adjustedY = _pickViewport[3] - mouseY;   // OpenGL Y is bottom-up.
 
-            byte[] depthBytes = new byte[4];
             gl.ReadPixels(mouseX, adjustedY, 1, 1,
-                OpenGL.GL_DEPTH_COMPONENT, OpenGL.GL_FLOAT, depthBytes);
-            float depth = BitConverter.ToSingle(depthBytes, 0);
+                OpenGL.GL_DEPTH_COMPONENT, OpenGL.GL_FLOAT, _pickDepthBytes);
+            float depth = BitConverter.ToSingle(_pickDepthBytes, 0);
 
             if (Math.Abs(depth - 1.0f) < 0.00001f) return null;
 
