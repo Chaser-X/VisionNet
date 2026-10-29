@@ -6,7 +6,12 @@
 
 ## 未发布（工作区，尚未提交）
 
-### B 批：渲染资源层与上下文重建
+（暂无）
+
+## 已提交
+
+### 2585526（2026-10-29）渲染资源层重构：共享 surface 程序、球体实例化、字形图集与上下文重建
+
 - 共享程序：三个内建 `ComplexGeometry` 渲染项每个 GL 上下文共用一份 surface 着色器程序（`ModernOverlayRenderer.EnsureSurfaceProgram`），句柄以 `OwnsShader` 标记归属，避免逐句柄编译/删除；是否共享按着色器源码文本判定。
 - 上传：顶点/索引/纹理上传改为 `GCHandle` 固定内存直传（`UploadPinned`），去掉 `Marshal.AllocHGlobal` + `BlockCopy` 中转。
 - 球体实例化：`CxPoint3DItem` 的 `Sphere` 模式改用上下文级单位球 + 每帧流式实例缓冲（`DrawSpheres`），不再每帧重建 VAO/VBO/着色器（半径仍为 `Size / 2`）。
@@ -14,16 +19,17 @@
 - 上下文重建：`DoOpenGLInitialized` 不再 `Delete` 旧上下文的程序，改为复位全部句柄（`ResetForContextRecreate`）并排空待释放队列，交由首帧重建。
 - 重绘合并：`SafeInvalidate` 合并同一帧内的重复失效请求，`OnHandleCreated` / `OnHandleDestroyed` 复位合并标记。
 - FBO 尺寸：缓存上次 `SetDimensions` 的尺寸，仅在控件尺寸变化时重设（原先每帧重设）。
-
-## 已提交
+- 验证：`CxControl` 与 `DemoFrom` MSBuild `/t:Rebuild`（Debug/Release）→ 0 错误、0 C# 警告（仅预存在 MSB3270）。
+- 未做运行时/OpenGL 验证（见「待验证」第 7–10 项）。
 
 ### 7900d29（2026-10-29）CxDisplay 交互/拾取与颜色条性能修复，包围盒改为直接扫描源数据
 
-- 拾取：`GetNearestSurfacePoint` 路径复用实例级视口/深度读回缓冲，避免每次鼠标移动分配短生命周期数组；同一像素的连续移动不再重复读回、也不再重复触发 `CoordinatesChanged`（`CxDisplay.Api.cs` 与 `README.md` 的契约说明已同步为“同一像素的连续移动会被合并”）。
+- 拾取：`GetNearestSurfacePoint` 路径复用实例级视口/深度读回缓冲，避免每次鼠标移动分配短生命周期数组；同一像素的连续移动不再重复读回、也不再重复触发 `CoordinatesChanged`（`CxDisplay.Api.cs` 与 `README.md` 的契约说明已同步为"同一像素的连续移动会被合并"）。
 - 颜色条：`CxColorBarItem` 按 (Z 范围, 视口尺寸) 缓存几何，仅在变化时重算渐变色与刻度位置；**每帧仍会交错复制并流式上传**（约 800 顶点 / 22 KB），本轮未消除这部分。
 - 包围盒：新增 `CxExtension.CalculateBoundingBox(CxSurface)` / `CalculateBoundingBox(CxPointCloud)`，直接从紧凑源数组扫描，避免为求包围盒构造整份 `CxPoint3D[]`；不再经 `ToPoints()`（也不再持有 `CxSurface._lock`）。数值结果与旧路径逐点等价。
 - 模式切换：`SurfaceMode` setter 对相同值直接返回；PointCloud→Mesh 切换时惰性重建带索引的渲染数据，`Draw` 在 Mesh 模式且索引为空时跳过 `DrawElements(0)`。
 - 输入：拖拽期间不再逐帧做工具提示的深度读回；按下鼠标时隐藏工具提示。
+- 数据准备：`SetSurface` / `SetPointCloud` / `SetMesh` 在登记前显式调用 `PrepareRenderData()`，把 `BuildRenderData()`（大顶点/UV 数组与纹理字节）从渲染线程提前到调用线程执行；构造时 `Initialize()` 已在同一线程全量扫描，增量有限，属有意取舍。
 - 验证：`CxControl` 与 `DemoFrom` MSBuild `/t:Rebuild`（Debug/Release）→ 0 错误、0 C# 警告（仅预存在 MSB3270）。
 
 ### cfdab2b（2026-10-29）重组 3D 渲染项目录：表面类渲染项聚合为 `ComplexGeometry`
@@ -140,7 +146,7 @@
 4. `ResetView(true)` 清空组与表面；`ResetView(false)` 保留表面对象。
 5. 3-Axis Stage（X / Y / Z 三组联动）行为不变。
 6. 着色器编译失败路径（`ShaderFailed`）与 Box 边线不透明表现。
-7. 字形图集排版保真度：坐标提示 / 色条标签与旧的“整串纹理”排版是否像素级一致（`Advance` / `LegacyLeftBearing` 为启发式）。
+7. 字形图集排版保真度：坐标提示 / 色条标签与旧的"整串纹理"排版是否像素级一致（`Advance` / `LegacyLeftBearing` 为启发式）。
 8. 球体实例化：`Sphere` 模式外观与旧实现一致（半径 = `Size / 2`、模型矩阵直传）。
 9. 共享 surface 程序 + 上下文重建：GL 上下文重建后三个内建项正常绘制、无残留/重复释放的句柄。
 10. FBO 尺寸缓存：resize 路径（基类 `OnSizeChanged` 已 `SetDimensions`，首帧是否重复）行为正常。
