@@ -53,6 +53,12 @@ namespace VisionNet.Controls
         /// <summary>Whether a shader program was compiled and linked for this handle.</summary>
         public bool HasShader { get; set; }
 
+        /// <summary>
+        /// <c>true</c> when this handle owns <see cref="ShaderProgram"/> and may delete it.
+        /// The built-in ComplexGeometry items share one context-owned surface program.
+        /// </summary>
+        internal bool OwnsShader { get; set; }
+
         /// <summary>Whether a 2D texture was uploaded for this handle.</summary>
         public bool HasTexture { get; set; }
 
@@ -90,6 +96,35 @@ namespace VisionNet.Controls
                 UniformLocations[name] = location;
             }
             return location;
+        }
+
+        /// <summary>
+        /// Forgets resource names from a context that has already been destroyed or replaced.
+        /// This deliberately makes no GL calls; the names are invalid outside their owning
+        /// context and must not be deleted through the new context.
+        /// </summary>
+        internal void ResetForContextRecreate()
+        {
+            VaoId = 0;
+            if (VboIds == null)
+                VboIds = new uint[4];
+            else
+                Array.Clear(VboIds, 0, VboIds.Length);
+            ElementBufferId = 0;
+            ShaderProgram = 0;
+            TextureId = 0;
+
+            IsValid = false;
+            NeedsUpdate = true;
+            ShaderFailed = false;
+            HasVAO = false;
+            HasShader = false;
+            OwnsShader = false;
+            HasTexture = false;
+            HasEBO = false;
+            VboCount = 0;
+            UseUVMode = false;
+            UniformLocations.Clear();
         }
     }
 }

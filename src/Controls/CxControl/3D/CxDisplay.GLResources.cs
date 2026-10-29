@@ -6,18 +6,48 @@ namespace VisionNet.Controls
 {
     public partial class CxDisplay
     {
+        private static void UploadPinned(OpenGL gl, uint target, Array data,
+            int bytes, uint usage)
+        {
+            GCHandle pinned = default(GCHandle);
+            try
+            {
+                pinned = GCHandle.Alloc(data, GCHandleType.Pinned);
+                gl.BufferData(target, bytes, pinned.AddrOfPinnedObject(), usage);
+            }
+            finally
+            {
+                if (pinned.IsAllocated) pinned.Free();
+            }
+        }
+
         private void CreateGLResources(OpenGL gl, ICxObjRenderItem item, GLResourceHandle handle)
         {
             var data = item.PrepareRenderData();
             if (data == null) return;
 
             handle.ShaderFailed = false;
+            handle.OwnsShader = false;
 
-            // Compile first: a failing shader aborts before any buffer or texture upload.
+            // Compile or acquire the shader first: a failing shader aborts before any buffer or
+            // texture upload. The three built-in ComplexGeometry items share one program per
+            // OpenGL context; custom shader sources retain the old per-handle ownership path.
             if (data.ShaderSource != null)
             {
-                handle.ShaderProgram = ShaderProgramCompiler.CompileProgram(gl,
-                    data.ShaderSource.VertexSource, data.ShaderSource.FragmentSource);
+                if (IsSharedSurfaceShader(data.ShaderSource))
+                {
+                    var renderer = ModernOverlayRenderer.For(gl);
+                    if (renderer.EnsureSurfaceProgram(gl))
+                    {
+                        handle.ShaderProgram = renderer.SurfaceProgram;
+                    }
+                }
+                else
+                {
+                    handle.ShaderProgram = ShaderProgramCompiler.CompileProgram(gl,
+                        data.ShaderSource.VertexSource, data.ShaderSource.FragmentSource);
+                    handle.OwnsShader = true;
+                }
                 handle.HasShader = handle.ShaderProgram != 0;
                 handle.UniformLocations.Clear();
                 if (!handle.HasShader)
@@ -47,7 +77,8 @@ namespace VisionNet.Controls
                     gl.GenBuffers(1, tempId);
                     handle.VboIds[vboIndex] = tempId[0];
                     gl.BindBuffer(OpenGL.GL_ARRAY_BUFFER, handle.VboIds[vboIndex]);
-                    gl.BufferData(OpenGL.GL_ARRAY_BUFFER, data.Vertices, OpenGL.GL_STATIC_DRAW);
+                    UploadPinned(gl, OpenGL.GL_ARRAY_BUFFER, data.Vertices,
+                        data.Vertices.Length * sizeof(float), OpenGL.GL_STATIC_DRAW);
                     gl.VertexAttribPointer(0, 3, OpenGL.GL_FLOAT, false, 3 * sizeof(float), IntPtr.Zero);
                     gl.EnableVertexAttribArray(0);
                     vboIndex++;
@@ -58,7 +89,8 @@ namespace VisionNet.Controls
                     gl.GenBuffers(1, tempId);
                     handle.VboIds[vboIndex] = tempId[0];
                     gl.BindBuffer(OpenGL.GL_ARRAY_BUFFER, handle.VboIds[vboIndex]);
-                    gl.BufferData(OpenGL.GL_ARRAY_BUFFER, data.Colors, OpenGL.GL_STATIC_DRAW);
+                    UploadPinned(gl, OpenGL.GL_ARRAY_BUFFER, data.Colors,
+                        data.Colors.Length * sizeof(float), OpenGL.GL_STATIC_DRAW);
                     gl.VertexAttribPointer(1, 3, OpenGL.GL_FLOAT, false, 3 * sizeof(float), IntPtr.Zero);
                     gl.EnableVertexAttribArray(1);
                     vboIndex++;
@@ -68,7 +100,8 @@ namespace VisionNet.Controls
                     gl.GenBuffers(1, tempId);
                     handle.VboIds[vboIndex] = tempId[0];
                     gl.BindBuffer(OpenGL.GL_ARRAY_BUFFER, handle.VboIds[vboIndex]);
-                    gl.BufferData(OpenGL.GL_ARRAY_BUFFER, data.UVCoords, OpenGL.GL_STATIC_DRAW);
+                    UploadPinned(gl, OpenGL.GL_ARRAY_BUFFER, data.UVCoords,
+                        data.UVCoords.Length * sizeof(float), OpenGL.GL_STATIC_DRAW);
                     gl.VertexAttribPointer(1, 2, OpenGL.GL_FLOAT, false, 2 * sizeof(float), IntPtr.Zero);
                     gl.EnableVertexAttribArray(1);
                     vboIndex++;
@@ -79,7 +112,8 @@ namespace VisionNet.Controls
                     gl.GenBuffers(1, tempId);
                     handle.VboIds[vboIndex] = tempId[0];
                     gl.BindBuffer(OpenGL.GL_ARRAY_BUFFER, handle.VboIds[vboIndex]);
-                    gl.BufferData(OpenGL.GL_ARRAY_BUFFER, data.DiffValues, OpenGL.GL_STATIC_DRAW);
+                    UploadPinned(gl, OpenGL.GL_ARRAY_BUFFER, data.DiffValues,
+                        data.DiffValues.Length * sizeof(float), OpenGL.GL_STATIC_DRAW);
                     gl.VertexAttribPointer(2, 1, OpenGL.GL_FLOAT, false, 0, IntPtr.Zero);
                     gl.EnableVertexAttribArray(2);
                     vboIndex++;
@@ -90,7 +124,8 @@ namespace VisionNet.Controls
                     gl.GenBuffers(1, tempId);
                     handle.VboIds[vboIndex] = tempId[0];
                     gl.BindBuffer(OpenGL.GL_ARRAY_BUFFER, handle.VboIds[vboIndex]);
-                    gl.BufferData(OpenGL.GL_ARRAY_BUFFER, data.IntensityValues, OpenGL.GL_STATIC_DRAW);
+                    UploadPinned(gl, OpenGL.GL_ARRAY_BUFFER, data.IntensityValues,
+                        data.IntensityValues.Length * sizeof(float), OpenGL.GL_STATIC_DRAW);
                     gl.VertexAttribPointer(3, 1, OpenGL.GL_FLOAT, false, sizeof(float), IntPtr.Zero);
                     gl.EnableVertexAttribArray(3);
                     vboIndex++;
@@ -106,18 +141,8 @@ namespace VisionNet.Controls
 
                     gl.BindBuffer(OpenGL.GL_ELEMENT_ARRAY_BUFFER, handle.ElementBufferId);
                     int bytes = data.Indices.Length * sizeof(uint);
-                    IntPtr ptr = Marshal.AllocHGlobal(bytes);
-                    try
-                    {
-                        var indexBytes = new byte[bytes];
-                        Buffer.BlockCopy(data.Indices, 0, indexBytes, 0, bytes);
-                        Marshal.Copy(indexBytes, 0, ptr, bytes);
-                        gl.BufferData(OpenGL.GL_ELEMENT_ARRAY_BUFFER, bytes, ptr, OpenGL.GL_STATIC_DRAW);
-                    }
-                    finally
-                    {
-                        Marshal.FreeHGlobal(ptr);
-                    }
+                    UploadPinned(gl, OpenGL.GL_ELEMENT_ARRAY_BUFFER, data.Indices,
+                        bytes, OpenGL.GL_STATIC_DRAW);
                 }
             }
 
@@ -157,12 +182,13 @@ namespace VisionNet.Controls
                 handle.HasEBO = false;
             }
 
-            if (handle.HasShader && handle.ShaderProgram != 0)
+            if (handle.HasShader && handle.OwnsShader && handle.ShaderProgram != 0)
             {
                 gl.DeleteProgram(handle.ShaderProgram);
-                handle.ShaderProgram = 0;
-                handle.HasShader = false;
             }
+            handle.ShaderProgram = 0;
+            handle.HasShader = false;
+            handle.OwnsShader = false;
             handle.UniformLocations.Clear();
 
             if (handle.HasTexture && handle.TextureId != 0)
@@ -173,6 +199,15 @@ namespace VisionNet.Controls
             }
 
             handle.IsValid = false;
+        }
+
+        private static bool IsSharedSurfaceShader(ShaderSource source)
+        {
+            return source != null
+                && string.Equals(source.VertexSource,
+                    AbstractCxObjRenderItem.SharedVertexShaderSource, StringComparison.Ordinal)
+                && string.Equals(source.FragmentSource,
+                    AbstractCxObjRenderItem.SharedFragmentShaderSource, StringComparison.Ordinal);
         }
 
         private uint CreateTexture(OpenGL gl, TextureData tex)
@@ -195,16 +230,17 @@ namespace VisionNet.Controls
             gl.TexParameter(OpenGL.GL_TEXTURE_2D, OpenGL.GL_TEXTURE_WRAP_S, OpenGL.GL_CLAMP_TO_EDGE);
             gl.TexParameter(OpenGL.GL_TEXTURE_2D, OpenGL.GL_TEXTURE_WRAP_T, OpenGL.GL_CLAMP_TO_EDGE);
 
-            IntPtr ptr = Marshal.AllocHGlobal(uploadData.Length);
+            GCHandle pinned = default(GCHandle);
             try
             {
-                Marshal.Copy(uploadData, 0, ptr, uploadData.Length);
+                pinned = GCHandle.Alloc(uploadData, GCHandleType.Pinned);
                 gl.TexImage2D(OpenGL.GL_TEXTURE_2D, 0, OpenGL.GL_RGBA,
-                    uploadW, uploadH, 0, OpenGL.GL_RGBA, OpenGL.GL_UNSIGNED_BYTE, ptr);
+                    uploadW, uploadH, 0, OpenGL.GL_RGBA, OpenGL.GL_UNSIGNED_BYTE,
+                    pinned.AddrOfPinnedObject());
             }
             finally
             {
-                Marshal.FreeHGlobal(ptr);
+                if (pinned.IsAllocated) pinned.Free();
                 gl.BindTexture(OpenGL.GL_TEXTURE_2D, 0);
             }
 

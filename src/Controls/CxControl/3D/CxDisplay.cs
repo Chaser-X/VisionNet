@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Numerics;
+using System.Threading;
 using System.Windows.Forms;
 using SharpGL;
 using SharpGL.SceneGraph;
@@ -34,6 +35,9 @@ namespace VisionNet.Controls
         // members while the GL thread is iterating them is not safe.
         private readonly object _renderLock = new object();
         private readonly object _cameraLock = new object();
+        private int _invalidatePending;
+        private int _fboWidth = -1;
+        private int _fboHeight = -1;
 
         // Resources dequeued by Dispose/Replace that must be freed inside the GL thread.
         private readonly ConcurrentQueue<GLResourceHandle> _pendingRelease
@@ -238,6 +242,20 @@ namespace VisionNet.Controls
             }
         }
 
+        /// <summary>Clears a coalesced invalidation left over from a newly created handle.</summary>
+        protected override void OnHandleCreated(EventArgs e)
+        {
+            base.OnHandleCreated(e);
+            Interlocked.Exchange(ref _invalidatePending, 0);
+        }
+
+        /// <summary>Allows invalidation requests to be queued after the handle is recreated.</summary>
+        protected override void OnHandleDestroyed(EventArgs e)
+        {
+            base.OnHandleDestroyed(e);
+            Interlocked.Exchange(ref _invalidatePending, 0);
+        }
+
         // ── Shared private helpers ───────────────────────────────────────────────
 
         /// <summary>
@@ -245,8 +263,35 @@ namespace VisionNet.Controls
         /// </summary>
         internal void SafeInvalidate()
         {
-            if (InvokeRequired) { BeginInvoke(new Action(Invalidate)); return; }
+            if (IsDisposed) return;
+
+            if (InvokeRequired)
+            {
+                if (!IsHandleCreated
+                    || Interlocked.CompareExchange(ref _invalidatePending, 1, 0) != 0)
+                    return;
+
+                try
+                {
+                    BeginInvoke(new Action(CompletePendingInvalidate));
+                }
+                catch (InvalidOperationException)
+                {
+                    // The handle may be destroyed between IsHandleCreated and BeginInvoke.
+                    Interlocked.Exchange(ref _invalidatePending, 0);
+                }
+                return;
+            }
+
+            Interlocked.Exchange(ref _invalidatePending, 0);
             Invalidate();
+        }
+
+        private void CompletePendingInvalidate()
+        {
+            Interlocked.Exchange(ref _invalidatePending, 0);
+            if (!IsDisposed && IsHandleCreated)
+                Invalidate();
         }
 
         /// <summary>Synchronizes the context-menu check marks with the current mode settings.</summary>

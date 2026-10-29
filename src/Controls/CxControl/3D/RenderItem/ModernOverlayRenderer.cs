@@ -58,6 +58,25 @@ namespace VisionNet.Controls
             internal int Height;
         }
 
+        private struct GlyphCell
+        {
+            internal float U0;
+            internal float V0;
+            internal float U1;
+            internal float V1;
+            internal int Advance;
+        }
+
+        private sealed class GlyphAtlas
+        {
+            internal uint Texture;
+            internal int CellWidth;
+            internal int CellHeight;
+            internal int LegacyLeftBearing;
+            internal readonly Dictionary<char, GlyphCell> Cells
+                = new Dictionary<char, GlyphCell>();
+        }
+
         // Textures are keyed by effective pixel size plus the complete string. The
         // frame residency set prevents a FIFO cache from evicting its own working set.
         private readonly Dictionary<string, CachedText> _textTextures
@@ -66,14 +85,19 @@ namespace VisionNet.Controls
         private readonly HashSet<string> _textTexturesUsedThisFrame
             = new HashSet<string>(StringComparer.Ordinal);
         private const int MaxCachedTextTextures = 256;
+        private const string NumericGlyphCharacters = "0123456789XYZI:.,-+ ";
+        private readonly Dictionary<string, GlyphAtlas> _glyphAtlases
+            = new Dictionary<string, GlyphAtlas>(StringComparer.Ordinal);
 
         // Shared geometry resources. Geometry uploads stream into one reusable VBO;
         // the text path has a separate VAO/VBO because its attributes are vec2/UV.
         private uint _geometryProgram;
         private uint _textProgram;
+        private uint _surfaceProgram;
         // Set when a shader failed to compile so draws skip instead of recompiling each call.
         private bool _geometryProgramFailed;
         private bool _textProgramFailed;
+        private bool _surfaceProgramFailed;
         private uint _geometryVao;
         private uint _geometryVbo;
         private uint _textVao;
@@ -86,6 +110,21 @@ namespace VisionNet.Controls
         private int _textProjection = -1;
         private int _textColor = -1;
         private int _textGlyph = -1;
+
+        // Sphere overlays share one unit-sphere mesh and program per GL context. The instance
+        // buffer is streamed each draw because point positions may be edited interactively.
+        private uint _sphereProgram;
+        private bool _sphereProgramFailed;
+        private uint _sphereVao;
+        private uint _sphereVbo;
+        private uint _sphereEbo;
+        private uint _sphereInstanceVbo;
+        private int _sphereIndexCount;
+        private int _sphereProjection = -1;
+        private int _sphereView = -1;
+        private int _sphereModel = -1;
+        private int _sphereColor = -1;
+        private int _sphereRadius = -1;
         // CPU-side row-major camera matrices. They are uploaded with transpose=true
         // to match the row-major convention used by CxMatrix4X4 and the camera code.
         private float[] _projection = IdentityData();
@@ -109,6 +148,7 @@ namespace VisionNet.Controls
         private readonly float[] _identity = IdentityData();
         private float[] _ortho = IdentityData();
         private readonly float[] _textQuad = new float[16];
+        private float[] _glyphTriangles = new float[0];
 
         // Viewport is stable for the duration of a frame. Project/Unproject reuse
         // this storage and only refresh it when the viewport changes.
@@ -150,6 +190,27 @@ uniform vec4 color;
 out vec4 FragColor;
 void main() { float alpha = texture(glyph, texCoord).r; FragColor = vec4(color.rgb, color.a * alpha); }";
 
+        private const string SphereVertex = @"#version 330 core
+layout(location=0) in vec3 aPos;
+layout(location=1) in vec3 aInstancePos;
+uniform mat4 view;
+uniform mat4 projection;
+uniform mat4 model;
+uniform float radius;
+uniform vec4 aColor;
+out vec4 vertexColor;
+void main()
+{
+    vec3 localPos = aInstancePos + aPos * radius;
+    gl_Position = projection * view * model * vec4(localPos, 1.0);
+    vertexColor = aColor;
+}";
+
+        private const string SphereFragment = @"#version 330 core
+in vec4 vertexColor;
+out vec4 FragColor;
+void main() { FragColor = vertexColor; }";
+
         // Instances are created through For so a caller cannot accidentally share
         // GL handles between unrelated contexts.
         private ModernOverlayRenderer() { }
@@ -170,6 +231,17 @@ void main() { float alpha = texture(glyph, texCoord).r; FragColor = vec4(color.r
                 }
                 return renderer;
             }
+        }
+
+        /// <summary>
+        /// Forgets the renderer for a context that has been recreated. The old GL names are
+        /// invalid in the new context, so this path must not MakeCurrent or call Delete*.
+        /// </summary>
+        internal static void ResetForContextRecreate(OpenGL gl)
+        {
+            if (gl == null) return;
+            lock (Sync)
+                Instances.Remove(gl);
         }
 
         /// <summary>
@@ -419,6 +491,12 @@ void main() { float alpha = texture(glyph, texCoord).r; FragColor = vec4(color.r
             // 96 DPI (fontSize * 96 / 72). Keep that visual contract for the
             // System.Drawing texture path as well.
             float effectiveFontSize = Math.Max(1f, fontSize * 4f / 3f);
+            if (CanUseNumericGlyphAtlas(text))
+            {
+                DrawNumericGlyphText(gl, x, y, color, effectiveFontSize, text);
+                return;
+            }
+
             CachedText cached = GetOrCreateTextTexture(gl, effectiveFontSize, text);
             _textQuad[0] = x; _textQuad[1] = y; _textQuad[2] = 0; _textQuad[3] = 1;
             _textQuad[4] = x + cached.Width; _textQuad[5] = y; _textQuad[6] = 1; _textQuad[7] = 1;
@@ -434,6 +512,144 @@ void main() { float alpha = texture(glyph, texCoord).r; FragColor = vec4(color.r
                 TrimTextCache(gl, MaxCachedTextTextures);
                 _textTexturesUsedThisFrame.Clear();
             }
+        }
+
+        private static bool CanUseNumericGlyphAtlas(string text)
+        {
+            if (string.IsNullOrEmpty(text)) return false;
+            for (int i = 0; i < text.Length; i++)
+                if (NumericGlyphCharacters.IndexOf(text[i]) < 0) return false;
+            return true;
+        }
+
+        private void DrawNumericGlyphText(OpenGL gl, int x, int y, Color color,
+            float fontSize, string text)
+        {
+            var atlas = GetOrCreateGlyphAtlas(gl, fontSize);
+            int quadWidth = Math.Max(1, atlas.CellWidth - 2);
+            int quadHeight = Math.Max(1, atlas.CellHeight - 2);
+            int cursor = x + atlas.LegacyLeftBearing + 1;
+            int requiredFloats = text.Length * 6 * 4;
+            if (_glyphTriangles.Length < requiredFloats)
+            {
+                int newLength = Math.Max(requiredFloats,
+                    Math.Max(24, _glyphTriangles.Length * 2));
+                _glyphTriangles = new float[newLength];
+            }
+
+            int vertexOffset = 0;
+            foreach (char ch in text)
+            {
+                GlyphCell cell;
+                if (!atlas.Cells.TryGetValue(ch, out cell)) continue;
+
+                // Match the former triangle-fan order: bottom-left, bottom-right,
+                // top-right, then bottom-left, top-right, top-left.
+                WriteTextVertex(_glyphTriangles, ref vertexOffset,
+                    cursor, y, cell.U0, cell.V1);
+                WriteTextVertex(_glyphTriangles, ref vertexOffset,
+                    cursor + quadWidth, y, cell.U1, cell.V1);
+                WriteTextVertex(_glyphTriangles, ref vertexOffset,
+                    cursor + quadWidth, y + quadHeight, cell.U1, cell.V0);
+                WriteTextVertex(_glyphTriangles, ref vertexOffset,
+                    cursor, y, cell.U0, cell.V1);
+                WriteTextVertex(_glyphTriangles, ref vertexOffset,
+                    cursor + quadWidth, y + quadHeight, cell.U1, cell.V0);
+                WriteTextVertex(_glyphTriangles, ref vertexOffset,
+                    cursor, y + quadHeight, cell.U0, cell.V0);
+                cursor += Math.Max(1, cell.Advance);
+            }
+
+            if (vertexOffset > 0)
+                DrawTextTriangles(gl, _glyphTriangles, vertexOffset / 4,
+                    atlas.Texture, color);
+        }
+
+        private static void WriteTextVertex(float[] vertices, ref int offset,
+            float x, float y, float u, float v)
+        {
+            vertices[offset++] = x;
+            vertices[offset++] = y;
+            vertices[offset++] = u;
+            vertices[offset++] = v;
+        }
+
+        private GlyphAtlas GetOrCreateGlyphAtlas(OpenGL gl, float fontSize)
+        {
+            string key = fontSize.ToString("R", CultureInfo.InvariantCulture);
+            GlyphAtlas atlas;
+            if (_glyphAtlases.TryGetValue(key, out atlas)) return atlas;
+
+            using (var font = new Font("Arial", fontSize, GraphicsUnit.Pixel))
+            using (var measure = new Bitmap(1, 1, PixelFormat.Format32bppArgb))
+            using (var measuringGraphics = Graphics.FromImage(measure))
+            {
+                int cellWidth = 1;
+                int cellHeight = 1;
+                float legacyWidth = measuringGraphics.MeasureString(
+                    "X", font).Width;
+                float capAdvance = measuringGraphics.MeasureString(
+                    "X", font, new PointF(0, 0), StringFormat.GenericTypographic).Width;
+                float measuredLeading = (legacyWidth - capAdvance) / 2f;
+                int legacyLeftBearing = measuredLeading > 0f
+                    && measuredLeading <= fontSize / 3f
+                    ? Math.Max(0, (int)Math.Round(measuredLeading))
+                    : Math.Max(0, (int)Math.Round(fontSize / 6f));
+                for (int i = 0; i < NumericGlyphCharacters.Length; i++)
+                {
+                    SizeF measured = measuringGraphics.MeasureString(
+                        NumericGlyphCharacters[i].ToString(), font);
+                    cellWidth = Math.Max(cellWidth, (int)Math.Ceiling(measured.Width) + 4);
+                    cellHeight = Math.Max(cellHeight, (int)Math.Ceiling(measured.Height) + 4);
+                }
+
+                const int columns = 8;
+                int rows = (NumericGlyphCharacters.Length + columns - 1) / columns;
+                int atlasWidth = columns * cellWidth;
+                int atlasHeight = rows * cellHeight;
+                using (var bitmap = new Bitmap(atlasWidth, atlasHeight, PixelFormat.Format32bppArgb))
+                using (var graphics = Graphics.FromImage(bitmap))
+                using (var brush = new SolidBrush(Color.White))
+                {
+                    graphics.Clear(Color.Transparent);
+                    graphics.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;
+                    atlas = new GlyphAtlas
+                    {
+                        CellWidth = cellWidth,
+                        CellHeight = cellHeight,
+                        LegacyLeftBearing = legacyLeftBearing,
+                    };
+
+                    for (int i = 0; i < NumericGlyphCharacters.Length; i++)
+                    {
+                        char ch = NumericGlyphCharacters[i];
+                        int cellX = (i % columns) * cellWidth;
+                        int cellY = (i / columns) * cellHeight;
+                        graphics.DrawString(ch.ToString(), font, brush, cellX + 2, cellY + 1,
+                            StringFormat.GenericTypographic);
+                        atlas.Cells[ch] = new GlyphCell
+                        {
+                            U0 = (float)(cellX + 1) / atlasWidth,
+                            V0 = (float)(cellY + 1) / atlasHeight,
+                            U1 = (float)(cellX + cellWidth - 1) / atlasWidth,
+                            V1 = (float)(cellY + cellHeight - 1) / atlasHeight,
+                            // Measure a surrounded glyph so spaces and punctuation retain
+                            // their typographic advance; measuring each glyph in isolation
+                            // includes GDI+'s side-bearing padding and makes the tooltip too wide.
+                            Advance = Math.Max(1, (int)Math.Ceiling(
+                                measuringGraphics.MeasureString(
+                                    "X" + ch + "X", font,
+                                    new PointF(0, 0), StringFormat.GenericTypographic).Width
+                                - capAdvance * 2f)),
+                        };
+                    }
+
+                    atlas.Texture = UploadGlyph(gl, bitmap);
+                }
+            }
+
+            _glyphAtlases.Add(key, atlas);
+            return atlas;
         }
 
         /// <summary>
@@ -554,6 +770,22 @@ void main() { float alpha = texture(glyph, texCoord).r; FragColor = vec4(color.r
         /// <summary>Uploads one screen quad and composites a cached text alpha mask.</summary>
         private void DrawTextQuad(OpenGL gl, float[] quad, uint texture, Color color)
         {
+            DrawTextVertices(gl, quad, 4, OpenGL.GL_TRIANGLE_FAN, texture, color);
+        }
+
+        /// <summary>Uploads a batched text triangle list and composites a cached text alpha mask.</summary>
+        private void DrawTextTriangles(OpenGL gl, float[] vertices, int vertexCount,
+            uint texture, Color color)
+        {
+            DrawTextVertices(gl, vertices, vertexCount, OpenGL.GL_TRIANGLES, texture, color);
+        }
+
+        private void DrawTextVertices(OpenGL gl, float[] vertices, int vertexCount,
+            uint primitive, uint texture, Color color)
+        {
+            if (vertices == null || vertexCount <= 0
+                || vertices.Length < vertexCount * 4)
+                return;
             if (!EnsureTextProgram(gl)) return;
             EnsureTextBuffers(gl);
             RenderStateSnapshot previous = CaptureRenderState(gl);
@@ -561,7 +793,17 @@ void main() { float alpha = texture(glyph, texCoord).r; FragColor = vec4(color.r
             gl.DepthMask(0);
             gl.BindVertexArray(_textVao);
             gl.BindBuffer(OpenGL.GL_ARRAY_BUFFER, _textVbo);
-            gl.BufferData(OpenGL.GL_ARRAY_BUFFER, quad, OpenGL.GL_STREAM_DRAW);
+            GCHandle pinned = default(GCHandle);
+            try
+            {
+                pinned = GCHandle.Alloc(vertices, GCHandleType.Pinned);
+                gl.BufferData(OpenGL.GL_ARRAY_BUFFER, vertexCount * 4 * sizeof(float),
+                    pinned.AddrOfPinnedObject(), OpenGL.GL_STREAM_DRAW);
+            }
+            finally
+            {
+                if (pinned.IsAllocated) pinned.Free();
+            }
             gl.VertexAttribPointer(0, 2, OpenGL.GL_FLOAT, false, 4 * sizeof(float), IntPtr.Zero);
             gl.EnableVertexAttribArray(0);
             gl.VertexAttribPointer(1, 2, OpenGL.GL_FLOAT, false, 4 * sizeof(float), new IntPtr(2 * sizeof(float)));
@@ -574,7 +816,7 @@ void main() { float alpha = texture(glyph, texCoord).r; FragColor = vec4(color.r
             gl.ActiveTexture(OpenGL.GL_TEXTURE0);
             gl.BindTexture(OpenGL.GL_TEXTURE_2D, texture);
             gl.Uniform1(_textGlyph, 0);
-            gl.DrawArrays(OpenGL.GL_TRIANGLE_FAN, 0, 4);
+            gl.DrawArrays(primitive, 0, vertexCount);
             gl.BindTexture(OpenGL.GL_TEXTURE_2D, 0);
             gl.UseProgram(0);
             gl.DisableVertexAttribArray(0);
@@ -652,6 +894,150 @@ void main() { float alpha = texture(glyph, texCoord).r; FragColor = vec4(color.r
                 _states.Add(gl, state);
             }
             return state;
+        }
+
+        /// <summary>Gets the context-owned shader shared by the built-in surface items.</summary>
+        internal uint SurfaceProgram => _surfaceProgram;
+
+        /// <summary>Compiles the built-in surface shader once per GL context.</summary>
+        internal bool EnsureSurfaceProgram(OpenGL gl)
+        {
+            if (_surfaceProgram != 0) return true;
+            if (_surfaceProgramFailed) return false;
+
+            _surfaceProgram = ShaderProgramCompiler.CompileProgram(
+                gl,
+                AbstractCxObjRenderItem.SharedVertexShaderSource,
+                AbstractCxObjRenderItem.SharedFragmentShaderSource);
+            if (_surfaceProgram == 0)
+            {
+                _surfaceProgramFailed = true;
+                return false;
+            }
+            return true;
+        }
+
+        /// <summary>
+        /// Draws instanced unit spheres for a point overlay. The sphere mesh and shader are
+        /// context-owned; only the instance positions are streamed for each draw.
+        /// </summary>
+        internal void DrawSpheres(OpenGL gl, float[] positions, Color color, float radius,
+            CxMatrix4X4 model)
+        {
+            if (positions == null || positions.Length < 3) return;
+            if (!EnsureSphereProgram(gl)) return;
+            EnsureSphereBuffers(gl);
+
+            EnsureSceneMatrices(gl);
+            gl.BindVertexArray(_sphereVao);
+            gl.BindBuffer(OpenGL.GL_ARRAY_BUFFER, _sphereInstanceVbo);
+            gl.BufferData(OpenGL.GL_ARRAY_BUFFER, positions, OpenGL.GL_STREAM_DRAW);
+
+            gl.UseProgram(_sphereProgram);
+            gl.UniformMatrix4(_sphereProjection, 1, true, _projection);
+            gl.UniformMatrix4(_sphereView, 1, true, _view);
+            gl.UniformMatrix4(_sphereModel, 1, true,
+                (model ?? CxMatrix4X4.Identity()).Data);
+            gl.Uniform1(_sphereRadius, radius);
+            gl.Uniform4(_sphereColor,
+                color.R / 255f, color.G / 255f, color.B / 255f, color.A / 255f);
+            gl.DrawElementsInstanced(OpenGL.GL_TRIANGLES, _sphereIndexCount,
+                OpenGL.GL_UNSIGNED_SHORT, IntPtr.Zero, positions.Length / 3);
+
+            gl.BindVertexArray(0);
+            gl.BindBuffer(OpenGL.GL_ARRAY_BUFFER, 0);
+            gl.UseProgram(0);
+        }
+
+        private bool EnsureSphereProgram(OpenGL gl)
+        {
+            if (_sphereProgram != 0) return true;
+            if (_sphereProgramFailed) return false;
+
+            _sphereProgram = ShaderProgramCompiler.CompileProgram(gl, SphereVertex, SphereFragment);
+            if (_sphereProgram == 0)
+            {
+                _sphereProgramFailed = true;
+                return false;
+            }
+            _sphereProjection = gl.GetUniformLocation(_sphereProgram, "projection");
+            _sphereView = gl.GetUniformLocation(_sphereProgram, "view");
+            _sphereModel = gl.GetUniformLocation(_sphereProgram, "model");
+            _sphereColor = gl.GetUniformLocation(_sphereProgram, "aColor");
+            _sphereRadius = gl.GetUniformLocation(_sphereProgram, "radius");
+            return true;
+        }
+
+        private void EnsureSphereBuffers(OpenGL gl)
+        {
+            if (_sphereVao != 0) return;
+
+            var ids = new uint[1];
+            gl.GenVertexArrays(1, ids);
+            _sphereVao = ids[0];
+            gl.BindVertexArray(_sphereVao);
+
+            gl.GenBuffers(1, ids);
+            _sphereVbo = ids[0];
+            gl.BindBuffer(OpenGL.GL_ARRAY_BUFFER, _sphereVbo);
+            var vertices = new List<float>();
+            var indices = new List<ushort>();
+            GenerateUnitSphereData(10, 10, vertices, indices);
+            gl.BufferData(OpenGL.GL_ARRAY_BUFFER, vertices.ToArray(), OpenGL.GL_STATIC_DRAW);
+            gl.EnableVertexAttribArray(0);
+            gl.VertexAttribPointer(0, 3, OpenGL.GL_FLOAT, false,
+                3 * sizeof(float), IntPtr.Zero);
+
+            gl.GenBuffers(1, ids);
+            _sphereEbo = ids[0];
+            gl.BindBuffer(OpenGL.GL_ELEMENT_ARRAY_BUFFER, _sphereEbo);
+            gl.BufferData(OpenGL.GL_ELEMENT_ARRAY_BUFFER, indices.ToArray(), OpenGL.GL_STATIC_DRAW);
+            _sphereIndexCount = indices.Count;
+
+            gl.GenBuffers(1, ids);
+            _sphereInstanceVbo = ids[0];
+            gl.BindBuffer(OpenGL.GL_ARRAY_BUFFER, _sphereInstanceVbo);
+            gl.EnableVertexAttribArray(1);
+            gl.VertexAttribPointer(1, 3, OpenGL.GL_FLOAT, false,
+                3 * sizeof(float), IntPtr.Zero);
+            gl.VertexAttribDivisor(1, 1);
+
+            gl.BindVertexArray(0);
+            gl.BindBuffer(OpenGL.GL_ARRAY_BUFFER, 0);
+        }
+
+        private static void GenerateUnitSphereData(int slices, int stacks,
+            List<float> vertices, List<ushort> indices)
+        {
+            for (int stack = 0; stack <= stacks; stack++)
+            {
+                float phi = (float)(Math.PI / 2 - stack * Math.PI / stacks);
+                float y = (float)Math.Sin(phi);
+                float scale = (float)Math.Cos(phi);
+
+                for (int slice = 0; slice <= slices; slice++)
+                {
+                    float theta = (float)(slice * 2 * Math.PI / slices);
+                    vertices.Add(scale * (float)Math.Cos(theta));
+                    vertices.Add(y);
+                    vertices.Add(scale * (float)Math.Sin(theta));
+                }
+            }
+
+            for (int stack = 0; stack < stacks; stack++)
+            {
+                for (int slice = 0; slice < slices; slice++)
+                {
+                    ushort first = (ushort)(stack * (slices + 1) + slice);
+                    ushort second = (ushort)(first + (ushort)(slices + 1));
+                    indices.Add(first);
+                    indices.Add(second);
+                    indices.Add((ushort)(first + 1));
+                    indices.Add(second);
+                    indices.Add((ushort)(second + 1));
+                    indices.Add((ushort)(first + 1));
+                }
+            }
         }
 
         /// <summary>Compiles the shared geometry program once per GL context.</summary>
@@ -789,6 +1175,12 @@ void main() { float alpha = texture(glyph, texCoord).r; FragColor = vec4(color.r
                 gl.DeleteProgram(_geometryProgram);
                 _geometryProgram = 0;
             }
+            if (_surfaceProgram != 0)
+            {
+                gl.DeleteProgram(_surfaceProgram);
+                _surfaceProgram = 0;
+            }
+            _surfaceProgramFailed = false;
             _geometryProgramFailed = false;
             _textProgramFailed = false;
             _geometryProjection = _geometryView = _geometryModel = -1;
@@ -799,6 +1191,14 @@ void main() { float alpha = texture(glyph, texCoord).r; FragColor = vec4(color.r
                 _textProgram = 0;
             }
             _textProjection = _textColor = _textGlyph = -1;
+            if (_sphereProgram != 0)
+            {
+                gl.DeleteProgram(_sphereProgram);
+                _sphereProgram = 0;
+            }
+            _sphereProgramFailed = false;
+            _sphereProjection = _sphereView = _sphereModel = -1;
+            _sphereColor = _sphereRadius = -1;
             if (_geometryVbo != 0)
             {
                 gl.DeleteBuffers(1, new[] { _geometryVbo });
@@ -819,12 +1219,37 @@ void main() { float alpha = texture(glyph, texCoord).r; FragColor = vec4(color.r
                 gl.DeleteVertexArrays(1, new[] { _textVao });
                 _textVao = 0;
             }
+            if (_sphereInstanceVbo != 0)
+            {
+                gl.DeleteBuffers(1, new[] { _sphereInstanceVbo });
+                _sphereInstanceVbo = 0;
+            }
+            if (_sphereEbo != 0)
+            {
+                gl.DeleteBuffers(1, new[] { _sphereEbo });
+                _sphereEbo = 0;
+            }
+            if (_sphereVbo != 0)
+            {
+                gl.DeleteBuffers(1, new[] { _sphereVbo });
+                _sphereVbo = 0;
+            }
+            if (_sphereVao != 0)
+            {
+                gl.DeleteVertexArrays(1, new[] { _sphereVao });
+                _sphereVao = 0;
+            }
+            _sphereIndexCount = 0;
             foreach (var cached in _textTextures.Values)
                 if (cached.Texture != 0)
                     gl.DeleteTextures(1, new[] { cached.Texture });
             _textTextures.Clear();
             _textTextureOrder.Clear();
             _textTexturesUsedThisFrame.Clear();
+            foreach (var atlas in _glyphAtlases.Values)
+                if (atlas.Texture != 0)
+                    gl.DeleteTextures(1, new[] { atlas.Texture });
+            _glyphAtlases.Clear();
             _states.Clear();
             _frameStateCaptured = false;
             _hasSceneMatrices = false;

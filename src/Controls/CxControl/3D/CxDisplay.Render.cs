@@ -14,9 +14,16 @@ namespace VisionNet.Controls
             base.DoOpenGLInitialized();
             lock (_renderLock)
             {
-                // A context can be recreated on the same OpenGL wrapper. Drop programs
-                // compiled for the previous context before the first draw.
-                ModernOverlayRenderer.Release(OpenGL);
+                _fboWidth = _fboHeight = -1;
+                // A context can be recreated on the same OpenGL wrapper. Forget all names
+                // belonging to the old context and rebuild active items on the next frame.
+                lock (_resourceLock)
+                {
+                    foreach (var handle in _resourcePool.Values)
+                        handle.ResetForContextRecreate();
+                }
+                while (_pendingRelease.TryDequeue(out _)) { }
+                ModernOverlayRenderer.ResetForContextRecreate(OpenGL);
                 OpenGL.ClearColor(_backColor.R / 255f, _backColor.G / 255f, _backColor.B / 255f, _backColor.A / 255f);
                 OpenGL.PointSize(2.0f);
             }
@@ -36,7 +43,12 @@ namespace VisionNet.Controls
                 var rcp = OpenGL.RenderContextProvider;
                 if (rcp != null && Width > 0 && Height > 0)
                 {
-                    OpenGL.SetDimensions(Width, Height);
+                    if (_fboWidth != Width || _fboHeight != Height)
+                    {
+                        OpenGL.SetDimensions(Width, Height);
+                        _fboWidth = Width;
+                        _fboHeight = Height;
+                    }
                     OpenGL.Viewport(0, 0, Width, Height);
                 }
 
