@@ -14,6 +14,10 @@ using System.Runtime.InteropServices;
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 
+// The test project drives CxItemRegistry (internal) directly, so the pure-CPU regression
+// suite can assert the registry's queue/key/pool semantics without a GL context.
+[assembly: InternalsVisibleTo("CxControl.Tests")]
+
 // 将 ComVisible 设置为 false 会使此程序集中的类型
 //对 COM 组件不可见。如果需要从 COM 访问此程序集中的类型
 //请将此类型的 ComVisible 特性设置为 true。

@@ -6,7 +6,18 @@
 
 ## 未发布（工作区，尚未提交）
 
-（暂无）
+### M4：新增纯 CPU 回归测试项目 `CxControl.Tests`（47 项断言）
+
+- 新增 `Test/CxControl.Tests/`（SDK 风格 csproj，net48，xUnit 2.9.2 + Microsoft.NET.Test.Sdk 17.11.1 + xunit.runner.visualstudio 2.8.2），并加入 `VisionNet.sln`（Test 解决方案文件夹下）。`PlatformTarget=x64`（CxControl 引用的是 AMD64 的 VisionNet）；对 VisionNet 采用 HintPath 引用（与 CxControl 一致，避免与 CxControl 的二进制引用冲突）。
+- `CxControl/Properties/AssemblyInfo.cs` 新增 `[assembly: InternalsVisibleTo("CxControl.Tests")]`，使测试可直接驱动 `CxItemRegistry`（internal）——**本轮唯一的产物侧改动**，纯附加、不影响运行行为。
+- 覆盖（全部不依赖 GL、不做任何渲染）：
+  - `CxItemRegistryTests`（18 项）：新 key 注册；同 key **原位替换并保持槽位**、上报 `dispose=true`；改名**保持槽位**且 `dispose=false`；同实例重复 Set 为空操作；按 key / 按引用移除；清空上报每个条目；`CopyFrameSnapshot` 索引对齐；`ForEachPoolEntry` 遍历完整；`MarkNeedsUpdate`；`GetKeyOf`；`CopyItemsOfType<T>`；`DrainReleases` 恰好一次且 `null` 不入队；overlay 注册/替换/改名不重复/追加/按 key 与按引用移除/清空；`ContainsOverlay`；`CopyOverlayItems` 返回独立副本。
+  - `CxExtensionTests`（11 项）：**新包围盒重载与旧 `ToPoints()` 路径逐项等值**（surface 与 point cloud，含 `-32768` 空洞与全空洞）、空输入返回 `null`、`ComputeWorldZRange`（含模型矩阵与 null box 的 `[-0.5, 0.5]` 兜底）、`GetColorByHeight` 端点、`IEnumerable` 重载忽略 Infinity。
+  - `ComplexGeometryItemTests`（10 项）：`Opacity` 钳制并写入 uniform（且不重建渲染数据）、`SolidColor` 默认 217 灰与就地更新、`PointSize` 默认 2、**`Lit` 在 PointCloud 下也发 `colorMode = 4`（不再回退为 Color）**、颜色模式切换只改 uniform、PointCloud→Mesh 重建带索引数据、Mesh→PointCloud 复用缓存。
+  - `CxMatrix4X4Tests`（5 项）：单位矩阵求逆、平移/缩放/乘法的组合顺序、`GLResourceHandle.ResetForContextRecreate` 清空名称并置 `NeedsUpdate`、uniform 位置缓存。
+- 验证：`dotnet test`（Debug 与 Release）→ **47/47 通过**；`CxControl` 与 `DemoFrom` MSBuild `/t:Rebuild`（Debug/Release）→ 0 错误、0 C# 警告（仅预存在 MSB3270）。
+- 首轮有 3 项断言失败，全部是**测试期望写错**（把 `ComputeWorldZRange` 的 null-box 兜底当成 `0`、忘了平移叠加、把空洞点的 X/Y 跨度算成 0），已按真实语义修正 —— 说明断言不是恒真。
+- 未覆盖：任何 GL / 绘制；以及"后台线程 Set 与渲染并发"的锁竞争（测试单线程、无上下文）。这两项仍需人工回归（见「待验证」第 15 项）。
 
 ## 已提交
 
