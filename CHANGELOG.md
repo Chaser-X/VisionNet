@@ -6,7 +6,11 @@
 
 ## 未发布（工作区，尚未提交）
 
-### 重命名与归档：`ModernOverlayRenderer` → `ModernGLRenderer` @ `3D\RenderItem\Shared\`
+（暂无）
+
+## 已提交
+
+### fe522eb（2026-10-30）重命名：`ModernOverlayRenderer` → `ModernGLRenderer` @ `3D\RenderItem\Shared\`
 
 - 该类型实际服务**全部**渲染项 —— 既服务 `ComplexGeometry` 表面项（`EnsureSurfaceProgram` 提供共享 surface 程序、`UploadSceneMatrices` 上传矩阵、`CaptureState`/`RestoreState` 提供状态作用域），也服务 overlay 项；旧名 `ModernOverlayRenderer` 容易让人误以为只针对叠加层。改名并归入独立文件夹。
 - `3D\RenderItem\` 下的 6 个 partial 文件 → `3D\RenderItem\Shared\ModernGLRenderer{.Geometry,.Text,.Programs,.State,.Matrix}.cs`；`ShaderProgramCompiler.cs` 一并移入同一文件夹（它是这套管线的 shader 编译工具）。
@@ -14,8 +18,6 @@
 - 类的 XML 文档改写：由「Shared renderer for the small, immediate-data overlays」改为「per-context rendering services shared by every render item」，并明确它不只为叠加层服务。
 - **纯重命名 + 文件移动，无行为改动**：除类名与注释/文档外没有其他代码变更。
 - 验证：`CxControl` / `DemoFrom` / `CxControl.Tests` MSBuild `/t:Rebuild`（Debug/Release）→ 0 错误、0 C# 警告（仅预存在 MSB3270）；`dotnet test` → **65/65 通过**（Debug 与 Release）。
-
-## 已提交
 
 ### 0a283a4（2026-10-30）M4 续：测试覆盖扩展到 `CxDisplay` 编排层（+18 项，共 65 项）
 
