@@ -6,7 +6,17 @@
 
 ## 未发布（工作区，尚未提交）
 
-### M4：新增纯 CPU 回归测试项目 `CxControl.Tests`（47 项断言）
+### M4 续：测试覆盖扩展到 `CxDisplay` 编排层（+18 项，共 65 项）
+
+- 新增 `CxDisplayApiTests`（18 项）：在 **STA 线程**上构造真实 `CxDisplay`（不显示、不渲染、不创建 GL 上下文），覆盖 M1 重写的 display 级流程 —— `SetMesh`/`SetSurface` 注册与返回值、同 key 替换、跨类型替换、`SetSurfaceItem(同实例)` 的**改名**与**空操作**（后者断言不 Dispose 调用方实例）、按 key / 按实例移除、`ClearSurfaceItems`；overlay 的 upsert（被替换者被 Dispose）与同实例空操作、按 key 移除、`ClearOverlayItems`；`SurfaceMode`/`SurfaceColorMode` 写穿到每个 item；`Opacity`/`SolidColor` 的逐项隔离；`Groups` 的 Add / Remove / FindGroupOf；`FitView` / `Redraw` 不抛异常；`Dispose` 幂等。
+- 测试项目新增 `SharpGL` / `SharpGL.SceneGraph` / `SharpGL.WinForms` 引用（`CxDisplay` 的基类是 `OpenGLControl`）与 `UseWindowsForms`。
+- 验证：`dotnet test`（Debug 与 Release）→ **65/65 通过**；`CxControl` 与 `DemoFrom` 未受影响。
+- 首轮 2 项失败同样是**测试用错 API**：`SetMesh(data, key)` 每次都会新建 item，因此"改名 / 同实例空操作"只能通过 `SetSurfaceItem(key, item)` 观察；已修正。
+- 仍未覆盖：任何 GL / 绘制（含 M3 拆分的 6 个文件）；并发（测试单线程）。
+
+## 已提交
+
+### fc5a707（2026-10-30）M4：新增纯 CPU 回归测试项目 `CxControl.Tests`（47 项断言）
 
 - 新增 `Test/CxControl.Tests/`（SDK 风格 csproj，net48，xUnit 2.9.2 + Microsoft.NET.Test.Sdk 17.11.1 + xunit.runner.visualstudio 2.8.2），并加入 `VisionNet.sln`（Test 解决方案文件夹下）。`PlatformTarget=x64`（CxControl 引用的是 AMD64 的 VisionNet）；对 VisionNet 采用 HintPath 引用（与 CxControl 一致，避免与 CxControl 的二进制引用冲突）。
 - `CxControl/Properties/AssemblyInfo.cs` 新增 `[assembly: InternalsVisibleTo("CxControl.Tests")]`，使测试可直接驱动 `CxItemRegistry`（internal）——**本轮唯一的产物侧改动**，纯附加、不影响运行行为。
@@ -18,8 +28,6 @@
 - 验证：`dotnet test`（Debug 与 Release）→ **47/47 通过**；`CxControl` 与 `DemoFrom` MSBuild `/t:Rebuild`（Debug/Release）→ 0 错误、0 C# 警告（仅预存在 MSB3270）。
 - 首轮有 3 项断言失败，全部是**测试期望写错**（把 `ComputeWorldZRange` 的 null-box 兜底当成 `0`、忘了平移叠加、把空洞点的 X/Y 跨度算成 0），已按真实语义修正 —— 说明断言不是恒真。
 - 未覆盖：任何 GL / 绘制；以及"后台线程 Set 与渲染并发"的锁竞争（测试单线程、无上下文）。这两项仍需人工回归（见「待验证」第 15 项）。
-
-## 已提交
 
 ### f02bcce（2026-10-30）M1 第 2/3 步：消除 `Sync` / `*InLock`，注册表状态完全私有
 

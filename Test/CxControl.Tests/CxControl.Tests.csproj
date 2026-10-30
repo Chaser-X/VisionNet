@@ -7,6 +7,8 @@
     <IsPackable>false</IsPackable>
     <!-- CxControl references an AMD64 VisionNet, so the test host must be 64-bit too. -->
     <PlatformTarget>x64</PlatformTarget>
+    <!-- CxDisplay derives from a WinForms control. -->
+    <UseWindowsForms>true</UseWindowsForms>
     <NoWarn>$(NoWarn);MSB3270</NoWarn>
   </PropertyGroup>
 
@@ -22,6 +24,19 @@
          needs its own reference to reach the VisionNet.DataType model types. -->
     <Reference Include="VisionNet">
       <HintPath>..\..\bin\Debug\VisionNet.dll</HintPath>
+      <SpecificVersion>False</SpecificVersion>
+    </Reference>
+    <!-- CxDisplay derives from SharpGL's OpenGLControl, so its base type must be referenceable. -->
+    <Reference Include="SharpGL">
+      <HintPath>..\..\3rd\SharpGL.dll</HintPath>
+      <SpecificVersion>False</SpecificVersion>
+    </Reference>
+    <Reference Include="SharpGL.SceneGraph">
+      <HintPath>..\..\3rd\SharpGL.SceneGraph.dll</HintPath>
+      <SpecificVersion>False</SpecificVersion>
+    </Reference>
+    <Reference Include="SharpGL.WinForms">
+      <HintPath>..\..\3rd\SharpGL.WinForms.dll</HintPath>
       <SpecificVersion>False</SpecificVersion>
     </Reference>
   </ItemGroup>
