@@ -189,8 +189,7 @@ namespace VisionNet.Controls
         /// </summary>
         private AbstractRenderItem FindActiveItemHit(CxPoint3D worldPos)
         {
-            IRenderItem[] snapshot;
-            lock (_resourceLock) snapshot = _renderItems.ToArray();
+            IRenderItem[] snapshot = _registry.SnapshotOverlayItems();
             foreach (var item in snapshot)
             {
                 if (!(item is AbstractRenderItem ar) || !ar.IsActiveObj) continue;
@@ -250,14 +249,9 @@ namespace VisionNet.Controls
         /// </summary>
         private (CxPoint3D? Location, float? Intensity) GetNearestSurfacePoint(CxPoint3D world)
         {
-            List<ICxObjRenderItem> snapshot;
-            lock (_resourceLock)
-            {
-                // Reuse a scratch buffer: this runs on every hover frame.
-                _pickSnapshot.Clear();
-                _pickSnapshot.AddRange(_surfaceItems);
-                snapshot = _pickSnapshot;
-            }
+            // Reuse a scratch buffer: this runs on every hover frame.
+            List<ICxObjRenderItem> snapshot = _pickSnapshot;
+            _registry.CopyItemsInto(_pickSnapshot);
 
             if (snapshot.Count == 0) return (null, null);
 
@@ -351,7 +345,7 @@ namespace VisionNet.Controls
             mi.Checked = !mi.Checked;
             _camera.Enable2DView = mi.Checked;
             CxBox3D? combined;
-            lock (_resourceLock) combined = GetCombinedBoundingBox();
+            combined = GetCombinedBoundingBox();
             _camera?.FitView(combined);
         }
 
@@ -363,7 +357,7 @@ namespace VisionNet.Controls
             mi.Checked = true;
             _camera.ViewMode = (ViewMode)Enum.Parse(typeof(ViewMode), mi.Text);
             CxBox3D? combined;
-            lock (_resourceLock) combined = GetCombinedBoundingBox();
+            combined = GetCombinedBoundingBox();
             _camera?.FitView(combined);
         }
 

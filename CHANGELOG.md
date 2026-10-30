@@ -6,7 +6,31 @@
 
 ## 未发布（工作区，尚未提交）
 
-（暂无）
+### M1（第 1 步）：把 surface/overlay 队列与 GL 资源池收进 `CxItemRegistry`
+
+- 新增 `internal sealed class CxItemRegistry`：集中持有 surface 队列 + key 映射、overlay 队列 + key 映射、per-item GL 资源池、延迟释放队列，以及**守护它们的唯一锁**。
+- `CxDisplay` 不再声明这些集合与 `_resourceLock`（`CxDisplay.*` 合计 −72 行）；锁顺序（`_renderLock → registry`）只在 registry 的 XML 注释里声明一次。
+- 需要原子性的复合流程（`SetSurfaceItem` / `RemoveSurfaceItem` / `ClearSurfaceItems` / `SetOverlayItem` / `RemoveOverlayItem` / `ClearOverlayItems` / `DisposeResources` / `ProcessResourcePool` 等，共 13 处）改走 `_registry.Sync(...)`；块内状态访问走 `*InLock` 访问器（53 处）。
+- 所有**锁外**访问改为线程安全的类型化方法：`GetByKey` / `SnapshotItems` / `CopyItems` / `CopyItemsOfType<T>` / `CopyFrameSnapshot` / `GetOverlayByKey` / `SnapshotOverlayItems` / `CopyOverlayItemsInto` / `ContainsOverlay` / `TryGetHandle` / `ForEachPoolHandle` / `EnqueueRelease` / `DrainReleases` / `DropReleases` —— 调用方无法漏加锁。
+- 行为不变：复合流程的步骤顺序逐一保留；`GetCombinedBoundingBox` 改为内部取项快照，因此不再要求调用方持锁（3 处调用点去掉了锁包裹）。
+- 验证：`CxControl` 与 `DemoFrom` MSBuild `/t:Rebuild`（Debug/Release）→ 0 错误、0 C# 警告（仅预存在 MSB3270）；旧标识符（`_resourceLock` / `_surfaceItems` / `_surfaceKeys` / `_resourcePool` / `_pendingRelease` / `_renderItems` / `_overlayKeys`）在 registry 之外**零残留**（已核对）。
+- 未做：第 2/3 步 —— 把 13 处 `Sync(() => { …*InLock… })` 换成目的明确的 registry 方法，并删除 `*InLock` 访问器（届时任何调用方都无法绕过锁）。
+- 未做运行时/OpenGL 验证。
+
+### M3（第 1 步）：`ModernOverlayRenderer` 纯文件移动（partial class）
+
+- 1257 行的 `ModernOverlayRenderer.cs` 拆为 6 个 `partial class` 文件（**零逻辑改动**）：
+  - `ModernOverlayRenderer.cs`（322 行）：嵌套类型、字段、GLSL 源码常量、生命周期（ctor / `For` / `ResetForContextRecreate` / `Release`）、模型栈、场景矩阵、帧窗口（`BeginFrame` / `EndFrame`）。
+  - `ModernOverlayRenderer.Geometry.cs`（135 行）：`Draw` / `DrawScreenGeometry` / `DrawScreenGeometryColored`。
+  - `ModernOverlayRenderer.Text.cs`（386 行）：文本纹理缓存、字形图集、文本绘制；`Project` / `Unproject` 因在源文件中夹在文本方法之间，一并落在此文件。
+  - `ModernOverlayRenderer.Programs.cs`（246 行）：`UploadSceneMatrices` ×2、`GetState`、surface 程序、球体绘制与球体程序/缓冲/网格、geometry/text 的 `Ensure*Program` / `Ensure*Buffers`。
+  - `ModernOverlayRenderer.State.cs`（69 行）：GL 状态快照与应用（`CaptureState` / `RestoreState` / `SetRenderState` / `RestoreRenderState` / `GetDepthWrite`）。
+  - `ModernOverlayRenderer.Matrix.cs`（184 行）：`ReleasePrograms`、矩阵/视口/投影数学（`Multiply4x4` / `Ortho` / `To3D` / `IdentityData` / `RefreshViewport` 等）。
+- 唯一非搬移改动：类声明加 `partial`；每个文件补 usings / namespace / 类头与收尾大括号。
+- **等价性证据（可复现）**：切分脚本在写盘前校验"6 个文件正文拼接 == 原类体"逐行相同；另用独立脚本从 `git show HEAD:<原文件>` 取原类体，与磁盘上 6 个文件的正文再比对一次 → **1342 行逐行相同**。
+- 验证：`CxControl` 与 `DemoFrom` MSBuild `/t:Rebuild`（Debug/Release）→ 0 错误、0 C# 警告（仅预存在 MSB3270）。
+- 未做：第 2 步 —— 把 `Text` / `Programs` / `State` 从 partial 提升为**独立 internal 类**（真正的职责解耦，需要 M4 单测网兜底）。
+- 已知不纯：文件边界取在成员之间的空行，因此 `Text.cs` 含 `Project`/`Unproject`、`Programs.cs` 含球体绘制；第 2 步会做真正的职责切分。
 
 ## 已提交
 

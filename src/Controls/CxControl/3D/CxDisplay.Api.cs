@@ -103,13 +103,13 @@ namespace VisionNet.Controls
             if (item == null)
                 throw new ArgumentNullException(nameof(item));
 
-            CxBox3D? combined;
+            CxBox3D? combined = null;
             bool alreadyRegistered = false;
             lock (_renderLock)
             {
-                lock (_resourceLock)
+                _registry.Sync(() =>
                 {
-                    bool hasOld = _surfaceKeys.TryGetValue(key, out var old);
+                    bool hasOld = _registry.KeysInLock.TryGetValue(key, out var old);
                     if (hasOld && ReferenceEquals(old, item))
                     {
                         // Re-registering the same instance under its own key is a no-op: replacing it
@@ -129,34 +129,34 @@ namespace VisionNet.Controls
                             // Replace in place so the draw order of the remaining items is kept. Group
                             // membership is deliberately left untouched: keyed group leaves keep their
                             // slot and re-bind to this new item (see CxGroupManager.OnSurfaceKeyChanged).
-                            int index = _surfaceItems.IndexOf(old);
+                            int index = _registry.ItemsInLock.IndexOf(old);
                             ReleaseSurfaceItem(old);
-                            if (index >= 0) _surfaceItems[index] = item;
-                            else _surfaceItems.Add(item);
+                            if (index >= 0) _registry.ItemsInLock[index] = item;
+                            else _registry.ItemsInLock.Add(item);
                         }
                         else if (previousIndex >= 0)
                         {
-                            _surfaceItems.Insert(previousIndex, item);
+                            _registry.ItemsInLock.Insert(previousIndex, item);
                         }
                         else
                         {
-                            _surfaceItems.Add(item);
+                            _registry.ItemsInLock.Add(item);
                         }
 
-                        _surfaceKeys[key] = item;
+                        _registry.KeysInLock[key] = item;
 
                         // Subscribe with a per-item delegate stored on the handle, so the dirty flag
                         // can be raised for exactly this item and unsubscribed by the same instance.
                         var handle = new GLResourceHandle { IsValid = false, NeedsUpdate = true };
                         Action onDataChanged = () => OnItemRenderDataChanged(item);
                         handle.RenderDataChangedHandler = onDataChanged;
-                        _resourcePool[item] = handle;
+                        _registry.PoolInLock[item] = handle;
                         item.OnRenderDataChanged += onDataChanged;
 
                         // Only needed for the camera fit; skipped entirely when the caller opts out.
                         combined = autoFit ? GetCombinedBoundingBox() : null;
                     }
-                }
+                });
             }
 
             if (alreadyRegistered) return;
@@ -178,10 +178,7 @@ namespace VisionNet.Controls
         /// <returns>The item, or <c>null</c> when the key is missing or holds another item type.</returns>
         public CxSurfaceItem GetSurface(string key = null)
         {
-            lock (_resourceLock)
-                return _surfaceKeys.TryGetValue(key ?? DefaultSurfaceKey, out var item)
-                    ? item as CxSurfaceItem
-                    : null;
+            return _registry.GetByKey(key ?? DefaultSurfaceKey) as CxSurfaceItem;
         }
 
         /// <summary>Gets the ordered point cloud stored under <paramref name="key"/>.</summary>
@@ -189,10 +186,7 @@ namespace VisionNet.Controls
         /// <returns>The item, or <c>null</c> when the key is missing or holds another item type.</returns>
         public CxPointCloudItem GetPointCloud(string key = null)
         {
-            lock (_resourceLock)
-                return _surfaceKeys.TryGetValue(key ?? DefaultPointCloudKey, out var item)
-                    ? item as CxPointCloudItem
-                    : null;
+            return _registry.GetByKey(key ?? DefaultPointCloudKey) as CxPointCloudItem;
         }
 
         /// <summary>Gets the mesh stored under <paramref name="key"/>.</summary>
@@ -200,10 +194,7 @@ namespace VisionNet.Controls
         /// <returns>The item, or <c>null</c> when the key is missing or holds another item type.</returns>
         public CxMeshItem GetMesh(string key = null)
         {
-            lock (_resourceLock)
-                return _surfaceKeys.TryGetValue(key ?? DefaultMeshKey, out var item)
-                    ? item as CxMeshItem
-                    : null;
+            return _registry.GetByKey(key ?? DefaultMeshKey) as CxMeshItem;
         }
 
         /// <summary>
@@ -214,8 +205,7 @@ namespace VisionNet.Controls
         public ICxObjRenderItem GetSurfaceItem(string key)
         {
             if (string.IsNullOrEmpty(key)) return null;
-            lock (_resourceLock)
-                return _surfaceKeys.TryGetValue(key, out var item) ? item : null;
+            return _registry.GetByKey(key);
         }
         #endregion Surface items - Get (表面对象：查询)
 
@@ -226,15 +216,15 @@ namespace VisionNet.Controls
         {
             lock (_renderLock)
             {
-                lock (_resourceLock)
+                _registry.Sync(() =>
                 {
                     // Keyed group leaves are intentionally kept: a later resource under the same key
                     // re-binds to them (see CxGroupManager).
-                    foreach (var old in _surfaceItems)
+                    foreach (var old in _registry.ItemsInLock)
                         ReleaseSurfaceItem(old);
-                    _surfaceItems.Clear();
-                    _surfaceKeys.Clear();
-                }
+                    _registry.ItemsInLock.Clear();
+                    _registry.KeysInLock.Clear();
+                });
             }
             SafeInvalidate();
         }
@@ -249,16 +239,16 @@ namespace VisionNet.Controls
             bool removed = false;
             lock (_renderLock)
             {
-                lock (_resourceLock)
+                _registry.Sync(() =>
                 {
-                    if (_surfaceKeys.TryGetValue(key, out var item))
+                    if (_registry.KeysInLock.TryGetValue(key, out var item))
                     {
-                        _surfaceKeys.Remove(key);
-                        _surfaceItems.Remove(item);
+                        _registry.KeysInLock.Remove(key);
+                        _registry.ItemsInLock.Remove(item);
                         ReleaseSurfaceItem(item);
                         removed = true;
                     }
-                }
+                });
             }
             if (removed) SafeInvalidate();
             return removed;
@@ -273,15 +263,16 @@ namespace VisionNet.Controls
             bool removed;
             lock (_renderLock)
             {
-                lock (_resourceLock)
+                removed = _registry.Sync(() =>
                 {
-                    removed = _surfaceItems.Remove(item);
-                    if (removed)
+                    bool wasRemoved = _registry.ItemsInLock.Remove(item);
+                    if (wasRemoved)
                     {
                         RemoveKeyForItem(item);
                         ReleaseSurfaceItem(item);
                     }
-                }
+                    return wasRemoved;
+                });
             }
             if (removed) SafeInvalidate();
         }
@@ -294,17 +285,14 @@ namespace VisionNet.Controls
         /// <param name="key">Optional item key; <c>null</c> updates every <see cref="CxSurfaceItem"/>.</param>
         public void SetSurfacePose(CxMatrix4X4 pose, string key = null)
         {
-            lock (_resourceLock)
+            if (key == null)
             {
-                if (key == null)
-                {
-                    foreach (var item in _surfaceItems.OfType<CxSurfaceItem>())
-                        item.ModelMatrix = pose;
-                }
-                else if (_surfaceKeys.TryGetValue(key, out var target) && target is CxSurfaceItem surfaceItem)
-                {
-                    surfaceItem.ModelMatrix = pose;
-                }
+                foreach (var item in _registry.CopyItemsOfType<CxSurfaceItem>())
+                    item.ModelMatrix = pose;
+            }
+            else if (_registry.GetByKey(key) is CxSurfaceItem surfaceItem)
+            {
+                surfaceItem.ModelMatrix = pose;
             }
             SafeInvalidate();
         }
@@ -314,17 +302,14 @@ namespace VisionNet.Controls
         /// <param name="key">Optional item key; <c>null</c> updates every <see cref="CxPointCloudItem"/>.</param>
         public void SetPointCloudPose(CxMatrix4X4 pose, string key = null)
         {
-            lock (_resourceLock)
+            if (key == null)
             {
-                if (key == null)
-                {
-                    foreach (var item in _surfaceItems.OfType<CxPointCloudItem>())
-                        item.ModelMatrix = pose;
-                }
-                else if (_surfaceKeys.TryGetValue(key, out var target) && target is CxPointCloudItem cloudItem)
-                {
-                    cloudItem.ModelMatrix = pose;
-                }
+                foreach (var item in _registry.CopyItemsOfType<CxPointCloudItem>())
+                    item.ModelMatrix = pose;
+            }
+            else if (_registry.GetByKey(key) is CxPointCloudItem cloudItem)
+            {
+                cloudItem.ModelMatrix = pose;
             }
             SafeInvalidate();
         }
@@ -334,17 +319,14 @@ namespace VisionNet.Controls
         /// <param name="key">Optional item key; <c>null</c> updates every <see cref="CxMeshItem"/>.</param>
         public void SetMeshPose(CxMatrix4X4 pose, string key = null)
         {
-            lock (_resourceLock)
+            if (key == null)
             {
-                if (key == null)
-                {
-                    foreach (var item in _surfaceItems.OfType<CxMeshItem>())
-                        item.ModelMatrix = pose;
-                }
-                else if (_surfaceKeys.TryGetValue(key, out var target) && target is CxMeshItem meshItem)
-                {
-                    meshItem.ModelMatrix = pose;
-                }
+                foreach (var item in _registry.CopyItemsOfType<CxMeshItem>())
+                    item.ModelMatrix = pose;
+            }
+            else if (_registry.GetByKey(key) is CxMeshItem meshItem)
+            {
+                meshItem.ModelMatrix = pose;
             }
             SafeInvalidate();
         }
@@ -364,10 +346,7 @@ namespace VisionNet.Controls
         {
             _manualColorRange = (zMin, zMax);
 
-            ICxObjRenderItem[] snapshot;
-            lock (_resourceLock)
-                snapshot = _surfaceItems.ToArray();
-            foreach (var item in snapshot)
+            foreach (var item in _registry.SnapshotItems())
                 if (item != null && !item.IsDisposed)
                     item.SetGlobalZRange(zMin, zMax);
 
@@ -396,10 +375,7 @@ namespace VisionNet.Controls
 
             // Apply immediately to current Diff-mode items; the renderer re-propagates
             // each frame while _manualDiffRange is set.
-            ICxObjRenderItem[] snapshot;
-            lock (_resourceLock)
-                snapshot = _surfaceItems.ToArray();
-            foreach (var item in snapshot)
+            foreach (var item in _registry.SnapshotItems())
                 if (item != null && !item.IsDisposed)
                     item.SetGlobalDiffRange(min, max);
 
@@ -507,9 +483,9 @@ namespace VisionNet.Controls
             bool alreadyRegistered = false;
             lock (_renderLock)
             {
-                lock (_resourceLock)
+                _registry.Sync(() =>
                 {
-                    bool hasOld = _overlayKeys.TryGetValue(key, out var old);
+                    bool hasOld = _registry.OverlayKeysInLock.TryGetValue(key, out var old);
                     if (hasOld && ReferenceEquals(old, item))
                     {
                         // Same instance re-registered under its own key: nothing to replace.
@@ -525,23 +501,23 @@ namespace VisionNet.Controls
 
                         if (hasOld)
                         {
-                            int index = _renderItems.IndexOf(old);
-                            if (index >= 0) _renderItems[index] = item;
-                            else _renderItems.Add(item);
+                            int index = _registry.RenderItemsInLock.IndexOf(old);
+                            if (index >= 0) _registry.RenderItemsInLock[index] = item;
+                            else _registry.RenderItemsInLock.Add(item);
                             replaced = old;
                         }
                         else if (previousIndex >= 0)
                         {
-                            _renderItems.Insert(previousIndex, item);
+                            _registry.RenderItemsInLock.Insert(previousIndex, item);
                         }
                         else
                         {
-                            _renderItems.Add(item);
+                            _registry.RenderItemsInLock.Add(item);
                         }
 
-                        _overlayKeys[key] = item;
+                        _registry.OverlayKeysInLock[key] = item;
                     }
-                }
+                });
             }
 
             if (alreadyRegistered) return;
@@ -566,8 +542,7 @@ namespace VisionNet.Controls
         public AbstractRenderItem GetOverlayItem(string key)
         {
             if (string.IsNullOrEmpty(key)) return null;
-            lock (_resourceLock)
-                return _overlayKeys.TryGetValue(key, out var item) ? item : null;
+            return _registry.GetOverlayByKey(key);
         }
 
         /// <summary>Removes and disposes the overlay item stored under <paramref name="key"/>.</summary>
@@ -579,15 +554,15 @@ namespace VisionNet.Controls
             AbstractRenderItem removed = null;
             lock (_renderLock)
             {
-                lock (_resourceLock)
+                _registry.Sync(() =>
                 {
-                    if (_overlayKeys.TryGetValue(key, out var item))
+                    if (_registry.OverlayKeysInLock.TryGetValue(key, out var item))
                     {
-                        _overlayKeys.Remove(key);
-                        _renderItems.Remove(item);
+                        _registry.OverlayKeysInLock.Remove(key);
+                        _registry.RenderItemsInLock.Remove(item);
                         removed = item;
                     }
-                }
+                });
             }
 
             if (removed == null) return false;
@@ -613,11 +588,12 @@ namespace VisionNet.Controls
             bool removed;
             lock (_renderLock)
             {
-                lock (_resourceLock)
+                removed = _registry.Sync(() =>
                 {
-                    removed = _renderItems.Remove(item);
-                    if (removed) RemoveOverlayKeyForItem(item);
-                }
+                    bool wasRemoved = _registry.RenderItemsInLock.Remove(item);
+                    if (wasRemoved) RemoveOverlayKeyForItem(item);
+                    return wasRemoved;
+                });
             }
 
             if (!removed) return;
@@ -641,7 +617,7 @@ namespace VisionNet.Controls
         {
             if (key == null)
             {
-                lock (_resourceLock) _renderItems.Add(item);
+                _registry.Sync(() => _registry.RenderItemsInLock.Add(item));
                 SafeInvalidate();
                 return;
             }
@@ -652,25 +628,28 @@ namespace VisionNet.Controls
         /// <summary>
         /// Detaches <paramref name="item"/> from the overlay queue and from its key (if any),
         /// returning the index it occupied (or <c>-1</c> when it was not registered).
-        /// Caller must hold <see cref="_resourceLock"/>.
+        /// Caller must hold the registry lock (via <see cref="CxItemRegistry.Sync(Action)"/>).
         /// </summary>
         private int DetachOverlayRegistration(AbstractRenderItem item)
         {
-            int index = _renderItems.IndexOf(item);
+            int index = _registry.RenderItemsInLock.IndexOf(item);
             if (index < 0) return -1;
 
-            _renderItems.RemoveAt(index);
+            _registry.RenderItemsInLock.RemoveAt(index);
             RemoveOverlayKeyForItem(item);
             return index;
         }
 
-        /// <summary>Removes the key entry pointing at <paramref name="item"/>. Caller must hold <see cref="_resourceLock"/>.</summary>
+        /// <summary>
+        /// Removes the key entry pointing at <paramref name="item"/>.
+        /// Caller must hold the registry lock (via <see cref="CxItemRegistry.Sync(Action)"/>).
+        /// </summary>
         private void RemoveOverlayKeyForItem(AbstractRenderItem item)
         {
             string foundKey = null;
-            foreach (var kv in _overlayKeys)
+            foreach (var kv in _registry.OverlayKeysInLock)
                 if (ReferenceEquals(kv.Value, item)) { foundKey = kv.Key; break; }
-            if (foundKey != null) _overlayKeys.Remove(foundKey);
+            if (foundKey != null) _registry.OverlayKeysInLock.Remove(foundKey);
         }
 
         #endregion Overlay items - Key / Get / Remove (叠加层：key 与单项管理)
@@ -687,21 +666,21 @@ namespace VisionNet.Controls
         public void ClearOverlayItems()
         {
             // Drop the selection first, outside the locks: OnDeselected is an external callback and
-            // must not run while _renderLock / _resourceLock are held (the GL thread takes the same
+            // must not run while the render / registry locks are held (the render pass takes the same
             // locks, so a re-entrant callback could deadlock). No-op when nothing is selected.
             ClearSelection();
             _isDraggingItem = false;
 
             lock (_renderLock)
             {
-                lock (_resourceLock)
+                _registry.Sync(() =>
                 {
-                    Groups.ForgetOverlayMembers(_renderItems);
-                    foreach (var item in _renderItems)
+                    Groups.ForgetOverlayMembers(_registry.RenderItemsInLock);
+                    foreach (var item in _registry.RenderItemsInLock)
                         item.Dispose();
-                    _renderItems.Clear();
-                    _overlayKeys.Clear();
-                }
+                    _registry.RenderItemsInLock.Clear();
+                    _registry.OverlayKeysInLock.Clear();
+                });
             }
             SafeInvalidate();
         }
@@ -818,9 +797,7 @@ namespace VisionNet.Controls
         /// </summary>
         public void ActivateAllItems()
         {
-            IRenderItem[] snapshot;
-            lock (_resourceLock) snapshot = _renderItems.ToArray();
-            foreach (var item in snapshot)
+            foreach (var item in _registry.SnapshotOverlayItems())
                 if (item is AbstractRenderItem ar)
                     ar.IsActiveObj = true;
             // IsActiveObj gates the selected-item marker, so a redraw may be needed.
@@ -835,9 +812,7 @@ namespace VisionNet.Controls
         public void DeactivateAllItems()
         {
             ClearSelection();
-            IRenderItem[] snapshot;
-            lock (_resourceLock) snapshot = _renderItems.ToArray();
-            foreach (var item in snapshot)
+            foreach (var item in _registry.SnapshotOverlayItems())
                 if (item is AbstractRenderItem ar)
                     ar.IsActiveObj = false;
         }
@@ -931,9 +906,7 @@ namespace VisionNet.Controls
             CxBox3D? box = viewBox;
             if (box == null)
             {
-                lock (_resourceLock)
-                    box = GetCombinedBoundingBox();
-
+                box = GetCombinedBoundingBox();
                 if (box == null) return;
             }
 
@@ -960,39 +933,39 @@ namespace VisionNet.Controls
         private SurfaceColorMode ResolveColorMode(SurfaceColorMode? colorMode) => colorMode ?? SurfaceColorMode;
 
         /// <summary>
-        /// Removes the key entry that points at <paramref name="item"/>, so
-        /// <see cref="_surfaceKeys"/> stays in sync when an item is removed by handle.
-        /// Caller must hold <see cref="_resourceLock"/>.
+        /// Removes the key entry that points at <paramref name="item"/>, so the key map stays in
+        /// sync when an item is removed by handle.
+        /// Caller must hold the registry lock (via <see cref="CxItemRegistry.Sync(Action)"/>).
         /// </summary>
         private void RemoveKeyForItem(ICxObjRenderItem item)
         {
             string foundKey = null;
-            foreach (var kv in _surfaceKeys)
+            foreach (var kv in _registry.KeysInLock)
                 if (ReferenceEquals(kv.Value, item)) { foundKey = kv.Key; break; }
-            if (foundKey != null) _surfaceKeys.Remove(foundKey);
+            if (foundKey != null) _registry.KeysInLock.Remove(foundKey);
         }
 
         /// <summary>
         /// Detaches <paramref name="item"/> from the surface queue, from its key and from the GL
         /// resource pool (its handle is queued for deferred release), returning the index it
         /// occupied (or <c>-1</c> when it was not registered).
-        /// Caller must hold <see cref="_resourceLock"/>.
+        /// Caller must hold the registry lock (via <see cref="CxItemRegistry.Sync(Action)"/>).
         /// </summary>
         private int DetachSurfaceRegistration(ICxObjRenderItem item)
         {
-            int index = _surfaceItems.IndexOf(item);
+            int index = _registry.ItemsInLock.IndexOf(item);
             if (index < 0) return -1;
 
-            _surfaceItems.RemoveAt(index);
+            _registry.ItemsInLock.RemoveAt(index);
             RemoveKeyForItem(item);
 
-            if (_resourcePool.TryGetValue(item, out var handle))
+            if (_registry.PoolInLock.TryGetValue(item, out var handle))
             {
                 if (handle.RenderDataChangedHandler != null)
                     item.OnRenderDataChanged -= handle.RenderDataChangedHandler;
 
-                _pendingRelease.Enqueue(handle);
-                _resourcePool.Remove(item);
+                _registry.EnqueueRelease(handle);
+                _registry.PoolInLock.Remove(item);
             }
 
             return index;
@@ -1000,18 +973,18 @@ namespace VisionNet.Controls
 
         /// <summary>
         /// Detaches an item's GL resources, event subscription and lifetime.
-        /// Queues the GL handle for deferred release on the render thread.
-        /// Caller must hold <see cref="_resourceLock"/>.
+        /// Queues the GL handle for deferred release on the render pass.
+        /// Caller must hold the registry lock (via <see cref="CxItemRegistry.Sync(Action)"/>).
         /// </summary>
         private void ReleaseSurfaceItem(ICxObjRenderItem item)
         {
-            if (_resourcePool.TryGetValue(item, out var h))
+            if (_registry.PoolInLock.TryGetValue(item, out var h))
             {
                 if (h.RenderDataChangedHandler != null)
                     item.OnRenderDataChanged -= h.RenderDataChangedHandler;
 
-                _pendingRelease.Enqueue(h);
-                _resourcePool.Remove(item);
+                _registry.EnqueueRelease(h);
+                _registry.PoolInLock.Remove(item);
             }
             item.Dispose();
         }
@@ -1025,11 +998,11 @@ namespace VisionNet.Controls
         {
             if (item == null) return;
 
-            lock (_resourceLock)
+            _registry.Sync(() =>
             {
-                if (_resourcePool.TryGetValue(item, out var handle))
+                if (_registry.PoolInLock.TryGetValue(item, out var handle))
                     handle.NeedsUpdate = true;
-            }
+            });
             SafeInvalidate();
         }
         #endregion Internal helpers (内部辅助)

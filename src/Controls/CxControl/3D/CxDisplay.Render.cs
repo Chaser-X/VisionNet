@@ -17,12 +17,8 @@ namespace VisionNet.Controls
                 _fboWidth = _fboHeight = -1;
                 // A context can be recreated on the same OpenGL wrapper. Forget all names
                 // belonging to the old context and rebuild active items on the next frame.
-                lock (_resourceLock)
-                {
-                    foreach (var handle in _resourcePool.Values)
-                        handle.ResetForContextRecreate();
-                }
-                while (_pendingRelease.TryDequeue(out _)) { }
+                _registry.ForEachPoolHandle(handle => handle.ResetForContextRecreate());
+                _registry.DropReleases();
                 ModernOverlayRenderer.ResetForContextRecreate(OpenGL);
                 OpenGL.ClearColor(_backColor.R / 255f, _backColor.G / 255f, _backColor.B / 255f, _backColor.A / 255f);
                 OpenGL.PointSize(2.0f);
@@ -103,8 +99,7 @@ namespace VisionNet.Controls
         /// <summary>Releases all GL resource handles waiting in the deferred-release queue.</summary>
         private void ProcessPendingRelease(OpenGL gl)
         {
-            while (_pendingRelease.TryDequeue(out var handle))
-                ReleaseGLResources(gl, handle);
+            _registry.DrainReleases(handle => ReleaseGLResources(gl, handle));
         }
 
         /// <summary>
@@ -115,9 +110,9 @@ namespace VisionNet.Controls
         {
             _failedItems.Clear();
 
-            lock (_resourceLock)
+            _registry.Sync(() =>
             {
-                foreach (var kv in _resourcePool)
+                foreach (var kv in _registry.PoolInLock)
                 {
                     var item   = kv.Key;
                     var handle = kv.Value;
@@ -136,11 +131,11 @@ namespace VisionNet.Controls
                         CreateGLResources(gl, item, handle);
                     }
                 }
-            }
+            });
 
             // Report failures outside the lock and outside the pool enumeration: a handler may
             // legitimately call back into the display (e.g. to drop the failing item), which would
-            // otherwise mutate _resourcePool while it is being iterated.
+            // otherwise mutate the pool while it is being iterated.
             if (_failedItems.Count == 0) return;
 
             foreach (var failed in _failedItems)
@@ -168,18 +163,10 @@ namespace VisionNet.Controls
 
             // Snapshot under lock so GL calls are issued without holding it.
             List<ICxObjRenderItem> snapshot;
-            lock (_resourceLock)
-            {
-                _surfaceSnapshot.Clear();
-                _surfaceSnapshot.AddRange(_surfaceItems);
-
-                // Resolve every handle once per frame (index-aligned) instead of locking per item.
-                _handleSnapshot.Clear();
-                foreach (var item in _surfaceSnapshot)
-                    _handleSnapshot.Add(_resourcePool.TryGetValue(item, out var h) ? h : null);
-
-                snapshot = _surfaceSnapshot;
-            }
+            // Fill the frame snapshots (items + index-aligned handles) atomically; they are
+            // consumed after the registry lock has been released.
+            _registry.CopyFrameSnapshot(_surfaceSnapshot, _handleSnapshot);
+            snapshot = _surfaceSnapshot;
 
             // Phase 1 — aggregate global Z and diff ranges, and track whether all items share
             // a single SurfaceColorMode (the colour bar is hidden when modes differ).
@@ -270,11 +257,7 @@ namespace VisionNet.Controls
             }
 
             // Phase 4 — overlay geometry (segments, points, polygons, etc.).
-            lock (_resourceLock)
-            {
-                _overlaySnapshot.Clear();
-                _overlaySnapshot.AddRange(_renderItems);
-            }
+            _registry.CopyOverlayItemsInto(_overlaySnapshot);
             foreach (var item in _overlaySnapshot)
                 item.Draw(gl);
 

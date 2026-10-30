@@ -124,6 +124,11 @@
     <Compile Include="3D\RenderItem\ICxGroupMember.cs" />
     <Compile Include="3D\RenderItem\ShaderProgramCompiler.cs" />
     <Compile Include="3D\RenderItem\ModernOverlayRenderer.cs" />
+    <Compile Include="3D\RenderItem\ModernOverlayRenderer.Geometry.cs" />
+    <Compile Include="3D\RenderItem\ModernOverlayRenderer.Text.cs" />
+    <Compile Include="3D\RenderItem\ModernOverlayRenderer.Programs.cs" />
+    <Compile Include="3D\RenderItem\ModernOverlayRenderer.State.cs" />
+    <Compile Include="3D\RenderItem\ModernOverlayRenderer.Matrix.cs" />
     <Compile Include="3D\RenderItem\ComplexGeometry\Enums.cs" />
     <Compile Include="3D\RenderItem\ComplexGeometry\ICxObjRenderItem.cs" />
     <Compile Include="3D\RenderItem\ComplexGeometry\AbstractCxObjRenderItem.cs" />
@@ -145,6 +150,7 @@
     <Compile Include="3D\CxExtension.cs" />
     <Compile Include="3D\CxGroup.cs" />
     <Compile Include="3D\CxGroupManager.cs" />
+    <Compile Include="3D\CxItemRegistry.cs" />
     <!-- 2D display control -->
     <Compile Include="2D\CxDisplay2D.cs">
       <SubType>UserControl</SubType>

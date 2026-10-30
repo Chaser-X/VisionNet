@@ -26,20 +26,19 @@ namespace VisionNet.Controls
         internal ICxObjRenderItem ResolveSurfaceItem(string key)
         {
             if (string.IsNullOrEmpty(key)) return null;
-            lock (_resourceLock)
-                return _surfaceKeys.TryGetValue(key, out var item) ? item : null;
+            return _registry.GetByKey(key);
         }
 
         /// <summary>Gets the key <paramref name="item"/> is currently registered under, or <c>null</c>.</summary>
         internal string GetSurfaceKeyOf(ICxObjRenderItem item)
         {
             if (item == null) return null;
-            lock (_resourceLock)
+            return _registry.Sync(() =>
             {
-                foreach (var kv in _surfaceKeys)
+                foreach (var kv in _registry.KeysInLock)
                     if (ReferenceEquals(kv.Value, item)) return kv.Key;
-            }
-            return null;
+                return null;
+            });
         }
 
 
@@ -47,7 +46,7 @@ namespace VisionNet.Controls
         internal bool ContainsOverlayItem(AbstractRenderItem item)
         {
             if (item == null) return false;
-            lock (_resourceLock) return _renderItems.Contains(item);
+            return _registry.ContainsOverlay(item);
         }
 
         #endregion Key lookups for the group manager (组管理只读查询)

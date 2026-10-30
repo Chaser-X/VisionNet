@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Numerics;
@@ -26,10 +25,10 @@ namespace VisionNet.Controls
         private bool               _isDraggingItem   = false;
         private CxPoint3D?         _lastDragWorldPos = null;
 
-        // ── GL resource pool (all GL objects owned here; items hold only CPU data) ─
-        private readonly Dictionary<ICxObjRenderItem, GLResourceHandle> _resourcePool
-            = new Dictionary<ICxObjRenderItem, GLResourceHandle>();
-        private readonly object _resourceLock = new object();
+        // ── Item registry (surface + overlay queues, keys, GL resource pool) ─────
+        // Every mutable item collection lives here, behind one lock owned by the registry.
+        private readonly CxItemRegistry _registry = new CxItemRegistry();
+
         // Serializes a frame with item disposal and snapshot cleanup. The render
         // snapshots are intentionally reused, so clearing or disposing their
         // members while the GL thread is iterating them is not safe.
@@ -39,30 +38,14 @@ namespace VisionNet.Controls
         private int _fboWidth = -1;
         private int _fboHeight = -1;
 
-        // Resources dequeued by Dispose/Replace that must be freed inside the GL thread.
-        private readonly ConcurrentQueue<GLResourceHandle> _pendingRelease
-            = new ConcurrentQueue<GLResourceHandle>();
-
         // Items whose shader failed while processing the resource pool this frame. Collected during
         // the locked pass and reported through RenderItemFailed once the lock has been released, so
         // handlers may safely call back into the display. Render-thread only.
         private readonly List<ICxObjRenderItem> _failedItems = new List<ICxObjRenderItem>();
 
-        // ── Render item lists ────────────────────────────────────────────────────
-        private readonly List<ICxObjRenderItem> _surfaceItems = new List<ICxObjRenderItem>();
-        // Maps each caller-supplied key to the item currently stored under it. Kept in sync
-        // with _surfaceItems under _resourceLock; a key is unique across all three item types
-        // (Surface / PointCloud / Mesh), so setting an existing key replaces whatever is there.
-        private readonly Dictionary<string, ICxObjRenderItem> _surfaceKeys
-            = new Dictionary<string, ICxObjRenderItem>(StringComparer.Ordinal);
-        private readonly List<IRenderItem>      _renderItems  = new List<IRenderItem>();
-        // Maps each overlay key to its item. A namespace of its own: overlay keys never collide
-        // with surface keys, and only items registered with a key appear here.
-        private readonly Dictionary<string, AbstractRenderItem> _overlayKeys
-            = new Dictionary<string, AbstractRenderItem>(StringComparer.Ordinal);
-        // Render-thread snapshots are reused between frames. The lists are filled
-        // under _resourceLock and then consumed after the lock is released, so a
-        // drag/resize does not allocate a new list or array on every paint.
+        // ── Frame snapshots ─────────────────────────────────────────────────────
+        // Reused between frames: filled from the registry (under its lock) and then consumed
+        // after the lock is released, so a drag/resize allocates no list per paint.
         private readonly List<ICxObjRenderItem> _surfaceSnapshot = new List<ICxObjRenderItem>();
         // GL handles aligned by index with _surfaceSnapshot, so the draw loop needs no per-item lock.
         private readonly List<GLResourceHandle> _handleSnapshot = new List<GLResourceHandle>();
@@ -152,8 +135,7 @@ namespace VisionNet.Controls
             set
             {
                 if (_surfaceMode != value) { _surfaceMode = value; UpdateMenuItems(); }
-                List<ICxObjRenderItem> snapshot;
-                lock (_resourceLock) snapshot = new List<ICxObjRenderItem>(_surfaceItems);
+                var snapshot = _registry.CopyItems();
                 foreach (var item in snapshot)
                     if (!item.IsDisposed) item.SurfaceMode = value;
             }
@@ -169,8 +151,7 @@ namespace VisionNet.Controls
             set
             {
                 if (_surfaceColorMode != value) { _surfaceColorMode = value; UpdateMenuItems(); }
-                List<ICxObjRenderItem> snapshot;
-                lock (_resourceLock) snapshot = new List<ICxObjRenderItem>(_surfaceItems);
+                var snapshot = _registry.CopyItems();
                 foreach (var item in snapshot)
                     if (!item.IsDisposed) item.SurfaceColorMode = value;
             }
@@ -329,7 +310,6 @@ namespace VisionNet.Controls
         /// accounting for each item's model matrix (pose). The eight corners of each item's
         /// local bounding box are transformed and the union is accumulated.
         /// Returns <c>null</c> when no items are loaded or none have a valid bounding box.
-        /// Caller must hold <see cref="_resourceLock"/>.
         /// </summary>
         private CxBox3D? GetCombinedBoundingBox()
         {
@@ -337,7 +317,7 @@ namespace VisionNet.Controls
             float maxX = float.MinValue, maxY = float.MinValue, maxZ = float.MinValue;
             bool any = false;
 
-            foreach (var item in _surfaceItems)
+            foreach (var item in _registry.SnapshotItems())
             {
                 var bb = item.BoundingBox;
                 if (bb == null) continue;
@@ -399,39 +379,37 @@ namespace VisionNet.Controls
             lock (_renderLock)
             {
                 if (gl != null)
-                    while (_pendingRelease.TryDequeue(out var p)) ReleaseGLResources(gl, p);
+                    _registry.DrainReleases(p => ReleaseGLResources(gl, p));
 
-                lock (_resourceLock)
+                _registry.Sync(() =>
                 {
                     Groups.Clear();
-                    foreach (var item in _surfaceItems)
+                    foreach (var item in _registry.ItemsInLock)
                     {
-                        if (_resourcePool.TryGetValue(item, out var h))
+                        if (_registry.PoolInLock.TryGetValue(item, out var h))
                         {
                             if (h.RenderDataChangedHandler != null)
                                 item.OnRenderDataChanged -= h.RenderDataChangedHandler;
 
                             if (gl != null) ReleaseGLResources(gl, h);
-                            _resourcePool.Remove(item);
+                            _registry.PoolInLock.Remove(item);
                         }
                         item.Dispose();
                     }
-                    _surfaceItems.Clear();
-                    _surfaceKeys.Clear();
-                }
+                    _registry.ItemsInLock.Clear();
+                    _registry.KeysInLock.Clear();
 
-                lock (_resourceLock)
-                {
-                    _overlayKeys.Clear();
-                    while (_renderItems.Count > 0)
+                    _registry.OverlayKeysInLock.Clear();
+                    var overlayItems = _registry.RenderItemsInLock;
+                    while (overlayItems.Count > 0)
                     {
-                        _renderItems[0].Dispose();
-                        _renderItems.RemoveAt(0);
+                        overlayItems[0].Dispose();
+                        overlayItems.RemoveAt(0);
                     }
                     _surfaceSnapshot.Clear();
                     _handleSnapshot.Clear();
                     _overlaySnapshot.Clear();
-                }
+                });
 
                 ModernOverlayRenderer.Release(gl);
             }
