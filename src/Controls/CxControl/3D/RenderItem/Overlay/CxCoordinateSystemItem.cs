@@ -50,7 +50,7 @@ namespace VisionNet.Controls
 
         public void DrawScreenPositionedAxes(OpenGL gl)
         {
-            var renderer = ModernOverlayRenderer.For(gl);
+            var renderer = ModernGLRenderer.For(gl);
             renderer.EnsureSceneMatrices(gl);
             float[] mv = renderer.SceneView;
             const float ox = 50f, oy = 50f, length = 42f;
@@ -108,7 +108,7 @@ namespace VisionNet.Controls
 
         private void DrawAxis(OpenGL gl, float[] mesh, CxVector3D direction, Color color, string label)
         {
-            var renderer = ModernOverlayRenderer.For(gl);
+            var renderer = ModernGLRenderer.For(gl);
             renderer.Draw(gl, OpenGL.GL_TRIANGLES,
                 mesh, color);
             var tip = Add(_coordination.Origin, Scale(direction, _axisLength));

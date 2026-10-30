@@ -144,7 +144,7 @@ namespace VisionNet.Controls
                 positions[offset++] = seg.Start.X; positions[offset++] = seg.Start.Y; positions[offset++] = seg.Start.Z;
                 positions[offset++] = seg.End.X; positions[offset++] = seg.End.Y; positions[offset++] = seg.End.Z;
             }
-            var renderer = ModernOverlayRenderer.For(gl);
+            var renderer = ModernGLRenderer.For(gl);
             renderer.Draw(gl, OpenGL.GL_LINES, positions, DrawColor, Size);
 
             // Endpoint markers on the hit segment when active and selected.

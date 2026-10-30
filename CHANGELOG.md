@@ -6,15 +6,24 @@
 
 ## 未发布（工作区，尚未提交）
 
-### M4 续：测试覆盖扩展到 `CxDisplay` 编排层（+18 项，共 65 项）
+### 重命名与归档：`ModernOverlayRenderer` → `ModernGLRenderer` @ `3D\RenderItem\Shared\`
+
+- 该类型实际服务**全部**渲染项 —— 既服务 `ComplexGeometry` 表面项（`EnsureSurfaceProgram` 提供共享 surface 程序、`UploadSceneMatrices` 上传矩阵、`CaptureState`/`RestoreState` 提供状态作用域），也服务 overlay 项；旧名 `ModernOverlayRenderer` 容易让人误以为只针对叠加层。改名并归入独立文件夹。
+- `3D\RenderItem\` 下的 6 个 partial 文件 → `3D\RenderItem\Shared\ModernGLRenderer{.Geometry,.Text,.Programs,.State,.Matrix}.cs`；`ShaderProgramCompiler.cs` 一并移入同一文件夹（它是这套管线的 shader 编译工具）。
+- 类名替换：全项目 **40 处引用**（19 个调用文件 + 6 个 partial 自身），残留 **0**；`CxControl.csproj` 的 7 个 `Compile Include` 同步；README 架构树补出 `RenderItem/Shared/` 一行；CHANGELOG「架构现状」补出 `ModernGLRenderer` 与 `CxItemRegistry` 两项，并注明旧名易误导。
+- 类的 XML 文档改写：由「Shared renderer for the small, immediate-data overlays」改为「per-context rendering services shared by every render item」，并明确它不只为叠加层服务。
+- **纯重命名 + 文件移动，无行为改动**：除类名与注释/文档外没有其他代码变更。
+- 验证：`CxControl` / `DemoFrom` / `CxControl.Tests` MSBuild `/t:Rebuild`（Debug/Release）→ 0 错误、0 C# 警告（仅预存在 MSB3270）；`dotnet test` → **65/65 通过**（Debug 与 Release）。
+
+## 已提交
+
+### 0a283a4（2026-10-30）M4 续：测试覆盖扩展到 `CxDisplay` 编排层（+18 项，共 65 项）
 
 - 新增 `CxDisplayApiTests`（18 项）：在 **STA 线程**上构造真实 `CxDisplay`（不显示、不渲染、不创建 GL 上下文），覆盖 M1 重写的 display 级流程 —— `SetMesh`/`SetSurface` 注册与返回值、同 key 替换、跨类型替换、`SetSurfaceItem(同实例)` 的**改名**与**空操作**（后者断言不 Dispose 调用方实例）、按 key / 按实例移除、`ClearSurfaceItems`；overlay 的 upsert（被替换者被 Dispose）与同实例空操作、按 key 移除、`ClearOverlayItems`；`SurfaceMode`/`SurfaceColorMode` 写穿到每个 item；`Opacity`/`SolidColor` 的逐项隔离；`Groups` 的 Add / Remove / FindGroupOf；`FitView` / `Redraw` 不抛异常；`Dispose` 幂等。
 - 测试项目新增 `SharpGL` / `SharpGL.SceneGraph` / `SharpGL.WinForms` 引用（`CxDisplay` 的基类是 `OpenGLControl`）与 `UseWindowsForms`。
 - 验证：`dotnet test`（Debug 与 Release）→ **65/65 通过**；`CxControl` 与 `DemoFrom` 未受影响。
 - 首轮 2 项失败同样是**测试用错 API**：`SetMesh(data, key)` 每次都会新建 item，因此"改名 / 同实例空操作"只能通过 `SetSurfaceItem(key, item)` 观察；已修正。
 - 仍未覆盖：任何 GL / 绘制（含 M3 拆分的 6 个文件）；并发（测试单线程）。
-
-## 已提交
 
 ### fc5a707（2026-10-30）M4：新增纯 CPU 回归测试项目 `CxControl.Tests`（47 项断言）
 
@@ -206,17 +215,19 @@
 
 **分层**
 
-- `CxDisplay`（partial）：渲染管线（`CxDisplay.Render.cs`）、GL 资源生命周期（`CxDisplay.GLResources.cs` + `_resourcePool` / `_pendingRelease`）、表面队列与 key（`_surfaceItems` / `_surfaceKeys`）、叠加层队列（`_renderItems`）、输入与拾取（`CxDisplay.Input.cs`）。
+- `CxDisplay`（partial）：渲染管线（`CxDisplay.Render.cs`）、GL 资源生命周期（`CxDisplay.GLResources.cs`）、表面与叠加层队列 / key / GL 池（全部收在 `CxItemRegistry` 内，见 `CxDisplay.cs` 的 `_registry`）、输入与拾取（`CxDisplay.Input.cs`）。
+- `CxItemRegistry`（`3D\CxItemRegistry.cs`）：**唯一**持有 surface 队列 + key、overlay 队列 + key、per-item GL 池与延迟释放队列，以及守护它们的锁；对外只暴露类型化方法，绕锁访问在编译期不可能。
 - `CxGroupManager`（经 `CxDisplay.Groups` 访问）：组拓扑 + 成员关系 + 姿态；surface 成员按 key 解析、overlay 按引用。
 - `CxGroup` / `CxGroupLeaf`：纯数据结构（叶子只存 key 或直接引用 + 局部姿态），遍历与姿态运算都在 manager 里。
 - RenderItem：`CxSurfaceItem` / `CxMeshItem` / `CxPointCloudItem`（`ICxObjRenderItem`）与 `AbstractRenderItem` 派生叠加项。
+- `3D\RenderItem\Shared\ModernGLRenderer`（6 个 partial 文件）：**全部渲染项共用**的 per-context GL 服务 —— GLSL 程序（geometry / text / surface / sphere）+ 可复用 VAO/VBO、文本纹理与字形图集缓存、GL 状态快照（`CaptureState` / `RestoreState`）、相机矩阵与模型栈、CPU 侧 project/unproject；`ShaderProgramCompiler` 是它的 shader 编译工具。（旧名 `ModernOverlayRenderer` 容易让人误以为只服务叠加层，已改名。）
 
 **线程与锁**
 
 - 锁顺序恒为 `_renderLock → _resourceLock`；渲染为**按需刷新**（`SafeInvalidate()`，`RenderTrigger = Manual`，无渲染定时器）。
 - 渲染发生在 **UI 线程**（SharpGL 在 `OnPaint` 中绘制并 `MakeCurrent`），因此 `glReadPixels` / `glGetInteger` 等只能出现在渲染帧内 —— 悬停拾取为此改为帧内延迟执行（Phase 4b）。
 - 组 API 跨线程调用会 `BeginInvoke` 到 UI 线程（返回值按现有约定为 `false` / `null`）。
-- GL 删除只能在渲染帧内：surface 走 `_pendingRelease` 队列延迟释放；overlay 的 GL 对象由共享 `ModernOverlayRenderer` 持有（item 只持有托管数组）。
+- GL 删除只能在渲染帧内：surface 走 `_pendingRelease` 队列延迟释放；overlay 的 GL 对象由共享 `ModernGLRenderer` 持有（item 只持有托管数组）。
 
 **已知坑**
 

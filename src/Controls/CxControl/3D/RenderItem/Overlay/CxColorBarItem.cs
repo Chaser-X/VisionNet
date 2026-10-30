@@ -52,7 +52,7 @@ namespace VisionNet.Controls
             int startY    = (gl.RenderContextProvider.Height - barHeight) / 2;
             const int divisions = 7;
 
-            var renderer = ModernOverlayRenderer.For(gl);
+            var renderer = ModernGLRenderer.For(gl);
             bool geometryChanged = !_hasCachedGeometry
                 || _cachedZMin != _zMin
                 || _cachedZMax != _zMax

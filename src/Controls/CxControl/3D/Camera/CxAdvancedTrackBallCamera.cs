@@ -474,7 +474,7 @@ namespace VisionNet.Controls
             gl.Viewport(0, 0, _glControl.Width, _glControl.Height);
             float[] projection, view;
             GetMatrices(_glControl.Width, _glControl.Height, out projection, out view);
-            ModernOverlayRenderer.For(gl).SetSceneMatrices(projection, view);
+            ModernGLRenderer.For(gl).SetSceneMatrices(projection, view);
 
             // Preserve the ICamera contract for callers that still issue fixed-
             // function draw calls after applying the camera. CxDisplay itself uses
@@ -533,7 +533,7 @@ namespace VisionNet.Controls
 
             float[] projection, view;
             GetMatrices(_glControl.Width, _glControl.Height, out projection, out view);
-            var renderer = ModernOverlayRenderer.For(gl);
+            var renderer = ModernGLRenderer.For(gl);
             renderer.SetSceneMatrices(projection, view);
             CxPoint3D world;
             if (!renderer.Unproject(gl, screenX, adjustedY, depth, out world)) return null;

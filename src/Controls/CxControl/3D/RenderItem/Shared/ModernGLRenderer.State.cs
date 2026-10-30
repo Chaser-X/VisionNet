@@ -9,7 +9,7 @@ using VisionNet.DataType;
 
 namespace VisionNet.Controls
 {
-    internal sealed partial class ModernOverlayRenderer
+    internal sealed partial class ModernGLRenderer
     {
 
         /// <summary>Reads mutable GL state that overlay draws temporarily change.</summary>

@@ -34,7 +34,7 @@ namespace VisionNet.Controls
             if (Planes == null || Planes.Length == 0) return;
 
             PushModelMatrix(gl);
-            var renderer = ModernOverlayRenderer.For(gl);
+            var renderer = ModernGLRenderer.For(gl);
             int required = Planes.Length * 18;
             if (_positionsBuffer.Length != required)
                 _positionsBuffer = new float[required];

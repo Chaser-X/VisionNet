@@ -33,7 +33,7 @@ namespace VisionNet.Controls
             if (TextItems == null || TextItems.Length == 0) return;
 
             int vpHeight = gl.RenderContextProvider.Height;
-            var renderer = ModernOverlayRenderer.For(gl);
+            var renderer = ModernGLRenderer.For(gl);
             foreach (var item in TextItems)
             {
                 // Convert Y from top-origin to bottom-origin (OpenGL convention).

@@ -32,7 +32,7 @@ namespace VisionNet.Controls
             if (TextInfos == null || TextInfos.Length == 0) return;
 
             PushModelMatrix(gl);
-            var renderer = ModernOverlayRenderer.For(gl);
+            var renderer = ModernGLRenderer.For(gl);
             foreach (var info in TextInfos)
             {
                 float sx, sy, sz;

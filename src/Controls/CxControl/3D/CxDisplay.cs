@@ -399,7 +399,7 @@ namespace VisionNet.Controls
                 _handleSnapshot.Clear();
                 _overlaySnapshot.Clear();
 
-                ModernOverlayRenderer.Release(gl);
+                ModernGLRenderer.Release(gl);
             }
         }
     }

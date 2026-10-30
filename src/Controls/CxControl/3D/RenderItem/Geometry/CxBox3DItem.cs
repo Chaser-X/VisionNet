@@ -161,7 +161,7 @@ namespace VisionNet.Controls
             if (Box3Ds == null || Box3Ds.Length == 0) return;
 
             PushModelMatrix(gl);
-            var renderer = ModernOverlayRenderer.For(gl);
+            var renderer = ModernGLRenderer.For(gl);
             int triangleLength = Box3Ds.Length * TriangleVertexIndices.Length * 3;
             int edgeLength = Box3Ds.Length * EdgeVertexIndices.Length * 3;
             if (_trianglesBuffer.Length != triangleLength)

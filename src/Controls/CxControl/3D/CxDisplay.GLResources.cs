@@ -36,7 +36,7 @@ namespace VisionNet.Controls
             {
                 if (IsSharedSurfaceShader(data.ShaderSource))
                 {
-                    var renderer = ModernOverlayRenderer.For(gl);
+                    var renderer = ModernGLRenderer.For(gl);
                     if (renderer.EnsureSurfaceProgram(gl))
                     {
                         handle.ShaderProgram = renderer.SurfaceProgram;

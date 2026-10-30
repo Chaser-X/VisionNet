@@ -136,7 +136,7 @@ namespace VisionNet.Controls
             if (Polygon3Ds == null || Polygon3Ds.Length == 0) return;
 
             PushModelMatrix(gl);
-            var renderer = ModernOverlayRenderer.For(gl);
+            var renderer = ModernGLRenderer.For(gl);
             if (_polygonBuffers.Length != Polygon3Ds.Length)
                 _polygonBuffers = new float[Polygon3Ds.Length][];
             for (int polygonIndex = 0; polygonIndex < Polygon3Ds.Length; polygonIndex++)

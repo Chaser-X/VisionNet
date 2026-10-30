@@ -10,15 +10,22 @@ using VisionNet.DataType;
 namespace VisionNet.Controls
 {
     /// <summary>
-    /// Shared renderer for the small, immediate-data overlays used by <see cref="CxDisplay"/>.
-    ///
-    /// The renderer owns the GLSL programs and reusable VAO/VBO pairs used by geometry
-    /// and text. Overlay items only provide CPU-side vertices; they do not create or
-    /// destroy per-item GL objects and never call the legacy Begin/End or matrix-stack API.
-    /// One instance is kept for each <see cref="OpenGL"/> wrapper because all GL object
-    /// names are local to the wrapper's current context.
+    /// Per-OpenGL-context rendering services shared by every render item: the GLSL programs
+    /// (geometry, text, surface, sphere) with their reusable VAO/VBO pairs, the text-texture and
+    /// glyph-atlas caches, the GL state snapshot helpers, the camera matrices and model stack,
+    /// and the CPU-side project/unproject helpers.
     /// </summary>
-    internal sealed partial class ModernOverlayRenderer
+    /// <remarks>
+    /// Items only provide CPU-side vertices; they never create or destroy GL objects and never
+    /// call the legacy Begin/End or matrix-stack API. One instance is kept for each
+    /// <see cref="OpenGL"/> wrapper because all GL object names are local to the wrapper's current
+    /// context.
+    /// <para>This type is deliberately not overlay-specific: the built-in surface items acquire
+    /// their shared shader program from it (<see cref="EnsureSurfaceProgram"/>) and upload their
+    /// matrices through it (<see cref="UploadSceneMatrices(OpenGL, GLResourceHandle, CxMatrix4X4)"/>),
+    /// and it also owns the GL state scope both kinds of item use.</para>
+    /// </remarks>
+    internal sealed partial class ModernGLRenderer
     {
         /// <summary>Stores the model-matrix stack for one GL wrapper.</summary>
         private sealed class State
@@ -43,8 +50,8 @@ namespace VisionNet.Controls
         // Access to the wrapper-to-renderer map is synchronized because resource
         // disposal can happen on a UI/lifecycle callback while drawing is in progress.
         private static readonly object Sync = new object();
-        private static readonly Dictionary<OpenGL, ModernOverlayRenderer> Instances
-            = new Dictionary<OpenGL, ModernOverlayRenderer>();
+        private static readonly Dictionary<OpenGL, ModernGLRenderer> Instances
+            = new Dictionary<OpenGL, ModernGLRenderer>();
 
         // The stack is kept per wrapper even though the normal CxDisplay path uses one
         // wrapper per renderer. This also keeps custom overlay callers isolated.
@@ -213,20 +220,20 @@ void main() { FragColor = vertexColor; }";
 
         // Instances are created through For so a caller cannot accidentally share
         // GL handles between unrelated contexts.
-        private ModernOverlayRenderer() { }
+        private ModernGLRenderer() { }
 
         /// <summary>
         /// Returns the renderer associated with <paramref name="gl"/>, creating it
         /// lazily before the first overlay draw.
         /// </summary>
-        internal static ModernOverlayRenderer For(OpenGL gl)
+        internal static ModernGLRenderer For(OpenGL gl)
         {
             lock (Sync)
             {
-                ModernOverlayRenderer renderer;
+                ModernGLRenderer renderer;
                 if (!Instances.TryGetValue(gl, out renderer))
                 {
-                    renderer = new ModernOverlayRenderer();
+                    renderer = new ModernGLRenderer();
                     Instances.Add(gl, renderer);
                 }
                 return renderer;
@@ -253,7 +260,7 @@ void main() { FragColor = vertexColor; }";
             if (gl == null) return;
             lock (Sync)
             {
-                ModernOverlayRenderer renderer;
+                ModernGLRenderer renderer;
                 if (!Instances.TryGetValue(gl, out renderer)) return;
                 Instances.Remove(gl);
                 // Program names are only meaningful in the context in which they

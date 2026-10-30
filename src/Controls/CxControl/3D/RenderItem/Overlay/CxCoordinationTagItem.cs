@@ -42,7 +42,7 @@ namespace VisionNet.Controls
         {
             if (!Visible) return;
 
-            var renderer = ModernOverlayRenderer.For(gl);
+            var renderer = ModernGLRenderer.For(gl);
             float sx, sy, sz;
             if (!renderer.Project(gl, Point.X, Point.Y, Point.Z, out sx, out sy, out sz)) return;
             if (sx < 0 || sx > gl.RenderContextProvider.Width || sy < 0 || sy > gl.RenderContextProvider.Height)

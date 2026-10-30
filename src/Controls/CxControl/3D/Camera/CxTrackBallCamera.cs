@@ -228,7 +228,7 @@ namespace VisionNet.Controls
             gl.Viewport(0, 0, _glControl.Width, _glControl.Height);
             float[] projection, view;
             GetMatrices(_glControl.Width, _glControl.Height, out projection, out view);
-            ModernOverlayRenderer.For(gl).SetSceneMatrices(projection, view);
+            ModernGLRenderer.For(gl).SetSceneMatrices(projection, view);
         }
 
         /// <summary>Computes the modern row-major projection and view matrices.</summary>
@@ -372,7 +372,7 @@ namespace VisionNet.Controls
 
             float[] projection, view;
             GetMatrices(_glControl.Width, _glControl.Height, out projection, out view);
-            var renderer = ModernOverlayRenderer.For(gl);
+            var renderer = ModernGLRenderer.For(gl);
             renderer.SetSceneMatrices(projection, view);
             CxPoint3D world;
             if (!renderer.Unproject(gl, mouseX, adjustedY, depth, out world)) return null;

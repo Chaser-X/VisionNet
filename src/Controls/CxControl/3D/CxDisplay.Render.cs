@@ -19,7 +19,7 @@ namespace VisionNet.Controls
                 // belonging to the old context and rebuild active items on the next frame.
                 _registry.ForEachPoolHandle(handle => handle.ResetForContextRecreate());
                 _registry.DropReleases();
-                ModernOverlayRenderer.ResetForContextRecreate(OpenGL);
+                ModernGLRenderer.ResetForContextRecreate(OpenGL);
                 OpenGL.ClearColor(_backColor.R / 255f, _backColor.G / 255f, _backColor.B / 255f, _backColor.A / 255f);
                 OpenGL.PointSize(2.0f);
             }
@@ -66,7 +66,7 @@ namespace VisionNet.Controls
                 float[] view;
                 lock (_cameraLock)
                     _camera.GetMatrices(Width, Height, out projection, out view);
-                var overlayRenderer = ModernOverlayRenderer.For(gl);
+                var overlayRenderer = ModernGLRenderer.For(gl);
                 overlayRenderer.SetSceneMatrices(projection, view);
                 overlayRenderer.BeginFrame(gl);
                 try

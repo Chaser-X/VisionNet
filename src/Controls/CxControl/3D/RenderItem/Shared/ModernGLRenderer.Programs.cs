@@ -9,7 +9,7 @@ using VisionNet.DataType;
 
 namespace VisionNet.Controls
 {
-    internal sealed partial class ModernOverlayRenderer
+    internal sealed partial class ModernGLRenderer
     {
 
         /// <summary>Uploads camera matrices and one item model matrix to a shader program.</summary>

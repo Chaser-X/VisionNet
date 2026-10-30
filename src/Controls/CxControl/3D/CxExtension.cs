@@ -231,7 +231,7 @@ namespace VisionNet.Controls
         /// <param name="text">Text string to draw.</param>
         public static void DrawTextLabel3D(OpenGL gl, float x, float y, float z, float size, string text)
         {
-            var renderer = ModernOverlayRenderer.For(gl);
+            var renderer = ModernGLRenderer.For(gl);
             float sx, sy, sz;
             if (!renderer.Project(gl, x, y, z, out sx, out sy, out sz)) return;
             renderer.DrawText(gl, (int)sx, (int)sy, System.Drawing.Color.White,
@@ -250,7 +250,7 @@ namespace VisionNet.Controls
         /// <param name="text">Text string to draw.</param>
         public static void DrawTextLabel2D(OpenGL gl, float x, float y, float z, float size, string text)
         {
-            var renderer = ModernOverlayRenderer.For(gl);
+            var renderer = ModernGLRenderer.For(gl);
             float sx, sy, sz;
             if (!renderer.Project(gl, x, y, z, out sx, out sy, out sz)) return;
             renderer.DrawText(gl, (int)sx, (int)sy, System.Drawing.Color.White, size, text);

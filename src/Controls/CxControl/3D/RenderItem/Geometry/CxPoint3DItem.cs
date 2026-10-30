@@ -64,7 +64,7 @@ namespace VisionNet.Controls
                     positions[i * 3 + 1] = Point3Ds[i].Y;
                     positions[i * 3 + 2] = Point3Ds[i].Z;
                 }
-                ModernOverlayRenderer.For(gl).Draw(gl, OpenGL.GL_POINTS, positions, DrawColor, Size);
+                ModernGLRenderer.For(gl).Draw(gl, OpenGL.GL_POINTS, positions, DrawColor, Size);
                 PopModelMatrix(gl);
             }
             else
@@ -82,7 +82,7 @@ namespace VisionNet.Controls
 
                 // Preserve the historical Size / 2 sphere radius while reusing the context-level
                 // mesh and shader. Only the instance-position buffer is streamed per frame.
-                ModernOverlayRenderer.For(gl).DrawSpheres(
+                ModernGLRenderer.For(gl).DrawSpheres(
                     gl, positions, DrawColor, Size / 2f, ModelMatrix);
             }
         }

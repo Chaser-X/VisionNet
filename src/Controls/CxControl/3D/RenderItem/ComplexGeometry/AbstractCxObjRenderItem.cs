@@ -446,11 +446,11 @@ namespace VisionNet.Controls
             // before the render thread has rebuilt the GL handle. Do not issue DrawElements(0).
             if (_surfaceMode == SurfaceMode.Mesh && data.IndexCount <= 0) return;
 
-            var renderer = ModernOverlayRenderer.For(gl);
+            var renderer = ModernGLRenderer.For(gl);
             // Only items that actually change GL state (translucent -> depth write off,
             // point cloud -> point size) pay for the capture/restore round trip.
             bool changesState = IsTranslucent || _surfaceMode == SurfaceMode.PointCloud;
-            ModernOverlayRenderer.RenderStateSnapshot previous = default;
+            ModernGLRenderer.RenderStateSnapshot previous = default;
             if (changesState) previous = renderer.CaptureState(gl);
 
             gl.UseProgram(handle.ShaderProgram);
