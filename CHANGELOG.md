@@ -6,7 +6,11 @@
 
 ## 未发布（工作区，尚未提交）
 
-### 评审修复（P1–P9）：拾取事件移出帧锁、NaN 透明度、注册表整洁与文档
+（暂无）
+
+## 已提交
+
+### b35d2ef（2026-10-30）评审修复（P1–P9）：拾取事件移出帧锁、NaN 透明度、注册表整洁与文档
 
 - **P1（行为修复）**：`CoordinatesChanged` 原先在渲染帧内、`_renderLock` 持有期间触发（hover 拾取被延迟到 `Render` 后引入）。现在 `ApplyPendingPick` 只**暂存**结果（tooltip 仍在本帧绘制），事件由 `DoOpenGLDraw` **在帧锁释放后**触发 —— 与 `RenderItemFailed` 的既定契约一致（处理器可安全回调 display）。
 - **P3（缺陷修复）**：`OnMouseDown` / 拖拽分支 / `OnMouseUp` 原先只隐藏 tooltip、不清待处理拾取，导致按下前最后一次 move 留下的拾取会在下一帧让 tooltip 重新可见并触发事件。新增 `CancelPendingPick()` 在这三处调用。
@@ -19,8 +23,6 @@
 - **P9 整洁性**：删除 `CxItemRegistry` 中空的 `// ── Critical section ──` 段头；把承载延迟释放方法的段头由误标的 `// ── Surface mutations ──` 改为 `// ── Deferred release ──`（同时消除重复段头）；段头前补空行；`CxDisplay.Api.cs` 的 `RefreshViewSize` 去掉行尾空白与 3 行失效注释代码。
 - 验证：`CxControl` / `DemoFrom` / `CxControl.Tests` MSBuild `/t:Rebuild`（Debug/Release）→ 0 错误、0 C# 警告（仅预存在 MSB3270）；`dotnet test` → **67/67 通过**（新增 P6 组合分支与 P8 NaN 两项用例）。
 - **未处理**：P2 的"缓存时保存 `Data` 快照/版本号"方案（成本高于收益，改为文档契约）；P4 的并发安全（与既有 `_pickViewport` / `_pickDepthBytes` 的取舍一致，属待验证）。
-
-## 已提交
 
 ### fe522eb（2026-10-30）重命名：`ModernOverlayRenderer` → `ModernGLRenderer` @ `3D\RenderItem\Shared\`
 
