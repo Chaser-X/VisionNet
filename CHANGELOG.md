@@ -6,7 +6,13 @@
 
 ## 未发布（工作区，尚未提交）
 
-### M1（第 1 步）：把 surface/overlay 队列与 GL 资源池收进 `CxItemRegistry`
+（暂无）
+
+## 已提交
+
+### 88e4511（2026-10-30）M1 第 1 步：CxItemRegistry 收拢队列与 GL 池；M3 第 1 步：ModernOverlayRenderer 纯文件移动
+
+#### M1 第 1 步：把 surface/overlay 队列与 GL 资源池收进 `CxItemRegistry`
 
 - 新增 `internal sealed class CxItemRegistry`：集中持有 surface 队列 + key 映射、overlay 队列 + key 映射、per-item GL 资源池、延迟释放队列，以及**守护它们的唯一锁**。
 - `CxDisplay` 不再声明这些集合与 `_resourceLock`（`CxDisplay.*` 合计 −72 行）；锁顺序（`_renderLock → registry`）只在 registry 的 XML 注释里声明一次。
@@ -17,7 +23,7 @@
 - 未做：第 2/3 步 —— 把 13 处 `Sync(() => { …*InLock… })` 换成目的明确的 registry 方法，并删除 `*InLock` 访问器（届时任何调用方都无法绕过锁）。
 - 未做运行时/OpenGL 验证。
 
-### M3（第 1 步）：`ModernOverlayRenderer` 纯文件移动（partial class）
+#### M3 第 1 步：`ModernOverlayRenderer` 纯文件移动（partial class）
 
 - 1257 行的 `ModernOverlayRenderer.cs` 拆为 6 个 `partial class` 文件（**零逻辑改动**）：
   - `ModernOverlayRenderer.cs`（322 行）：嵌套类型、字段、GLSL 源码常量、生命周期（ctor / `For` / `ResetForContextRecreate` / `Release`）、模型栈、场景矩阵、帧窗口（`BeginFrame` / `EndFrame`）。
@@ -31,8 +37,6 @@
 - 验证：`CxControl` 与 `DemoFrom` MSBuild `/t:Rebuild`（Debug/Release）→ 0 错误、0 C# 警告（仅预存在 MSB3270）。
 - 未做：第 2 步 —— 把 `Text` / `Programs` / `State` 从 partial 提升为**独立 internal 类**（真正的职责解耦，需要 M4 单测网兜底）。
 - 已知不纯：文件边界取在成员之间的空行，因此 `Text.cs` 含 `Project`/`Unproject`、`Programs.cs` 含球体绘制；第 2 步会做真正的职责切分。
-
-## 已提交
 
 ### 6478e3f（2026-10-30）CxDisplay 渲染与交互效率、半透明支持、公开面收敛
 
