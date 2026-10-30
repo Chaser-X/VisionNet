@@ -159,7 +159,10 @@ namespace VisionNet.Controls
             }
         }
 
-        /// <summary>Gets or sets the surface color mode (Color, Intensity, or ColorWithIntensity).</summary>
+        /// <summary>
+        /// Gets or sets the surface colour mode (Color, Intensity, ColorWithIntensity, Diff or Lit)
+        /// and applies it to every registered surface item.
+        /// </summary>
         public SurfaceColorMode SurfaceColorMode
         {
             get => _surfaceColorMode;

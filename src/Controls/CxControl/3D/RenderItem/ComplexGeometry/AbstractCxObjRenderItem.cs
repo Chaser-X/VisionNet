@@ -1,6 +1,7 @@
 using SharpGL;
 using System;
 using System.Collections.Generic;
+using System.Drawing;
 using VisionNet.DataType;
 
 namespace VisionNet.Controls
@@ -96,7 +97,8 @@ namespace VisionNet.Controls
                 if (_surfaceMode == value) return;
 
                 _surfaceMode = value;
-                // Lit 仅在 Mesh 模式有效；模式切换时刷新 shader 的 colorMode / surfaceMode
+                // 模式切换时刷新 shader 的 colorMode / surfaceMode；Lit 的逐片元光照只在
+                // Mesh（surfaceMode == 1）下叠加。
                 if (value == SurfaceMode.Mesh
                     && (_cachedRenderData == null || _cachedRenderData.Indices == null))
                 {
@@ -168,15 +170,32 @@ namespace VisionNet.Controls
         }
 
         /// <summary>
-        /// Effective colour-mode value sent to the shader. <see cref="SurfaceColorMode.Lit"/>
-        /// is honoured only in <see cref="SurfaceMode.Mesh"/>; in point-cloud mode it falls back
-        /// to <see cref="SurfaceColorMode.Color"/> (the requested mode is preserved so switching
-        /// back to Mesh re-enables lighting automatically).
+        /// Effective colour-mode value sent to the shader. Every mode is honoured in both
+        /// <see cref="SurfaceMode.Mesh"/> and <see cref="SurfaceMode.PointCloud"/>; only the
+        /// per-fragment lighting term (Mesh) differs, so no mode needs a fallback.
         /// </summary>
-        protected int EffectiveColorMode =>
-            _surfaceColorMode == SurfaceColorMode.Lit && _surfaceMode != SurfaceMode.Mesh
-                ? (int)SurfaceColorMode.Color
-                : (int)_surfaceColorMode;
+        protected int EffectiveColorMode => (int)_surfaceColorMode;
+
+        private Color _solidColor = Color.FromArgb(217, 217, 217);
+
+        /// <summary>
+        /// Gets or sets the flat colour used by <see cref="SurfaceColorMode.Lit"/>. In
+        /// <see cref="SurfaceMode.Mesh"/> the colour is modulated by the per-fragment lighting
+        /// term (so curvature stays visible); in <see cref="SurfaceMode.PointCloud"/> it is drawn
+        /// flat. Defaults to <c>RGB(217,217,217)</c>, matching the previously hard-coded 0.85 grey.
+        /// Changing this value updates a shader uniform only — no GL resources are rebuilt.
+        /// </summary>
+        public Color SolidColor
+        {
+            get => _solidColor;
+            set
+            {
+                if (_solidColor == value) return;
+                _solidColor = value;
+                if (_cachedRenderData?.Uniforms != null)
+                    _cachedRenderData.Uniforms["solidColor"] = value;
+            }
+        }
 
         /// <summary>Cached CPU-side render data; <c>null</c> means it must be rebuilt.</summary>
         protected RenderData _cachedRenderData;
@@ -230,6 +249,7 @@ namespace VisionNet.Controls
             uniform float colorMax;
             uniform int colorMode;
             uniform int surfaceMode;
+            uniform vec4 solidColor;
             uniform sampler2D intensityTexture;
             uniform int useIntensityAttribute;
 
@@ -273,7 +293,7 @@ namespace VisionNet.Controls
                 } else if (colorMode == 1) {
                     FragColor = vec4(vec3(intensity) * lightFactor, 1.0);
                 } else if (colorMode == 4) {
-                    FragColor = vec4(vec3(0.85) * lightFactor, 1.0);
+                    FragColor = vec4(solidColor.rgb * lightFactor, 1.0);
                 } else {
                     FragColor = vec4(mix(vec3(intensity), getColorByHeight(height), 0.5) * lightFactor, 1.0);
                 }
@@ -333,7 +353,12 @@ namespace VisionNet.Controls
             if (IsDisposed || !HasRenderableData)
                 return null;
 
-            return BuildRenderData();
+            var data = BuildRenderData();
+            // Base-class uniforms shared by all three items are injected here so the derived
+            // BuildRenderData implementations do not have to know about them.
+            if (data?.Uniforms != null)
+                data.Uniforms["solidColor"] = _solidColor;
+            return data;
         }
 
         public void Draw(OpenGL gl, GLResourceHandle handle)
@@ -356,6 +381,8 @@ namespace VisionNet.Controls
                 int loc = handle.GetUniformLocation(gl, kv.Key);
                 if (kv.Value is float f) gl.Uniform1(loc, f);
                 else if (kv.Value is int i) gl.Uniform1(loc, i);
+                else if (kv.Value is Color c)
+                    gl.Uniform4(loc, c.R / 255f, c.G / 255f, c.B / 255f, c.A / 255f);
             }
 
             gl.ActiveTexture(OpenGL.GL_TEXTURE0);
@@ -375,7 +402,7 @@ namespace VisionNet.Controls
         public void SetGlobalZRange(float zMin, float zMax)
         {
             if (_surfaceColorMode == SurfaceColorMode.Intensity) return;
-            if (_surfaceColorMode == SurfaceColorMode.Lit && _surfaceMode == SurfaceMode.Mesh) return;
+            if (_surfaceColorMode == SurfaceColorMode.Lit) return;
             if (_surfaceColorMode == SurfaceColorMode.Diff) return;
             if (Math.Abs(ColorMin - zMin) < 1e-6f && Math.Abs(ColorMax - zMax) < 1e-6f) return;
 

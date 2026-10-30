@@ -640,12 +640,16 @@ VisionOperator.DestroyLib();
 | 属性                     | 可选值                                      | 说明      |
 | ---------------------- | ---------------------------------------- | ------- |
 | `SurfaceMode`          | `PointCloud` `Mesh`                      | 点云或三角面片 |
-| `SurfaceColorMode`     | `Color` `Intensity` `ColorWithIntensity` `Diff` | 颜色来源；Diff 为每顶点差分彩虹伪彩 |
+| `SurfaceColorMode`     | `Color` `Intensity` `ColorWithIntensity` `Diff` `Lit` | 颜色来源；`Diff` 为每顶点差分彩虹伪彩，`Lit` 为纯色 |
 | `SurfaceViewMode`      | `Top` `Front` `Left` `Right` `None`      | 预设视角    |
 | `ShowCoordinateSystem` | `bool`                                   | 显示世界坐标轴 |
 | `IsLeftHanded`         | `bool`                                   | 左手坐标系（默认 `false`） |
 
 `Diff` 模式复用 `getColorByHeight` 彩虹映射，`ColorMin/ColorMax`  自动切换为差分范围；SetGlobalZRange 早返回，不受外部 Z 同步影响。
+
+`Lit`（纯色模式）：整个 Item 用单一颜色渲染，颜色由 `AbstractCxObjRenderItem.SolidColor` 指定（默认 `RGB(217,217,217)`）。`Mesh` 模式下仍叠加逐片元光照（保留立体感），`PointCloud` 模式下为纯平色。该模式与数据无关：不参与 `ColorMin/ColorMax` 聚合（`SetGlobalZRange` 早返回），也不显示颜色条。
+
+> 注意：颜色条要求**所有** Item 共享同一数据色模式。场景中只要存在一个 `Lit` Item，颜色条就会整条隐藏（`Lit` 不参与数据色映射，但也无法与 `Color`/`Diff` 等构成"统一模式"）。
 
 颜色梯度（`Color` / `ColorWithIntensity` / `Diff` 模式）：
 

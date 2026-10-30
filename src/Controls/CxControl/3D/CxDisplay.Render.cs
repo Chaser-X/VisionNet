@@ -187,8 +187,6 @@ namespace VisionNet.Controls
                 if (cur == null || cur.IsDisposed) continue;
 
                 var mode = cur.SurfaceColorMode;
-                if (mode == SurfaceColorMode.Lit && cur.SurfaceMode != SurfaceMode.Mesh)
-                    mode = SurfaceColorMode.Color;
                 if (!mixedMode)
                 {
                     if (singleMode == null) singleMode = mode;

@@ -6,7 +6,15 @@
 
 ## 未发布（工作区，尚未提交）
 
-（暂无）
+### Lit 纯色化（ComplexGeometry 纯色模式）
+
+- `SurfaceColorMode.Lit` 由"固定 0.85 灰 + 光照"改为**纯色模式**：新增 `AbstractCxObjRenderItem.SolidColor`（`System.Drawing.Color`，默认 `RGB(217,217,217)`），着色器 `colorMode == 4` 分支改读 `solidColor.rgb`，不再硬编码 0.85。
+- 着色器新增 `uniform vec4 solidColor`；`RenderData.Uniforms` 新增对 `System.Drawing.Color` 的支持（按 `vec4` 上传，`AbstractCxObjRenderItem.Draw` 的 uniform 循环扩展）。
+- `PrepareRenderData()` 集中注入 `solidColor`，三个派生 Item（`CxSurfaceItem` / `CxPointCloudItem` / `CxMeshItem`）无需改动。
+- **行为变化**：`EffectiveColorMode` 取消"`Lit` 非 `Mesh` 时回退为 `Color`"——`Lit` 在 `PointCloud` 模式下也生效（纯平色）；`SetGlobalZRange` 对 `Lit` 无条件早退；`CxDisplay.Render` Phase 1 移除同一回退 → 纯色 Item 不再显示颜色条。**混合场景**（`Lit` 与其他数据色模式共存）颜色条同样整条隐藏：Phase 1 的模式共识把 `Lit` 视为独立模式而不再折算为 `Color`；此前只有 `Lit` + `Mesh` 的混合场景如此，现在 `Lit` + `PointCloud` 也如此。
+- `SolidColor` 是 uniform-only 更新，修改/切换不重建 GPU 资源。
+- 验证：`CxControl` 与 `DemoFrom` MSBuild `/t:Rebuild`（Debug/Release）→ 0 错误、0 C# 警告（仅预存在 MSB3270）。
+- 未做运行时/OpenGL 验证（见文末「待验证」第 11 项）。
 
 ## 已提交
 
@@ -150,3 +158,4 @@
 8. 球体实例化：`Sphere` 模式外观与旧实现一致（半径 = `Size / 2`、模型矩阵直传）。
 9. 共享 surface 程序 + 上下文重建：GL 上下文重建后三个内建项正常绘制、无残留/重复释放的句柄。
 10. FBO 尺寸缓存：resize 路径（基类 `OnSizeChanged` 已 `SetDimensions`，首帧是否重复）行为正常。
+11. `Lit` 纯色模式：`SolidColor` 生效（Mesh 下保留光照立体感、PointCloud 下为纯平色），且纯色 Item 不再触发颜色条。

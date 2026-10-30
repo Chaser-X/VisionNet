@@ -26,9 +26,11 @@ namespace VisionNet.Controls
         Diff,
 
         /// <summary>
-        /// Physical lighting / material shading (Blinn-Phong). Only effective when
-        /// <see cref="SurfaceMode.Mesh"/> is active; the normal is evaluated per-fragment
-        /// in GLSL via screen-space derivatives of the view-space position.
+        /// Flat colour mode: the item is drawn in a single caller-chosen colour
+        /// (<see cref="AbstractCxObjRenderItem.SolidColor"/>) instead of a data-driven colour map.
+        /// In <see cref="SurfaceMode.Mesh"/> the colour is modulated by per-fragment Blinn-Phong
+        /// lighting (the normal is evaluated in GLSL via screen-space derivatives of the
+        /// view-space position); in <see cref="SurfaceMode.PointCloud"/> it is drawn flat.
         /// </summary>
         Lit,
     }

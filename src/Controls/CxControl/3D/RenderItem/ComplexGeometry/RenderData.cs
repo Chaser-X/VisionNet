@@ -65,7 +65,8 @@ namespace VisionNet.Controls
 
         /// <summary>
         /// Named uniform values passed to the shader each frame.
-        /// Supported value types: <see cref="float"/>, <see cref="int"/>.
+        /// Supported value types: <see cref="float"/>, <see cref="int"/> and
+        /// <see cref="System.Drawing.Color"/> (uploaded as a <c>vec4</c>).
         /// </summary>
         public Dictionary<string, object> Uniforms { get; set; } = new Dictionary<string, object>();
     }
