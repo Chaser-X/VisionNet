@@ -6,7 +6,11 @@
 
 ## 未发布（工作区，尚未提交）
 
-### 渲染/交互效率、半透明与公开面收敛
+（暂无）
+
+## 已提交
+
+### 6478e3f（2026-10-30）CxDisplay 渲染与交互效率、半透明支持、公开面收敛
 
 - **E1 按需重绘**：`CxDisplay.Designer.cs` 设 `RenderTrigger = Manual`。此前只设 `FrameRate = 10` 而未设 `RenderTrigger`（默认 `TimerBased`），空闲时也按 10 FPS 全量重绘（Phase 1 全 Item 范围聚合 → Phase 3 全部绘制 → Phase 5 HUD 含色条交错与上传）；现无渲染定时器，悬停等入口改为显式 `SafeInvalidate()`。与文档「手动刷新」一致。另：左键点击的相机轴心复用选中路径已解算的世界坐标（`ResolveRotationPoint`），一次点击由两次深度读回降为一次。
   - 未做（有风险）：把 `FrameRate` 设为 `0` 以停掉空转定时器。SharpGL 的 `SetupDrawingTimer` 仅在定时器**已启用**时才跳过 `Interval = (int)(1000.0 / FrameRate)`；定时器已禁用时会走到 `(int)double.PositiveInfinity`，而 WinForms `Timer.Interval` 对 <1 的值抛 `ArgumentOutOfRangeException`。保留 `FrameRate = 10` 时该 tick 在 `Manual` 下只是一次比较，无实际开销。
@@ -22,8 +26,6 @@
 - **M6 文档漂移**：README 补 `PointSize` / `Opacity` / 半透明已知限制 / 按需重绘与 `Redraw()` 提醒；把「渲染线程」措辞修正为「渲染帧内（UI 线程）」（SharpGL 在 `OnPaint` 中绘制）；新增「提交前检查清单」（见文末维护要点）。
 - 验证：`CxControl` 与 `DemoFrom` MSBuild `/t:Rebuild`（Debug/Release）→ 0 错误、0 C# 警告（仅预存在 MSB3270）。
 - 未做运行时/OpenGL 验证（见文末「待验证」第 12–14 项）。
-
-## 已提交
 
 ### e23af5a（2026-10-30）Lit 纯色化：ComplexGeometry 新增纯色模式（SolidColor）
 
