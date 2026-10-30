@@ -149,6 +149,14 @@ namespace VisionNet.Controls
         }
 
         /// <summary>
+        /// True when a surface item is translucent, i.e. it must be drawn in the second
+        /// (blended, non-depth-writing) pass of <see cref="Render"/>. Items that are not
+        /// built-in surface items are treated as opaque.
+        /// </summary>
+        private static bool IsTranslucentItem(ICxObjRenderItem item)
+            => item is AbstractCxObjRenderItem surfaceItem && surfaceItem.Opacity < 1f;
+
+        /// <summary>
         /// Issues all draw calls for one frame:
         /// world-space coordinate system → surface items (unified Z range) →
         /// color bar → coord tag → overlay geometry → screen-space axes indicator.
@@ -240,18 +248,25 @@ namespace VisionNet.Controls
                         cur.SetGlobalDiffRange(globalDiffMin, globalDiffMax);
             }
 
-            // Phase 3 — draw surface items.
+            // Phase 3 — draw surface items, opaque first so translucent items blend over a
+            // settled frame. When nothing is translucent the order (and result) is unchanged.
             bool anyDrawn = false;
-            for (int i = 0; i < snapshot.Count; i++)
+            for (int pass = 0; pass < 2; pass++)
             {
-                var cur = snapshot[i];
-                if (cur == null || cur.IsDisposed) continue;
+                bool translucentPass = pass == 1;
+                for (int i = 0; i < snapshot.Count; i++)
+                {
+                    var cur = snapshot[i];
+                    if (cur == null || cur.IsDisposed) continue;
 
-                var handle = _handleSnapshot[i];
-                if (handle?.IsValid != true) continue;
+                    var handle = _handleSnapshot[i];
+                    if (handle?.IsValid != true) continue;
 
-                cur.Draw(gl, handle);
-                anyDrawn = true;
+                    if (IsTranslucentItem(cur) != translucentPass) continue;
+
+                    cur.Draw(gl, handle);
+                    anyDrawn = true;
+                }
             }
 
             // Phase 4 — overlay geometry (segments, points, polygons, etc.).
@@ -265,6 +280,16 @@ namespace VisionNet.Controls
 
             if (!_camera.Enable2DView)
                 _coordinationItem.DrawScreenPositionedAxes(gl);
+
+            // Phase 4b — resolve a pending hover pick. It is deferred from the mouse handler so
+            // the depth readback happens at most once per frame, with the scene already drawn
+            // and the GL context guaranteed current. Phase 5 draws the tooltip, so it shows
+            // the coordinates resolved here.
+            if (_hasPendingPick)
+            {
+                _hasPendingPick = false;
+                ApplyPendingPick();
+            }
 
             // Phase 5 — screen-space HUD. The colour bar and coordinate tooltip are
             // emitted after all scene and interactive geometry, so later depth-tested

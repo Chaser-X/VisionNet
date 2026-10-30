@@ -43,12 +43,6 @@ namespace VisionNet.Controls
         public ShaderSource ShaderSource { get; set; }
 
         /// <summary>
-        /// Retained for source compatibility. CxDisplay always uses a VAO for every render item.
-        /// </summary>
-        [Obsolete("CxDisplay always uses VAOs; this property is retained for source compatibility.")]
-        public bool UseVAO { get; set; }
-
-        /// <summary>
         /// Per-vertex difference values as <c>float[n]</c> (one per vertex), or <c>null</c>
         /// when the shader path is not using differential coloring.
         /// When set, <see cref="CxDisplay"/> creates an additional VBO at attribute location 2.

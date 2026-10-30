@@ -6,7 +6,26 @@
 
 ## 未发布（工作区，尚未提交）
 
-### Lit 纯色化（ComplexGeometry 纯色模式）
+### 渲染/交互效率、半透明与公开面收敛
+
+- **E1 按需重绘**：`CxDisplay.Designer.cs` 设 `RenderTrigger = Manual`。此前只设 `FrameRate = 10` 而未设 `RenderTrigger`（默认 `TimerBased`），空闲时也按 10 FPS 全量重绘（Phase 1 全 Item 范围聚合 → Phase 3 全部绘制 → Phase 5 HUD 含色条交错与上传）；现无渲染定时器，悬停等入口改为显式 `SafeInvalidate()`。与文档「手动刷新」一致。另：左键点击的相机轴心复用选中路径已解算的世界坐标（`ResolveRotationPoint`），一次点击由两次深度读回降为一次。
+  - 未做（有风险）：把 `FrameRate` 设为 `0` 以停掉空转定时器。SharpGL 的 `SetupDrawingTimer` 仅在定时器**已启用**时才跳过 `Interval = (int)(1000.0 / FrameRate)`；定时器已禁用时会走到 `(int)double.PositiveInfinity`，而 WinForms `Timer.Interval` 对 <1 的值抛 `ArgumentOutOfRangeException`。保留 `FrameRate = 10` 时该 tick 在 `Manual` 下只是一次比较，无实际开销。
+- **E2 延迟拾取**：鼠标移动只记录坐标，深度读回 + 最近表面搜索改到渲染帧内（`CxDisplay.Render` 新增 Phase 4b）执行，每帧最多一次，且保证 GL 上下文 current；`CoordinatesChanged` 因此在**渲染帧内**触发（README 契约已同步，处理器不得同步 `Invoke`）。
+- **E3 拾取路径**：`ModelMatrix` 的逆改为惰性缓存（`AbstractCxObjRenderItem` / `AbstractRenderItem` 各持一份，姿态变更时失效），`GetNearestSurfacePoint` 复用遍历缓冲 —— 不再每次鼠标移动对每个 Item 求逆并分配 List。
+- **U1 点大小**：新增 `AbstractCxObjRenderItem.PointSize`（默认 2），`SurfaceMode.PointCloud` 下可配；此前只有 `CxDisplay.Render` 里一次性 `gl.PointSize(2.0f)`，无法调整。
+- **M2 半透明与 GL 状态统一**：
+  - 新增逐项 `Opacity`（`0..1`，默认 `1`，越界钳制）与着色器 `uniform float opacity` —— **所有**颜色模式的片元 alpha 都由它决定（此前硬编码 `1.0`）。
+  - 渲染 Phase 3 改为**两趟**：先不透明、后半透明；半透明项关闭深度写入。全部不透明时顺序与结果逐像素不变。
+  - 状态快照从 `ModernOverlayRenderer` 暴露为 internal（`CaptureState` / `RestoreState`，`RenderStateSnapshot` 改 internal），surface 路径现在也捕获/恢复 GL 状态；`SetRenderState` 在开启混合时**同时关闭深度写入** → 修掉 `CxBox3DItem` 等半透明 overlay 仍写深度、遮挡其后绘制几何的问题。
+  - 已知限制（README 已记录）：半透明项之间不按远近排序、闭合网格不做背面剔除。
+- **M5 公开面收敛**：`GLResourceHandle` 全部状态（含构造函数）改为 `internal`，类型与接口注释明确 `ICxObjRenderItem` 是内建项的实现契约、不支持程序集外实现；删除从未使用的 `RenderData.UseVAO`（`[Obsolete]`）。仓库内 `CxControl` 之外对这两个类型**零引用**（已核对）。
+- **M6 文档漂移**：README 补 `PointSize` / `Opacity` / 半透明已知限制 / 按需重绘与 `Redraw()` 提醒；把「渲染线程」措辞修正为「渲染帧内（UI 线程）」（SharpGL 在 `OnPaint` 中绘制）；新增「提交前检查清单」（见文末维护要点）。
+- 验证：`CxControl` 与 `DemoFrom` MSBuild `/t:Rebuild`（Debug/Release）→ 0 错误、0 C# 警告（仅预存在 MSB3270）。
+- 未做运行时/OpenGL 验证（见文末「待验证」第 12–14 项）。
+
+## 已提交
+
+### e23af5a（2026-10-30）Lit 纯色化：ComplexGeometry 新增纯色模式（SolidColor）
 
 - `SurfaceColorMode.Lit` 由"固定 0.85 灰 + 光照"改为**纯色模式**：新增 `AbstractCxObjRenderItem.SolidColor`（`System.Drawing.Color`，默认 `RGB(217,217,217)`），着色器 `colorMode == 4` 分支改读 `solidColor.rgb`，不再硬编码 0.85。
 - 着色器新增 `uniform vec4 solidColor`；`RenderData.Uniforms` 新增对 `System.Drawing.Color` 的支持（按 `vec4` 上传，`AbstractCxObjRenderItem.Draw` 的 uniform 循环扩展）。
@@ -15,8 +34,6 @@
 - `SolidColor` 是 uniform-only 更新，修改/切换不重建 GPU 资源。
 - 验证：`CxControl` 与 `DemoFrom` MSBuild `/t:Rebuild`（Debug/Release）→ 0 错误、0 C# 警告（仅预存在 MSB3270）。
 - 未做运行时/OpenGL 验证（见文末「待验证」第 11 项）。
-
-## 已提交
 
 ### 2585526（2026-10-29）渲染资源层重构：共享 surface 程序、球体实例化、字形图集与上下文重建
 
@@ -135,9 +152,10 @@
 
 **线程与锁**
 
-- 锁顺序恒为 `_renderLock → _resourceLock`；渲染为**手动刷新**（`SafeInvalidate()`，无渲染定时器）。
+- 锁顺序恒为 `_renderLock → _resourceLock`；渲染为**按需刷新**（`SafeInvalidate()`，`RenderTrigger = Manual`，无渲染定时器）。
+- 渲染发生在 **UI 线程**（SharpGL 在 `OnPaint` 中绘制并 `MakeCurrent`），因此 `glReadPixels` / `glGetInteger` 等只能出现在渲染帧内 —— 悬停拾取为此改为帧内延迟执行（Phase 4b）。
 - 组 API 跨线程调用会 `BeginInvoke` 到 UI 线程（返回值按现有约定为 `false` / `null`）。
-- GL 删除只能在渲染线程：surface 走 `_pendingRelease` 队列延迟释放；overlay 的 GL 对象由共享 `ModernOverlayRenderer` 持有（item 只持有托管数组）。
+- GL 删除只能在渲染帧内：surface 走 `_pendingRelease` 队列延迟释放；overlay 的 GL 对象由共享 `ModernOverlayRenderer` 持有（item 只持有托管数组）。
 
 **已知坑**
 
@@ -145,6 +163,13 @@
 - 直接改 `MaxPointCount` 不会重建采样；直接赋值 `ColorMin` / `ColorMax` 不生效（Draw 上传的是缓存 uniform，由显示层每帧聚合下发）。
 - overlay 成员无法重绑（没有 key 概念）；如需替换 overlay 成员，需要另加资源层 API。
 - 根目录 `end` 是历史 `git log` 转储文件（内容含旧 API 名，非代码），全仓库检索时注意排除。
+
+**提交前检查清单（防文档漂移）**
+
+- 新增/删除枚举成员 → 同步 README「渲染模式」表，并确认右键菜单项的 `Text` 与枚举名一致（`UpdateMenuItems` / `Enum.Parse` 依赖它）。
+- 新增/删除公开成员 → 同步 README「API 参考」与 CHANGELOG「未发布」。
+- 改动渲染 / 线程行为 → 同步 README「线程安全与重绘」与本文件「架构现状」。
+- CHANGELOG：本次条目先留在「未发布」；**下一次**提交时移入「已提交」并补提交哈希（避免「未发布」段长期写着已提交内容）。
 
 ## 待验证（无 OpenGL 环境、仓库无渲染测试）
 
@@ -159,3 +184,6 @@
 9. 共享 surface 程序 + 上下文重建：GL 上下文重建后三个内建项正常绘制、无残留/重复释放的句柄。
 10. FBO 尺寸缓存：resize 路径（基类 `OnSizeChanged` 已 `SetDimensions`，首帧是否重复）行为正常。
 11. `Lit` 纯色模式：`SolidColor` 生效（Mesh 下保留光照立体感、PointCloud 下为纯平色），且纯色 Item 不再触发颜色条。
+12. 按需重绘（E1）：相机旋转/平移/缩放、数据加载、选中与拖拽、组变换、GL 上下文重建后画面是否都及时刷新（不再有 10 FPS 定时兜底）；后台线程准备完数据后未经过 `Set*` / `Redraw()` 时不刷新（预期行为，README 已注明）。
+13. 延迟拾取（E2）：悬停坐标标签是否随鼠标及时更新、与旧行为一致；`CoordinatesChanged` 现在在渲染帧内触发，处理器若用同步 `Invoke` 会卡帧。
+14. 半透明（M2）：`Opacity < 1` 的 Item 是否正确混合在不透明场景之上；全不透明场景的渲染结果与改动前逐像素一致；`CxBox3DItem` 等半透明 overlay 不再遮挡其后绘制的几何。

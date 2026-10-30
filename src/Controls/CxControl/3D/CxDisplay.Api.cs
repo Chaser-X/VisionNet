@@ -823,6 +823,8 @@ namespace VisionNet.Controls
             foreach (var item in snapshot)
                 if (item is AbstractRenderItem ar)
                     ar.IsActiveObj = true;
+            // IsActiveObj gates the selected-item marker, so a redraw may be needed.
+            SafeInvalidate();
         }
 
         /// <summary>

@@ -8,6 +8,13 @@ namespace VisionNet.Controls
     /// Interface for primary renderable objects (point clouds, meshes).
     /// Item owns CPU data; CxDisplay owns GL resources.
     /// </summary>
+    /// <remarks>
+    /// This is an implementation contract for the library's built-in surface items
+    /// (<see cref="CxSurfaceItem"/>, <see cref="CxPointCloudItem"/>, <see cref="CxMeshItem"/>).
+    /// It is not meant to be implemented outside the assembly: drawing requires internal
+    /// helpers on <see cref="GLResourceHandle"/>. Use <see cref="CxDisplay.SetSurfaceItem"/>
+    /// to register items.
+    /// </remarks>
     public interface ICxObjRenderItem : IDisposable
     {
         /// <summary>Raised when the item is disposed.</summary>

@@ -382,6 +382,15 @@ namespace VisionNet.Controls
         }
 
         /// <summary>
+        /// Inverse of an item's model matrix. Built-in surface items cache their inverse (it is
+        /// only recomputed when the pose changes); anything else is inverted on demand.
+        /// </summary>
+        private static CxMatrix4X4 GetItemInverseModelMatrix(ICxObjRenderItem item)
+            => item is AbstractCxObjRenderItem surfaceItem
+                ? surfaceItem.ModelMatrixInverse
+                : GetItemModelMatrix(item).Inverse();
+
+        /// <summary>
         /// Releases all GL resources, surface items, and overlay items held by this control.
         /// Called by <see cref="Dispose(bool)"/> in Designer.cs.
         /// </summary>

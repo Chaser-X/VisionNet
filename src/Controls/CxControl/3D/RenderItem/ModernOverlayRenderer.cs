@@ -31,7 +31,7 @@ namespace VisionNet.Controls
         /// Captures the small subset of mutable GL state changed by an overlay draw,
         /// allowing the next item to observe the same state as before the draw.
         /// </summary>
-        private struct RenderStateSnapshot
+        internal struct RenderStateSnapshot
         {
             internal bool DepthTest;
             internal bool DepthWrite;
@@ -1116,6 +1116,17 @@ void main() { FragColor = vertexColor; }";
             return _frameStateCaptured ? _frameState : CaptureRenderStateUncached(gl);
         }
 
+        /// <summary>
+        /// Captures the GL state a draw may change, so the caller can restore it afterwards.
+        /// During a <see cref="BeginFrame"/> window this returns the frame-start snapshot, which
+        /// is the state every item in the frame should observe; outside a frame it queries GL.
+        /// </summary>
+        internal RenderStateSnapshot CaptureState(OpenGL gl) => CaptureRenderState(gl);
+
+        /// <summary>Restores state captured by <see cref="CaptureState"/>.</summary>
+        internal void RestoreState(OpenGL gl, RenderStateSnapshot state)
+            => RestoreRenderState(gl, state);
+
         private RenderStateSnapshot CaptureRenderStateUncached(OpenGL gl)
         {
             gl.GetFloat(OpenGL.GL_POINT_SIZE, _pointSizeQuery);
@@ -1130,7 +1141,12 @@ void main() { FragColor = vertexColor; }";
             };
         }
 
-        /// <summary>Applies the depth/blend state required by one overlay draw.</summary>
+        /// <summary>
+        /// Applies the depth/blend state required by one overlay draw. Translucent draws
+        /// (<paramref name="blend"/>) also stop writing depth, otherwise the translucent
+        /// surface would occlude geometry drawn later and could not blend with what is
+        /// already in the framebuffer. <see cref="RestoreRenderState"/> puts it back.
+        /// </summary>
         private static void SetRenderState(OpenGL gl, bool depth, bool blend)
         {
             if (depth) gl.Enable(OpenGL.GL_DEPTH_TEST); else gl.Disable(OpenGL.GL_DEPTH_TEST);
@@ -1138,6 +1154,7 @@ void main() { FragColor = vertexColor; }";
             {
                 gl.Enable(OpenGL.GL_BLEND);
                 gl.BlendFunc(OpenGL.GL_SRC_ALPHA, OpenGL.GL_ONE_MINUS_SRC_ALPHA);
+                gl.DepthMask(0);
             }
             else
             {

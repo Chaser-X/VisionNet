@@ -189,6 +189,11 @@ namespace VisionNet.Controls
             this.BackColor = System.Drawing.SystemColors.ActiveCaptionText;
             this.ContextMenuStrip = this.menu_right;
             this.FrameRate = 10;
+            // Redraw on demand only: CxDisplay invalidates explicitly (SafeInvalidate /
+            // Invalidate) whenever data, camera, selection or overlays change. With the
+            // default TimerBased trigger the control also repainted 10x/s while idle,
+            // burning CPU/GPU for an unchanged scene.
+            this.RenderTrigger = SharpGL.RenderTrigger.Manual;
             this.Margin = new System.Windows.Forms.Padding(4, 4, 4, 4);
             this.Name = "CxDisplay";
             this.RenderContextType = SharpGL.RenderContextType.FBO;

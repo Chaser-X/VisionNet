@@ -61,7 +61,39 @@ namespace VisionNet.Controls
         /// world-space geometry items wrap their draw calls with this pose, screen-space
         /// HUD items ignore it. Maintained by <see cref="CxDisplay"/> for group members.
         /// </summary>
-        public CxMatrix4X4 ModelMatrix { get; set; } = CxMatrix4X4.Identity();
+        private CxMatrix4X4 _modelMatrix = CxMatrix4X4.Identity();
+
+        public CxMatrix4X4 ModelMatrix
+        {
+            get => _modelMatrix;
+            set
+            {
+                _modelMatrix = value;
+                _modelMatrixInverseDirty = true;
+            }
+        }
+
+        // Lazily computed inverse of ModelMatrix. The picking path transforms the query point
+        // into the item's local frame, so without this every mouse move inverts the pose of
+        // every overlay item.
+        private CxMatrix4X4 _modelMatrixInverse = CxMatrix4X4.Identity();
+        private bool _modelMatrixInverseDirty = true;
+
+        /// <summary>
+        /// Inverse of <see cref="ModelMatrix"/>, computed on first use after each pose change.
+        /// </summary>
+        internal CxMatrix4X4 ModelMatrixInverse
+        {
+            get
+            {
+                if (_modelMatrixInverseDirty)
+                {
+                    _modelMatrixInverse = (_modelMatrix ?? CxMatrix4X4.Identity()).Inverse();
+                    _modelMatrixInverseDirty = false;
+                }
+                return _modelMatrixInverse;
+            }
+        }
 
         /// <summary>
         /// Gets whether this item honours <see cref="ModelMatrix"/> in its <see cref="Draw"/>.

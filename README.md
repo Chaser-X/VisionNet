@@ -641,6 +641,8 @@ VisionOperator.DestroyLib();
 | ---------------------- | ---------------------------------------- | ------- |
 | `SurfaceMode`          | `PointCloud` `Mesh`                      | 点云或三角面片 |
 | `SurfaceColorMode`     | `Color` `Intensity` `ColorWithIntensity` `Diff` `Lit` | 颜色来源；`Diff` 为每顶点差分彩虹伪彩，`Lit` 为纯色 |
+| `PointSize`（Item 属性） | `float`，默认 `2`                        | `PointCloud` 模式的点大小（像素），`Mesh` 模式忽略 |
+| `Opacity`（Item 属性）   | `float`，取值 `0..1`，默认 `1`            | 不透明度；小于 1 时走半透明通道（见下） |
 | `SurfaceViewMode`      | `Top` `Front` `Left` `Right` `None`      | 预设视角    |
 | `ShowCoordinateSystem` | `bool`                                   | 显示世界坐标轴 |
 | `IsLeftHanded`         | `bool`                                   | 左手坐标系（默认 `false`） |
@@ -658,6 +660,17 @@ VisionOperator.DestroyLib();
 ```
 
 多个表面叠加时，颜色条与各 Item 自动同步至**全局 Z 范围**。
+
+#### 半透明（`Opacity < 1`）
+
+`CxSurfaceItem` / `CxPointCloudItem` / `CxMeshItem` 都支持逐项 `Opacity`（`0..1`，默认 `1`）。半透明项在**全部不透明项之后**单独一趟绘制，并关闭深度写入，因此能与已经画好的场景正确混合；全部项都不透明时，绘制顺序与结果与之前完全一致。
+
+已知限制（不做逐三角形排序的代价，务必按适用边界使用）：
+
+- **半透明项之间按绘制顺序混合，不按远近排序**：两块半透明面，先画的会被后画的覆盖，看上去"远的盖住近的"。
+- **闭合网格不做背面剔除**：前后两面都参与混合，`Opacity = 0.5` 的盒子看起来约 `0.75` 实。
+- **仍参与深度测试**：能被前面的不透明几何正确遮挡（这是"不透明先画"的前提）。
+- 适用边界：一个不透明主场景 + 少量半透明覆盖物（ROI 框、剖切参考面、半透明包围盒）；不适合多个互相穿插的半透明实体。
 
 #### 鼠标交互
 
@@ -746,15 +759,17 @@ display2D.SetBackgroundColor(Color.Black);
 > **叠加层 key 与交互事件**
 > 叠加层的 `key` 与 surface 的 key 是**两个独立命名空间**：`key == null` 保持"追加"语义（向后兼容），传入 key 则按 key 原位替换并释放旧 Item；用 `GetOverlayItem` / `RemoveOverlayItem` 查询与移除，`ClearOverlayItems` 全清。
 > 同一实例只会登记一次：对已登记实例再次 `SetOverlayItem` / `SetSurfaceItem` 视为**改 key**（保持原队列位置），不会重复登记。
-> `SelectionChanged`（UI 线程）在选中项变化时触发（`null` = 取消选中）；`CoordinatesChanged`（UI 线程）随鼠标移动触发（`null` = 未命中几何；同一像素的连续移动会被合并为一次）；`RenderItemFailed`（**渲染线程**，在资源锁释放后触发，可安全回调 display）在 Item 上传失败（如 shader 编译失败）时触发；WinForms 控件请用 `BeginInvoke` 更新（同步 `Invoke` 可能卡住渲染帧）。
+> `SelectionChanged`（UI 线程）在选中项变化时触发（`null` = 取消选中）；`CoordinatesChanged`（UI 线程）在**渲染帧内**解析：鼠标移动只记录位置，每帧最多做一次深度读回并触发一次（`null` = 未命中几何；同一像素的连续移动会被合并）；`RenderItemFailed`（渲染帧内，在资源锁释放后触发，可安全回调 display）在 Item 上传失败（如 shader 编译失败）时触发。二者都发生在渲染帧内，**WinForms 控件请用 `BeginInvoke` 更新，不要用同步 `Invoke`**（会卡住渲染帧）。
 > `Get*` 返回的 Item 修改底层数据仍需重新 `Set*`；只改姿态 / 颜色模式后调用 `Redraw()` 即可看到效果。
 
 > **多 Item 颜色一致性**
 > 叠加多个表面时，颜色条与每个 Item 的颜色映射统一采用**所有 Item 的全局 Z 范围**，无需手动同步。
 > Diff 模式 Item 使用差分范围而非 Z 范围；混合场景（Diff + 非 Diff 共存）时颜色条自动隐藏。
 
-> **线程安全**
-> `SetPointCloud` 等数据设置 API 可在后台线程调用；GL 资源的创建与释放由 `CxDisplay` 在渲染线程内完成。
+> **线程安全与重绘**
+> `SetPointCloud` 等数据设置 API 可在后台线程调用；GL 资源的创建与释放由 `CxDisplay` 在**渲染帧内**完成（WinForms 的 UI 线程 —— SharpGL 在 `OnPaint` 中绘制，`glReadPixels` 等调用因此必须发生在渲染帧内）。
+> 渲染为**按需重绘**：控件设了 `FrameRate = 10` 但 `RenderTrigger = Manual`，即**没有渲染定时器**；数据 / 相机 / 选中 / 叠加层变化时由 `SafeInvalidate()`（线程安全）触发重绘。
+> ⚠ 因此若在后台线程准备好数据后**没有**经过 `Set*` / `Redraw()` 等会触发重绘的入口，画面不会自动更新 —— 请显式调用 `Redraw()`。
 
 ---
 

@@ -17,6 +17,13 @@ namespace VisionNet.Controls
         private int _lastHoverX;
         private int _lastHoverY;
 
+        // Hover picking is deferred to the frame: the mouse handler only records the latest
+        // position and CxDisplay.Render performs at most one depth readback per frame.
+        private bool _hasPendingPick;
+        private int _pendingPickX;
+        private int _pendingPickY;
+        private readonly List<ICxObjRenderItem> _pickSnapshot = new List<ICxObjRenderItem>();
+
         // ── Mouse events ─────────────────────────────────────────────────────────
 
         /// <inheritdoc/>
@@ -25,10 +32,17 @@ namespace VisionNet.Controls
             _isMouseDown = true;
             _hasHoverPixel = false;
             _coordTagItem.Visible = false;
+            // Redraw is on demand (RenderTrigger = Manual), and the camera only invalidates from
+            // its MouseMove handler, so hiding the tooltip here must request a repaint itself.
+            SafeInvalidate();
+
+            // A left click already unprojects this pixel for selection; reuse that world position
+            // for the camera pivot so a click costs one depth readback instead of two.
+            CxPoint3D? worldPos = null;
 
             if (e.Button == MouseButtons.Left)
             {
-                var worldPos = ScreenToWorldCoordinate(e.X, e.Y);
+                worldPos = ScreenToWorldCoordinate(e.X, e.Y);
                 if (worldPos.HasValue)
                 {
                     var hit = FindActiveItemHit(worldPos.Value);
@@ -62,8 +76,19 @@ namespace VisionNet.Controls
             }
 
             // Normal camera interaction.
-            _camera.RotationPoint = GetNearestSurfacePoint(e.X, e.Y).Location;
+            _camera.RotationPoint = ResolveRotationPoint(e.X, e.Y, worldPos);
             base.OnMouseDown(e);
+        }
+
+        /// <summary>
+        /// Camera rotation pivot for a click: the surface point nearest to the clicked pixel.
+        /// <paramref name="worldAtPixel"/> lets a caller that has already unprojected this pixel
+        /// skip the second depth readback.
+        /// </summary>
+        private CxPoint3D? ResolveRotationPoint(int x, int y, CxPoint3D? worldAtPixel)
+        {
+            var world = worldAtPixel ?? ScreenToWorldCoordinate(x, y);
+            return world.HasValue ? GetNearestSurfacePoint(world.Value).Location : null;
         }
 
         /// <inheritdoc/>
@@ -84,6 +109,7 @@ namespace VisionNet.Controls
             if (_isDraggingItem && _isMouseDown && _selectedItem != null)
             {
                 _coordTagItem.Visible = false;
+                SafeInvalidate();
                 var worldPos = ScreenToWorldCoordinate(e.X, e.Y);
                 if (worldPos.HasValue && _lastDragWorldPos.HasValue)
                 {
@@ -94,12 +120,9 @@ namespace VisionNet.Controls
                     // frame so Translate() moves the stored (local) geometry by the correct delta.
                     if (_selectedItem.SupportsGroupTransform)
                     {
-                        var inv = _selectedItem.ModelMatrix?.Inverse();
-                        if (inv != null)
-                        {
-                            cur  = inv.TransformPoint3D(cur);
-                            prev = inv.TransformPoint3D(prev);
-                        }
+                        var inv = _selectedItem.ModelMatrixInverse;
+                        cur  = inv.TransformPoint3D(cur);
+                        prev = inv.TransformPoint3D(prev);
                     }
 
                     _selectedItem.OnMouseMove(cur, prev);
@@ -115,6 +138,7 @@ namespace VisionNet.Controls
             if (_isMouseDown)
             {
                 _coordTagItem.Visible = false;
+                SafeInvalidate();
                 CoordinatesChanged?.Invoke(null, null);
                 base.OnMouseMove(e);
                 return;
@@ -129,14 +153,32 @@ namespace VisionNet.Controls
             _lastHoverX = e.X;
             _lastHoverY = e.Y;
 
-            var pos = GetNearestSurfacePoint(e.X, e.Y);
+            // Record the request only. The depth readback plus the nearest-surface search run
+            // once per frame in CxDisplay.Render (Phase 4b): doing it here would stall the GPU
+            // pipeline on every mouse move and would also require the GL context to be current
+            // in this handler.
+            _hasPendingPick = true;
+            _pendingPickX = e.X;
+            _pendingPickY = e.Y;
+            SafeInvalidate();
+
+            base.OnMouseMove(e);
+        }
+
+        /// <summary>
+        /// Resolves the hover pick requested by <see cref="OnMouseMove"/>. Called inside the
+        /// render pass, after the scene has been drawn (so the depth buffer is valid and the GL
+        /// context is current), before the tooltip is drawn.
+        /// </summary>
+        private void ApplyPendingPick()
+        {
+            var pos = GetNearestSurfacePoint(_pendingPickX, _pendingPickY);
             bool hasHit = pos.Location.HasValue;
             _coordTagItem.Visible = hasHit;
             if (hasHit)
                 _coordTagItem.SetCoordinates(pos.Location.Value, pos.Intensity);
 
             CoordinatesChanged?.Invoke(hasHit ? pos.Location : null, hasHit ? pos.Intensity : null);
-            base.OnMouseMove(e);
         }
 
         /// <summary>
@@ -155,8 +197,8 @@ namespace VisionNet.Controls
 
                 // Posed items store local geometry: transform the query point into local space.
                 var testPos = worldPos;
-                if (ar.SupportsGroupTransform && ar.ModelMatrix != null)
-                    testPos = ar.ModelMatrix.Inverse().TransformPoint3D(worldPos);
+                if (ar.SupportsGroupTransform)
+                    testPos = ar.ModelMatrixInverse.TransformPoint3D(worldPos);
 
                 if (ar.HitTest(testPos)) return ar;
             }
@@ -199,12 +241,23 @@ namespace VisionNet.Controls
         public (CxPoint3D? Location, float? Intensity) GetNearestSurfacePoint(int mouseX, int mouseY)
         {
             var pos = ScreenToWorldCoordinate(mouseX, mouseY);
-            if (!pos.HasValue) return (null, null);
-            var world = pos.Value;
+            return pos.HasValue ? GetNearestSurfacePoint(pos.Value) : (null, null);
+        }
 
+        /// <summary>
+        /// Finds the surface point nearest to an already-unprojected world position, so a caller
+        /// that has already paid for the depth readback at this pixel does not repeat it.
+        /// </summary>
+        private (CxPoint3D? Location, float? Intensity) GetNearestSurfacePoint(CxPoint3D world)
+        {
             List<ICxObjRenderItem> snapshot;
             lock (_resourceLock)
-                snapshot = new List<ICxObjRenderItem>(_surfaceItems);
+            {
+                // Reuse a scratch buffer: this runs on every hover frame.
+                _pickSnapshot.Clear();
+                _pickSnapshot.AddRange(_surfaceItems);
+                snapshot = _pickSnapshot;
+            }
 
             if (snapshot.Count == 0) return (null, null);
 
@@ -238,8 +291,7 @@ namespace VisionNet.Controls
                 // Transform the world-space picking point into this item's local frame so that
                 // grid indexing stays correct even when a pose (model matrix) is applied.
                 var model = GetItemModelMatrix(cur);
-                var inv   = model.Inverse();
-                var local = inv.TransformPoint3D(world);
+                var local = GetItemInverseModelMatrix(cur).TransformPoint3D(world);
                 if (float.IsNaN(local.X) || float.IsNaN(local.Y) || float.IsNaN(local.Z)) continue;
 
                 // Structured surface: 5×5 neighbourhood search in local grid coordinates.

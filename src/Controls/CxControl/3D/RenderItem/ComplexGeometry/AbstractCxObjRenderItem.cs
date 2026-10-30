@@ -81,7 +81,12 @@ namespace VisionNet.Controls
         public CxMatrix4X4 ModelMatrix
         {
             get => _modelMatrix;
-            set { _modelMatrix = value; UpdateWorldZRange(); }
+            set
+            {
+                _modelMatrix = value;
+                _modelMatrixInverseDirty = true;
+                UpdateWorldZRange();
+            }
         }
 
         private SurfaceMode _surfaceMode;
@@ -197,8 +202,74 @@ namespace VisionNet.Controls
             }
         }
 
+        private float _opacity = 1f;
+
+        /// <summary>
+        /// Gets or sets the item's opacity in the range [0, 1] (values outside are clamped).
+        /// Default <c>1</c> (fully opaque). Values below 1 make the item translucent: it is
+        /// drawn after the opaque items and stops writing depth, so it blends with what is
+        /// already in the framebuffer instead of occluding it. Changing this value updates a
+        /// shader uniform only — no GL resources are rebuilt.
+        /// </summary>
+        /// <remarks>
+        /// Translucent items are not sorted back-to-front: multiple translucent items blend in
+        /// draw order, and a closed mesh blends its front and back faces (so e.g. 0.5 opacity
+        /// looks closer to 0.75 on a box). Intended for a few translucent overlays on an opaque
+        /// scene, not for many intersecting translucent solids.
+        /// </remarks>
+        public float Opacity
+        {
+            get => _opacity;
+            set
+            {
+                float clamped = value < 0f ? 0f : (value > 1f ? 1f : value);
+                if (_opacity == clamped) return;
+                _opacity = clamped;
+                if (_cachedRenderData?.Uniforms != null)
+                    _cachedRenderData.Uniforms["opacity"] = clamped;
+            }
+        }
+
+        /// <summary>True when this item must be drawn in the translucent pass.</summary>
+        protected bool IsTranslucent => _opacity < 1f;
+
+        private float _pointSize = 2f;
+
+        /// <summary>
+        /// Gets or sets the point size in pixels used when <see cref="SurfaceMode.PointCloud"/>
+        /// is active. Default <c>2</c> (values below 1 are clamped at draw time). Ignored in
+        /// <see cref="SurfaceMode.Mesh"/>.
+        /// </summary>
+        public float PointSize
+        {
+            get => _pointSize;
+            set => _pointSize = value;
+        }
+
         /// <summary>Cached CPU-side render data; <c>null</c> means it must be rebuilt.</summary>
         protected RenderData _cachedRenderData;
+
+        // Lazily computed inverse of ModelMatrix, used by the picking path so a mouse move does
+        // not invert the pose of every item. Invalidated by the ModelMatrix setter.
+        private CxMatrix4X4 _modelMatrixInverse = CxMatrix4X4.Identity();
+        private bool _modelMatrixInverseDirty = true;
+
+        /// <summary>
+        /// Inverse of <see cref="ModelMatrix"/>, computed on first use after each pose change.
+        /// Used to move the picking point into the item's local frame.
+        /// </summary>
+        internal CxMatrix4X4 ModelMatrixInverse
+        {
+            get
+            {
+                if (_modelMatrixInverseDirty)
+                {
+                    _modelMatrixInverse = (_modelMatrix ?? CxMatrix4X4.Identity()).Inverse();
+                    _modelMatrixInverseDirty = false;
+                }
+                return _modelMatrixInverse;
+            }
+        }
 
         // 构造时一次性预计算的范围缓存（供 SurfaceColorMode 切换时快速赋值）
         private float _baseZMin, _baseZMax;   // BoundingBox Z 范围
@@ -250,6 +321,7 @@ namespace VisionNet.Controls
             uniform int colorMode;
             uniform int surfaceMode;
             uniform vec4 solidColor;
+            uniform float opacity;
             uniform sampler2D intensityTexture;
             uniform int useIntensityAttribute;
 
@@ -287,15 +359,15 @@ namespace VisionNet.Controls
                 }
                 if (colorMode == 3) {
                     if (isinf(diffValue)) discard;
-                    FragColor = vec4(getColorByHeight(diffValue) * lightFactor, 1.0);
+                    FragColor = vec4(getColorByHeight(diffValue) * lightFactor, opacity);
                 } else if (colorMode == 0) {
-                    FragColor = vec4(getColorByHeight(height) * lightFactor, 1.0);
+                    FragColor = vec4(getColorByHeight(height) * lightFactor, opacity);
                 } else if (colorMode == 1) {
-                    FragColor = vec4(vec3(intensity) * lightFactor, 1.0);
+                    FragColor = vec4(vec3(intensity) * lightFactor, opacity);
                 } else if (colorMode == 4) {
-                    FragColor = vec4(solidColor.rgb * lightFactor, 1.0);
+                    FragColor = vec4(solidColor.rgb * lightFactor, opacity);
                 } else {
-                    FragColor = vec4(mix(vec3(intensity), getColorByHeight(height), 0.5) * lightFactor, 1.0);
+                    FragColor = vec4(mix(vec3(intensity), getColorByHeight(height), 0.5) * lightFactor, opacity);
                 }
             }";
         #endregion Shader 源码
@@ -357,7 +429,10 @@ namespace VisionNet.Controls
             // Base-class uniforms shared by all three items are injected here so the derived
             // BuildRenderData implementations do not have to know about them.
             if (data?.Uniforms != null)
+            {
                 data.Uniforms["solidColor"] = _solidColor;
+                data.Uniforms["opacity"] = _opacity;
+            }
             return data;
         }
 
@@ -371,10 +446,17 @@ namespace VisionNet.Controls
             // before the render thread has rebuilt the GL handle. Do not issue DrawElements(0).
             if (_surfaceMode == SurfaceMode.Mesh && data.IndexCount <= 0) return;
 
+            var renderer = ModernOverlayRenderer.For(gl);
+            // Only items that actually change GL state (translucent -> depth write off,
+            // point cloud -> point size) pay for the capture/restore round trip.
+            bool changesState = IsTranslucent || _surfaceMode == SurfaceMode.PointCloud;
+            ModernOverlayRenderer.RenderStateSnapshot previous = default;
+            if (changesState) previous = renderer.CaptureState(gl);
+
             gl.UseProgram(handle.ShaderProgram);
             gl.BindVertexArray(handle.VaoId);
 
-            ModernOverlayRenderer.For(gl).UploadSceneMatrices(gl, handle, ModelMatrix);
+            renderer.UploadSceneMatrices(gl, handle, ModelMatrix);
 
             foreach (var kv in data.Uniforms)
             {
@@ -389,14 +471,24 @@ namespace VisionNet.Controls
             gl.BindTexture(OpenGL.GL_TEXTURE_2D, handle.TextureId);
             gl.Uniform1(handle.GetUniformLocation(gl, "intensityTexture"), 0);
 
+            // Translucent items must not write depth: they are drawn after the opaque pass and
+            // have to blend with what is already in the framebuffer.
+            if (IsTranslucent) gl.DepthMask(0);
+
             if (_surfaceMode == SurfaceMode.PointCloud)
+            {
+                gl.PointSize(Math.Max(1f, _pointSize));
                 gl.DrawArrays(OpenGL.GL_POINTS, 0, data.VertexCount);
+            }
             else
+            {
                 gl.DrawElements(OpenGL.GL_TRIANGLES, data.IndexCount, OpenGL.GL_UNSIGNED_INT, IntPtr.Zero);
+            }
 
             gl.BindTexture(OpenGL.GL_TEXTURE_2D, 0);
             gl.BindVertexArray(0);
             gl.UseProgram(0);
+            if (changesState) renderer.RestoreState(gl, previous);
         }
 
         public void SetGlobalZRange(float zMin, float zMax)
