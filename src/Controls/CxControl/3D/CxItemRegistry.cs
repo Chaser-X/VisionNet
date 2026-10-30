@@ -12,10 +12,11 @@ namespace VisionNet.Controls
     /// <remarks>
     /// <para><b>Lock ordering:</b> <c>CxDisplay._renderLock</c> → this registry's lock. Never take
     /// the render lock while holding this one.</para>
-    /// <para>Operations that must be atomic as a group (register/replace, detach, dispose) wrap
-    /// themselves in <see cref="Sync(Action)"/> and use the <c>*InLock</c> accessors inside it.
-    /// Everything else (the typed queries and mutations) takes the lock itself, so a caller cannot
-    /// forget it or get the order wrong.</para>
+    /// <para>Every member takes the lock itself, so a caller cannot forget it or get the order
+    /// wrong. Operations that must be atomic as a group (register/replace, detach, dispose) are
+    /// single methods here rather than critical sections opened by the caller; where the caller
+    /// still has work to do for each affected item (unsubscribe, dispose) the method reports it
+    /// through a callback.</para>
     /// <para>The deferred-release queue is a <see cref="ConcurrentQueue{T}"/>: it is filled from any
     /// thread and drained on the render pass, so enqueue/dequeue need no lock.</para>
     /// </remarks>
@@ -54,35 +55,6 @@ namespace VisionNet.Controls
             = new ConcurrentQueue<GLResourceHandle>();
 
         // ── Critical section ─────────────────────────────────────────────────────
-
-        /// <summary>Runs <paramref name="action"/> while holding the registry lock.</summary>
-        internal void Sync(Action action)
-        {
-            lock (_lock) action();
-        }
-
-        /// <summary>Runs <paramref name="func"/> while holding the registry lock.</summary>
-        internal T Sync<T>(Func<T> func)
-        {
-            lock (_lock) return func();
-        }
-
-        // ── Lock-held accessors (only valid inside Sync) ──────────────────────────
-
-        /// <summary>Surface items in draw order. Caller must hold the lock via <see cref="Sync(Action)"/>.</summary>
-        internal List<ICxObjRenderItem> ItemsInLock => _items;
-
-        /// <summary>Surface key → item. Caller must hold the lock via <see cref="Sync(Action)"/>.</summary>
-        internal Dictionary<string, ICxObjRenderItem> KeysInLock => _keys;
-
-        /// <summary>Overlay items in draw order. Caller must hold the lock via <see cref="Sync(Action)"/>.</summary>
-        internal List<IRenderItem> RenderItemsInLock => _renderItems;
-
-        /// <summary>Overlay key → item. Caller must hold the lock via <see cref="Sync(Action)"/>.</summary>
-        internal Dictionary<string, AbstractRenderItem> OverlayKeysInLock => _overlayKeys;
-
-        /// <summary>Surface item → GL handle. Caller must hold the lock via <see cref="Sync(Action)"/>.</summary>
-        internal Dictionary<ICxObjRenderItem, GLResourceHandle> PoolInLock => _pool;
 
         // ── Surface queries ──────────────────────────────────────────────────────
 
@@ -187,6 +159,12 @@ namespace VisionNet.Controls
             lock (_lock) return _renderItems.ToArray();
         }
 
+        /// <summary>Returns a new list with the current overlay items, in draw order.</summary>
+        internal List<IRenderItem> CopyOverlayItems()
+        {
+            lock (_lock) return new List<IRenderItem>(_renderItems);
+        }
+
         /// <summary>Copies the current overlay items into <paramref name="destination"/> (cleared first).</summary>
         internal void CopyOverlayItemsInto(List<IRenderItem> destination)
         {
@@ -232,6 +210,289 @@ namespace VisionNet.Controls
         internal void DropReleases()
         {
             while (_pendingRelease.TryDequeue(out _)) { }
+        }
+        // ── Overlay mutations ───────────────────────────────────────────────────
+
+        /// <summary>
+        /// Registers an overlay item under <paramref name="key"/> (upsert). An overlay item is
+        /// registered at most once, so re-registering it under a different key renames it in place
+        /// instead of creating a second queue entry.
+        /// </summary>
+        /// <param name="replaced">The item previously occupying the key, or <c>null</c>.</param>
+        /// <returns><c>true</c> when the item was already registered under this exact key.</returns>
+        internal bool RegisterOverlayItem(string key, AbstractRenderItem item, out AbstractRenderItem replaced)
+        {
+            replaced = null;
+            lock (_lock)
+            {
+                bool hasOld = _overlayKeys.TryGetValue(key, out var old);
+                if (hasOld && ReferenceEquals(old, item)) return true;
+
+                int previousIndex = DetachOverlayItem(item);
+                if (hasOld)
+                {
+                    int index = _renderItems.IndexOf(old);
+                    if (index >= 0) _renderItems[index] = item;
+                    else _renderItems.Add(item);
+                    replaced = old;
+                }
+                else if (previousIndex >= 0)
+                {
+                    _renderItems.Insert(previousIndex, item);
+                }
+                else
+                {
+                    _renderItems.Add(item);
+                }
+
+                _overlayKeys[key] = item;
+                return false;
+            }
+        }
+
+        /// <summary>Appends an overlay item without a key (the historical behaviour).</summary>
+        internal void AppendOverlayItem(IRenderItem item)
+        {
+            lock (_lock) _renderItems.Add(item);
+        }
+
+        /// <summary>Removes and returns the overlay item stored under <paramref name="key"/>.</summary>
+        internal AbstractRenderItem RemoveOverlayItem(string key)
+        {
+            lock (_lock)
+            {
+                if (!_overlayKeys.TryGetValue(key, out var item)) return null;
+                _overlayKeys.Remove(key);
+                _renderItems.Remove(item);
+                return item;
+            }
+        }
+
+        /// <summary>Removes an overlay item by reference, releasing its key (if any).</summary>
+        internal bool RemoveOverlayItem(IRenderItem item)
+        {
+            lock (_lock)
+            {
+                if (!_renderItems.Remove(item)) return false;
+                RemoveOverlayKeyForItem(item);
+                return true;
+            }
+        }
+
+        /// <summary>Forgets every overlay item, invoking <paramref name="dispose"/> for each of them.</summary>
+        internal void ClearOverlayItems(Action<IRenderItem> dispose)
+        {
+            lock (_lock)
+            {
+                foreach (var item in _renderItems)
+                    dispose(item);
+                _renderItems.Clear();
+                _overlayKeys.Clear();
+            }
+        }
+
+        // ── Surface mutations ───────────────────────────────────────────────────
+
+        /// <summary>
+        /// Upserts a surface item under <paramref name="key"/> (append when the key is new, replace
+        /// in place otherwise). An item is registered at most once, so re-registering it under a
+        /// different key is a rename that keeps its slot.
+        /// </summary>
+        /// <param name="handle">Handle to register for <paramref name="item"/>.</param>
+        /// <param name="displaced">
+        /// Invoked for every registration this upsert displaced (the item's previous key, or the item
+        /// previously occupying the key). The handle has already been removed from the pool; the
+        /// third argument is <c>true</c> when the displaced item must also be disposed.
+        /// </param>
+        /// <returns><c>true</c> when the item was already registered under this exact key.</returns>
+        internal bool RegisterSurfaceItem(string key, ICxObjRenderItem item, GLResourceHandle handle,
+            Action<ICxObjRenderItem, GLResourceHandle, bool> displaced)
+        {
+            lock (_lock)
+            {
+                bool hasOld = _keys.TryGetValue(key, out var old);
+                if (hasOld && ReferenceEquals(old, item)) return true;
+
+                int previousIndex = DetachSurfaceItem(item, displaced);
+                if (hasOld)
+                {
+                    int index = _items.IndexOf(old);
+                    ReleasePoolEntry(old, displaced, disposeItem: true);
+                    if (index >= 0) _items[index] = item;
+                    else _items.Add(item);
+                }
+                else if (previousIndex >= 0)
+                {
+                    _items.Insert(previousIndex, item);
+                }
+                else
+                {
+                    _items.Add(item);
+                }
+
+                _keys[key] = item;
+                _pool[item] = handle;
+                return false;
+            }
+        }
+
+        /// <summary>Forgets every surface item, reporting each through <paramref name="displaced"/>.</summary>
+        internal void ClearSurfaceItems(Action<ICxObjRenderItem, GLResourceHandle, bool> displaced)
+        {
+            lock (_lock)
+            {
+                foreach (var item in _items)
+                    ReleasePoolEntry(item, displaced, disposeItem: true);
+                _items.Clear();
+                _keys.Clear();
+            }
+        }
+
+        /// <summary>
+        /// Removes the surface item stored under <paramref name="key"/>. The returned handle (if any)
+        /// has already been detached from the pool and must be released by the caller.
+        /// </summary>
+        internal bool RemoveSurfaceItem(string key, out ICxObjRenderItem removed, out GLResourceHandle handle)
+        {
+            removed = null;
+            handle = null;
+            lock (_lock)
+            {
+                if (!_keys.TryGetValue(key, out removed)) return false;
+                _keys.Remove(key);
+                _items.Remove(removed);
+                _pool.TryGetValue(removed, out handle);
+                _pool.Remove(removed);
+                return true;
+            }
+        }
+
+        /// <summary>
+        /// Removes a surface item by reference (releasing its key). The returned handle (if any) has
+        /// already been detached from the pool and must be released by the caller.
+        /// </summary>
+        internal bool RemoveSurfaceItem(ICxObjRenderItem item, out GLResourceHandle handle)
+        {
+            handle = null;
+            lock (_lock)
+            {
+                if (!_items.Remove(item)) return false;
+                RemoveSurfaceKeyForItem(item);
+                _pool.TryGetValue(item, out handle);
+                _pool.Remove(item);
+                return true;
+            }
+        }
+
+        /// <summary>Returns the key <paramref name="item"/> is registered under, or <c>null</c>.</summary>
+        internal string GetKeyOf(ICxObjRenderItem item)
+        {
+            if (item == null) return null;
+            lock (_lock)
+            {
+                foreach (var kv in _keys)
+                    if (ReferenceEquals(kv.Value, item)) return kv.Key;
+                return null;
+            }
+        }
+
+        /// <summary>Marks the item's handle as needing a GPU rebuild on the next render pass.</summary>
+        internal void MarkNeedsUpdate(ICxObjRenderItem item)
+        {
+            lock (_lock)
+                if (_pool.TryGetValue(item, out var handle))
+                    handle.NeedsUpdate = true;
+        }
+
+        /// <summary>Invokes <paramref name="action"/> for every pool entry (item plus its handle).</summary>
+        internal void ForEachPoolEntry(Action<ICxObjRenderItem, GLResourceHandle> action)
+        {
+            lock (_lock)
+                foreach (var kv in _pool)
+                    action(kv.Key, kv.Value);
+        }
+
+        /// <summary>
+        /// Forgets every registered item. Surface handles are reported through
+        /// <paramref name="releaseSurface"/> (already detached from the pool; the caller releases them
+        /// directly, because disposal runs with the context current) and overlay items through
+        /// <paramref name="disposeOverlay"/>.
+        /// </summary>
+        internal void DisposeAll(Action<ICxObjRenderItem, GLResourceHandle> releaseSurface,
+            Action<IRenderItem> disposeOverlay)
+        {
+            lock (_lock)
+            {
+                foreach (var item in _items)
+                {
+                    _pool.TryGetValue(item, out var handle);
+                    releaseSurface(item, handle);
+                }
+                _items.Clear();
+                _keys.Clear();
+                _pool.Clear();
+
+                _overlayKeys.Clear();
+                foreach (var item in _renderItems)
+                    disposeOverlay(item);
+                _renderItems.Clear();
+            }
+        }
+
+        // ── Private helpers (caller holds the lock) ──────────────────────────────
+
+        /// <summary>Removes <paramref name="item"/> from the overlay queue and its key; returns its index.</summary>
+        private int DetachOverlayItem(AbstractRenderItem item)
+        {
+            int index = _renderItems.IndexOf(item);
+            if (index < 0) return -1;
+
+            _renderItems.RemoveAt(index);
+            RemoveOverlayKeyForItem(item);
+            return index;
+        }
+
+        /// <summary>Removes the key entry pointing at <paramref name="item"/>.</summary>
+        private void RemoveOverlayKeyForItem(IRenderItem item)
+        {
+            string foundKey = null;
+            foreach (var kv in _overlayKeys)
+                if (ReferenceEquals(kv.Value, item)) { foundKey = kv.Key; break; }
+            if (foundKey != null) _overlayKeys.Remove(foundKey);
+        }
+
+        /// <summary>Removes the key entry pointing at <paramref name="item"/>.</summary>
+        private void RemoveSurfaceKeyForItem(ICxObjRenderItem item)
+        {
+            string foundKey = null;
+            foreach (var kv in _keys)
+                if (ReferenceEquals(kv.Value, item)) { foundKey = kv.Key; break; }
+            if (foundKey != null) _keys.Remove(foundKey);
+        }
+
+        /// <summary>Detaches <paramref name="item"/> from the queue, its key and the pool; returns its index.</summary>
+        private int DetachSurfaceItem(ICxObjRenderItem item,
+            Action<ICxObjRenderItem, GLResourceHandle, bool> displaced)
+        {
+            int index = _items.IndexOf(item);
+            if (index < 0) return -1;
+
+            _items.RemoveAt(index);
+            RemoveSurfaceKeyForItem(item);
+            ReleasePoolEntry(item, displaced, disposeItem: false);
+            return index;
+        }
+
+        /// <summary>
+        /// Detaches <paramref name="item"/>'s handle from the pool and reports it. No GL calls are
+        /// made; the caller decides when and how to release the handle.
+        /// </summary>
+        private void ReleasePoolEntry(ICxObjRenderItem item,
+            Action<ICxObjRenderItem, GLResourceHandle, bool> displaced, bool disposeItem)
+        {
+            _pool.TryGetValue(item, out var handle);
+            _pool.Remove(item);
+            displaced(item, handle, disposeItem);
         }
     }
 }

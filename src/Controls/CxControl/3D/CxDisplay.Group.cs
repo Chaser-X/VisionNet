@@ -33,12 +33,7 @@ namespace VisionNet.Controls
         internal string GetSurfaceKeyOf(ICxObjRenderItem item)
         {
             if (item == null) return null;
-            return _registry.Sync(() =>
-            {
-                foreach (var kv in _registry.KeysInLock)
-                    if (ReferenceEquals(kv.Value, item)) return kv.Key;
-                return null;
-            });
+            return _registry.GetKeyOf(item);
         }
 
 

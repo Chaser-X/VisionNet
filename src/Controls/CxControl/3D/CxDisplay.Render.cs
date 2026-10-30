@@ -110,26 +110,20 @@ namespace VisionNet.Controls
         {
             _failedItems.Clear();
 
-            _registry.Sync(() =>
+            _registry.ForEachPoolEntry((item, handle) =>
             {
-                foreach (var kv in _registry.PoolInLock)
+                if (item.IsDisposed) return;
+
+                // A shader compile failure is deterministic: do not re-upload geometry
+                // every frame. Retry only after the item reports new data.
+                if (handle.ShaderFailed && !handle.NeedsUpdate) return;
+
+                if (!handle.IsValid || handle.NeedsUpdate)
                 {
-                    var item   = kv.Key;
-                    var handle = kv.Value;
+                    if (handle.IsValid)
+                        ReleaseGLResources(gl, handle);
 
-                    if (item.IsDisposed) continue;
-
-                    // A shader compile failure is deterministic: do not re-upload geometry
-                    // every frame. Retry only after the item reports new data.
-                    if (handle.ShaderFailed && !handle.NeedsUpdate) continue;
-
-                    if (!handle.IsValid || handle.NeedsUpdate)
-                    {
-                        if (handle.IsValid)
-                            ReleaseGLResources(gl, handle);
-
-                        CreateGLResources(gl, item, handle);
-                    }
+                    CreateGLResources(gl, item, handle);
                 }
             });
 

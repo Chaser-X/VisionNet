@@ -6,7 +6,17 @@
 
 ## 未发布（工作区，尚未提交）
 
-（暂无）
+### M1 第 2/3 步：消除 `Sync` / `*InLock`，注册表状态完全私有
+
+- 13 处 `_registry.Sync(() => { …*InLock… })` 全部替换为**目的明确的注册表方法**；`Sync` / `Sync<T>` 与 5 个 `*InLock` 访问器**已删除**（全项目残留 0 处）。注册表的 `_lock` / `_items` / `_keys` / `_renderItems` / `_overlayKeys` / `_pool` / `_pendingRelease` 现在全部 `private`，外部**只能**通过 31 个类型化成员访问 —— 绕锁访问在编译期已不可能。
+- 复合流程整体搬进注册表，调用方需要为每个受影响项做的事通过回调上报：
+  - `RegisterSurfaceItem(key, item, handle, displaced)`：upsert（append / 原位替换 / 改名保持槽位）整体在锁内完成；被顶掉的注册通过 `displaced(item, handle, dispose)` 上报（handle 已从池中摘除）。
+  - `ClearSurfaceItems(displaced)`、`RemoveSurfaceItem(key|item, out …)`、`DisposeAll(releaseSurface, disposeOverlay)`、`ForEachPoolEntry(action)`、`ClearOverlayItems(dispose)`、`RegisterOverlayItem(key, item, out replaced)`、`RemoveOverlayItem(key|item)`、`AppendOverlayItem`、`GetKeyOf`、`MarkNeedsUpdate`。
+  - `CxDisplay` 侧新增 `OnSurfaceRegistrationDisplaced`（退订 + 入延迟释放队列 + 可选 Dispose），替代原先的 `ReleaseSurfaceItem` / `DetachSurfaceRegistration` / `RemoveKeyForItem` / `DetachOverlayRegistration` / `RemoveOverlayKeyForItem`（均已删除）。
+- **行为等价性核对**（逐方法比对操作顺序）：`SetSurfaceItem` 的 detach→原位替换→插入→key→池→订阅顺序一致（handle 由调用方先创建后传入，注册表内插池；订阅在 `_renderLock` 内完成，渲染帧无法插入）；`ClearSurfaceItems` / `RemoveSurfaceItem` ×2 / `SetOverlayItem` / `RemoveOverlayItem` ×2 / `ClearOverlayItems` / `ProcessResourcePool` / `GetSurfaceKeyOf` / `OnItemRenderDataChanged` 的步骤与副作用顺序均与改前相同；`DisposeResources` 保持「drain → Groups.Clear → surface（退订 + 直接释放 + Dispose）→ overlay Dispose → 清快照 → Release」的顺序（Dispose 时上下文 current，故句柄直接释放而非入队）。
+- 回调在注册表锁内触发（`RegisterSurfaceItem` / `ClearSurfaceItems` / `DisposeAll`），与改前 `ReleaseSurfaceItem` 在 `_resourceLock` 内调用一致；`Dispose` 触发的回调若回头调用 display，`_renderLock` 与注册表锁对同线程可重入，无新死锁面。
+- 验证：`CxControl` 与 `DemoFrom` MSBuild `/t:Rebuild`（Debug/Release）→ 0 错误、0 C# 警告（仅预存在 MSB3270）。`CxDisplay.Api.cs` 1010 → 829 行。
+- **未做运行时/OpenGL 验证** —— 本轮改的是最敏感的注册/替换/释放路径，且仓库无测试（M4 已推迟），**必须做一次交互回归**：见「待验证」第 15 项。
 
 ## 已提交
 
@@ -217,3 +227,6 @@
 12. 按需重绘（E1）：相机旋转/平移/缩放、数据加载、选中与拖拽、组变换、GL 上下文重建后画面是否都及时刷新（不再有 10 FPS 定时兜底）；后台线程准备完数据后未经过 `Set*` / `Redraw()` 时不刷新（预期行为，README 已注明）。
 13. 延迟拾取（E2）：悬停坐标标签是否随鼠标及时更新、与旧行为一致；`CoordinatesChanged` 现在在渲染帧内触发，处理器若用同步 `Invoke` 会卡帧。
 14. 半透明（M2）：`Opacity < 1` 的 Item 是否正确混合在不透明场景之上；全不透明场景的渲染结果与改动前逐像素一致；`CxBox3DItem` 等半透明 overlay 不再遮挡其后绘制的几何。
+15. 注册/替换/释放路径（M1 第 2/3 步）：
+    - **CPU 层已用临时脚本覆盖**（不新增项目、不进仓库）：驱动公开 API + 反射校验注册表内部不变量，55 项断言全过 —— 含新 key 注册、同 key 替换、改名保持槽位、跨类型替换、同实例重复 Set 为空操作、按 key 移除、清空、overlay 注册/替换/移除/清空、`Dispose` 后状态清空，以及渲染帧侧 API（`CopyFrameSnapshot` 索引对齐、`ForEachPoolEntry`、`GetKeyOf`、`MarkNeedsUpdate`、`DrainReleases` 恰好一次）。**该脚本只证明当前语义自洽，不能证明与重构前等价**（无 oracle）。
+    - **仍需 GL 侧人工回归**（脚本无 GL 上下文，不覆盖绘制与真实资源释放）：同 key 反复 `Set*`（含不同类型互替）后绘制顺序与画面正常；`Set*(otherKey, 已登记实例)` 不重复绘制；`RemoveSurfaceItem` / `ClearSurfaceItems` / `ClearOverlayItems` / `SetOverlayItem` 同 key 替换后无残留句柄；控件 `Dispose` 后无 GL 资源泄漏或异常；后台线程 Set 与渲染并发时不抛异常（脚本为单线程，未覆盖锁竞争）。

@@ -381,35 +381,23 @@ namespace VisionNet.Controls
                 if (gl != null)
                     _registry.DrainReleases(p => ReleaseGLResources(gl, p));
 
-                _registry.Sync(() =>
-                {
-                    Groups.Clear();
-                    foreach (var item in _registry.ItemsInLock)
+                Groups.Clear();
+                _registry.DisposeAll(
+                    (item, handle) =>
                     {
-                        if (_registry.PoolInLock.TryGetValue(item, out var h))
-                        {
-                            if (h.RenderDataChangedHandler != null)
-                                item.OnRenderDataChanged -= h.RenderDataChangedHandler;
+                        if (handle?.RenderDataChangedHandler != null)
+                            item.OnRenderDataChanged -= handle.RenderDataChangedHandler;
 
-                            if (gl != null) ReleaseGLResources(gl, h);
-                            _registry.PoolInLock.Remove(item);
-                        }
+                        // Disposal runs with the context current, so the handle is released directly
+                        // instead of being queued for the render pass.
+                        if (gl != null && handle != null) ReleaseGLResources(gl, handle);
                         item.Dispose();
-                    }
-                    _registry.ItemsInLock.Clear();
-                    _registry.KeysInLock.Clear();
+                    },
+                    overlay => overlay.Dispose());
 
-                    _registry.OverlayKeysInLock.Clear();
-                    var overlayItems = _registry.RenderItemsInLock;
-                    while (overlayItems.Count > 0)
-                    {
-                        overlayItems[0].Dispose();
-                        overlayItems.RemoveAt(0);
-                    }
-                    _surfaceSnapshot.Clear();
-                    _handleSnapshot.Clear();
-                    _overlaySnapshot.Clear();
-                });
+                _surfaceSnapshot.Clear();
+                _handleSnapshot.Clear();
+                _overlaySnapshot.Clear();
 
                 ModernOverlayRenderer.Release(gl);
             }
