@@ -6,7 +6,11 @@
 
 ## 未发布（工作区，尚未提交）
 
-### M1 第 2/3 步：消除 `Sync` / `*InLock`，注册表状态完全私有
+（暂无）
+
+## 已提交
+
+### f02bcce（2026-10-30）M1 第 2/3 步：消除 `Sync` / `*InLock`，注册表状态完全私有
 
 - 13 处 `_registry.Sync(() => { …*InLock… })` 全部替换为**目的明确的注册表方法**；`Sync` / `Sync<T>` 与 5 个 `*InLock` 访问器**已删除**（全项目残留 0 处）。注册表的 `_lock` / `_items` / `_keys` / `_renderItems` / `_overlayKeys` / `_pool` / `_pendingRelease` 现在全部 `private`，外部**只能**通过 31 个类型化成员访问 —— 绕锁访问在编译期已不可能。
 - 复合流程整体搬进注册表，调用方需要为每个受影响项做的事通过回调上报：
@@ -17,8 +21,6 @@
 - 回调在注册表锁内触发（`RegisterSurfaceItem` / `ClearSurfaceItems` / `DisposeAll`），与改前 `ReleaseSurfaceItem` 在 `_resourceLock` 内调用一致；`Dispose` 触发的回调若回头调用 display，`_renderLock` 与注册表锁对同线程可重入，无新死锁面。
 - 验证：`CxControl` 与 `DemoFrom` MSBuild `/t:Rebuild`（Debug/Release）→ 0 错误、0 C# 警告（仅预存在 MSB3270）。`CxDisplay.Api.cs` 1010 → 829 行。
 - **未做运行时/OpenGL 验证** —— 本轮改的是最敏感的注册/替换/释放路径，且仓库无测试（M4 已推迟），**必须做一次交互回归**：见「待验证」第 15 项。
-
-## 已提交
 
 ### 88e4511（2026-10-30）M1 第 1 步：CxItemRegistry 收拢队列与 GL 池；M3 第 1 步：ModernOverlayRenderer 纯文件移动
 
