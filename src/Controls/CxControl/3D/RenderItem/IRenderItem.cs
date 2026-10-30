@@ -55,14 +55,20 @@ namespace VisionNet.Controls
 
         // ── Group pose support ───────────────────────────────────────────────────
 
+        private CxMatrix4X4 _modelMatrix = CxMatrix4X4.Identity();
+
         /// <summary>
         /// Model matrix applied to this item's geometry before the camera transform.
         /// Only honoured when <see cref="SupportsGroupTransform"/> is <c>true</c>;
         /// world-space geometry items wrap their draw calls with this pose, screen-space
         /// HUD items ignore it. Maintained by <see cref="CxDisplay"/> for group members.
         /// </summary>
-        private CxMatrix4X4 _modelMatrix = CxMatrix4X4.Identity();
-
+        /// <remarks>
+        /// Treat the matrix as immutable: the inverse used by the picking path is cached and only
+        /// recomputed when this property is assigned. Mutating the assigned matrix's
+        /// <see cref="CxMatrix4X4.Data"/> array in place would leave that cache stale — assign a new
+        /// matrix instead.
+        /// </remarks>
         public CxMatrix4X4 ModelMatrix
         {
             get => _modelMatrix;

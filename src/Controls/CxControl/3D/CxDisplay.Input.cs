@@ -24,6 +24,13 @@ namespace VisionNet.Controls
         private int _pendingPickY;
         private readonly List<ICxObjRenderItem> _pickSnapshot = new List<ICxObjRenderItem>();
 
+        // Result of the pick resolved during the last frame. CoordinatesChanged is raised after the
+        // frame lock has been released (see RaisePendingCoordinatesChanged), so a handler may call
+        // back into the display.
+        private bool _hasCoordinatesResult;
+        private CxPoint3D? _coordinatesResultLocation;
+        private float? _coordinatesResultIntensity;
+
         // ── Mouse events ─────────────────────────────────────────────────────────
 
         /// <inheritdoc/>
@@ -32,6 +39,8 @@ namespace VisionNet.Controls
             _isMouseDown = true;
             _hasHoverPixel = false;
             _coordTagItem.Visible = false;
+            // Drop any hover pick recorded before the press: it must not re-show the tooltip.
+            CancelPendingPick();
             // Redraw is on demand (RenderTrigger = Manual), and the camera only invalidates from
             // its MouseMove handler, so hiding the tooltip here must request a repaint itself.
             SafeInvalidate();
@@ -100,6 +109,7 @@ namespace VisionNet.Controls
             _lastDragWorldPos = null;
             _isMouseDown      = false;
             _hasHoverPixel    = false;
+            CancelPendingPick();
             base.OnMouseUp(e);
         }
 
@@ -109,6 +119,7 @@ namespace VisionNet.Controls
             if (_isDraggingItem && _isMouseDown && _selectedItem != null)
             {
                 _coordTagItem.Visible = false;
+                CancelPendingPick();
                 SafeInvalidate();
                 var worldPos = ScreenToWorldCoordinate(e.X, e.Y);
                 if (worldPos.HasValue && _lastDragWorldPos.HasValue)
@@ -178,7 +189,34 @@ namespace VisionNet.Controls
             if (hasHit)
                 _coordTagItem.SetCoordinates(pos.Location.Value, pos.Intensity);
 
-            CoordinatesChanged?.Invoke(hasHit ? pos.Location : null, hasHit ? pos.Intensity : null);
+            // Stash the result: the tooltip needs it now (Phase 5 draws it), but the event itself is
+            // raised after the frame lock has been released.
+            _hasCoordinatesResult = true;
+            _coordinatesResultLocation = hasHit ? pos.Location : null;
+            _coordinatesResultIntensity = hasHit ? pos.Intensity : null;
+        }
+
+        /// <summary>
+        /// Raises <see cref="CoordinatesChanged"/> for the result resolved by the last frame.
+        /// Called by <c>DoOpenGLDraw</c> after the render lock has been released, so a handler may
+        /// safely call back into the display (the same contract <c>RenderItemFailed</c> documents).
+        /// </summary>
+        private void RaisePendingCoordinatesChanged()
+        {
+            if (!_hasCoordinatesResult) return;
+            _hasCoordinatesResult = false;
+            CoordinatesChanged?.Invoke(_coordinatesResultLocation, _coordinatesResultIntensity);
+        }
+
+        /// <summary>
+        /// Drops a hover pick that has not been resolved yet, plus any result the last frame stashed.
+        /// Used when the mouse button goes down or up, so a pick recorded before the press cannot
+        /// re-show the tooltip on the next frame.
+        /// </summary>
+        private void CancelPendingPick()
+        {
+            _hasPendingPick = false;
+            _hasCoordinatesResult = false;
         }
 
         /// <summary>
@@ -247,13 +285,21 @@ namespace VisionNet.Controls
         /// Finds the surface point nearest to an already-unprojected world position, so a caller
         /// that has already paid for the depth readback at this pixel does not repeat it.
         /// </summary>
+        /// <remarks>
+        /// Reuses an instance-level scratch buffer, and the search needs a current GL context for
+        /// the readback done by the public overload, so this path is <b>UI-thread only</b>.
+        /// </remarks>
         private (CxPoint3D? Location, float? Intensity) GetNearestSurfacePoint(CxPoint3D world)
         {
             // Reuse a scratch buffer: this runs on every hover frame.
             List<ICxObjRenderItem> snapshot = _pickSnapshot;
             _registry.CopyItemsInto(_pickSnapshot);
 
-            if (snapshot.Count == 0) return (null, null);
+            if (snapshot.Count == 0)
+            {
+                _pickSnapshot.Clear();
+                return (null, null);
+            }
 
             CxPoint3D? bestPoint    = null;
             float?      bestIntensity = null;
@@ -334,6 +380,8 @@ namespace VisionNet.Controls
                 }
             }
 
+            // Do not keep references to (possibly disposed) items in the scratch buffer.
+            _pickSnapshot.Clear();
             return (bestPoint, bestIntensity);
         }
 

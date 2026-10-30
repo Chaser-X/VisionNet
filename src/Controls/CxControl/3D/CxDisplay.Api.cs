@@ -740,10 +740,7 @@ namespace VisionNet.Controls
         /// <summary>refresh fbo viewer size</summary>
         public void RefreshViewSize()
         {
-            if (this.OpenGL.RenderContextProvider == null) return;   
-            //if (this.Width <= 0 || this.Height <= 0) return;
-            //this.OpenGL.SetDimensions(this.Width, this.Height);
-            //this.OpenGL.Viewport(0, 0, this.Width, this.Height);
+            if (this.OpenGL.RenderContextProvider == null) return;
             this.SafeInvalidate();
         }
         /// <summary>

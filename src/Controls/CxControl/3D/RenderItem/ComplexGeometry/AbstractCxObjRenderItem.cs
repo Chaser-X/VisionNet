@@ -71,13 +71,20 @@ namespace VisionNet.Controls
             }
         }
 
+        private CxMatrix4X4 _modelMatrix = CxMatrix4X4.Identity();
+
         /// <summary>
         /// Model matrix applied to this item's geometry before the camera transform.
         /// Represents the item's pose (position and orientation) in world space.
         /// Defaults to identity (no transform).
         /// Setting a new pose recomputes the world-space Z range used for colour mapping.
         /// </summary>
-        private CxMatrix4X4 _modelMatrix = CxMatrix4X4.Identity();
+        /// <remarks>
+        /// Treat the matrix as immutable: the inverse used by the picking path is cached and only
+        /// recomputed when this property is assigned. Mutating the assigned matrix's
+        /// <see cref="CxMatrix4X4.Data"/> array in place would leave that cache stale — assign a new
+        /// matrix instead.
+        /// </remarks>
         public CxMatrix4X4 ModelMatrix
         {
             get => _modelMatrix;
@@ -205,24 +212,30 @@ namespace VisionNet.Controls
         private float _opacity = 1f;
 
         /// <summary>
-        /// Gets or sets the item's opacity in the range [0, 1] (values outside are clamped).
-        /// Default <c>1</c> (fully opaque). Values below 1 make the item translucent: it is
-        /// drawn after the opaque items and stops writing depth, so it blends with what is
-        /// already in the framebuffer instead of occluding it. Changing this value updates a
-        /// shader uniform only — no GL resources are rebuilt.
+        /// Gets or sets the item's opacity in the range [0, 1] (values outside are clamped, and
+        /// <see cref="float.NaN"/> is treated as fully opaque). Default <c>1</c> (fully opaque).
+        /// Values below 1 make the item translucent: it is drawn after the opaque items and stops
+        /// writing depth, so it blends with what is already in the framebuffer instead of occluding
+        /// it. Changing this value updates a shader uniform only — no GL resources are rebuilt.
         /// </summary>
         /// <remarks>
         /// Translucent items are not sorted back-to-front: multiple translucent items blend in
         /// draw order, and a closed mesh blends its front and back faces (so e.g. 0.5 opacity
         /// looks closer to 0.75 on a box). Intended for a few translucent overlays on an opaque
         /// scene, not for many intersecting translucent solids.
+        /// <para>Like the other uniform-only settings (<see cref="SolidColor"/>), this does not
+        /// request a repaint by itself: call <c>CxDisplay.Redraw()</c> after changing it outside a
+        /// data update.</para>
         /// </remarks>
         public float Opacity
         {
             get => _opacity;
             set
             {
-                float clamped = value < 0f ? 0f : (value > 1f ? 1f : value);
+                // NaN would pass both comparisons below and reach the shader as an alpha of NaN.
+                float clamped = float.IsNaN(value)
+                    ? 1f
+                    : (value < 0f ? 0f : (value > 1f ? 1f : value));
                 if (_opacity == clamped) return;
                 _opacity = clamped;
                 if (_cachedRenderData?.Uniforms != null)

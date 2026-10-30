@@ -81,6 +81,11 @@ namespace VisionNet.Controls
                 gl.Disable(OpenGL.GL_DEPTH_TEST);
                 gl.Disable(OpenGL.GL_BLEND);
             }
+
+            // CoordinatesChanged is raised here, outside the render lock, so a handler may call back
+            // into the display (the contract RenderItemFailed already documents). The tooltip was
+            // already updated inside the frame, so it shows the same coordinates.
+            RaisePendingCoordinatesChanged();
         }
 
         /// <inheritdoc/>

@@ -50,6 +50,19 @@ namespace VisionNet.Controls.Tests
         }
 
         [Fact]
+        public void Opacity_NaNIsTreatedAsOpaque()
+        {
+            var item = NewItem();
+            item.Opacity = 0.5f;
+
+            // NaN must not reach the shader as an alpha value.
+            item.Opacity = float.NaN;
+
+            Assert.Equal(1f, item.Opacity);
+            Assert.Equal(1f, (float)item.PrepareRenderData().Uniforms["opacity"]);
+        }
+
+        [Fact]
         public void SolidColor_DefaultsToTheLegacyLitGrey()
         {
             var item = NewItem();

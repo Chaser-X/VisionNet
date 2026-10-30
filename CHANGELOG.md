@@ -6,7 +6,19 @@
 
 ## 未发布（工作区，尚未提交）
 
-（暂无）
+### 评审修复（P1–P9）：拾取事件移出帧锁、NaN 透明度、注册表整洁与文档
+
+- **P1（行为修复）**：`CoordinatesChanged` 原先在渲染帧内、`_renderLock` 持有期间触发（hover 拾取被延迟到 `Render` 后引入）。现在 `ApplyPendingPick` 只**暂存**结果（tooltip 仍在本帧绘制），事件由 `DoOpenGLDraw` **在帧锁释放后**触发 —— 与 `RenderItemFailed` 的既定契约一致（处理器可安全回调 display）。
+- **P3（缺陷修复）**：`OnMouseDown` / 拖拽分支 / `OnMouseUp` 原先只隐藏 tooltip、不清待处理拾取，导致按下前最后一次 move 留下的拾取会在下一帧让 tooltip 重新可见并触发事件。新增 `CancelPendingPick()` 在这三处调用。
+- **P8（缺陷修复）**：`Opacity` 的钳制对 `NaN` 不生效（两个比较都为 false），NaN 会被存下并在 shader 中作为 alpha 输出；现在 `NaN` 视为完全不透明（`1`），并补充"uniform-only 设置需自行 `Redraw()`"的说明。
+- **P4**：`_pickSnapshot` 在两条返回路径上 `Clear()`，不再滞留已移除（可能已 Dispose）的 item 引用；并在 XML 文档注明该路径**仅限 UI 线程**（需要 GL 深度读回）。
+- **P5**：删除注册表中零生产调用的 `TryGetHandle` / `CopyKeys`（此前只有测试在用）；测试改用生产 API（`CopyFrameSnapshot` / `GetByKey`）断言。
+- **P6**：补 `RegisterSurfaceItem` 的槽位规则文档（含"key 已占用 **且** item 已以另一 key 注册"这一组合分支：item 取**被替换者**的槽位，原槽位丢弃），并新增对应用例。
+- **P7**：注册表类注释写明 **回调在锁内执行**（与旧 `_resourceLock` 行为一致），并说明回调不得阻塞、同线程可重入。
+- **P2**：`ModelMatrix` 的逆矩阵缓存只在属性赋值时失效，而 `CxMatrix4X4.Data` 是公开可写的 `float[]`（原地修改会让缓存过期）；在两个 `ModelMatrix` 属性上写明"视为不可变，请整体重新赋值"，并加入「已知坑」。
+- **P9 整洁性**：删除 `CxItemRegistry` 中空的 `// ── Critical section ──` 段头；把承载延迟释放方法的段头由误标的 `// ── Surface mutations ──` 改为 `// ── Deferred release ──`（同时消除重复段头）；段头前补空行；`CxDisplay.Api.cs` 的 `RefreshViewSize` 去掉行尾空白与 3 行失效注释代码。
+- 验证：`CxControl` / `DemoFrom` / `CxControl.Tests` MSBuild `/t:Rebuild`（Debug/Release）→ 0 错误、0 C# 警告（仅预存在 MSB3270）；`dotnet test` → **67/67 通过**（新增 P6 组合分支与 P8 NaN 两项用例）。
+- **未处理**：P2 的"缓存时保存 `Data` 快照/版本号"方案（成本高于收益，改为文档契约）；P4 的并发安全（与既有 `_pickViewport` / `_pickDepthBytes` 的取舍一致，属待验证）。
 
 ## 已提交
 
@@ -237,6 +249,8 @@
 - 直接改 `MaxPointCount` 不会重建采样；直接赋值 `ColorMin` / `ColorMax` 不生效（Draw 上传的是缓存 uniform，由显示层每帧聚合下发）。
 - overlay 成员无法重绑（没有 key 概念）；如需替换 overlay 成员，需要另加资源层 API。
 - 根目录 `end` 是历史 `git log` 转储文件（内容含旧 API 名，非代码），全仓库检索时注意排除。
+- `ModelMatrix` **视为不可变**：拾取用的逆矩阵只在属性赋值时失效，原地修改 `CxMatrix4X4.Data[...]` 会让缓存过期。请整体重新赋值（`Set*Pose` / `Groups.SetMemberLocalTransform`）。
+- `GetNearestSurfacePoint`（公开重载）与悬停拾取需要 GL 深度读回，**只能在 UI 线程调用**。
 
 **提交前检查清单（防文档漂移）**
 

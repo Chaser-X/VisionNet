@@ -14,9 +14,13 @@ namespace VisionNet.Controls
     /// the render lock while holding this one.</para>
     /// <para>Every member takes the lock itself, so a caller cannot forget it or get the order
     /// wrong. Operations that must be atomic as a group (register/replace, detach, dispose) are
-    /// single methods here rather than critical sections opened by the caller; where the caller
-    /// still has work to do for each affected item (unsubscribe, dispose) the method reports it
-    /// through a callback.</para>
+    /// single methods here rather than critical sections opened by the caller.</para>
+    /// <para><b>Callbacks run while the lock is held.</b> The members that report affected items
+    /// (<see cref="RegisterSurfaceItem"/>, <see cref="ClearSurfaceItems"/>, <see cref="DisposeAll"/>,
+    /// <see cref="ClearOverlayItems"/>) invoke the caller's delegate from inside the critical
+    /// section, so those delegates must not block, and any callback that re-enters the registry or
+    /// the display must be on the same thread (the lock is re-entrant for it). This matches the
+    /// previous behaviour, where the same delegates ran inside <c>CxDisplay._resourceLock</c>.</para>
     /// <para>The deferred-release queue is a <see cref="ConcurrentQueue{T}"/>: it is filled from any
     /// thread and drained on the render pass, so enqueue/dequeue need no lock.</para>
     /// </remarks>
@@ -54,8 +58,6 @@ namespace VisionNet.Controls
         private readonly ConcurrentQueue<GLResourceHandle> _pendingRelease
             = new ConcurrentQueue<GLResourceHandle>();
 
-        // ── Critical section ─────────────────────────────────────────────────────
-
         // ── Surface queries ──────────────────────────────────────────────────────
 
         /// <summary>Number of registered surface items.</summary>
@@ -69,12 +71,6 @@ namespace VisionNet.Controls
         {
             if (key == null) return null;
             lock (_lock) return _keys.TryGetValue(key, out var item) ? item : null;
-        }
-
-        /// <summary>Returns the GL handle registered for <paramref name="item"/>.</summary>
-        internal bool TryGetHandle(ICxObjRenderItem item, out GLResourceHandle handle)
-        {
-            lock (_lock) return _pool.TryGetValue(item, out handle);
         }
 
         /// <summary>Returns a new array with the current surface items, in draw order.</summary>
@@ -109,12 +105,6 @@ namespace VisionNet.Controls
                     if (item is T typed) result.Add(typed);
                 return result;
             }
-        }
-
-        /// <summary>Returns a new list with the surface keys currently registered.</summary>
-        internal List<string> CopyKeys()
-        {
-            lock (_lock) return new List<string>(_keys.Keys);
         }
 
         /// <summary>
@@ -181,7 +171,7 @@ namespace VisionNet.Controls
             lock (_lock) return _renderItems.Contains(item);
         }
 
-        // ── Surface mutations ────────────────────────────────────────────────────
+        // ── Deferred release ─────────────────────────────────────────────────────
 
         /// <summary>Queues a handle for release on the render pass (lock-free).</summary>
         internal void EnqueueRelease(GLResourceHandle handle)
@@ -211,6 +201,7 @@ namespace VisionNet.Controls
         {
             while (_pendingRelease.TryDequeue(out _)) { }
         }
+
         // ── Overlay mutations ───────────────────────────────────────────────────
 
         /// <summary>
@@ -298,6 +289,18 @@ namespace VisionNet.Controls
         /// in place otherwise). An item is registered at most once, so re-registering it under a
         /// different key is a rename that keeps its slot.
         /// </summary>
+        /// <remarks>
+        /// Draw-order slot rules, applied in this order:
+        /// <list type="bullet">
+        /// <item>New key, item not registered yet: appended at the end.</item>
+        /// <item>New key, item already registered under another key: the item keeps the slot it
+        /// occupied (rename).</item>
+        /// <item>Existing key: the item takes the slot of the item it replaces.</item>
+        /// <item>Both at once (existing key <i>and</i> the item already registered elsewhere): the
+        /// item takes the <b>replaced</b> item's slot and the slot it held under its previous key is
+        /// dropped, so it never occupies two slots.</item>
+        /// </list>
+        /// </remarks>
         /// <param name="handle">Handle to register for <paramref name="item"/>.</param>
         /// <param name="displaced">
         /// Invoked for every registration this upsert displaced (the item's previous key, or the item

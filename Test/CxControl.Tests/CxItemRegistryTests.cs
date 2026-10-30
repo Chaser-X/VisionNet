@@ -40,8 +40,35 @@ namespace VisionNet.Controls.Tests
             Assert.False(already);
             Assert.Equal(1, reg.Count);
             Assert.Same(item, reg.GetByKey("A"));
-            Assert.True(reg.TryGetHandle(item, out var stored));
-            Assert.Same(handle, stored);
+
+            var items = new List<ICxObjRenderItem>();
+            var handles = new List<GLResourceHandle>();
+            reg.CopyFrameSnapshot(items, handles);
+            Assert.Same(item, items[0]);
+            Assert.Same(handle, handles[0]);
+        }
+
+        [Fact]
+        public void Register_ExistingKeyForAnItemRegisteredElsewhere_TakesTheReplacedSlot()
+        {
+            var reg = new CxItemRegistry();
+            var a = NewSurfaceItem(1f);
+            var b = NewSurfaceItem(2f);
+            var c = NewSurfaceItem(3f);
+            reg.RegisterSurfaceItem("A", a, new GLResourceHandle(), (i, h, d) => { });
+            reg.RegisterSurfaceItem("B", b, new GLResourceHandle(), (i, h, d) => { });
+            reg.RegisterSurfaceItem("C", c, new GLResourceHandle(), (i, h, d) => { });
+
+            // "B" is occupied by b while a is registered under "A": a takes b's slot and the slot it
+            // held under "A" is dropped, so it never occupies two slots.
+            reg.RegisterSurfaceItem("B", a, new GLResourceHandle(), (i, h, d) => { });
+
+            var order = reg.SnapshotItems();
+            Assert.Equal(2, order.Length);
+            Assert.Same(a, order[0]);
+            Assert.Same(c, order[1]);
+            Assert.Null(reg.GetByKey("A"));
+            Assert.Same(a, reg.GetByKey("B"));
         }
 
         [Fact]
@@ -160,7 +187,8 @@ namespace VisionNet.Controls.Tests
             reg.ClearSurfaceItems((i, h, d) => reported.Add((i, h, d)));
 
             Assert.Equal(0, reg.Count);
-            Assert.Empty(reg.CopyKeys());
+            Assert.Null(reg.GetByKey("A"));
+            Assert.Null(reg.GetByKey("B"));
             Assert.Equal(2, reported.Count);
             Assert.All(reported, r => Assert.True(r.Dispose));
             Assert.All(reported, r => Assert.NotNull(r.Handle));
