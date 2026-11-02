@@ -20,6 +20,85 @@ namespace VisionNet.Controls
         internal const short NoDataValue = -32768;
 
         /// <summary>
+        /// Half-width of the grid neighbourhood scanned around a picked cell — 2 gives a 5×5 window.
+        /// </summary>
+        internal const int PickNeighbourhoodRadius = 2;
+
+        /// <summary>
+        /// A reconstructed candidate must land within this multiple of the squared grid spacing,
+        /// otherwise it is too far from the depth-buffer hit to plausibly belong to this surface.
+        /// </summary>
+        internal const float PickNeighbourhoodTolerance = 5f;
+
+        /// <summary>
+        /// Searches the <see cref="PickNeighbourhoodRadius"/>-neighbourhood of the grid cell
+        /// containing <paramref name="local"/> for the point closest to <paramref name="world"/>,
+        /// updating the running best in place.
+        /// </summary>
+        /// <remarks>
+        /// Pure geometry — no GL calls and no display state — so it is directly unit-testable.
+        /// Each candidate is reconstructed in <b>world</b> space via <paramref name="model"/>
+        /// before its distance is measured: the front-most surface (the one whose geometry
+        /// actually contains the depth-buffer point) reconstructs nearest to
+        /// <paramref name="world"/>, so overlapping surfaces are disambiguated by world-space
+        /// distance rather than local coordinate overlap.
+        /// </remarks>
+        /// <param name="surface">Structured surface to search.</param>
+        /// <param name="model">The owning item's model matrix (local → world).</param>
+        /// <param name="local">Picking point transformed into the surface's local frame.</param>
+        /// <param name="world">Picking point in world space.</param>
+        /// <param name="useDiff">True in Diff colour mode: report Diff values instead of Intensity.</param>
+        /// <param name="bestDist">Best squared distance so far; lowered when a closer candidate is found.</param>
+        /// <param name="bestPoint">Best world-space point so far; updated with <paramref name="bestDist"/>.</param>
+        /// <param name="bestIntensity">Value at the best point (diff or intensity, per <paramref name="useDiff"/>).</param>
+        internal static void SearchSurfaceNeighbourhood(CxSurface surface, CxMatrix4X4 model,
+            CxPoint3D local, CxPoint3D world, bool useDiff,
+            ref float bestDist, ref CxPoint3D? bestPoint, ref float? bestIntensity)
+        {
+            int xi = (int)Math.Round((local.X - surface.XOffset) / surface.XScale);
+            int yi = (int)Math.Round((local.Y - surface.YOffset) / surface.YScale);
+            if (xi < 0 || xi >= surface.Width || yi < 0 || yi >= surface.Length) return;
+
+            float threshold = PickNeighbourhoodTolerance * (surface.XScale * surface.XScale
+                                                          + surface.YScale * surface.YScale
+                                                          + surface.ZScale * surface.ZScale);
+
+            for (int dy = -PickNeighbourhoodRadius; dy <= PickNeighbourhoodRadius; dy++)
+            {
+                for (int dx = -PickNeighbourhoodRadius; dx <= PickNeighbourhoodRadius; dx++)
+                {
+                    int nx = xi + dx, ny = yi + dy;
+                    if (nx < 0 || nx >= surface.Width || ny < 0 || ny >= surface.Length) continue;
+
+                    int idx = ny * surface.Width + nx;
+                    float z = surface.Data[idx] == NoDataValue
+                        ? float.NegativeInfinity
+                        : surface.ZOffset + surface.Data[idx] * surface.ZScale;
+                    if (float.IsInfinity(z)) continue;
+
+                    float px = surface.XOffset + nx * surface.XScale;
+                    float py = surface.YOffset + ny * surface.YScale;
+
+                    var worldCand = model.TransformPoint3D(new CxPoint3D(px, py, z));
+                    float d = (worldCand.X - world.X) * (worldCand.X - world.X)
+                            + (worldCand.Y - world.Y) * (worldCand.Y - world.Y)
+                            + (worldCand.Z - world.Z) * (worldCand.Z - world.Z);
+
+                    if (d < bestDist && d < threshold)
+                    {
+                        bestDist  = d;
+                        bestPoint = worldCand;
+                        bestIntensity = useDiff
+                            ? (surface.Diff != null && surface.Diff.Length > idx)
+                                ? surface.Diff[idx] : (float?)null
+                            : (surface.Intensity != null && surface.Intensity.Length > idx)
+                                ? surface.Intensity[idx] : (float?)null;
+                    }
+                }
+            }
+        }
+
+        /// <summary>
         /// Finalises a bounding box from accumulated per-axis extremes. Callers must have already
         /// skipped every invalid point, so the extremes describe at least one real point.
         /// </summary>

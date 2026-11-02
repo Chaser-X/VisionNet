@@ -64,6 +64,16 @@ namespace VisionNet.Controls
             PointCloud = null;
         }
 
+        /// <summary>
+        /// A point cloud has no per-point grid: the un-projected world coordinate is itself the
+        /// answer, and it outranks any grid candidate.
+        /// </summary>
+        internal override void PickAt(CxPoint3D world, bool useDiff,
+            ref float bestDist, ref CxPoint3D? bestPoint, ref float? bestIntensity)
+        {
+            if (0f < bestDist) { bestDist = 0f; bestPoint = world; bestIntensity = null; }
+        }
+
         protected override RenderData BuildRenderData()
         {
             CalculateSamplingFactors();

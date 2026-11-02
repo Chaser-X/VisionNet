@@ -310,110 +310,16 @@ namespace VisionNet.Controls
             {
                 if (cur == null || cur.IsDisposed) continue;
 
-                // Mesh items and point clouds have no per-point grid: the un-projected world
-                // coordinate is itself the answer, and it outranks any grid candidate.
-                if (cur is CxMeshItem || cur is CxPointCloudItem)
-                {
-                    if (0f < bestDist) { bestDist = 0f; bestPoint = world; bestIntensity = null; }
-                    continue;
-                }
-
-                // Structured surfaces are the only remaining source of grid candidates.
-                if (!(cur is CxSurfaceItem si) || si.Surface == null) continue;
-
-                // Transform the world-space picking point into this item's local frame so that
-                // grid indexing stays correct even when a pose (model matrix) is applied.
-                var model = GetItemModelMatrix(cur);
-                var local = GetItemInverseModelMatrix(cur).TransformPoint3D(world);
-                if (float.IsNaN(local.X) || float.IsNaN(local.Y) || float.IsNaN(local.Z)) continue;
-
-                SearchSurfaceNeighbourhood(si.Surface, model, local, world, useDiff,
-                    ref bestDist, ref bestPoint, ref bestIntensity);
+                // Each item knows how it answers a pick query (grid search vs. the query point
+                // itself), so this loop needs no per-type branching. Only the built-in
+                // surface items implement the contract; anything else contributes nothing.
+                if (!(cur is AbstractCxObjRenderItem item)) continue;
+                item.PickAt(world, useDiff, ref bestDist, ref bestPoint, ref bestIntensity);
             }
 
             // Do not keep references to (possibly disposed) items in the scratch buffer.
             _pickSnapshot.Clear();
             return (bestPoint, bestIntensity);
-        }
-
-        /// <summary>
-        /// Half-width of the grid neighbourhood scanned around the picked cell — 2 gives the
-        /// documented 5×5 window.
-        /// </summary>
-        private const int PickNeighbourhoodRadius = 2;
-
-        /// <summary>
-        /// A reconstructed candidate must land within this multiple of the squared grid spacing,
-        /// otherwise it is too far from the depth-buffer hit to plausibly belong to this surface.
-        /// </summary>
-        private const float PickNeighbourhoodTolerance = 5f;
-
-        /// <summary>
-        /// Searches the <see cref="PickNeighbourhoodRadius"/>-neighbourhood of the grid cell
-        /// containing <paramref name="local"/> for the point closest to <paramref name="world"/>,
-        /// updating the running best in place.
-        /// </summary>
-        /// <remarks>
-        /// Pure geometry — no GL calls and no display state — so it is directly unit-testable.
-        /// Each candidate is reconstructed in <b>world</b> space via <paramref name="model"/>
-        /// before its distance is measured: the front-most surface (the one whose geometry
-        /// actually contains the depth-buffer point) reconstructs nearest to
-        /// <paramref name="world"/>, so overlapping surfaces are disambiguated by world-space
-        /// distance rather than local coordinate overlap.
-        /// </remarks>
-        /// <param name="surface">Structured surface to search.</param>
-        /// <param name="model">The owning item's model matrix (local → world).</param>
-        /// <param name="local">Picking point transformed into the surface's local frame.</param>
-        /// <param name="world">Picking point in world space.</param>
-        /// <param name="useDiff">True in Diff colour mode: report Diff values instead of Intensity.</param>
-        /// <param name="bestDist">Best squared distance so far; lowered when a closer candidate is found.</param>
-        /// <param name="bestPoint">Best world-space point so far; updated with <paramref name="bestDist"/>.</param>
-        /// <param name="bestIntensity">Value at the best point (diff or intensity, per <paramref name="useDiff"/>).</param>
-        internal static void SearchSurfaceNeighbourhood(CxSurface surface, CxMatrix4X4 model,
-            CxPoint3D local, CxPoint3D world, bool useDiff,
-            ref float bestDist, ref CxPoint3D? bestPoint, ref float? bestIntensity)
-        {
-            int xi = (int)Math.Round((local.X - surface.XOffset) / surface.XScale);
-            int yi = (int)Math.Round((local.Y - surface.YOffset) / surface.YScale);
-            if (xi < 0 || xi >= surface.Width || yi < 0 || yi >= surface.Length) return;
-
-            float threshold = PickNeighbourhoodTolerance * (surface.XScale * surface.XScale
-                                                          + surface.YScale * surface.YScale
-                                                          + surface.ZScale * surface.ZScale);
-
-            for (int dy = -PickNeighbourhoodRadius; dy <= PickNeighbourhoodRadius; dy++)
-            {
-                for (int dx = -PickNeighbourhoodRadius; dx <= PickNeighbourhoodRadius; dx++)
-                {
-                    int nx = xi + dx, ny = yi + dy;
-                    if (nx < 0 || nx >= surface.Width || ny < 0 || ny >= surface.Length) continue;
-
-                    int idx = ny * surface.Width + nx;
-                    float z = surface.Data[idx] == CxExtension.NoDataValue
-                        ? float.NegativeInfinity
-                        : surface.ZOffset + surface.Data[idx] * surface.ZScale;
-                    if (float.IsInfinity(z)) continue;
-
-                    float px = surface.XOffset + nx * surface.XScale;
-                    float py = surface.YOffset + ny * surface.YScale;
-
-                    var worldCand = model.TransformPoint3D(new CxPoint3D(px, py, z));
-                    float d = (worldCand.X - world.X) * (worldCand.X - world.X)
-                            + (worldCand.Y - world.Y) * (worldCand.Y - world.Y)
-                            + (worldCand.Z - world.Z) * (worldCand.Z - world.Z);
-
-                    if (d < bestDist && d < threshold)
-                    {
-                        bestDist  = d;
-                        bestPoint = worldCand;
-                        bestIntensity = useDiff
-                            ? (surface.Diff != null && surface.Diff.Length > idx)
-                                ? surface.Diff[idx] : (float?)null
-                            : (surface.Intensity != null && surface.Intensity.Length > idx)
-                                ? surface.Intensity[idx] : (float?)null;
-                    }
-                }
-            }
         }
 
         // ── Context-menu event handlers ──────────────────────────────────────────

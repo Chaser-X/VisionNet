@@ -4,7 +4,7 @@ using Xunit;
 namespace VisionNet.Controls.Tests
 {
     /// <summary>
-    /// Pure-geometry tests for <see cref="CxDisplay.SearchSurfaceNeighbourhood"/>, the 5×5 grid
+    /// Pure-geometry tests for <see cref="CxExtension.SearchSurfaceNeighbourhood"/>, the 5×5 grid
     /// search extracted out of the hover-picking path. It takes no GL context and no display
     /// instance, so the picking maths can be pinned without a live render loop.
     /// </summary>
@@ -39,7 +39,7 @@ namespace VisionNet.Controls.Tests
             float bestDist = float.MaxValue;
             CxPoint3D? bestPoint = null;
             float? bestValue = null;
-            CxDisplay.SearchSurfaceNeighbourhood(surface, model ?? Identity, local ?? world, world,
+            CxExtension.SearchSurfaceNeighbourhood(surface, model ?? Identity, local ?? world, world,
                 useDiff, ref bestDist, ref bestPoint, ref bestValue);
             return (bestPoint, bestValue, bestDist);
         }
@@ -182,7 +182,7 @@ namespace VisionNet.Controls.Tests
             float bestDist = 0f;
             CxPoint3D? bestPoint = pinned;
             float? bestValue = null;
-            CxDisplay.SearchSurfaceNeighbourhood(surface, Identity,
+            CxExtension.SearchSurfaceNeighbourhood(surface, Identity,
                 new CxPoint3D(2f, 2f, 0f), new CxPoint3D(2f, 2f, 0f), false,
                 ref bestDist, ref bestPoint, ref bestValue);
 

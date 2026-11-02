@@ -430,6 +430,37 @@ namespace VisionNet.Controls
         /// <summary>Builds and caches the render data for the current data object.</summary>
         protected abstract RenderData BuildRenderData();
 
+        /// <summary>
+        /// Contributes this item's answer to a world-space pick query, lowering the running best
+        /// when this item is a better match than whatever earlier items reported.
+        /// </summary>
+        /// <remarks>
+        /// Overridden by each built-in item so the picking path needs no per-type branching: a
+        /// structured surface searches its grid, while a mesh or point cloud has no grid and
+        /// answers with the query point itself. The default implementation contributes nothing.
+        /// </remarks>
+        /// <param name="world">Query point in world space.</param>
+        /// <param name="useDiff">True in Diff colour mode: report Diff values instead of Intensity.</param>
+        /// <param name="bestDist">Best squared distance so far; lowered when this item is closer.</param>
+        /// <param name="bestPoint">Best world-space point so far; updated with <paramref name="bestDist"/>.</param>
+        /// <param name="bestIntensity">Value at the best point (diff or intensity, per <paramref name="useDiff"/>).</param>
+        internal virtual void PickAt(CxPoint3D world, bool useDiff,
+            ref float bestDist, ref CxPoint3D? bestPoint, ref float? bestIntensity)
+        {
+        }
+
+        /// <summary>
+        /// True when the item draws with the context-owned shared surface program instead of
+        /// compiling a private one from <see cref="RenderData.ShaderSource"/>.
+        /// </summary>
+        /// <remarks>
+        /// Every built-in item shares the context-owned program (see the class remarks), so this
+        /// defaults to <c>true</c>. A derived item that supplies its own GLSL pair must override
+        /// it to <c>false</c>, otherwise its source is ignored. This replaces comparing shader
+        /// source text at resource-creation time.
+        /// </remarks>
+        internal virtual bool UsesSharedSurfaceProgram => true;
+
         /// <summary>Prepares CPU-side render data. Does not make GL calls.</summary>
         public RenderData PrepareRenderData()
         {

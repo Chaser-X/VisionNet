@@ -64,6 +64,22 @@ namespace VisionNet.Controls
             Surface = null;
         }
 
+        /// <summary>
+        /// Searches the 5×5 grid neighbourhood around the picked cell. The query point is moved
+        /// into the item's local frame first, so grid indexing stays correct under a pose.
+        /// </summary>
+        internal override void PickAt(CxPoint3D world, bool useDiff,
+            ref float bestDist, ref CxPoint3D? bestPoint, ref float? bestIntensity)
+        {
+            if (Surface == null) return;
+
+            var local = ModelMatrixInverse.TransformPoint3D(world);
+            if (float.IsNaN(local.X) || float.IsNaN(local.Y) || float.IsNaN(local.Z)) return;
+
+            CxExtension.SearchSurfaceNeighbourhood(Surface, ModelMatrix, local, world, useDiff,
+                ref bestDist, ref bestPoint, ref bestIntensity);
+        }
+
         protected override RenderData BuildRenderData()
         {
             CalculateSamplingFactors();

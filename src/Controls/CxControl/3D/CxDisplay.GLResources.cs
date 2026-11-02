@@ -58,7 +58,9 @@ namespace VisionNet.Controls
             // OpenGL context; custom shader sources retain the old per-handle ownership path.
             if (data.ShaderSource != null)
             {
-                if (IsSharedSurfaceShader(data.ShaderSource))
+                bool sharedProgram = item is AbstractCxObjRenderItem builtIn
+                                     && builtIn.UsesSharedSurfaceProgram;
+                if (sharedProgram)
                 {
                     var renderer = ModernGLRenderer.For(gl);
                     if (renderer.EnsureSurfaceProgram(gl))
@@ -183,15 +185,6 @@ namespace VisionNet.Controls
             }
 
             handle.IsValid = false;
-        }
-
-        private static bool IsSharedSurfaceShader(ShaderSource source)
-        {
-            return source != null
-                && string.Equals(source.VertexSource,
-                    AbstractCxObjRenderItem.SharedVertexShaderSource, StringComparison.Ordinal)
-                && string.Equals(source.FragmentSource,
-                    AbstractCxObjRenderItem.SharedFragmentShaderSource, StringComparison.Ordinal);
         }
 
         private uint CreateTexture(OpenGL gl, TextureData tex)

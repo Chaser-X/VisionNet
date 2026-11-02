@@ -6,7 +6,14 @@
 
 ## 未发布（工作区，尚未提交）
 
-（暂无）
+### S3 多态替换类型分支（行为不变）
+
+- **拾取路径去类型分支**：`CxDisplay.GetNearestSurfacePoint` 原先按 `is CxMeshItem` / `is CxPointCloudItem` / `is CxSurfaceItem` 三分支派发。现改为 `AbstractCxObjRenderItem` 上的 `internal virtual void PickAt(world, useDiff, ref bestDist, ref bestPoint, ref bestIntensity)`，三个内建 item 各自 override —— 网格/点云返回查询点本身，结构曲面做 5×5 网格搜索。显示层只剩一句 `if (!(cur is AbstractCxObjRenderItem item)) continue;`。
+- **`SearchSurfaceNeighbourhood` 迁到 `CxExtension`**：它是对 `CxSurface` 的纯几何运算，留在 `CxDisplay` 上会让 `CxSurfaceItem` 反过来依赖控件类。`PickNeighbourhoodRadius` / `PickNeighbourhoodTolerance` 一并迁移。测试同步改调用点。
+- **共享程序判断改显式契约**：原先 `IsSharedSurfaceShader` 靠 `string.Equals` 逐字比较顶点/片元着色器源码来决定"用上下文共享程序还是编译私有程序"。现改为 `AbstractCxObjRenderItem.UsesSharedSurfaceProgram`（内建 item 默认 `true`；自备 GLSL 的派生类必须 override 为 `false`）。`CxDisplay` 不再持有 `AbstractCxObjRenderItem.SharedVertexShaderSource` 的引用，字符串比较随之删除。
+- **删除 `GetItemInverseModelMatrix`**：它唯一的调用点就是拾取路径，逻辑已并入 `CxSurfaceItem.PickAt`（直接用该 item 自己缓存的 `ModelMatrixInverse`）。`GetItemModelMatrix` 保留，仍被 `GetCombinedBoundingBox` 使用。
+- 新增 `ItemPickAtTests`（7 项）：曲面按网格命中、带姿态时先用逆矩阵还原网格坐标并以世界坐标回报、网格/点云返回查询点本身、已有精确命中不被覆盖、已释放 item 不贡献、三个内建 item 的 `UsesSharedSurfaceProgram` 均为 true。
+- 验证：`dotnet test` → **97/97 通过**；0 错误 0 C# 警告（仅预存在 MSB3270）。
 
 ## 已提交
 
