@@ -27,7 +27,7 @@
 - `SimDriver` 做背压合并：`BeginInvoke` 队列没有背压，所以同一时刻最多只排队一次应用；上一次还没执行完时新 tick 直接丢弃，把突发合并到最新状态而不是堆积过期姿态。定时器为一次性、每 tick 自行重置，慢 UI 线程不会叠出回调积压。
 - `SimTick` / `StageTick` 签名由 `(object, EventArgs)` 改为无参（由 driver 在 UI 线程调用），原有的 `_simWatch == null` / `_stageWatch == null` 早退守卫现在实际承担"已停止则丢弃在途回调"的职责。
 
-**未做**：`CxPickingService.ScreenToWorld` 在帧外（`OnMouseDown` / 拖拽路径）调用 `ReadPixels`，全项目没有 `MakeCurrent`。`glReadPixels` 读的是线程当前上下文，双控件时左侧点击理论上可能读到右侧的深度缓冲。修法是入口处 `gl.MakeCurrent()`，但需先确认该 SharpGL 版本在 `RenderContextType.FBO` 下的行为，未验证前不改。
+**曾怀疑、已排除**：一度认为 `CxPickingService.ScreenToWorld` 在帧外（`OnMouseDown` / 拖拽路径）调用 `ReadPixels` 会读到另一个控件的深度缓冲，因为本项目源码里没有任何 `MakeCurrent`。查 SharpGL 3.1.1 的 IL 后确认**不成立**：生成的 GL 入口点内建了 `PreGLCall()`（`if (currentOpenGLInstance != this) MakeCurrent();`），而 `OpenGL.MakeCurrent()` 会 `wglMakeCurrent` 到本实例的上下文并回写该静态字段。`ReadPixels` 的 IL 正是 `PreGLCall → glReadPixels → PostGLCall`，所以帧外调用会先自动绑好正确的上下文。原有代码无需改动。
 
 - 验证：`dotnet test` → **103/103 通过**（本次未新增用例：改动集中在 GL 帧路径与消息循环，无法单测）；`CxControl` 与 `DemoFrom` 均 0 错误（DemoFrom 3 个警告为预存在 MSB3270）。
 - **需本机实测确认**：右侧持续移动鼠标时左侧动画应保持流畅（SimTick 间隔稳定在 ~16 ms）；悬停 tooltip 仍跟随鼠标、停住后位置正确；旋转/平移/缩放、拖拽 overlay item 不受影响。
