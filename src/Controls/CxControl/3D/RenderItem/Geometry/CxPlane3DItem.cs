@@ -35,9 +35,7 @@ namespace VisionNet.Controls
 
             PushModelMatrix(gl);
             var renderer = ModernGLRenderer.For(gl);
-            int required = Planes.Length * 18;
-            if (_positionsBuffer.Length != required)
-                _positionsBuffer = new float[required];
+            EnsureExactCapacity(ref _positionsBuffer, Planes.Length * 18);
             int offset = 0;
             foreach (var plane in Planes)
             {

@@ -21,9 +21,8 @@ namespace VisionNet.Controls
         {
             if (positions == null || positions.Length < 3) return;
             EnsureSceneMatrices(gl);
-            if (!EnsureGeometryProgram(gl)) return;
-            EnsureGeometryBuffers(gl);
-            RenderStateSnapshot previous = CaptureRenderState(gl);
+            RenderStateSnapshot previous;
+            if (!BeginGeometryDraw(gl, out previous)) return;
             SetRenderState(gl, depthTest, color.A < 255);
 
             gl.BindVertexArray(_geometryVao);
@@ -44,6 +43,34 @@ namespace VisionNet.Controls
             if (primitive == OpenGL.GL_POINTS) gl.PointSize(Math.Max(1f, size));
             gl.DrawArrays(primitive, 0, positions.Length / 3);
 
+            EndGeometryDraw(gl, previous, vertexColorAttribute: false);
+        }
+
+        /// <summary>
+        /// Common prologue for a shared-geometry draw: compiles/acquires the geometry program,
+        /// allocates its VAO/VBO on first use, and captures the GL state the draw may change.
+        /// Returns <c>false</c> when the program is unavailable, in which case nothing was bound
+        /// and nothing needs restoring.
+        /// </summary>
+        private bool BeginGeometryDraw(OpenGL gl, out RenderStateSnapshot previous)
+        {
+            previous = default(RenderStateSnapshot);
+            if (!EnsureGeometryProgram(gl)) return false;
+            EnsureGeometryBuffers(gl);
+            previous = CaptureRenderState(gl);
+            return true;
+        }
+
+        /// <summary>
+        /// Common epilogue for a shared-geometry draw: releases the geometry VAO/VBO bindings and
+        /// the program, then restores the state captured by <see cref="BeginGeometryDraw"/>.
+        /// </summary>
+        /// <param name="vertexColorAttribute">
+        /// <c>true</c> when the draw enabled attribute 1 for per-vertex colours.
+        /// </param>
+        private void EndGeometryDraw(OpenGL gl, RenderStateSnapshot previous, bool vertexColorAttribute)
+        {
+            if (vertexColorAttribute) gl.DisableVertexAttribArray(1);
             gl.DisableVertexAttribArray(0);
             gl.BindVertexArray(0);
             gl.BindBuffer(OpenGL.GL_ARRAY_BUFFER, 0);
@@ -59,9 +86,8 @@ namespace VisionNet.Controls
             float width = 1f)
         {
             if (positions == null || positions.Length < 2) return;
-            if (!EnsureGeometryProgram(gl)) return;
-            EnsureGeometryBuffers(gl);
-            RenderStateSnapshot previous = CaptureRenderState(gl);
+            RenderStateSnapshot previous;
+            if (!BeginGeometryDraw(gl, out previous)) return;
             SetRenderState(gl, false, color.A < 255);
             gl.DepthMask(0);
 
@@ -81,11 +107,8 @@ namespace VisionNet.Controls
             if (primitive == OpenGL.GL_LINES || primitive == OpenGL.GL_LINE_STRIP ||
                 primitive == OpenGL.GL_LINE_LOOP) gl.LineWidth(Math.Max(1f, width));
             gl.DrawArrays(primitive, 0, positions.Length / 2);
-            gl.DisableVertexAttribArray(0);
-            gl.BindVertexArray(0);
-            gl.BindBuffer(OpenGL.GL_ARRAY_BUFFER, 0);
-            gl.UseProgram(0);
-            RestoreRenderState(gl, previous);
+
+            EndGeometryDraw(gl, previous, vertexColorAttribute: false);
         }
 
         /// <summary>
@@ -98,9 +121,8 @@ namespace VisionNet.Controls
             if (positions == null || positions.Length < 2 || colors == null
                 || colors.Length < (positions.Length / 2) * 4) return;
 
-            if (!EnsureGeometryProgram(gl)) return;
-            EnsureGeometryBuffers(gl);
-            RenderStateSnapshot previous = CaptureRenderState(gl);
+            RenderStateSnapshot previous;
+            if (!BeginGeometryDraw(gl, out previous)) return;
             SetRenderState(gl, false, true);
             gl.DepthMask(0);
 
@@ -139,12 +161,8 @@ namespace VisionNet.Controls
                 gl.LineWidth(Math.Max(1f, width));
             gl.DrawArrays(primitive, 0, vertexCount);
             gl.Uniform1(_geometryUseVertexColor, 0);
-            gl.DisableVertexAttribArray(1);
-            gl.DisableVertexAttribArray(0);
-            gl.BindVertexArray(0);
-            gl.BindBuffer(OpenGL.GL_ARRAY_BUFFER, 0);
-            gl.UseProgram(0);
-            RestoreRenderState(gl, previous);
+
+            EndGeometryDraw(gl, previous, vertexColorAttribute: true);
         }
     }
 }

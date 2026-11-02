@@ -6,7 +6,18 @@
 
 ## 未发布（工作区，尚未提交）
 
-（暂无）
+### S1 低风险去重（行为不变）
+
+- **包围盒收尾**：`CxExtension` 的三个 `CalculateBoundingBox` 重载各自重复一遍"中心 + 尺寸"构造，现统一走新的 `CxExtension.BuildBox(min,max)`；`CxDisplay.GetCombinedBoundingBox` 的同一段收尾也改用它。`CxBoundingBoxConsistencyTests` 先于本次改动落地，用于守住等价性。
+- **缓冲扩容**：新增 `AbstractRenderItem.EnsureExactCapacity(ref float[], int)`，替换 `CxPoint3DItem` / `CxSegment3DItem` / `CxPlane3DItem` / `CxPolygon3DItem` 中手写的 `if (buf.Length != required) buf = new float[required]`（共 6 处）。
+  - ⚠️ **没有**沿用 `ModernGLRenderer.Matrix.cs` 里既有的 `EnsureCapacity`：那个是 **grow-only**（`buffer.Length < required` 才扩容），而 `gl.DrawArrays(..., positions.Length / 3)` 的顶点数**取自数组长度**，缓冲区一旦大于需要量就会多画尾部残留顶点。因此这里必须是**精确**分配语义，两者不可互换。`EnsureExactCapacity` 额外接受 `null`（`CxPolygon3DItem._polygonBuffers[i]` 初值为 null）。
+- **`PointToSegDistSq`**：`CxSegment3DItem` 与 `CxPolygon3DItem` 各有一份逐字相同的私有实现，上提到 `AbstractRenderItem` 作为 `protected static`，两处私有副本删除。
+- **`CxPoint3DItem.Draw`**：Point 与 Sphere 两个分支各自重复一遍相同的"分配 + 逐点填充"循环（共 14 行重复），抽为私有 `FillPositionBuffer()`。注意保留了两分支的既有差异 —— Point 分支 `PushModelMatrix`/`PopModelMatrix`，Sphere 分支不推栈（它通过 `DrawSpheres` 的 `model` uniform 自行应用姿态，推栈会导致重复应用）。
+- **菜单遍历**：`UpdateMenuItems` 的三段"按文本勾选"循环与 4 个点击处理器里的"全部取消勾选"循环，抽为 `CxDisplay.SyncMenuSelection` / `CxDisplay.UncheckAllMenuItems`。
+- **`ModernGLRenderer.Geometry`**：`Draw` / `DrawScreenGeometry` / `DrawScreenGeometryColored` 三份方法的前置（取程序、建 VAO/VBO、捕获状态）与后置（解绑、`UseProgram(0)`、恢复状态）样板抽为 `BeginGeometryDraw` / `EndGeometryDraw`。着色器上传顺序与逐顶点颜色属性（attrib 1）的启用/关闭时机均保持不变。
+- **魔法数字提常量**：`CxDisplay.InitialPointSize`（原 `PointSize(2.0f)`）、`CxColorBarItem.TickDivisions`（原 53 行的 `divisions` 与 65 行硬编码的 `7 + 1` 合并）、`ModernGLRenderer.SphereSlices` / `SphereStacks`（原 `GenerateUnitSphereData(10, 10, …)`）、`CxExtension.NoDataValue`（原散落的 `-32768`）。
+- 验证：MSBuild 构建 `CxControl` + `CxControl.Tests` → **0 错误、0 C# 警告**（仅预存在 MSB3270）；`dotnet test` → **73/73 通过**。
+- **未做**：`-32768` 在 `CxDisplay.Input.cs` 的拾取路径里也出现，但它随 5×5 邻域常量一起属于 S2 的拾取算法抽取，本轮先留在原处。
 
 ## 已提交
 

@@ -109,22 +109,6 @@ namespace VisionNet.Controls
             return (-1, -1);
         }
 
-        private static float PointToSegDistSq(CxPoint3D p, CxPoint3D a, CxPoint3D b)
-        {
-            float abX = b.X - a.X, abY = b.Y - a.Y, abZ = b.Z - a.Z;
-            float ab2 = abX * abX + abY * abY + abZ * abZ;
-            if (ab2 < 1e-10f)
-            {
-                float dx = p.X - a.X, dy = p.Y - a.Y, dz = p.Z - a.Z;
-                return dx * dx + dy * dy + dz * dz;
-            }
-            float t = Math.Max(0, Math.Min(1,
-                ((p.X - a.X) * abX + (p.Y - a.Y) * abY + (p.Z - a.Z) * abZ) / ab2));
-            float cx = a.X + t * abX, cy = a.Y + t * abY, cz = a.Z + t * abZ;
-            float ex = p.X - cx, ey = p.Y - cy, ez = p.Z - cz;
-            return ex * ex + ey * ey + ez * ez;
-        }
-
         // ── Rendering ────────────────────────────────────────────────────────────
 
         /// <inheritdoc/>
@@ -143,9 +127,7 @@ namespace VisionNet.Controls
             {
                 var polygon = Polygon3Ds[polygonIndex];
                 if (polygon.Points == null || polygon.Points.Length == 0) continue;
-                int required = polygon.Points.Length * 3;
-                if (_polygonBuffers[polygonIndex] == null || _polygonBuffers[polygonIndex].Length != required)
-                    _polygonBuffers[polygonIndex] = new float[required];
+                EnsureExactCapacity(ref _polygonBuffers[polygonIndex], polygon.Points.Length * 3);
                 var positions = _polygonBuffers[polygonIndex];
                 for (int i = 0; i < polygon.Points.Length; i++)
                 {
@@ -163,9 +145,7 @@ namespace VisionNet.Controls
                 var pts = Polygon3Ds[_hitPolyIndex].Points;
                 if (pts != null && pts.Length > 0)
                 {
-                    int required = pts.Length * 3;
-                    if (_markerBuffer.Length != required)
-                        _markerBuffer = new float[required];
+                    EnsureExactCapacity(ref _markerBuffer, pts.Length * 3);
                     var positions = _markerBuffer;
                     for (int i = 0; i < pts.Length; i++)
                     {

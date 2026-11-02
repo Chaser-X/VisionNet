@@ -13,12 +13,13 @@
 
 ## S1 低风险去重
 
-- [ ] `CxExtension.cs` 三处包围盒收尾抽 `BuildBox(min, max)`
-- [ ] Point/Segment/Plane/Polygon 缓冲扩容统一用 `ModernGLRenderer.Matrix.cs` 的 `EnsureCapacity`
-- [ ] `PointToSegDistSq`（Polygon/Segment 各一份）抽共享静态 helper
-- [ ] 菜单 foreach（`CxDisplay.cs`、`CxDisplay.Input.cs`）抽 `ForEachMenuItem`
-- [ ] `ModernGLRenderer.Geometry` 三份绘制流程抽状态作用域（基于 State partial 的 Capture/Restore）
-- [ ] 魔法数字提常量：`PointSize 2.0f`、色条 `divisions`（`7` / `7+1`）、球体分段、`-32768`、5×5 邻域与阈值
+- [x] `CxExtension.cs` 三处包围盒收尾抽 `BuildBox(...)`（并复用到 `CxDisplay.GetCombinedBoundingBox`）
+- [x] 缓冲扩容统一为 `AbstractRenderItem.EnsureExactCapacity`（**精确**分配，非 grow-only —— 见 CHANGELOG 说明）
+- [x] `PointToSegDistSq`（Polygon/Segment 各一份）抽到 `AbstractRenderItem`
+- [x] 菜单 foreach 抽 `SyncMenuSelection` / `UncheckAllMenuItems`
+- [x] `ModernGLRenderer.Geometry` 三份绘制流程抽 `BeginGeometryDraw` / `EndGeometryDraw`
+- [x] 魔法数字提常量：`InitialPointSize`、色条 `TickDivisions`、`SphereSlices/Stacks`、`CxExtension.NoDataValue`
+- [ ] 5×5 邻域与阈值常量 —— 挪到 S2 与拾取算法抽取一起做
 
 ## S2 拆长方法
 

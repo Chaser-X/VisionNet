@@ -51,40 +51,36 @@ namespace VisionNet.Controls
         {
             if (Point3Ds == null || Point3Ds.Length == 0) return;
 
+            var positions = FillPositionBuffer();
+            var renderer = ModernGLRenderer.For(gl);
             if (Shape == PointShape.Point)
             {
                 PushModelMatrix(gl);
-                int required = Point3Ds.Length * 3;
-                if (_positionsBuffer.Length != required)
-                    _positionsBuffer = new float[required];
-                var positions = _positionsBuffer;
-                for (int i = 0; i < Point3Ds.Length; i++)
-                {
-                    positions[i * 3] = Point3Ds[i].X;
-                    positions[i * 3 + 1] = Point3Ds[i].Y;
-                    positions[i * 3 + 2] = Point3Ds[i].Z;
-                }
-                ModernGLRenderer.For(gl).Draw(gl, OpenGL.GL_POINTS, positions, DrawColor, Size);
+                renderer.Draw(gl, OpenGL.GL_POINTS, positions, DrawColor, Size);
                 PopModelMatrix(gl);
             }
             else
             {
-                int required = Point3Ds.Length * 3;
-                if (_positionsBuffer.Length != required)
-                    _positionsBuffer = new float[required];
-                var positions = _positionsBuffer;
-                for (int i = 0; i < Point3Ds.Length; i++)
-                {
-                    positions[i * 3] = Point3Ds[i].X;
-                    positions[i * 3 + 1] = Point3Ds[i].Y;
-                    positions[i * 3 + 2] = Point3Ds[i].Z;
-                }
-
                 // Preserve the historical Size / 2 sphere radius while reusing the context-level
                 // mesh and shader. Only the instance-position buffer is streamed per frame.
-                ModernGLRenderer.For(gl).DrawSpheres(
-                    gl, positions, DrawColor, Size / 2f, ModelMatrix);
+                // The sphere path applies ModelMatrix through its own uniform, so it must not
+                // also push a model matrix onto the shared stack.
+                renderer.DrawSpheres(gl, positions, DrawColor, Size / 2f, ModelMatrix);
             }
+        }
+
+        /// <summary>Materialises <see cref="Point3Ds"/> into the reused interleaved position buffer.</summary>
+        private float[] FillPositionBuffer()
+        {
+            EnsureExactCapacity(ref _positionsBuffer, Point3Ds.Length * 3);
+            var positions = _positionsBuffer;
+            for (int i = 0; i < Point3Ds.Length; i++)
+            {
+                positions[i * 3] = Point3Ds[i].X;
+                positions[i * 3 + 1] = Point3Ds[i].Y;
+                positions[i * 3 + 2] = Point3Ds[i].Z;
+            }
+            return positions;
         }
 
         /// <inheritdoc/>

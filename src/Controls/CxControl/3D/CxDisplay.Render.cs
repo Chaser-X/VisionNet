@@ -8,6 +8,12 @@ namespace VisionNet.Controls
     /// <summary>Render pipeline: GL lifecycle callbacks, frame processing, and draw dispatch.</summary>
     public partial class CxDisplay
     {
+        /// <summary>
+        /// Point size the context starts with. Every overlay point draw sets its own size, so this
+        /// only governs anything drawn before the first item runs.
+        /// </summary>
+        private const float InitialPointSize = 2.0f;
+
         /// <inheritdoc/>
         protected override void DoOpenGLInitialized()
         {
@@ -21,7 +27,7 @@ namespace VisionNet.Controls
                 _registry.DropReleases();
                 ModernGLRenderer.ResetForContextRecreate(OpenGL);
                 OpenGL.ClearColor(_backColor.R / 255f, _backColor.G / 255f, _backColor.B / 255f, _backColor.A / 255f);
-                OpenGL.PointSize(2.0f);
+                OpenGL.PointSize(InitialPointSize);
             }
         }
 

@@ -10,6 +10,12 @@ namespace VisionNet.Controls
     /// </summary>
     public class CxColorBarItem : AbstractRenderItem
     {
+        /// <summary>
+        /// Number of intervals the bar is divided into. Also the number of tick marks plus one,
+        /// and the number of Z-value labels.
+        /// </summary>
+        private const int TickDivisions = 7;
+
         private float _zMin;
         private float _zMax;
         private float[] _barPositions = new float[0];
@@ -50,7 +56,6 @@ namespace VisionNet.Controls
             int barHeight = viewportHeight / 2;
             int startX    = viewportWidth - barWidth - 10;
             int startY    = (gl.RenderContextProvider.Height - barHeight) / 2;
-            const int divisions = 7;
 
             var renderer = ModernGLRenderer.For(gl);
             bool geometryChanged = !_hasCachedGeometry
@@ -62,7 +67,7 @@ namespace VisionNet.Controls
             {
                 _barPositions = new float[(barHeight + 1) * 2 * 2];
                 _barColors = new float[(barHeight + 1) * 2 * 4];
-                _tickPositions = new float[(7 + 1) * 4];
+                _tickPositions = new float[(TickDivisions + 1) * 4];
                 var positions = _barPositions;
                 var colors = _barColors;
                 for (int i = 0; i <= barHeight; i++)
@@ -86,9 +91,9 @@ namespace VisionNet.Controls
                 }
 
                 var tickPositions = _tickPositions;
-                for (int i = 0; i <= divisions; i++)
+                for (int i = 0; i <= TickDivisions; i++)
                 {
-                    int tickY = startY + (int)(i * (barHeight / (float)divisions));
+                    int tickY = startY + (int)(i * (barHeight / (float)TickDivisions));
                     int offset = i * 4;
                     tickPositions[offset] = startX - 5;
                     tickPositions[offset + 1] = tickY;
@@ -109,10 +114,10 @@ namespace VisionNet.Controls
             renderer.DrawScreenGeometry(gl, OpenGL.GL_LINES,
                 _tickPositions, System.Drawing.Color.White);
 
-            for (int i = 0; i <= divisions; i++)
+            for (int i = 0; i <= TickDivisions; i++)
             {
-                int tickY = startY + (int)(i * (barHeight / (float)divisions));
-                double zValue = _zMin + i * (_zMax - _zMin) / divisions;
+                int tickY = startY + (int)(i * (barHeight / (float)TickDivisions));
+                double zValue = _zMin + i * (_zMax - _zMin) / TickDivisions;
                 renderer.DrawText(gl, startX - 45, tickY - 5, System.Drawing.Color.White, 10, $"{zValue:F2}");
             }
         }

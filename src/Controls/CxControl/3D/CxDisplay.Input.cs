@@ -399,8 +399,7 @@ namespace VisionNet.Controls
 
         private void toolStripMenuItem_ViewModeClick(object sender, EventArgs e)
         {
-            foreach (var item in viewModeToolStripMenuItem.DropDownItems)
-                ((ToolStripMenuItem)item).Checked = false;
+            UncheckAllMenuItems(viewModeToolStripMenuItem);
             var mi = (ToolStripMenuItem)sender;
             mi.Checked = true;
             _camera.ViewMode = (ViewMode)Enum.Parse(typeof(ViewMode), mi.Text);
@@ -411,8 +410,7 @@ namespace VisionNet.Controls
 
         private void toolStripMenuItem_SurfaceModeClick(object sender, EventArgs e)
         {
-            foreach (var item in surfaceModeToolStripMenuItem.DropDownItems)
-                ((ToolStripMenuItem)item).Checked = false;
+            UncheckAllMenuItems(surfaceModeToolStripMenuItem);
             var mi = (ToolStripMenuItem)sender;
             mi.Checked = true;
             SurfaceMode = (SurfaceMode)Enum.Parse(typeof(SurfaceMode), mi.Text);
@@ -420,8 +418,7 @@ namespace VisionNet.Controls
 
         private void toolStripMenuItem_SurfaceColorModeClick(object sender, EventArgs e)
         {
-            foreach (var item in surfaceColorModeToolStripMenuItem.DropDownItems)
-                ((ToolStripMenuItem)item).Checked = false;
+            UncheckAllMenuItems(surfaceColorModeToolStripMenuItem);
             var mi = (ToolStripMenuItem)sender;
             mi.Checked = true;
             SurfaceColorMode = (SurfaceColorMode)Enum.Parse(typeof(SurfaceColorMode), mi.Text);

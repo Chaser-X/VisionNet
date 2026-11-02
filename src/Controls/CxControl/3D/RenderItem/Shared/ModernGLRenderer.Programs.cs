@@ -11,6 +11,11 @@ namespace VisionNet.Controls
 {
     internal sealed partial class ModernGLRenderer
     {
+        /// <summary>Longitude subdivisions of the instanced unit sphere mesh.</summary>
+        private const int SphereSlices = 10;
+
+        /// <summary>Latitude subdivisions of the instanced unit sphere mesh.</summary>
+        private const int SphereStacks = 10;
 
         /// <summary>Uploads camera matrices and one item model matrix to a shader program.</summary>
         internal void UploadSceneMatrices(OpenGL gl, uint program, CxMatrix4X4 model)
@@ -130,7 +135,7 @@ namespace VisionNet.Controls
             gl.BindBuffer(OpenGL.GL_ARRAY_BUFFER, _sphereVbo);
             var vertices = new List<float>();
             var indices = new List<ushort>();
-            GenerateUnitSphereData(10, 10, vertices, indices);
+            GenerateUnitSphereData(SphereSlices, SphereStacks, vertices, indices);
             gl.BufferData(OpenGL.GL_ARRAY_BUFFER, vertices.ToArray(), OpenGL.GL_STATIC_DRAW);
             gl.EnableVertexAttribArray(0);
             gl.VertexAttribPointer(0, 3, OpenGL.GL_FLOAT, false,

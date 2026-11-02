@@ -283,12 +283,29 @@ namespace VisionNet.Controls
         {
             if (InvokeRequired) { BeginInvoke(new Action(() => UpdateMenuItems())); return; }
 
-            foreach (var item in viewModeToolStripMenuItem.DropDownItems)
-                ((ToolStripMenuItem)item).Checked = ((ToolStripMenuItem)item).Text == _camera.ViewMode.ToString();
-            foreach (var item in surfaceModeToolStripMenuItem.DropDownItems)
-                ((ToolStripMenuItem)item).Checked = ((ToolStripMenuItem)item).Text == _surfaceMode.ToString();
-            foreach (var item in surfaceColorModeToolStripMenuItem.DropDownItems)
-                ((ToolStripMenuItem)item).Checked = ((ToolStripMenuItem)item).Text == _surfaceColorMode.ToString();
+            SyncMenuSelection(viewModeToolStripMenuItem, _camera.ViewMode.ToString());
+            SyncMenuSelection(surfaceModeToolStripMenuItem, _surfaceMode.ToString());
+            SyncMenuSelection(surfaceColorModeToolStripMenuItem, _surfaceColorMode.ToString());
+        }
+
+        /// <summary>
+        /// Checks the item in <paramref name="dropDownOwner"/> whose text equals
+        /// <paramref name="selected"/> and unchecks every other item. Menu item texts are the
+        /// enum names, which is what makes this text comparison the selection key.
+        /// </summary>
+        internal static void SyncMenuSelection(ToolStripMenuItem dropDownOwner, string selected)
+        {
+            if (dropDownOwner == null) return;
+            foreach (ToolStripMenuItem item in dropDownOwner.DropDownItems)
+                item.Checked = item.Text == selected;
+        }
+
+        /// <summary>Unchecks every item in <paramref name="dropDownOwner"/>.</summary>
+        internal static void UncheckAllMenuItems(ToolStripMenuItem dropDownOwner)
+        {
+            if (dropDownOwner == null) return;
+            foreach (ToolStripMenuItem item in dropDownOwner.DropDownItems)
+                item.Checked = false;
         }
 
         /// <summary>
@@ -345,9 +362,7 @@ namespace VisionNet.Controls
             }
 
             if (!any) return null;
-            return new CxBox3D(
-                new CxPoint3D((minX + maxX) / 2, (minY + maxY) / 2, (minZ + maxZ) / 2),
-                new CxSize3D(maxX - minX, maxY - minY, maxZ - minZ));
+            return CxExtension.BuildBox(minX, minY, minZ, maxX, maxY, maxZ);
         }
 
         /// <summary>

@@ -107,22 +107,6 @@ namespace VisionNet.Controls
             return (-1, -1);
         }
 
-        private static float PointToSegDistSq(CxPoint3D p, CxPoint3D a, CxPoint3D b)
-        {
-            float abX = b.X - a.X, abY = b.Y - a.Y, abZ = b.Z - a.Z;
-            float ab2 = abX * abX + abY * abY + abZ * abZ;
-            if (ab2 < 1e-10f)
-            {
-                float dx = p.X - a.X, dy = p.Y - a.Y, dz = p.Z - a.Z;
-                return dx * dx + dy * dy + dz * dz;
-            }
-            float t = Math.Max(0, Math.Min(1,
-                ((p.X - a.X) * abX + (p.Y - a.Y) * abY + (p.Z - a.Z) * abZ) / ab2));
-            float cx = a.X + t * abX, cy = a.Y + t * abY, cz = a.Z + t * abZ;
-            float ex = p.X - cx, ey = p.Y - cy, ez = p.Z - cz;
-            return ex * ex + ey * ey + ez * ez;
-        }
-
         // ── Rendering ────────────────────────────────────────────────────────────
 
         /// <inheritdoc/>
@@ -134,9 +118,7 @@ namespace VisionNet.Controls
             if (Segment3Ds == null || Segment3Ds.Length == 0) return;
 
             PushModelMatrix(gl);
-            int required = Segment3Ds.Length * 6;
-            if (_positionsBuffer.Length != required)
-                _positionsBuffer = new float[required];
+            EnsureExactCapacity(ref _positionsBuffer, Segment3Ds.Length * 6);
             var positions = _positionsBuffer;
             int offset = 0;
             foreach (var seg in Segment3Ds)

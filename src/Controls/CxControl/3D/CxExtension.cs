@@ -13,6 +13,25 @@ namespace VisionNet.Controls
     public static class CxExtension
     {
         /// <summary>
+        /// Raw value in the compact surface / point-cloud arrays that marks a no-data point.
+        /// Mirrors the convention documented on <see cref="CxSurface.Data"/> and
+        /// <see cref="CxPointCloud.Data"/>.
+        /// </summary>
+        internal const short NoDataValue = -32768;
+
+        /// <summary>
+        /// Finalises a bounding box from accumulated per-axis extremes. Callers must have already
+        /// skipped every invalid point, so the extremes describe at least one real point.
+        /// </summary>
+        internal static CxBox3D BuildBox(float minX, float minY, float minZ,
+            float maxX, float maxY, float maxZ)
+        {
+            return new CxBox3D(
+                new CxPoint3D((minX + maxX) / 2, (minY + maxY) / 2, (minZ + maxZ) / 2),
+                new CxSize3D(maxX - minX, maxY - minY, maxZ - minZ));
+        }
+
+        /// <summary>
         /// Computes the axis-aligned bounding box of a set of 3D points.
         /// Points with any <see cref="float.IsInfinity"/> coordinate are ignored.
         /// </summary>
@@ -43,9 +62,7 @@ namespace VisionNet.Controls
             }
 
             if (!hasValidPoint) return null;
-            return new CxBox3D(
-                new CxPoint3D((minX + maxX) / 2, (minY + maxY) / 2, (minZ + maxZ) / 2),
-                new CxSize3D(maxX - minX, maxY - minY, maxZ - minZ));
+            return BuildBox(minX, minY, minZ, maxX, maxY, maxZ);
         }
 
         /// <summary>
@@ -69,7 +86,7 @@ namespace VisionNet.Controls
                 for (int col = 0; col < width; col++)
                 {
                     short rawZ = surface.Data[row * width + col];
-                    if (rawZ == -32768) continue;
+                    if (rawZ == NoDataValue) continue;
 
                     float x = surface.XOffset + col * surface.XScale;
                     float y = surface.YOffset + row * surface.YScale;
@@ -85,9 +102,7 @@ namespace VisionNet.Controls
             }
 
             if (!hasValidPoint) return null;
-            return new CxBox3D(
-                new CxPoint3D((minX + maxX) / 2, (minY + maxY) / 2, (minZ + maxZ) / 2),
-                new CxSize3D(maxX - minX, maxY - minY, maxZ - minZ));
+            return BuildBox(minX, minY, minZ, maxX, maxY, maxZ);
         }
 
         /// <summary>
@@ -110,7 +125,7 @@ namespace VisionNet.Controls
                 short rawX = cloud.Data[i * 3];
                 short rawY = cloud.Data[i * 3 + 1];
                 short rawZ = cloud.Data[i * 3 + 2];
-                if (rawX == -32768 || rawY == -32768 || rawZ == -32768) continue;
+                if (rawX == NoDataValue || rawY == NoDataValue || rawZ == NoDataValue) continue;
 
                 float x = cloud.XOffset + rawX * cloud.XScale;
                 float y = cloud.YOffset + rawY * cloud.YScale;
@@ -125,9 +140,7 @@ namespace VisionNet.Controls
             }
 
             if (!hasValidPoint) return null;
-            return new CxBox3D(
-                new CxPoint3D((minX + maxX) / 2, (minY + maxY) / 2, (minZ + maxZ) / 2),
-                new CxSize3D(maxX - minX, maxY - minY, maxZ - minZ));
+            return BuildBox(minX, minY, minZ, maxX, maxY, maxZ);
         }
 
         /// <summary>

@@ -226,5 +226,40 @@ namespace VisionNet.Controls
 
         /// <summary>Raises <see cref="OnChanged"/>. Call from subclass overrides of mouse methods.</summary>
         protected void RaiseOnChanged() => OnChanged?.Invoke(this);
+
+        // ── Shared geometry helpers ──────────────────────────────────────────────
+
+        /// <summary>
+        /// Sizes a reused position buffer to exactly <paramref name="required"/> floats.
+        /// The draw calls derive their vertex count from the array length, so the buffer must be
+        /// sized <b>exactly</b>: a grow-only buffer would leave stale trailing vertices that the
+        /// next draw would submit.
+        /// </summary>
+        protected static void EnsureExactCapacity(ref float[] buffer, int required)
+        {
+            if (buffer == null || buffer.Length != required)
+                buffer = new float[required];
+        }
+
+        /// <summary>
+        /// Squared distance from <paramref name="p"/> to the segment <paramref name="a"/>–<paramref name="b"/>.
+        /// Used by the geometry items' hit tests; kept here so the segment and polygon items share
+        /// one implementation.
+        /// </summary>
+        protected static float PointToSegDistSq(CxPoint3D p, CxPoint3D a, CxPoint3D b)
+        {
+            float abX = b.X - a.X, abY = b.Y - a.Y, abZ = b.Z - a.Z;
+            float ab2 = abX * abX + abY * abY + abZ * abZ;
+            if (ab2 < 1e-10f)
+            {
+                float dx = p.X - a.X, dy = p.Y - a.Y, dz = p.Z - a.Z;
+                return dx * dx + dy * dy + dz * dz;
+            }
+            float t = Math.Max(0, Math.Min(1,
+                ((p.X - a.X) * abX + (p.Y - a.Y) * abY + (p.Z - a.Z) * abZ) / ab2));
+            float cx = a.X + t * abX, cy = a.Y + t * abY, cz = a.Z + t * abZ;
+            float ex = p.X - cx, ey = p.Y - cy, ez = p.Z - cz;
+            return ex * ex + ey * ey + ez * ez;
+        }
     }
 }
