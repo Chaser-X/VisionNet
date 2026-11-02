@@ -6,7 +6,11 @@
 
 ## 未发布（工作区，尚未提交）
 
-### S1 低风险去重（行为不变）
+（暂无）
+
+## 已提交
+
+### f0f883d（2026-11-02）S1 低风险去重（行为不变）
 
 - **包围盒收尾**：`CxExtension` 的三个 `CalculateBoundingBox` 重载各自重复一遍"中心 + 尺寸"构造，现统一走新的 `CxExtension.BuildBox(min,max)`；`CxDisplay.GetCombinedBoundingBox` 的同一段收尾也改用它。`CxBoundingBoxConsistencyTests` 先于本次改动落地，用于守住等价性。
 - **缓冲扩容**：新增 `AbstractRenderItem.EnsureExactCapacity(ref float[], int)`，替换 `CxPoint3DItem` / `CxSegment3DItem` / `CxPlane3DItem` / `CxPolygon3DItem` 中手写的 `if (buf.Length != required) buf = new float[required]`（共 6 处）。
@@ -18,8 +22,6 @@
 - **魔法数字提常量**：`CxDisplay.InitialPointSize`（原 `PointSize(2.0f)`）、`CxColorBarItem.TickDivisions`（原 53 行的 `divisions` 与 65 行硬编码的 `7 + 1` 合并）、`ModernGLRenderer.SphereSlices` / `SphereStacks`（原 `GenerateUnitSphereData(10, 10, …)`）、`CxExtension.NoDataValue`（原散落的 `-32768`）。
 - 验证：MSBuild 构建 `CxControl` + `CxControl.Tests` → **0 错误、0 C# 警告**（仅预存在 MSB3270）；`dotnet test` → **73/73 通过**。
 - **未做**：`-32768` 在 `CxDisplay.Input.cs` 的拾取路径里也出现，但它随 5×5 邻域常量一起属于 S2 的拾取算法抽取，本轮先留在原处。
-
-## 已提交
 
 ### c384234（2026-11-02）S0 安全网：包围盒三路一致性测试 + 每帧 CPU 基准
 
