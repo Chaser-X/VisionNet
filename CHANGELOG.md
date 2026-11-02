@@ -6,7 +6,11 @@
 
 ## 未发布（工作区，尚未提交）
 
-### S4 结构拆分（行为不变）
+（暂无）
+
+## 已提交
+
+### 8811088（2026-11-02）S4 结构拆分（行为不变）
 
 **抽出 `CxPickingService`**（新增 `3D/CxPickingService.cs`）
 - 深度读回（`ReadPixels` + `BitConverter`）、反投影（`ModernGLRenderer.Unproject`）、最近曲面搜索从 `CxDisplay.Input.cs` 移出，连同 `_pickViewport` / `_pickDepthBytes` / `_pickSnapshot` 三块 scratch 缓冲。显示层只剩 `private readonly CxPickingService _picking`，三处 `ScreenToWorldCoordinate(...)` 调用改为 `_picking.ScreenToWorld(OpenGL, ...)`。
@@ -34,8 +38,6 @@
 
 - 验证：`dotnet test` Debug 与 Release 均 **103/103 通过**；`CxControl` / `CxControl.Tests` 0 错误 0 C# 警告（仅预存在 MSB3270）；`DemoFrom` 0 错误。
 - **按你的要求跳过**：`ModernGLRenderer` 的 `Text / Programs / State` 提升为独立类（M3 第 2 步），已记入 TODO 后续项。
-
-## 已提交
 
 ### 559e706（2026-11-02）S3 多态替换类型分支（行为不变）
 
