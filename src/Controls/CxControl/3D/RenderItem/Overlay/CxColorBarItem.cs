@@ -45,6 +45,21 @@ namespace VisionNet.Controls
             _zMax = zMax;
         }
 
+        /// <summary>
+        /// Screen Y of tick <paramref name="index"/>, where index 0 is the bottom of the bar
+        /// (<paramref name="startY"/>) and <see cref="TickDivisions"/> is its top.
+        /// </summary>
+        internal static int TickY(int index, int startY, int barHeight)
+            => startY + (int)(index * (barHeight / (float)TickDivisions));
+
+        /// <summary>
+        /// Z value labelled at tick <paramref name="index"/>: the range split into
+        /// <see cref="TickDivisions"/> equal steps, so index 0 is <paramref name="zMin"/> and
+        /// <see cref="TickDivisions"/> is <paramref name="zMax"/>.
+        /// </summary>
+        internal static double TickZValue(int index, float zMin, float zMax)
+            => zMin + index * (zMax - zMin) / TickDivisions;
+
         /// <inheritdoc/>
         public override void Draw(OpenGL gl)
         {
@@ -93,7 +108,7 @@ namespace VisionNet.Controls
                 var tickPositions = _tickPositions;
                 for (int i = 0; i <= TickDivisions; i++)
                 {
-                    int tickY = startY + (int)(i * (barHeight / (float)TickDivisions));
+                    int tickY = TickY(i, startY, barHeight);
                     int offset = i * 4;
                     tickPositions[offset] = startX - 5;
                     tickPositions[offset + 1] = tickY;
@@ -116,8 +131,8 @@ namespace VisionNet.Controls
 
             for (int i = 0; i <= TickDivisions; i++)
             {
-                int tickY = startY + (int)(i * (barHeight / (float)TickDivisions));
-                double zValue = _zMin + i * (_zMax - _zMin) / TickDivisions;
+                int tickY = TickY(i, startY, barHeight);
+                double zValue = TickZValue(i, _zMin, _zMax);
                 renderer.DrawText(gl, startX - 45, tickY - 5, System.Drawing.Color.White, 10, $"{zValue:F2}");
             }
         }

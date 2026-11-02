@@ -157,6 +157,28 @@ namespace VisionNet.Controls
             => item is AbstractCxObjRenderItem surfaceItem && surfaceItem.Opacity < 1f;
 
         /// <summary>
+        /// Per-frame aggregate of the registered surface items: the union of their data ranges and
+        /// whether they all share one colour mode. Computed once in Phase 1 and consumed by the
+        /// range propagation (Phase 2/2b) and the colour-bar gate (Phase 5).
+        /// </summary>
+        private struct FrameRanges
+        {
+            /// <summary>Union of every item's auto-computed base Z range.</summary>
+            public float ZMin;
+            public float ZMax;
+
+            /// <summary>Union of every Diff-mode item's auto-computed base diff range.</summary>
+            public float DiffMin;
+            public float DiffMax;
+
+            /// <summary>The only colour mode seen, when every item agrees; otherwise the first one.</summary>
+            public SurfaceColorMode? SingleMode;
+
+            /// <summary>True when every item shares <see cref="SingleMode"/>.</summary>
+            public bool UniformMode;
+        }
+
+        /// <summary>
         /// Issues all draw calls for one frame:
         /// world-space coordinate system → surface items (unified Z range) →
         /// color bar → coord tag → overlay geometry → screen-space axes indicator.
@@ -166,22 +188,47 @@ namespace VisionNet.Controls
             if (!_camera.Enable2DView && ShowCoordinateSystem)
                 _coordinationItem.Draw(gl);
 
-            // Snapshot under lock so GL calls are issued without holding it.
-            List<ICxObjRenderItem> snapshot;
             // Fill the frame snapshots (items + index-aligned handles) atomically; they are
-            // consumed after the registry lock has been released.
+            // consumed after the registry lock has been released, so GL calls are issued
+            // without holding it.
             _registry.CopyFrameSnapshot(_surfaceSnapshot, _handleSnapshot);
-            snapshot = _surfaceSnapshot;
+            var snapshot = _surfaceSnapshot;
 
-            // Phase 1 — aggregate global Z and diff ranges, and track whether all items share
-            // a single SurfaceColorMode (the colour bar is hidden when modes differ).
-            // Ranges aggregate from each item's auto-computed BASE range (BaseZ/BaseDiff), NOT
-            // its active ColorMin/ColorMax — the latter may hold a manual override that would
-            // otherwise pollute the aggregate and prevent Clear*Range() from restoring the auto range.
-            float globalZMin = float.MaxValue, globalZMax = float.MinValue;
-            float globalDiffMin = float.MaxValue, globalDiffMax = float.MinValue;
+            var ranges = AggregateFrameRanges(snapshot);
+            PropagateFrameRanges(snapshot, ranges);
+
+            bool anyDrawn = DrawSurfaceItems(gl, snapshot);
+
+            DrawOverlays(gl);
+
+            if (!_camera.Enable2DView)
+                _coordinationItem.DrawScreenPositionedAxes(gl);
+
+            ResolvePendingPick();
+
+            DrawHud(gl, anyDrawn, ranges);
+        }
+
+        /// <summary>
+        /// Phase 1 — aggregates the global Z and diff ranges, and tracks whether all items share
+        /// a single <see cref="SurfaceColorMode"/> (the colour bar is hidden when modes differ).
+        /// Ranges aggregate from each item's auto-computed BASE range (BaseZ/BaseDiff), NOT
+        /// its active ColorMin/ColorMax — the latter may hold a manual override that would
+        /// otherwise pollute the aggregate and prevent Clear*Range() from restoring the auto range.
+        /// </summary>
+        private static FrameRanges AggregateFrameRanges(List<ICxObjRenderItem> snapshot)
+        {
+            var ranges = new FrameRanges
+            {
+                ZMin = float.MaxValue,
+                ZMax = float.MinValue,
+                DiffMin = float.MaxValue,
+                DiffMax = float.MinValue,
+            };
+
             SurfaceColorMode? singleMode = null;   // the only mode seen, if all items agree
-            bool mixedMode = false;                 // true once a second distinct mode appears
+            bool mixedMode = false;                // true once a second distinct mode appears
+
             foreach (var cur in snapshot)
             {
                 if (cur == null || cur.IsDisposed) continue;
@@ -195,53 +242,60 @@ namespace VisionNet.Controls
 
                 if (mode == SurfaceColorMode.Diff)
                 {
-                    if (cur.BaseDiffMin < globalDiffMin) globalDiffMin = cur.BaseDiffMin;
-                    if (cur.BaseDiffMax > globalDiffMax) globalDiffMax = cur.BaseDiffMax;
+                    if (cur.BaseDiffMin < ranges.DiffMin) ranges.DiffMin = cur.BaseDiffMin;
+                    if (cur.BaseDiffMax > ranges.DiffMax) ranges.DiffMax = cur.BaseDiffMax;
                 }
                 else
                 {
-                    if (cur.BaseZMin < globalZMin) globalZMin = cur.BaseZMin;
-                    if (cur.BaseZMax > globalZMax) globalZMax = cur.BaseZMax;
+                    if (cur.BaseZMin < ranges.ZMin) ranges.ZMin = cur.BaseZMin;
+                    if (cur.BaseZMax > ranges.ZMax) ranges.ZMax = cur.BaseZMax;
                 }
             }
-            bool uniformMode = !mixedMode && singleMode.HasValue;
 
-            // Phase 2 — propagate unified Z range so all items share the same colour mapping.
-            // A manually set colour range (_manualColorRange) overrides the auto-aggregated one.
+            ranges.SingleMode = singleMode;
+            ranges.UniformMode = !mixedMode && singleMode.HasValue;
+            return ranges;
+        }
+
+        /// <summary>
+        /// Phase 2/2b — propagates the unified ranges so all items share the same colour mapping.
+        /// A manually set range (<see cref="_manualColorRange"/> / <see cref="_manualDiffRange"/>)
+        /// overrides the auto-aggregated one.
+        /// </summary>
+        private void PropagateFrameRanges(List<ICxObjRenderItem> snapshot, FrameRanges ranges)
+        {
             if (_manualColorRange.HasValue)
-            {
-                float mMin = _manualColorRange.Value.min;
-                float mMax = _manualColorRange.Value.max;
-                foreach (var cur in snapshot)
-                    if (cur != null && !cur.IsDisposed)
-                        cur.SetGlobalZRange(mMin, mMax);
-            }
-            else if (globalZMin < globalZMax)
-            {
-                foreach (var cur in snapshot)
-                    if (cur != null && !cur.IsDisposed)
-                        cur.SetGlobalZRange(globalZMin, globalZMax);
-            }
+                SetGlobalZRangeOnAll(snapshot, _manualColorRange.Value.min, _manualColorRange.Value.max);
+            else if (ranges.ZMin < ranges.ZMax)
+                SetGlobalZRangeOnAll(snapshot, ranges.ZMin, ranges.ZMax);
 
-            // Phase 2b — propagate the unified diff range to Diff-mode items.
-            // A manually set diff range (_manualDiffRange) overrides the auto-aggregated one.
             if (_manualDiffRange.HasValue)
-            {
-                float dMin = _manualDiffRange.Value.min;
-                float dMax = _manualDiffRange.Value.max;
-                foreach (var cur in snapshot)
-                    if (cur != null && !cur.IsDisposed)
-                        cur.SetGlobalDiffRange(dMin, dMax);
-            }
-            else if (globalDiffMin < globalDiffMax)
-            {
-                foreach (var cur in snapshot)
-                    if (cur != null && !cur.IsDisposed)
-                        cur.SetGlobalDiffRange(globalDiffMin, globalDiffMax);
-            }
+                SetGlobalDiffRangeOnAll(snapshot, _manualDiffRange.Value.min, _manualDiffRange.Value.max);
+            else if (ranges.DiffMin < ranges.DiffMax)
+                SetGlobalDiffRangeOnAll(snapshot, ranges.DiffMin, ranges.DiffMax);
+        }
 
-            // Phase 3 — draw surface items, opaque first so translucent items blend over a
-            // settled frame. When nothing is translucent the order (and result) is unchanged.
+        private static void SetGlobalZRangeOnAll(List<ICxObjRenderItem> snapshot, float min, float max)
+        {
+            foreach (var cur in snapshot)
+                if (cur != null && !cur.IsDisposed)
+                    cur.SetGlobalZRange(min, max);
+        }
+
+        private static void SetGlobalDiffRangeOnAll(List<ICxObjRenderItem> snapshot, float min, float max)
+        {
+            foreach (var cur in snapshot)
+                if (cur != null && !cur.IsDisposed)
+                    cur.SetGlobalDiffRange(min, max);
+        }
+
+        /// <summary>
+        /// Phase 3 — draws the surface items, opaque first so translucent items blend over a
+        /// settled frame. When nothing is translucent the order (and result) is unchanged.
+        /// Returns whether at least one item was drawn.
+        /// </summary>
+        private bool DrawSurfaceItems(OpenGL gl, List<ICxObjRenderItem> snapshot)
+        {
             bool anyDrawn = false;
             for (int pass = 0; pass < 2; pass++)
             {
@@ -260,55 +314,92 @@ namespace VisionNet.Controls
                     anyDrawn = true;
                 }
             }
+            return anyDrawn;
+        }
 
-            // Phase 4 — overlay geometry (segments, points, polygons, etc.).
+        /// <summary>Phase 4 — overlay geometry (segments, points, polygons, etc.).</summary>
+        private void DrawOverlays(OpenGL gl)
+        {
             _registry.CopyOverlayItemsInto(_overlaySnapshot);
             foreach (var item in _overlaySnapshot)
                 item.Draw(gl);
+        }
 
-            if (!_camera.Enable2DView)
-                _coordinationItem.DrawScreenPositionedAxes(gl);
+        /// <summary>
+        /// Phase 4b — resolves a pending hover pick. It is deferred from the mouse handler so
+        /// the depth readback happens at most once per frame, with the scene already drawn
+        /// and the GL context guaranteed current. Phase 5 draws the tooltip, so it shows
+        /// the coordinates resolved here.
+        /// </summary>
+        private void ResolvePendingPick()
+        {
+            if (!_hasPendingPick) return;
+            _hasPendingPick = false;
+            ApplyPendingPick();
+        }
 
-            // Phase 4b — resolve a pending hover pick. It is deferred from the mouse handler so
-            // the depth readback happens at most once per frame, with the scene already drawn
-            // and the GL context guaranteed current. Phase 5 draws the tooltip, so it shows
-            // the coordinates resolved here.
-            if (_hasPendingPick)
-            {
-                _hasPendingPick = false;
-                ApplyPendingPick();
-            }
+        /// <summary>
+        /// Phase 5 — screen-space HUD. The colour bar and coordinate tooltip are emitted after
+        /// all scene and interactive geometry, so later depth-tested draws cannot cover their
+        /// text or backgrounds.
+        /// </summary>
+        private void DrawHud(OpenGL gl, bool anyDrawn, FrameRanges ranges)
+        {
+            if (!anyDrawn) return;
 
-            // Phase 5 — screen-space HUD. The colour bar and coordinate tooltip are
-            // emitted after all scene and interactive geometry, so later depth-tested
-            // draws cannot cover their text or backgrounds.
             // The colour bar is drawn only when every item shares one data-mapped mode.
-            if (anyDrawn && uniformMode && singleMode != SurfaceColorMode.Intensity
-                && singleMode != SurfaceColorMode.Lit && IsColorBarVisible)
+            float barMin, barMax;
+            if (ranges.UniformMode && IsColorBarVisible
+                && ranges.SingleMode != SurfaceColorMode.Intensity
+                && ranges.SingleMode != SurfaceColorMode.Lit
+                && TryResolveColorBarRange(ranges, out barMin, out barMax))
             {
-                if (singleMode == SurfaceColorMode.Diff && _manualDiffRange.HasValue)
-                {
-                    _colorBarItem.SetRange(_manualDiffRange.Value.min, _manualDiffRange.Value.max);
-                    _colorBarItem.Draw(gl);
-                }
-                else if (singleMode == SurfaceColorMode.Diff && globalDiffMin < globalDiffMax)
-                {
-                    _colorBarItem.SetRange(globalDiffMin, globalDiffMax);
-                    _colorBarItem.Draw(gl);
-                }
-                else if (singleMode != SurfaceColorMode.Diff && _manualColorRange.HasValue)
-                {
-                    _colorBarItem.SetRange(_manualColorRange.Value.min, _manualColorRange.Value.max);
-                    _colorBarItem.Draw(gl);
-                }
-                else if (singleMode != SurfaceColorMode.Diff && globalZMin < globalZMax)
-                {
-                    _colorBarItem.SetRange(globalZMin, globalZMax);
-                    _colorBarItem.Draw(gl);
-                }
+                _colorBarItem.SetRange(barMin, barMax);
+                _colorBarItem.Draw(gl);
             }
-            if (anyDrawn)
-                _coordTagItem.Draw(gl);
+
+            _coordTagItem.Draw(gl);
+        }
+
+        /// <summary>
+        /// Picks the range the colour bar should display. Diff mode uses the diff range, every
+        /// other mode the Z range; in both cases a manual override wins over the auto-aggregated
+        /// range. Returns <c>false</c> when no usable range exists, in which case the bar is skipped.
+        /// </summary>
+        private bool TryResolveColorBarRange(FrameRanges ranges, out float min, out float max)
+        {
+            min = max = 0f;
+
+            if (ranges.SingleMode == SurfaceColorMode.Diff)
+            {
+                if (_manualDiffRange.HasValue)
+                {
+                    min = _manualDiffRange.Value.min;
+                    max = _manualDiffRange.Value.max;
+                    return true;
+                }
+                if (ranges.DiffMin < ranges.DiffMax)
+                {
+                    min = ranges.DiffMin;
+                    max = ranges.DiffMax;
+                    return true;
+                }
+                return false;
+            }
+
+            if (_manualColorRange.HasValue)
+            {
+                min = _manualColorRange.Value.min;
+                max = _manualColorRange.Value.max;
+                return true;
+            }
+            if (ranges.ZMin < ranges.ZMax)
+            {
+                min = ranges.ZMin;
+                max = ranges.ZMax;
+                return true;
+            }
+            return false;
         }
     }
 }

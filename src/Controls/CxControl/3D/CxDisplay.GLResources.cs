@@ -21,6 +21,30 @@ namespace VisionNet.Controls
             }
         }
 
+        /// <summary>
+        /// Creates one vertex buffer for <paramref name="handle"/>, uploads <paramref name="data"/>
+        /// into it, and wires it to <paramref name="attributeIndex"/>. Buffers are always float
+        /// data, so the byte count is derived from the array length.
+        /// </summary>
+        /// <param name="vboIndex">Slot in <see cref="GLResourceHandle.VboIds"/> to fill.</param>
+        /// <param name="componentCount">Components per vertex (3 for positions/colours, 2 for UVs, 1 for scalars).</param>
+        /// <param name="stride">Byte stride between vertices; 0 means tightly packed.</param>
+        /// <returns>The next free VBO slot index.</returns>
+        private static int UploadVertexBuffer(OpenGL gl, GLResourceHandle handle, int vboIndex,
+            Array data, uint attributeIndex, int componentCount, int stride)
+        {
+            var tempId = new uint[1];
+            gl.GenBuffers(1, tempId);
+            handle.VboIds[vboIndex] = tempId[0];
+            gl.BindBuffer(OpenGL.GL_ARRAY_BUFFER, handle.VboIds[vboIndex]);
+            UploadPinned(gl, OpenGL.GL_ARRAY_BUFFER, data,
+                data.Length * sizeof(float), OpenGL.GL_STATIC_DRAW);
+            gl.VertexAttribPointer(attributeIndex, componentCount, OpenGL.GL_FLOAT, false,
+                stride, IntPtr.Zero);
+            gl.EnableVertexAttribArray(attributeIndex);
+            return vboIndex + 1;
+        }
+
         private void CreateGLResources(OpenGL gl, ICxObjRenderItem item, GLResourceHandle handle)
         {
             var data = item.PrepareRenderData();
@@ -73,63 +97,23 @@ namespace VisionNet.Controls
                 int vboIndex = 0;
 
                 if (data.Vertices != null && data.Vertices.Length >= data.VertexCount * 3)
-                {
-                    gl.GenBuffers(1, tempId);
-                    handle.VboIds[vboIndex] = tempId[0];
-                    gl.BindBuffer(OpenGL.GL_ARRAY_BUFFER, handle.VboIds[vboIndex]);
-                    UploadPinned(gl, OpenGL.GL_ARRAY_BUFFER, data.Vertices,
-                        data.Vertices.Length * sizeof(float), OpenGL.GL_STATIC_DRAW);
-                    gl.VertexAttribPointer(0, 3, OpenGL.GL_FLOAT, false, 3 * sizeof(float), IntPtr.Zero);
-                    gl.EnableVertexAttribArray(0);
-                    vboIndex++;
-                }
+                    vboIndex = UploadVertexBuffer(gl, handle, vboIndex, data.Vertices,
+                        attributeIndex: 0, componentCount: 3, stride: 3 * sizeof(float));
 
                 if (data.Colors != null && data.Colors.Length >= data.VertexCount * 3)
-                {
-                    gl.GenBuffers(1, tempId);
-                    handle.VboIds[vboIndex] = tempId[0];
-                    gl.BindBuffer(OpenGL.GL_ARRAY_BUFFER, handle.VboIds[vboIndex]);
-                    UploadPinned(gl, OpenGL.GL_ARRAY_BUFFER, data.Colors,
-                        data.Colors.Length * sizeof(float), OpenGL.GL_STATIC_DRAW);
-                    gl.VertexAttribPointer(1, 3, OpenGL.GL_FLOAT, false, 3 * sizeof(float), IntPtr.Zero);
-                    gl.EnableVertexAttribArray(1);
-                    vboIndex++;
-                }
+                    vboIndex = UploadVertexBuffer(gl, handle, vboIndex, data.Colors,
+                        attributeIndex: 1, componentCount: 3, stride: 3 * sizeof(float));
                 else if (data.UVCoords != null && data.UVCoords.Length >= data.VertexCount * 2)
-                {
-                    gl.GenBuffers(1, tempId);
-                    handle.VboIds[vboIndex] = tempId[0];
-                    gl.BindBuffer(OpenGL.GL_ARRAY_BUFFER, handle.VboIds[vboIndex]);
-                    UploadPinned(gl, OpenGL.GL_ARRAY_BUFFER, data.UVCoords,
-                        data.UVCoords.Length * sizeof(float), OpenGL.GL_STATIC_DRAW);
-                    gl.VertexAttribPointer(1, 2, OpenGL.GL_FLOAT, false, 2 * sizeof(float), IntPtr.Zero);
-                    gl.EnableVertexAttribArray(1);
-                    vboIndex++;
-                }
+                    vboIndex = UploadVertexBuffer(gl, handle, vboIndex, data.UVCoords,
+                        attributeIndex: 1, componentCount: 2, stride: 2 * sizeof(float));
 
                 if (data.DiffValues != null && data.DiffValues.Length >= data.VertexCount)
-                {
-                    gl.GenBuffers(1, tempId);
-                    handle.VboIds[vboIndex] = tempId[0];
-                    gl.BindBuffer(OpenGL.GL_ARRAY_BUFFER, handle.VboIds[vboIndex]);
-                    UploadPinned(gl, OpenGL.GL_ARRAY_BUFFER, data.DiffValues,
-                        data.DiffValues.Length * sizeof(float), OpenGL.GL_STATIC_DRAW);
-                    gl.VertexAttribPointer(2, 1, OpenGL.GL_FLOAT, false, 0, IntPtr.Zero);
-                    gl.EnableVertexAttribArray(2);
-                    vboIndex++;
-                }
+                    vboIndex = UploadVertexBuffer(gl, handle, vboIndex, data.DiffValues,
+                        attributeIndex: 2, componentCount: 1, stride: 0);
 
                 if (data.IntensityValues != null && data.IntensityValues.Length >= data.VertexCount)
-                {
-                    gl.GenBuffers(1, tempId);
-                    handle.VboIds[vboIndex] = tempId[0];
-                    gl.BindBuffer(OpenGL.GL_ARRAY_BUFFER, handle.VboIds[vboIndex]);
-                    UploadPinned(gl, OpenGL.GL_ARRAY_BUFFER, data.IntensityValues,
-                        data.IntensityValues.Length * sizeof(float), OpenGL.GL_STATIC_DRAW);
-                    gl.VertexAttribPointer(3, 1, OpenGL.GL_FLOAT, false, sizeof(float), IntPtr.Zero);
-                    gl.EnableVertexAttribArray(3);
-                    vboIndex++;
-                }
+                    vboIndex = UploadVertexBuffer(gl, handle, vboIndex, data.IntensityValues,
+                        attributeIndex: 3, componentCount: 1, stride: sizeof(float));
 
                 handle.VboCount = vboIndex;
 

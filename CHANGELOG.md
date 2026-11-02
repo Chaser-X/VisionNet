@@ -6,7 +6,26 @@
 
 ## 未发布（工作区，尚未提交）
 
-（暂无）
+### S2 拆长方法（行为不变）+ S0 收尾测试
+
+**`CxDisplay.Render` 拆解**（原约 150 行，单方法承担 Phase 1–5）：
+- 相位边界原样保留，但每一相位现在是一个具名方法：`AggregateFrameRanges`（Phase 1，返回新的私有 `FrameRanges` 结构）、`PropagateFrameRanges`（Phase 2/2b，含 `SetGlobalZRangeOnAll` / `SetGlobalDiffRangeOnAll`）、`DrawSurfaceItems`（Phase 3，返回 `anyDrawn`）、`DrawOverlays`（Phase 4）、`ResolvePendingPick`（Phase 4b）、`DrawHud`（Phase 5）。
+- **色条分支**：原先 4 个 `else if` 各自重复一遍 `SetRange + Draw`，现由 `TryResolveColorBarRange` 归一为"Diff 模式用 diff 范围、其余用 Z 范围；两者都是手动覆盖优先于自动聚合"，`DrawHud` 只保留一次 `SetRange + Draw`。`uniformMode && 模式不是 Intensity/Lit && IsColorBarVisible` 的门控条件原样保留。
+- `AggregateFrameRanges` 的 `mixedMode` / `singleMode` 语义逐字保留（含"混合后 `SingleMode` 仍保留首个模式、由 `UniformMode=false` 兜底"这一细节）。
+
+**`CreateGLResources` 拆解**：5 段"`GenBuffers` → `BindBuffer` → `UploadPinned` → `VertexAttribPointer` → `EnableVertexAttribArray`"样板收敛为 `UploadVertexBuffer(gl, handle, vboIndex, data, attributeIndex, componentCount, stride)`，返回下一个空槽位。字节数一律 `data.Length * sizeof(float)`（原先 5 处写法相同）。**唯一差异**：每个 VBO 各分配一个 `uint[1]` 临时 id 数组，而非 5 段共用同一个 —— 这只发生在资源创建期（每次数据变更一次），不在每帧路径上。
+
+**`GetNearestSurfacePoint` 拆解**：
+- 5×5 邻域搜索抽为 `internal static SearchSurfaceNeighbourhood(...)`，**不依赖 GL、不依赖 display 实例**，因此可直接单测。`-32768` 改用 `CxExtension.NoDataValue`，`-2..2` 与阈值系数 `5 *` 提为 `PickNeighbourhoodRadius` / `PickNeighbourhoodTolerance`。
+- 世界坐标重建语义不变：候选点先经 `model` 变换到世界空间再比距离，重叠曲面按世界距离而非局部坐标消歧。
+- 循环里逐次读取的 `SurfaceColorMode` 属性提升为循环外的 `useDiff` 局部量（该属性在单次调用内不可能变化）。Diff 分支的取值优先级不变。
+
+**新增 S0 收尾测试（17 项）**：
+- `SurfacePickNeighbourhoodTests`（10 项）：命中所在格、±2 窗口边界（同时验证"窗口内找得到 / 窗口外找不到"）、越界与全空洞返回空、超出容差的候选被拒、多候选取最近、intensity/diff 取值切换、缺值数组返回 null 而非抛异常、模型矩阵把候选点还原到世界空间、已有更优候选不被覆盖。
+- `CxColorBarTickTests`（7 项）：刻度数 = 分割数 + 1、端点值恰为范围上下界、等距、倒置范围下单调、屏幕位置从条底开始且落在条内。`TickY` 用单精度 `i * (barHeight / 7f)`，整除时会有 1 像素截断，测试显式允许该截断而非断言精确端点。
+
+- 验证：`dotnet test` Debug 与 Release 均 **90/90 通过**；`CxControl` / `CxControl.Tests` 0 错误 0 C# 警告（仅预存在 MSB3270）；`DemoFrom` 0 错误（3 个警告均为预存在的 MSB3270）。
+- **测试过程中发现的坑**：`CxSurface` 的构造函数**不接收 `Diff`** —— `Diff` 只是普通自动属性，必须构造后单独赋值。首轮 `ReportsIntensityByDefault_AndDiffInDiffMode` 因此失败（diff 路径静默拿到 null），已修正测试夹具；这也说明该断言不是恒真。
 
 ## 已提交
 

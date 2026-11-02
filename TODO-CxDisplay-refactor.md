@@ -6,8 +6,8 @@
 
 ## S0 安全网
 
-- [ ] 特征测试：`GetNearestSurfacePoint` 纯算法部分（S2 抽出后覆盖）
-- [ ] 特征测试：`CxColorBarItem` 刻度文本与 `divisions` 行为
+- [x] 特征测试：`GetNearestSurfacePoint` 纯算法部分（`SurfacePickNeighbourhoodTests`，10 项）
+- [x] 特征测试：`CxColorBarItem` 刻度文本与 `divisions` 行为（`CxColorBarTickTests`，7 项）
 - [x] 特征测试：`CxExtension` 三处包围盒收尾结果一致性（`CxBoundingBoxConsistencyTests`，5 项）
 - [x] 性能基线：手动基准（每帧耗时 + Gen0 次数），结果记入 CHANGELOG（`CxDisplayCpuBenchmarkTests`）
 
@@ -23,9 +23,9 @@
 
 ## S2 拆长方法
 
-- [ ] `CxDisplay.Render.cs` 的 `Render` 拆为 `UpdateTransforms / UploadPending / DrawSurfaces / DrawOverlays / DrawColorBar`，色条 4 处重复 `SetRange+Draw` 循环化
-- [ ] `CxDisplay.GLResources.cs` 的 `CreateGLResources` 抽 `UploadVertexBuffer(...)`
-- [ ] `CxDisplay.Input.cs` 的 `GetNearestSurfacePoint` 拆为取深度 / 邻域搜索 / 候选筛选 / 变换，纯数学部分去 GL 依赖
+- [x] `CxDisplay.Render.cs` 的 `Render` 拆为 `AggregateFrameRanges` / `PropagateFrameRanges` / `DrawSurfaceItems` / `DrawOverlays` / `ResolvePendingPick` / `DrawHud`，色条 4 处重复 `SetRange+Draw` 收敛为 `TryResolveColorBarRange`
+- [x] `CxDisplay.GLResources.cs` 的 `CreateGLResources` 抽 `UploadVertexBuffer(...)`（5 段样板合一）
+- [x] `CxDisplay.Input.cs` 的 `GetNearestSurfacePoint` 拆出纯函数 `SearchSurfaceNeighbourhood`（去 GL 依赖，可直接单测）
 
 ## 后续待办（不在本轮）
 
