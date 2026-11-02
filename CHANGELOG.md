@@ -6,7 +6,20 @@
 
 ## 未发布（工作区，尚未提交）
 
-（暂无）
+### S0（安全网）：包围盒三路一致性测试 + 每帧 CPU 基准
+
+- 新增 `CxBoundingBoxConsistencyTests`（5 项）：`CxExtension.CalculateBoundingBox` 的三个重载（`IEnumerable<CxPoint3D>` / `CxSurface` / `CxPointCloud`）是手写重复实现，现断言它们在**同一组点**上给出逐项相等的包围盒，覆盖全填充、整行空洞、全空洞三种情形；并单独钉住点云扫描"任一通道为 `-32768` 即整点作废"的语义（不是按轴各算各的）。这组测试是后续抽出共享收尾逻辑前的护栏。
+- 新增 `CxDisplayCpuBenchmarkTests`（1 项）：记录渲染帧中纯 CPU 热点的基线 —— 颜色映射（色条每帧每行一次）、曲面包围盒扫描（每帧聚合）、`CxPoint3D[]` → `float[]` 位置拷贝。**只记录不断言耗时**，断言的是被测代码的真实不变量（颜色落在 `[0,1]`、包围盒非退化、拷贝末值正确），因此不会因机器差异产生偶发失败。
+- 本轮基线（Debug/net48，本机）：
+
+  | 基准 | 耗时 | Gen0 |
+  | --- | --- | --- |
+  | `GetColorByHeight` ×200k | 5.56 ms | 0 |
+  | `CalculateBoundingBox(surface 512×512)` ×20 | 69.94 ms（≈3.5 ms/次） | 0 |
+  | `Point3D[]` → `float[]`（200k 点）×20 | 12.90 ms（≈0.65 ms/次） | 0 |
+
+- 验证：`dotnet test` → **73/73 通过**（原 67 + 新增 6）。
+- 说明：`CxDisplayCpuBenchmarkTests` 会随测试套件一起运行（约 0.5 s）。用 `--logger "console;verbosity=detailed"` 可读到上表数字。
 
 ## 已提交
 
