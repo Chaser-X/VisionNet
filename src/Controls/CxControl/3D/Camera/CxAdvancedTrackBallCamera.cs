@@ -165,13 +165,25 @@ namespace VisionNet.Controls
             int deltaX = e.X - _lastMousePosition.X;
             int deltaY = e.Y - _lastMousePosition.Y;
 
+            bool moved = false;
             if (_isRotating && !Enable2DView)
+            {
                 RotateCamera(deltaX, deltaY);
+                moved = true;
+            }
             else if (_isPanning)
+            {
                 PanCamera(deltaX, deltaY);
+                moved = true;
+            }
 
             _lastMousePosition = e.Location;
-            _glControl.Invalidate();
+
+            // Only a drag changes the view, so only a drag needs a repaint from here. A plain
+            // hover already repaints through CxDisplay's tooltip path; invalidating on every
+            // hover as well would keep a WM_PAINT permanently pending while the mouse moves,
+            // which starves low-priority WM_TIMER work in the host application.
+            if (moved) _glControl.Invalidate();
         }
 
         private void GlControl_MouseUp(object sender, MouseEventArgs e)

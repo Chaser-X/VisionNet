@@ -14,6 +14,7 @@ using System.Linq;
 using System.Runtime.InteropServices.ComTypes;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using System.Xml.Linq;
@@ -1340,7 +1341,7 @@ namespace DemoFrom
 
         // ���� Group / Simulation Demo ��������������������������������������������������������������������������������������������������
 
-        private System.Windows.Forms.Timer _simTimer;
+        private SimDriver _simDriver;
         private Stopwatch _simWatch;
         private CxGroup _platformGroup;
         private CxGroup _vehicleGroup;
@@ -1396,7 +1397,7 @@ namespace DemoFrom
 
         private void btn_groupSim_Click(object sender, EventArgs e)
         {
-            if (_simTimer != null) { StopGroupSim(); return; }
+            if (_simDriver != null) { StopGroupSim(); return; }
             StopStageSim();
             StartGroupSim();
         }
@@ -1423,11 +1424,12 @@ namespace DemoFrom
             cxDisplay1.Groups.Add(_vehicleGroup, vehicleItem);
             cxDisplay1.Groups.Add(_vehicleGroup, realItem);
 
-            // 外部仿真循环：Demo 自己驱动，CxDisplay 只提供 Groups.SetTransform
+            // 外部仿真循环：Demo 自己驱动，CxDisplay 只提供 Groups.SetTransform。
+            // 用后台驱动而非 WinForms Timer —— 后者跑在 WM_TIMER 上，鼠标在另一个 CxDisplay
+            // 上持续移动时会被 WM_PAINT 饿死，动画冻结。
             _simWatch = Stopwatch.StartNew();
-            _simTimer = new System.Windows.Forms.Timer { Interval = 16 };
-            _simTimer.Tick += SimTick;
-            _simTimer.Start();
+            _simDriver = new SimDriver(this, 16, SimTick);
+            _simDriver.Start();
 
             _btnGroupSim.Text = "Stop Sim";
         }
@@ -1470,14 +1472,14 @@ namespace DemoFrom
 
         private void StopGroupSim()
         {
-            _simTimer?.Stop();
-            _simTimer?.Dispose();
-            _simTimer = null;
+            _simDriver?.Dispose();
+            _simDriver = null;
             _simWatch = null;
             _btnGroupSim.Text = "Group Sim";
         }
 
-        private void SimTick(object sender, EventArgs e)
+        /// <summary>Runs on the UI thread (the driver marshals it there).</summary>
+        private void SimTick()
         {
             if (_simWatch == null) return;
             double t = _simWatch.Elapsed.TotalSeconds;
@@ -1495,7 +1497,7 @@ namespace DemoFrom
 
         // ── Gantry 3-axis trace demo ─────────────────────────────────────────────
 
-        private System.Windows.Forms.Timer _stageTimer;
+        private SimDriver _stageDriver;
         private Stopwatch _stageWatch;
         private CxGroup _stageGroupX;
         private CxGroup _stageGroupY;
@@ -1518,7 +1520,7 @@ namespace DemoFrom
 
         private void btn_stage3Axis_Click(object sender, EventArgs e)
         {
-            if (_stageTimer != null) { StopStageSim(); return; }
+            if (_stageDriver != null) { StopStageSim(); return; }
             StopGroupSim();
             StartStageSim();
         }
@@ -1596,26 +1598,25 @@ namespace DemoFrom
                 Color.Yellow, 0.6f, PointShape.Sphere);
             cxDisplay1.Groups.Add(_stageGroupZ, tipMarker);
 
-            // 外部仿真循环
+            // 外部仿真循环（同 Group Sim：后台驱动，不走 WM_TIMER）
             _stageWatch = Stopwatch.StartNew();
-            _stageTimer = new System.Windows.Forms.Timer { Interval = 50 };
-            _stageTimer.Tick += StageTick;
-            _stageTimer.Start();
+            _stageDriver = new SimDriver(this, 50, StageTick);
+            _stageDriver.Start();
 
             _btnStage3Axis.Text = "Stop Stage";
         }
 
         private void StopStageSim()
         {
-            if (_stageTimer == null) return;
-            _stageTimer.Stop();
-            _stageTimer.Dispose();
-            _stageTimer = null;
+            if (_stageDriver == null) return;
+            _stageDriver.Dispose();
+            _stageDriver = null;
             _stageWatch = null;
             _btnStage3Axis.Text = "3-Axis Stage";
         }
 
-        private void StageTick(object sender, EventArgs e)
+        /// <summary>Runs on the UI thread (the driver marshals it there).</summary>
+        private void StageTick()
         {
             if (_stageWatch == null) return;
 
@@ -1638,6 +1639,91 @@ namespace DemoFrom
             cxDisplay1.Groups.SetTransform(_stageGroupX, CxMatrix4X4.Translation(u, 0f, 0f));
             cxDisplay1.Groups.SetTransform(_stageGroupY, CxMatrix4X4.Translation(0f, -v, 0f));
             cxDisplay1.Groups.SetTransform(_stageGroupZ, CxMatrix4X4.Translation(0f, 0f, tipZ - StageTipHomeZ));
+        }
+
+        /// <summary>
+        /// Drives a simulation callback from a background timer instead of a
+        /// <see cref="System.Windows.Forms.Timer"/>.
+        /// </summary>
+        /// <remarks>
+        /// A WinForms Timer runs on <c>WM_TIMER</c>, the lowest-priority message in the queue.
+        /// While any control repaints continuously — e.g. hovering a second CxDisplay, which
+        /// invalidates once per mouse move — a <c>WM_PAINT</c> is essentially always pending,
+        /// <c>WM_TIMER</c> never gets generated, and the animation freezes. A background timer is
+        /// immune to that.
+        /// <para>The callback runs on the UI thread, so it may touch controls directly.
+        /// <c>BeginInvoke</c> work items have no backpressure, so at most one apply is queued at a
+        /// time: a tick that arrives while the previous apply is still waiting is dropped, which
+        /// coalesces the burst onto the latest state instead of building a backlog of stale poses.
+        /// </para>
+        /// </remarks>
+        private sealed class SimDriver : IDisposable
+        {
+            private readonly Control _marshalTo;
+            private readonly Action _apply;
+            private readonly int _intervalMs;
+            private readonly System.Threading.Timer _timer;
+
+            // 0 = idle, 1 = an apply is queued or running on the UI thread.
+            private int _queued;
+            private bool _disposed;
+
+            public SimDriver(Control marshalTo, int intervalMs, Action apply)
+            {
+                _marshalTo = marshalTo ?? throw new ArgumentNullException(nameof(marshalTo));
+                _apply = apply ?? throw new ArgumentNullException(nameof(apply));
+                _intervalMs = intervalMs;
+                // Created one-shot: each tick re-arms itself, so a slow UI thread cannot build up
+                // a backlog of timer callbacks on top of the coalescing below.
+                _timer = new System.Threading.Timer(OnTick, null, Timeout.Infinite, Timeout.Infinite);
+            }
+
+            /// <summary>Starts ticking every <c>intervalMs</c>.</summary>
+            public void Start() => _timer.Change(0, Timeout.Infinite);
+
+            private void OnTick(object state)
+            {
+                if (_disposed) return;
+
+                // Drop this tick when the previous apply has not run yet.
+                if (Interlocked.CompareExchange(ref _queued, 1, 0) != 0)
+                {
+                    Rearm();
+                    return;
+                }
+
+                try
+                {
+                    _marshalTo.BeginInvoke(new Action(() =>
+                    {
+                        Interlocked.Exchange(ref _queued, 0);
+                        if (_disposed || _marshalTo.IsDisposed) return;
+                        _apply();
+                    }));
+                }
+                catch (InvalidOperationException)
+                {
+                    // The handle can be destroyed between the check and the post.
+                    Interlocked.Exchange(ref _queued, 0);
+                    return;
+                }
+
+                Rearm();
+            }
+
+            private void Rearm()
+            {
+                if (_disposed) return;
+                try { _timer.Change(_intervalMs, Timeout.Infinite); }
+                catch (ObjectDisposedException) { /* disposed concurrently */ }
+            }
+
+            public void Dispose()
+            {
+                if (_disposed) return;
+                _disposed = true;
+                _timer.Dispose();
+            }
         }
 
         private static CxMesh BuildBoxMesh(float w, float d, float h, CxPoint3D origin)

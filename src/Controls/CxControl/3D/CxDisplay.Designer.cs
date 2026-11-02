@@ -41,6 +41,9 @@ namespace VisionNet.Controls
                     DisposeResources(this.OpenGL);
 
                     components?.Dispose();
+                    _hoverPickThrottle?.Stop();
+                    _hoverPickThrottle?.Dispose();
+                    _hoverPickThrottle = null;
                     _camera?.Dispose();
                     _coordinationItem?.Dispose();
                     _colorBarItem?.Dispose();

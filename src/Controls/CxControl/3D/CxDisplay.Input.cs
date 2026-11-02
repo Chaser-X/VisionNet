@@ -28,6 +28,17 @@ namespace VisionNet.Controls
         private CxPoint3D? _coordinatesResultLocation;
         private float? _coordinatesResultIntensity;
 
+        // Hover picking repaints once per mouse move, and a continuous hover would therefore keep a
+        // WM_PAINT permanently pending. WM_PAINT outranks WM_TIMER, so in a host application that
+        // animates something else from a WinForms Timer (another CxDisplay, a progress bar, ...)
+        // that timer gets starved and the other animation freezes while the mouse moves here.
+        // Cap the hover-driven repaint rate; the one-shot timer below still resolves the resting
+        // position, so the tooltip is never left stale.
+        private const int HoverPickMinIntervalMs = 33;
+
+        private Timer _hoverPickThrottle;
+        private int _lastHoverPickRequestTicks;
+
         // ── Mouse events ─────────────────────────────────────────────────────────
 
         /// <inheritdoc/>
@@ -168,9 +179,59 @@ namespace VisionNet.Controls
             _hasPendingPick = true;
             _pendingPickX = e.X;
             _pendingPickY = e.Y;
-            SafeInvalidate();
+            RequestHoverPickRepaint();
 
             base.OnMouseMove(e);
+        }
+
+        /// <summary>
+        /// Requests the repaint that resolves a hover pick, at most once per
+        /// <see cref="HoverPickMinIntervalMs"/>.
+        /// </summary>
+        /// <remarks>
+        /// A throttled request arms the one-shot timer instead of repainting immediately, so a
+        /// continuous hover leaves gaps in which the message queue drains — that is what keeps a
+        /// host application's <c>WM_TIMER</c> work alive. Restarting the timer on every throttled
+        /// move coalesces the burst onto the latest mouse position.
+        /// </remarks>
+        private void RequestHoverPickRepaint()
+        {
+            int now = Environment.TickCount;
+            bool throttled = _lastHoverPickRequestTicks != 0
+                && unchecked(now - _lastHoverPickRequestTicks) < HoverPickMinIntervalMs;
+
+            if (throttled)
+            {
+                HoverPickThrottle.Stop();
+                HoverPickThrottle.Start();
+                return;
+            }
+
+            _lastHoverPickRequestTicks = now;
+            SafeInvalidate();
+        }
+
+        /// <summary>Lazily created so the WinForms designer path never touches a timer.</summary>
+        private Timer HoverPickThrottle
+        {
+            get
+            {
+                if (_hoverPickThrottle == null)
+                {
+                    _hoverPickThrottle = new Timer { Interval = HoverPickMinIntervalMs };
+                    _hoverPickThrottle.Tick += OnHoverPickThrottleTick;
+                }
+                return _hoverPickThrottle;
+            }
+        }
+
+        private void OnHoverPickThrottleTick(object sender, EventArgs e)
+        {
+            _hoverPickThrottle.Stop();
+            if (IsDisposed || !IsHandleCreated) return;
+
+            _lastHoverPickRequestTicks = Environment.TickCount;
+            SafeInvalidate();
         }
 
         /// <summary>
@@ -214,6 +275,9 @@ namespace VisionNet.Controls
         {
             _hasPendingPick = false;
             _hasCoordinatesResult = false;
+            // A queued throttle tick would otherwise re-arm a repaint for a pick that no longer
+            // exists.
+            _hoverPickThrottle?.Stop();
         }
 
         /// <summary>

@@ -6,7 +6,27 @@
 
 ## 未发布（工作区，尚未提交）
 
-（暂无）
+### 双 CxDisplay 卡顿：悬停重绘节流 + Demo 仿真改用后台驱动
+
+**现象**：Demo 里左侧 `cxDisplay1` 跑 Group 仿真，右侧 `cxDisplay2` 加载 mesh；在右侧持续移动鼠标时，左侧动画冻结，停下即恢复。
+
+**根因**：两个控件的数据完全独立（各自的 `CxItemRegistry` / `CxGroupManager` / `_renderLock` / GL 上下文），但**共用同一条 UI 线程消息队列**。左侧动画由 `System.Windows.Forms.Timer` 驱动，它跑在 `WM_TIMER` 上 —— 消息队列里优先级最低的一类。而右侧每次鼠标移动都会请求一次完整重绘（相机 `GlControl_MouseMove` 末尾无条件 `Invalidate()`，悬停拾取又 `SafeInvalidate()` 一次），`WM_PAINT` 优先级高于 `WM_TIMER`，于是只要鼠标在动，队列里几乎总有待处理的 `WM_PAINT`，`WM_TIMER` 不再生成，`SimTick` 不再触发，姿态停止更新。
+
+**库侧改动（渲染行为变更）**
+- `CxAdvancedTrackBallCamera.GlControl_MouseMove`：只在**确实发生了旋转/平移**时 `Invalidate()`。原先无条件重绘，纯悬停也会触发一次完整帧。
+- `CxDisplay` 悬停拾取节流：新增 `HoverPickMinIntervalMs = 33`。未被节流时立即 `SafeInvalidate()`；被节流时改为启动一次性定时器（每次节流移动都重启，从而把一串移动合并到最新位置）。这样连续悬停会在消息队列里留出空档，宿主应用的 `WM_TIMER` 得以继续工作；同时一次性定时器保证**鼠标停住后仍会补一帧**，tooltip 不会停在过期位置。
+- 节流定时器懒创建（`HoverPickThrottle`），`CancelPendingPick()` 会停掉它（按下/抬起时不再残留一次针对已取消拾取的重绘），`Dispose` 中释放。
+- **公开 API 未变**：`HoverPickMinIntervalMs` 是私有常量，定时器是私有字段。
+
+**Demo 侧改动**（`Test/DemoFrom/DemoFrom.cs`）
+- Group Sim 与 3-Axis Stage 不再用 `System.Windows.Forms.Timer`，改为新增的私有 `SimDriver`：后台 `System.Threading.Timer` + `BeginInvoke` 到 UI 线程执行回调。
+- `SimDriver` 做背压合并：`BeginInvoke` 队列没有背压，所以同一时刻最多只排队一次应用；上一次还没执行完时新 tick 直接丢弃，把突发合并到最新状态而不是堆积过期姿态。定时器为一次性、每 tick 自行重置，慢 UI 线程不会叠出回调积压。
+- `SimTick` / `StageTick` 签名由 `(object, EventArgs)` 改为无参（由 driver 在 UI 线程调用），原有的 `_simWatch == null` / `_stageWatch == null` 早退守卫现在实际承担"已停止则丢弃在途回调"的职责。
+
+**未做**：`CxPickingService.ScreenToWorld` 在帧外（`OnMouseDown` / 拖拽路径）调用 `ReadPixels`，全项目没有 `MakeCurrent`。`glReadPixels` 读的是线程当前上下文，双控件时左侧点击理论上可能读到右侧的深度缓冲。修法是入口处 `gl.MakeCurrent()`，但需先确认该 SharpGL 版本在 `RenderContextType.FBO` 下的行为，未验证前不改。
+
+- 验证：`dotnet test` → **103/103 通过**（本次未新增用例：改动集中在 GL 帧路径与消息循环，无法单测）；`CxControl` 与 `DemoFrom` 均 0 错误（DemoFrom 3 个警告为预存在 MSB3270）。
+- **需本机实测确认**：右侧持续移动鼠标时左侧动画应保持流畅（SimTick 间隔稳定在 ~16 ms）；悬停 tooltip 仍跟随鼠标、停住后位置正确；旋转/平移/缩放、拖拽 overlay item 不受影响。
 
 ## 已提交
 
