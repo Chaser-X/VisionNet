@@ -211,8 +211,10 @@ namespace VisionNet.Controls
             SurfaceColorMode surfaceColorMode = SurfaceColorMode.ColorWithIntensity)
         {
             // The group manager is independent of the GL context and must exist in every mode
-            // (including the WinForms designer).
-            _groupManager = new CxGroupManager(this);
+            // (including the WinForms designer). It takes the registry and this control's narrow
+            // IDisplayHost contract rather than the control itself, so the two do not reference
+            // each other.
+            _groupManager = new CxGroupManager(_registry, this);
 
             if (!DesignMode)
             {
@@ -385,7 +387,7 @@ namespace VisionNet.Controls
             lock (_renderLock)
             {
                 if (gl != null)
-                    _registry.DrainReleases(p => ReleaseGLResources(gl, p));
+                    _registry.DrainReleases(p => CxGLResourceManager.Release(gl, p));
 
                 Groups.Clear();
                 _registry.DisposeAll(
@@ -396,7 +398,7 @@ namespace VisionNet.Controls
 
                         // Disposal runs with the context current, so the handle is released directly
                         // instead of being queued for the render pass.
-                        if (gl != null && handle != null) ReleaseGLResources(gl, handle);
+                        if (gl != null && handle != null) CxGLResourceManager.Release(gl, handle);
                         item.Dispose();
                     },
                     overlay => overlay.Dispose());

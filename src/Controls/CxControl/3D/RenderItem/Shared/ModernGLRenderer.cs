@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.Globalization;
@@ -32,6 +33,13 @@ namespace VisionNet.Controls
         {
             internal readonly Stack<CxMatrix4X4> Models = new Stack<CxMatrix4X4>();
             internal CxMatrix4X4 Current = CxMatrix4X4.Identity();
+
+            /// <summary>Drops the stack and returns to the identity model matrix.</summary>
+            internal void Reset()
+            {
+                Models.Clear();
+                Current = CxMatrix4X4.Identity();
+            }
         }
 
         /// <summary>
@@ -53,9 +61,10 @@ namespace VisionNet.Controls
         private static readonly Dictionary<OpenGL, ModernGLRenderer> Instances
             = new Dictionary<OpenGL, ModernGLRenderer>();
 
-        // The stack is kept per wrapper even though the normal CxDisplay path uses one
-        // wrapper per renderer. This also keeps custom overlay callers isolated.
-        private readonly Dictionary<OpenGL, State> _states = new Dictionary<OpenGL, State>();
+        // One renderer instance already exists per OpenGL wrapper (see For), so the model stack
+        // needs no further per-context indirection: a single State field is context-scoped
+        // by construction.
+        private readonly State _state = new State();
 
         /// <summary>GPU texture and pixel dimensions for one rasterized text string.</summary>
         private sealed class CachedText
@@ -273,10 +282,13 @@ void main() { FragColor = vertexColor; }";
                 {
                     gl.MakeCurrent();
                 }
-                catch
+                catch (Exception ex)
                 {
                     // The provider may already be torn down.  In that case there
                     // is no valid context in which a delete could be issued.
+                    Debug.WriteLine(
+                        "[CxControl] ModernGLRenderer.Release: MakeCurrent failed, skipping program release: "
+                        + ex.Message);
                     return;
                 }
                 renderer.ReleasePrograms(gl);
@@ -286,21 +298,19 @@ void main() { FragColor = vertexColor; }";
         /// <summary>Pushes the current overlay model matrix and selects <paramref name="model"/>.</summary>
         internal void PushModel(OpenGL gl, CxMatrix4X4 model)
         {
-            State state = GetState(gl);
-            state.Models.Push(state.Current);
-            state.Current = model ?? CxMatrix4X4.Identity();
+            _state.Models.Push(_state.Current);
+            _state.Current = model ?? CxMatrix4X4.Identity();
         }
 
         /// <summary>Restores the model matrix saved by the matching <see cref="PushModel"/> call.</summary>
         internal void PopModel(OpenGL gl)
         {
-            State state = GetState(gl);
-            state.Current = state.Models.Count == 0
-                ? CxMatrix4X4.Identity() : state.Models.Pop();
+            _state.Current = _state.Models.Count == 0
+                ? CxMatrix4X4.Identity() : _state.Models.Pop();
         }
 
         /// <summary>Gets the model matrix currently applied to world-space overlay vertices.</summary>
-        internal CxMatrix4X4 CurrentModel(OpenGL gl) => GetState(gl).Current;
+        internal CxMatrix4X4 CurrentModel(OpenGL gl) => _state.Current;
 
         /// <summary>
         /// Stores the camera matrices for subsequent world-space draws and CPU-side

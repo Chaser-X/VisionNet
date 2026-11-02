@@ -37,18 +37,6 @@ namespace VisionNet.Controls
                 (model ?? CxMatrix4X4.Identity()).Data);
         }
 
-        /// <summary>Gets or creates the model-stack state for a GL wrapper.</summary>
-        private State GetState(OpenGL gl)
-        {
-            State state;
-            if (!_states.TryGetValue(gl, out state))
-            {
-                state = new State();
-                _states.Add(gl, state);
-            }
-            return state;
-        }
-
         /// <summary>Gets the context-owned shader shared by the built-in surface items.</summary>
         internal uint SurfaceProgram => _surfaceProgram;
 

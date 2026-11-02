@@ -31,10 +31,11 @@
 
 ## S4 结构拆分
 
-- [ ] 抽出 `CxPickingService`
-- [ ] 抽出 `CxGLResourceManager`
-- [ ] 打破 `Display ⇄ GroupManager` 循环（`IDisplayHost`）
-- [ ] `ModernGLRenderer._states` 冗余层清理 + `Release` 吞异常改为记录日志
+- [x] 抽出 `CxPickingService`（深度读回、反投影、最近曲面搜索），`CxDisplay.Input.cs` 只负责"何时问"
+- [x] 抽出 `CxGLResourceManager`（`CxDisplay.GLResources.cs` → 独立静态类；`Create` 返回 bool 表示着色器失败）
+- [x] 打破 `Display ⇄ GroupManager` 循环：`CxGroupManager(CxItemRegistry, IDisplayHost)`，不再持有 `CxDisplay`
+- [x] `ModernGLRenderer._states` 冗余层清理（改为单一 `State` 字段）+ `Release` 吞异常改为 `Debug.WriteLine`
+- [x] 新增 `CxPickingServiceTests`（6 项）
 
 ## S2 拆长方法
 

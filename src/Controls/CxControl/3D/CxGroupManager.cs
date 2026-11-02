@@ -17,16 +17,21 @@ namespace VisionNet.Controls
     /// While a key has no live resource the leaf is skipped (kept, so a later resource under the
     /// same key is picked up again). Overlay members are bound by direct reference and cannot be
     /// re-bound.
+    /// <para>The manager depends on <see cref="CxItemRegistry"/> for key lookups and on
+    /// <see cref="IDisplayHost"/> for UI-thread marshalling — never on <see cref="CxDisplay"/>
+    /// itself, so the two types do not reference each other.</para>
     /// </remarks>
     public sealed class CxGroupManager
     {
         // Flat registry of every group owned by the display (nested groups included).
         private readonly List<CxGroup> _groups = new List<CxGroup>();
-        private readonly CxDisplay _display;
+        private readonly CxItemRegistry _registry;
+        private readonly IDisplayHost _host;
 
-        internal CxGroupManager(CxDisplay display)
+        internal CxGroupManager(CxItemRegistry registry, IDisplayHost host)
         {
-            _display = display ?? throw new ArgumentNullException(nameof(display));
+            _registry = registry ?? throw new ArgumentNullException(nameof(registry));
+            _host = host ?? throw new ArgumentNullException(nameof(host));
         }
 
         #region Group creation (创建分组)
@@ -81,7 +86,7 @@ namespace VisionNet.Controls
             if (item.IsDisposed)
                 throw new ArgumentException("The item has been disposed.", nameof(item));
 
-            string key = _display.GetSurfaceKeyOf(item);
+            string key = _registry.GetKeyOf(item);
             if (key == null)
                 throw new ArgumentException(
                     "The surface item is not registered in this display; create it with a Set* call first.", nameof(item));
@@ -111,7 +116,7 @@ namespace VisionNet.Controls
                 throw new ArgumentException("The group is not registered with this display.", nameof(group));
             if (item.IsDisposed)
                 throw new ArgumentException("The item has been disposed.", nameof(item));
-            if (!_display.ContainsOverlayItem(item))
+            if (!_registry.ContainsOverlay(item))
                 throw new ArgumentException(
                     "The overlay item is not registered in this display; create it with a Set* call first.", nameof(item));
 
@@ -135,7 +140,7 @@ namespace VisionNet.Controls
 
             parent.AddChildGroup(child);
             ApplyWorld(parent);
-            _display.SafeInvalidate();
+            _host.SafeInvalidate();
         }
 
         /// <summary>
@@ -148,7 +153,7 @@ namespace VisionNet.Controls
             if (group == null || item == null) return false;
             if (TryMarshal(() => Remove(group, item))) return false;
 
-            string key = _display.GetSurfaceKeyOf(item);
+            string key = _registry.GetKeyOf(item);
             var leaf = FindLeaf(group, key != null ? ByKey(key) : ByReference(item), out var owner);
             return DetachLeaf(owner, leaf);
         }
@@ -202,7 +207,7 @@ namespace VisionNet.Controls
                 _groups.Remove(g);
                 if (!ReferenceEquals(g, group)) g.Parent = null;
             }
-            _display.SafeInvalidate();
+            _host.SafeInvalidate();
         }
 
         #endregion Attach / detach items (挂载/卸载 Item)
@@ -221,7 +226,7 @@ namespace VisionNet.Controls
 
             group.Transform = transform ?? CxMatrix4X4.Identity();
             ApplyWorld(group);
-            _display.SafeInvalidate();
+            _host.SafeInvalidate();
         }
 
         /// <summary>
@@ -234,13 +239,13 @@ namespace VisionNet.Controls
             if (group == null || member == null) return false;
             if (TryMarshal(() => SetMemberLocalTransform(group, member, localTransform))) return false;
 
-            string key = member is ICxObjRenderItem obj ? _display.GetSurfaceKeyOf(obj) : null;
+            string key = member is ICxObjRenderItem obj ? _registry.GetKeyOf(obj) : null;
             var leaf = FindLeaf(group, key != null ? ByKey(key) : ByReference(member), out _);
             if (leaf == null) return false;
 
             leaf.LocalMatrix = localTransform ?? CxMatrix4X4.Identity();
             ApplyWorld(group);
-            _display.SafeInvalidate();
+            _host.SafeInvalidate();
             return true;
         }
 
@@ -258,7 +263,7 @@ namespace VisionNet.Controls
 
         private CxGroup FindGroupOfMember(object member)
         {
-            string key = member is ICxObjRenderItem obj ? _display.GetSurfaceKeyOf(obj) : null;
+            string key = member is ICxObjRenderItem obj ? _registry.GetKeyOf(obj) : null;
             var match = key != null ? ByKey(key) : ByReference(member);
 
             foreach (var group in _groups)
@@ -292,7 +297,7 @@ namespace VisionNet.Controls
                 }
             }
 
-            if (touched) _display.SafeInvalidate();
+            if (touched) _host.SafeInvalidate();
         }
 
         /// <summary>
@@ -340,7 +345,7 @@ namespace VisionNet.Controls
                 }
             }
 
-            if (touched) _display.SafeInvalidate();
+            if (touched) _host.SafeInvalidate();
         }
 
         /// <summary>Removes every group from the registry (used on reset / disposal).</summary>
@@ -357,8 +362,8 @@ namespace VisionNet.Controls
         /// </summary>
         private bool TryMarshal(Action action)
         {
-            if (!_display.InvokeRequired) return false;
-            _display.BeginInvoke(action);
+            if (!_host.InvokeRequired) return false;
+            _host.BeginInvoke(action);
             return true;
         }
 
@@ -374,7 +379,7 @@ namespace VisionNet.Controls
         {
             group.AddLeaf(leaf);
             ApplyWorld(group);
-            _display.SafeInvalidate();
+            _host.SafeInvalidate();
         }
 
         /// <summary>
@@ -384,7 +389,7 @@ namespace VisionNet.Controls
         private ICxGroupMember Resolve(CxGroupLeaf leaf)
         {
             if (leaf.Key == null) return leaf.Item;
-            return _display.ResolveSurfaceItem(leaf.Key) as ICxGroupMember;
+            return _registry.GetByKey(leaf.Key) as ICxGroupMember;
         }
 
         /// <summary>Matches keyed leaves by key.</summary>
@@ -445,7 +450,7 @@ namespace VisionNet.Controls
 
             owner.RemoveLeaf(leaf);
             TryRestorePose(leaf);
-            _display.SafeInvalidate();
+            _host.SafeInvalidate();
             return true;
         }
 

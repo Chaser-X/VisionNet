@@ -4,7 +4,15 @@ using SharpGL;
 
 namespace VisionNet.Controls
 {
-    public partial class CxDisplay
+    /// <summary>
+    /// Creates and releases the OpenGL objects owned by <see cref="CxDisplay"/> on behalf of its
+    /// render items: VAOs, VBOs, index buffers, textures and the per-handle shader program.
+    /// </summary>
+    /// <remarks>
+    /// Stateless — every method takes the handle it acts on. The GL context must be current on the
+    /// calling thread; this class never makes a context current itself.
+    /// </remarks>
+    internal static class CxGLResourceManager
     {
         private static void UploadPinned(OpenGL gl, uint target, Array data,
             int bytes, uint usage)
@@ -45,10 +53,21 @@ namespace VisionNet.Controls
             return vboIndex + 1;
         }
 
-        private void CreateGLResources(OpenGL gl, ICxObjRenderItem item, GLResourceHandle handle)
+        /// <summary>
+        /// Creates or rebuilds every GL object the item needs from its CPU-side render data.
+        /// </summary>
+        /// <param name="gl">Active OpenGL context.</param>
+        /// <param name="item">Item whose data is being uploaded.</param>
+        /// <param name="handle">Handle receiving the created names.</param>
+        /// <returns>
+        /// <c>false</c> only when the item's shader failed to compile, which marks the handle
+        /// invalid so the caller can report the failure. A missing render data set is a no-op
+        /// and still reports success.
+        /// </returns>
+        public static bool Create(OpenGL gl, ICxObjRenderItem item, GLResourceHandle handle)
         {
             var data = item.PrepareRenderData();
-            if (data == null) return;
+            if (data == null) return true;
 
             handle.ShaderFailed = false;
             handle.OwnsShader = false;
@@ -82,9 +101,8 @@ namespace VisionNet.Controls
                     handle.ShaderFailed = true;
                     handle.IsValid = false;
                     handle.NeedsUpdate = false;
-                    // Reported by ProcessResourcePool after the resource lock is released.
-                    _failedItems.Add(item);
-                    return;
+                    // Reported by the caller after the resource lock is released.
+                    return false;
                 }
             }
 
@@ -143,9 +161,14 @@ namespace VisionNet.Controls
 
             handle.IsValid = true;
             handle.NeedsUpdate = false;
+            return true;
         }
 
-        private void ReleaseGLResources(OpenGL gl, GLResourceHandle handle)
+        /// <summary>
+        /// Deletes every GL object named by <paramref name="handle"/> and resets it to the
+        /// "no resources" state. Safe to call on a handle that owns nothing.
+        /// </summary>
+        public static void Release(OpenGL gl, GLResourceHandle handle)
         {
             if (handle.VboCount > 0)
             {
@@ -187,7 +210,7 @@ namespace VisionNet.Controls
             handle.IsValid = false;
         }
 
-        private uint CreateTexture(OpenGL gl, TextureData tex)
+        private static uint CreateTexture(OpenGL gl, TextureData tex)
         {
             int[] maxSizeArr = new int[1];
             gl.GetInteger(OpenGL.GL_MAX_TEXTURE_SIZE, maxSizeArr);

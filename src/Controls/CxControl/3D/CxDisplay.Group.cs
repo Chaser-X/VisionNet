@@ -1,12 +1,13 @@
+using System;
+
 namespace VisionNet.Controls
 {
     /// <summary>
     /// Group / scene-graph entry point. Relationship and pose management lives entirely in
-    /// <see cref="CxGroupManager"/> (exposed as <see cref="Groups"/>); this partial only provides
-    /// the read-only lookups the manager needs to resolve keyed members. Resource lifetime
+    /// <see cref="CxGroupManager"/> (exposed as <see cref="Groups"/>). Resource lifetime
     /// (render queues, keys, disposal) stays with <see cref="CxDisplay"/>.
     /// </summary>
-    public partial class CxDisplay
+    public partial class CxDisplay : IDisplayHost
     {
         private readonly CxGroupManager _groupManager;
 
@@ -20,30 +21,20 @@ namespace VisionNet.Controls
 
         #endregion Group manager (组管理入口)
 
-        #region Key lookups for the group manager (组管理只读查询)
+        #region IDisplayHost (供 CxGroupManager 回调)
 
-        /// <summary>Resolves the surface item currently registered under <paramref name="key"/>, or <c>null</c>.</summary>
-        internal ICxObjRenderItem ResolveSurfaceItem(string key)
+        // InvokeRequired is the inherited public Control property, so it implements the
+        // contract implicitly. The other two are implemented explicitly to avoid widening the
+        // public surface (SafeInvalidate stays internal) and to adapt Control's Delegate-based
+        // BeginInvoke to the Action shape the contract asks for.
+        void IDisplayHost.BeginInvoke(Action action)
         {
-            if (string.IsNullOrEmpty(key)) return null;
-            return _registry.GetByKey(key);
+            if (action == null) return;
+            BeginInvoke((Delegate)action);
         }
 
-        /// <summary>Gets the key <paramref name="item"/> is currently registered under, or <c>null</c>.</summary>
-        internal string GetSurfaceKeyOf(ICxObjRenderItem item)
-        {
-            if (item == null) return null;
-            return _registry.GetKeyOf(item);
-        }
+        void IDisplayHost.SafeInvalidate() => SafeInvalidate();
 
-
-        /// <summary>Gets whether <paramref name="item"/> is currently in this display's overlay queue.</summary>
-        internal bool ContainsOverlayItem(AbstractRenderItem item)
-        {
-            if (item == null) return false;
-            return _registry.ContainsOverlay(item);
-        }
-
-        #endregion Key lookups for the group manager (组管理只读查询)
+        #endregion IDisplayHost (供 CxGroupManager 回调)
     }
 }

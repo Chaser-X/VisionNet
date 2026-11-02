@@ -98,10 +98,6 @@
       <DependentUpon>CxDisplay.cs</DependentUpon>
       <SubType>UserControl</SubType>
     </Compile>
-    <Compile Include="3D\CxDisplay.GLResources.cs">
-      <DependentUpon>CxDisplay.cs</DependentUpon>
-      <SubType>UserControl</SubType>
-    </Compile>
     <Compile Include="3D\CxDisplay.Input.cs">
       <DependentUpon>CxDisplay.cs</DependentUpon>
       <SubType>UserControl</SubType>
@@ -148,9 +144,12 @@
     <Compile Include="3D\RenderItem\Overlay\CxText2DItem.cs" />
     <Compile Include="3D\RenderItem\Overlay\CxTextInfoItem.cs" />
     <Compile Include="3D\CxExtension.cs" />
+    <Compile Include="3D\CxGLResourceManager.cs" />
     <Compile Include="3D\CxGroup.cs" />
     <Compile Include="3D\CxGroupManager.cs" />
     <Compile Include="3D\CxItemRegistry.cs" />
+    <Compile Include="3D\CxPickingService.cs" />
+    <Compile Include="3D\IDisplayHost.cs" />
     <!-- 2D display control -->
     <Compile Include="2D\CxDisplay2D.cs">
       <SubType>UserControl</SubType>

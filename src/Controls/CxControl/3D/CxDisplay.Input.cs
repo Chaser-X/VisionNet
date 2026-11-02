@@ -1,7 +1,5 @@
 using System;
-using System.Collections.Generic;
 using System.Windows.Forms;
-using SharpGL;
 using VisionNet.DataType;
 
 namespace VisionNet.Controls
@@ -9,10 +7,10 @@ namespace VisionNet.Controls
     /// <summary>Mouse interaction, coordinate picking, and context-menu event handlers.</summary>
     public partial class CxDisplay
     {
-        // Mouse hover is raised on the UI thread. Reuse the tiny readback buffers so the
-        // per-event path does not create short-lived arrays before the synchronous ReadPixels.
-        private readonly int[] _pickViewport = new int[4];
-        private readonly byte[] _pickDepthBytes = new byte[4];
+        // Depth-buffer picking (readback, unproject, nearest-surface search) lives here; this
+        // partial only decides when to ask it.
+        private readonly CxPickingService _picking = new CxPickingService();
+
         private bool _hasHoverPixel;
         private int _lastHoverX;
         private int _lastHoverY;
@@ -22,7 +20,6 @@ namespace VisionNet.Controls
         private bool _hasPendingPick;
         private int _pendingPickX;
         private int _pendingPickY;
-        private readonly List<ICxObjRenderItem> _pickSnapshot = new List<ICxObjRenderItem>();
 
         // Result of the pick resolved during the last frame. CoordinatesChanged is raised after the
         // frame lock has been released (see RaisePendingCoordinatesChanged), so a handler may call
@@ -51,7 +48,7 @@ namespace VisionNet.Controls
 
             if (e.Button == MouseButtons.Left)
             {
-                worldPos = ScreenToWorldCoordinate(e.X, e.Y);
+                worldPos = _picking.ScreenToWorld(OpenGL, e.X, e.Y);
                 if (worldPos.HasValue)
                 {
                     var hit = FindActiveItemHit(worldPos.Value);
@@ -96,7 +93,7 @@ namespace VisionNet.Controls
         /// </summary>
         private CxPoint3D? ResolveRotationPoint(int x, int y, CxPoint3D? worldAtPixel)
         {
-            var world = worldAtPixel ?? ScreenToWorldCoordinate(x, y);
+            var world = worldAtPixel ?? _picking.ScreenToWorld(OpenGL, x, y);
             return world.HasValue ? GetNearestSurfacePoint(world.Value).Location : null;
         }
 
@@ -121,7 +118,7 @@ namespace VisionNet.Controls
                 _coordTagItem.Visible = false;
                 CancelPendingPick();
                 SafeInvalidate();
-                var worldPos = ScreenToWorldCoordinate(e.X, e.Y);
+                var worldPos = _picking.ScreenToWorld(OpenGL, e.X, e.Y);
                 if (worldPos.HasValue && _lastDragWorldPos.HasValue)
                 {
                     var cur  = worldPos.Value;
@@ -245,82 +242,22 @@ namespace VisionNet.Controls
         // ── Coordinate picking ───────────────────────────────────────────────────
 
         /// <summary>
-        /// Reads the depth buffer at the given screen pixel and un-projects it to a world-space point.
-        /// Returns <c>null</c> when the pixel hits the far plane (no geometry present).
-        /// </summary>
-        private CxPoint3D? ScreenToWorldCoordinate(int mouseX, int mouseY)
-        {
-            var gl = OpenGL;
-            gl.GetInteger(OpenGL.GL_VIEWPORT, _pickViewport);
-            int adjustedY = _pickViewport[3] - mouseY;   // OpenGL Y is bottom-up.
-
-            gl.ReadPixels(mouseX, adjustedY, 1, 1,
-                OpenGL.GL_DEPTH_COMPONENT, OpenGL.GL_FLOAT, _pickDepthBytes);
-            float depth = BitConverter.ToSingle(_pickDepthBytes, 0);
-
-            if (Math.Abs(depth - 1.0f) < 0.00001f) return null;
-
-            CxPoint3D world;
-            if (!ModernGLRenderer.For(gl).Unproject(gl, mouseX, adjustedY, depth, out world))
-                return null;
-            return world;
-        }
-
-        /// <summary>
         /// Finds the surface point nearest to the given screen pixel across all active surface items.
-        /// Structured surfaces use a 5×5 neighbourhood grid search; mesh-type items
-        /// and unordered point clouds contribute the un-projected world coordinate directly.
-        /// Each structured surface is searched in its <b>local</b> frame — the world-space picking
-        /// point is transformed by the inverse model matrix before grid indexing — so surfaces
-        /// rendered with a pose (model matrix) still report the correct grid cell and intensity.
         /// </summary>
         /// <returns>Nearest world-space location and its intensity, or <c>(null, null)</c> if no hit.</returns>
         public (CxPoint3D? Location, float? Intensity) GetNearestSurfacePoint(int mouseX, int mouseY)
-        {
-            var pos = ScreenToWorldCoordinate(mouseX, mouseY);
-            return pos.HasValue ? GetNearestSurfacePoint(pos.Value) : (null, null);
-        }
+            => _picking.FindNearest(_registry, OpenGL, mouseX, mouseY, SurfaceColorMode);
 
         /// <summary>
         /// Finds the surface point nearest to an already-unprojected world position, so a caller
         /// that has already paid for the depth readback at this pixel does not repeat it.
         /// </summary>
         /// <remarks>
-        /// Reuses an instance-level scratch buffer, and the search needs a current GL context for
-        /// the readback done by the public overload, so this path is <b>UI-thread only</b>.
+        /// The search needs a current GL context for the readback done by the public overload, so
+        /// this path is <b>UI-thread only</b>.
         /// </remarks>
         private (CxPoint3D? Location, float? Intensity) GetNearestSurfacePoint(CxPoint3D world)
-        {
-            // Reuse a scratch buffer: this runs on every hover frame.
-            _registry.CopyItemsInto(_pickSnapshot);
-            var snapshot = _pickSnapshot;
-
-            if (snapshot.Count == 0)
-            {
-                _pickSnapshot.Clear();
-                return (null, null);
-            }
-
-            CxPoint3D? bestPoint      = null;
-            float?     bestIntensity  = null;
-            float      bestDist       = float.MaxValue;
-            bool       useDiff        = SurfaceColorMode == SurfaceColorMode.Diff;
-
-            foreach (var cur in snapshot)
-            {
-                if (cur == null || cur.IsDisposed) continue;
-
-                // Each item knows how it answers a pick query (grid search vs. the query point
-                // itself), so this loop needs no per-type branching. Only the built-in
-                // surface items implement the contract; anything else contributes nothing.
-                if (!(cur is AbstractCxObjRenderItem item)) continue;
-                item.PickAt(world, useDiff, ref bestDist, ref bestPoint, ref bestIntensity);
-            }
-
-            // Do not keep references to (possibly disposed) items in the scratch buffer.
-            _pickSnapshot.Clear();
-            return (bestPoint, bestIntensity);
-        }
+            => _picking.FindNearest(_registry, world, SurfaceColorMode);
 
         // ── Context-menu event handlers ──────────────────────────────────────────
 

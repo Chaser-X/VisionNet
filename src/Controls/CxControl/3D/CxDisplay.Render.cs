@@ -110,7 +110,7 @@ namespace VisionNet.Controls
         /// <summary>Releases all GL resource handles waiting in the deferred-release queue.</summary>
         private void ProcessPendingRelease(OpenGL gl)
         {
-            _registry.DrainReleases(handle => ReleaseGLResources(gl, handle));
+            _registry.DrainReleases(handle => CxGLResourceManager.Release(gl, handle));
         }
 
         /// <summary>
@@ -132,9 +132,11 @@ namespace VisionNet.Controls
                 if (!handle.IsValid || handle.NeedsUpdate)
                 {
                     if (handle.IsValid)
-                        ReleaseGLResources(gl, handle);
+                        CxGLResourceManager.Release(gl, handle);
 
-                    CreateGLResources(gl, item, handle);
+                    // A failed shader compile is reported once the lock has been released.
+                    if (!CxGLResourceManager.Create(gl, item, handle))
+                        _failedItems.Add(item);
                 }
             });
 

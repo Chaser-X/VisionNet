@@ -6,7 +6,34 @@
 
 ## 未发布（工作区，尚未提交）
 
-（暂无）
+### S4 结构拆分（行为不变）
+
+**抽出 `CxPickingService`**（新增 `3D/CxPickingService.cs`）
+- 深度读回（`ReadPixels` + `BitConverter`）、反投影（`ModernGLRenderer.Unproject`）、最近曲面搜索从 `CxDisplay.Input.cs` 移出，连同 `_pickViewport` / `_pickDepthBytes` / `_pickSnapshot` 三块 scratch 缓冲。显示层只剩 `private readonly CxPickingService _picking`，三处 `ScreenToWorldCoordinate(...)` 调用改为 `_picking.ScreenToWorld(OpenGL, ...)`。
+- 依赖以参数显式传入（`CxItemRegistry` / `OpenGL` / `SurfaceColorMode`），不使用回调或属性注入，避免引入间接层。
+- 待处理拾取的状态机（`_hasPendingPick` / `ApplyPendingPick` / `CancelPendingPick` / `RaisePendingCoordinatesChanged`）**留在显示层**：那是"何时问"的策略，与"怎么答"分开正是这次拆分的边界。
+- `CxDisplay.Input.cs` 中已不再使用的 `using System.Collections.Generic;` / `using SharpGL;` 一并删除。
+
+**抽出 `CxGLResourceManager`**（`3D/CxDisplay.GLResources.cs` → `3D/CxGLResourceManager.cs`，改为 `internal static class`）
+- `Create` 取代 `CreateGLResources`，**返回值改为 `bool`**：`false` 仅表示着色器编译失败。原先它直接往显示层的 `_failedItems` 里塞失败项，现在由 `ProcessResourcePool` 收到 `false` 后自行登记 —— 保持"失败项在帧锁释放后统一上报"的既有契约。`data == null` 的早退路径仍返回 `true`（是空操作，不是失败）。
+- `Release` 取代 `ReleaseGLResources`。类无状态，全部方法静态。
+- 旧 partial 文件删除，`CxControl.csproj` 的 `Compile Include` 同步（含 `<SubType>UserControl</SubType>` 与 `<DependentUpon>` 的清理）。
+
+**打破 `Display ⇄ GroupManager` 循环**
+- 新增 `3D/IDisplayHost.cs`：`InvokeRequired` / `BeginInvoke(Action)` / `SafeInvalidate()` 三个成员。
+- `CxGroupManager` 的构造函数改为 `CxGroupManager(CxItemRegistry registry, IDisplayHost host)`，字段 `_display` 删除。键查询直接走注册表（`GetKeyOf` / `ContainsOverlay` / `GetByKey`），UI 线程封送与重绘走 `_host`。验证：`CxGroupManager.cs` 中对 `CxDisplay` 的**代码**引用为 0（仅剩 XML 文档引用）。
+- `CxDisplay : IDisplayHost`：`InvokeRequired` 由继承的公共属性隐式实现；`BeginInvoke` 与 `SafeInvalidate` 用**显式实现**，因为 `SafeInvalidate` 是 `internal`（隐式实现要求 public），且 `Control.BeginInvoke` 是 `Delegate` 签名，需要适配到 `Action`。**公开面没有扩大**。
+- `CxDisplay.Group.cs` 里只服务于旧耦合的 `ResolveSurfaceItem` / `GetSurfaceKeyOf` / `ContainsOverlayItem` 三个转发方法删除（全项目已无调用点）。
+
+**`ModernGLRenderer` 清理**
+- `_states`（`Dictionary<OpenGL, State>`）删除。`For(gl)` 已保证一个 `OpenGL` 包装器对应一个 renderer 实例，字典再按 gl 套一层是纯冗余；改为单个 `State _state` 字段，`GetState(gl)` 删除。`ReleasePrograms` 里的 `_states.Clear()` 改为 `_state.Reset()`（新增）。
+- `Release` 的 `catch { return; }` 改为 `catch (Exception ex)` + `Debug.WriteLine`（与 `ShaderProgramCompiler` 记录着色器编译错误的做法一致）。异常仍然吞掉并提前返回 —— 只增加可诊断性，不改变控制流。
+
+**新增测试（6 项）**：`CxPickingServiceTests` —— 空注册表返回空、单曲面命中网格点、无网格项（网格/点云）以查询点胜出且与注册顺序无关、Diff 模式取 diff 值而非 intensity、已释放项被跳过、重复查询复用 scratch 缓冲不泄漏。
+- 其中 `DiffMode_ReportsDiffValuesInsteadOfIntensity` 首轮失败：我把命中格索引算成 `(2,1)`，实际精确命中格是 `(1,2)`（`idx = 2*3+1 = 7`）。是**测试期望写错**，已修正为断言命中格坐标 + `diff[7]`。
+
+- 验证：`dotnet test` Debug 与 Release 均 **103/103 通过**；`CxControl` / `CxControl.Tests` 0 错误 0 C# 警告（仅预存在 MSB3270）；`DemoFrom` 0 错误。
+- **按你的要求跳过**：`ModernGLRenderer` 的 `Text / Programs / State` 提升为独立类（M3 第 2 步），已记入 TODO 后续项。
 
 ## 已提交
 
