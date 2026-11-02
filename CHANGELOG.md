@@ -6,7 +6,11 @@
 
 ## 未发布（工作区，尚未提交）
 
-### S2 拆长方法（行为不变）+ S0 收尾测试
+（暂无）
+
+## 已提交
+
+### bde4b73（2026-11-02）S2 拆长方法（行为不变）+ S0 收尾测试
 
 **`CxDisplay.Render` 拆解**（原约 150 行，单方法承担 Phase 1–5）：
 - 相位边界原样保留，但每一相位现在是一个具名方法：`AggregateFrameRanges`（Phase 1，返回新的私有 `FrameRanges` 结构）、`PropagateFrameRanges`（Phase 2/2b，含 `SetGlobalZRangeOnAll` / `SetGlobalDiffRangeOnAll`）、`DrawSurfaceItems`（Phase 3，返回 `anyDrawn`）、`DrawOverlays`（Phase 4）、`ResolvePendingPick`（Phase 4b）、`DrawHud`（Phase 5）。
@@ -26,8 +30,6 @@
 
 - 验证：`dotnet test` Debug 与 Release 均 **90/90 通过**；`CxControl` / `CxControl.Tests` 0 错误 0 C# 警告（仅预存在 MSB3270）；`DemoFrom` 0 错误（3 个警告均为预存在的 MSB3270）。
 - **测试过程中发现的坑**：`CxSurface` 的构造函数**不接收 `Diff`** —— `Diff` 只是普通自动属性，必须构造后单独赋值。首轮 `ReportsIntensityByDefault_AndDiffInDiffMode` 因此失败（diff 路径静默拿到 null），已修正测试夹具；这也说明该断言不是恒真。
-
-## 已提交
 
 ### f0f883d（2026-11-02）S1 低风险去重（行为不变）
 
