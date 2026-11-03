@@ -37,6 +37,21 @@ namespace VisionNet.Controls
                 (model ?? CxMatrix4X4.Identity()).Data);
         }
 
+        /// <summary>
+        /// Uploads the normal matrix <c>transpose(inverse(model))</c> (upper-left 3×3) for the
+        /// shared surface program. The caller passes the item's already-cached pose
+        /// <b>inverse</b> so no extra inversion happens here; the array is transposed into the
+        /// row-major layout the other matrices use.
+        /// </summary>
+        internal void UploadNormalMatrix(OpenGL gl, GLResourceHandle handle, CxMatrix4X4 modelInverse)
+        {
+            var inv = (modelInverse ?? CxMatrix4X4.Identity()).Data;
+            _normalMatrix[0] = inv[0]; _normalMatrix[1] = inv[4]; _normalMatrix[2] = inv[8];
+            _normalMatrix[3] = inv[1]; _normalMatrix[4] = inv[5]; _normalMatrix[5] = inv[9];
+            _normalMatrix[6] = inv[2]; _normalMatrix[7] = inv[6]; _normalMatrix[8] = inv[10];
+            gl.UniformMatrix3(handle.GetUniformLocation(gl, "normalMatrix"), 1, true, _normalMatrix);
+        }
+
         /// <summary>Gets the context-owned shader shared by the built-in surface items.</summary>
         internal uint SurfaceProgram => _surfaceProgram;
 

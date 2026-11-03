@@ -135,6 +135,10 @@ namespace VisionNet.Controls
                     vboIndex = UploadVertexBuffer(gl, handle, vboIndex, data.IntensityValues,
                         attributeIndex: 3, componentCount: 1, stride: sizeof(float));
 
+                if (data.Normals != null && data.Normals.Length >= data.VertexCount * 3)
+                    vboIndex = UploadVertexBuffer(gl, handle, vboIndex, data.Normals,
+                        attributeIndex: 4, componentCount: 3, stride: 3 * sizeof(float));
+
                 handle.VboCount = vboIndex;
 
                 if (data.Indices != null && data.Indices.Length > 0)

@@ -236,6 +236,7 @@ VisionNet/
 - **延迟释放**：`Dispose` / 替换触发的 GL 资源回收推迟到下一渲染帧，避免跨线程 GL 调用
 - **线程安全**：`_resourceLock` 保护资源池；`Render()` 取快照遍历，不持锁执行 GL 调用
 - **现代 3D 管线**：`CxDisplay` 的 Surface、PointCloud、Mesh 及几何叠加层统一使用 VAO/VBO + GLSL，显式上传投影 / 视图 / 模型矩阵；`CxSurfaceItem`、`CxPointCloudItem`、`CxMeshItem` 是统一渲染入口。
+- **逐顶点法线**：Mesh 模式下优先使用逐顶点法线做光照——索引网格由面法线累积平滑（`CxExtension.ComputeTriangleNormals`），结构化曲面 / 有序点云由采样网格叉积（`CxExtension.ComputeGridNormals`）；无可用法线时回退到屏幕空间导数法线。点云模式不生成法线（不参与光照）。
 - **数据预算**：`Set*` / `Add*` 默认按最多 200 万个顶点采样后上传；可通过 `maxPointCount` 调整 Surface 和 PointCloud 的预算。
 
 #### CxDisplay2D（2D，ScottPlot）

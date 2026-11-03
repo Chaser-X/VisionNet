@@ -6,7 +6,23 @@
 
 ## 未发布（工作区，尚未提交）
 
-（暂无）
+### P1 逐顶点法线通道（渲染质量提升第 1 阶段）
+
+**目标**：Mesh 光照从「屏幕空间导数法线」升级为「真法线」，为后续 PBR/高光球打基础。计划见 `TODO-CxDisplay-render-quality.md`。
+
+**库侧改动**
+- `RenderData` 新增 `Normals`（`float[n×3]`，局部空间单位法线）。
+- `GLResourceHandle.VboIds` 由 4 扩到 5，槽位 4 = 法线；`ResetForContextRecreate` 同步。`CxGLResourceManager.Create` 在 intensity 之后上传法线到 attribute 4（`layout(location=4)`）。
+- 共享 surface program：顶点着色器新增 `aNormal` / `uniform mat3 normalMatrix` / `out vec3 vNormal`；片元着色器新增 `in vec3 vNormal` / `uniform int useVertexNormal`。Mesh 光照的 `N` 在 `useVertexNormal==1` 时取 `normalize(vNormal)`，否则回退到原来的 `cross(dFdx,dFdy)`。`vNormal` 在顶点着色器内用 `mat3(view) * normalMatrix * aNormal` 转到视空间，与 `viewPos` / `lightDirView` 保持一致。
+- `ModernGLRenderer.UploadNormalMatrix(gl, handle, modelInverse)`：用 item **已缓存**的 `ModelMatrixInverse`（拾取路径同一份）构造 `transpose(inverse(model))` 的上 3×3，不额外求逆；每帧每 item 一次。
+- `CxExtension.ComputeGridNormals(vertices, width, height)`：有序网格（结构化曲面 / 有序点云）叉积法线，边界单侧差分，邻居含无效点或退化时回退 `+Z`。
+- `CxExtension.ComputeTriangleNormals(vertices, indices)`：索引网格面法线累积平滑；无有效三角面时返回 `null`（回退导数法线）。
+- 三个内建 item：**仅 Mesh 模式**生成法线（点云模式不参与光照，省一份数组）。`AbstractCxObjRenderItem.PrepareRenderData` 统一注入 `useVertexNormal` uniform（`Normals != null ? 1 : 0`）。
+
+**公开 API 未变**：`Normals` 是 `RenderData` 上的新公开属性，但 `RenderData` 属内部管线数据；未新增枚举/属性/方法。
+
+- 验证：`dotnet test` → **113/113 通过**（新增 `NormalGenerationTests` 10 项：网格法线方向/单位长度/无效点回退/不可用输入、三角面法线、三个 item 的 Mesh/PointCloud 模式联动）；`CxControl` 与 `DemoFrom` 均 0 错误（DemoFrom 3 个警告为预存在 MSB3270）。
+- **需本机目视确认**：Mesh 模式光照是否更平滑（曲率处不应再有导数法线的噪点）；点云模式外观与改动前逐像素一致；带姿态（非均匀缩放）的 item 光照法线朝向正确。
 
 ## 已提交
 

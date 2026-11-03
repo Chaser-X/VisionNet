@@ -133,12 +133,18 @@ namespace VisionNet.Controls
                 ? GenerateMeshIndices(sampledWidth, sampledLength)
                 : null;
             byte[] textureBytes = GenerateIntensityTextureData();
+            // Normals are only needed when the item is lit, i.e. in Mesh mode; point-cloud
+            // mode draws unlit points and skips the extra array.
+            float[] normals = indices != null
+                ? CxExtension.ComputeGridNormals(vertices, sampledWidth, sampledLength)
+                : null;
 
             _cachedRenderData = new RenderData
             {
                 Vertices    = vertices,
                 UVCoords    = uvCoords,
                 Indices     = indices,
+                Normals     = normals,
                 VertexCount = totalVertices,
                 IndexCount  = indices?.Length ?? 0,
                 ShaderSource = new ShaderSource

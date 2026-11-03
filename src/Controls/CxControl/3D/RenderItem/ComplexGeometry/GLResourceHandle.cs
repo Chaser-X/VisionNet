@@ -17,10 +17,10 @@ namespace VisionNet.Controls
     {
         /// <summary>
         /// VBO IDs for vertex data. Index 0 = positions, 1 = colours or UVs,
-        /// 2 = difference values, 3 = per-vertex intensity.
+        /// 2 = difference values, 3 = per-vertex intensity, 4 = per-vertex normals.
         /// Allocated count is stored in <see cref="VboCount"/>.
         /// </summary>
-        internal uint[] VboIds { get; set; } = new uint[4];
+        internal uint[] VboIds { get; set; } = new uint[5];
 
         /// <summary>Vertex Array Object ID. Valid only when <see cref="HasVAO"/> is <c>true</c>.</summary>
         internal uint VaoId { get; set; }
@@ -115,7 +115,7 @@ namespace VisionNet.Controls
         {
             VaoId = 0;
             if (VboIds == null)
-                VboIds = new uint[4];
+                VboIds = new uint[5];
             else
                 Array.Clear(VboIds, 0, VboIds.Length);
             ElementBufferId = 0;

@@ -58,6 +58,15 @@ namespace VisionNet.Controls
         public float[] IntensityValues { get; set; }
 
         /// <summary>
+        /// Optional per-vertex normals as <c>float[n × 3]</c> (unit length, local space), or
+        /// <c>null</c> when the item has no normals for the current mode.
+        /// When set, <see cref="CxDisplay"/> creates an additional VBO at attribute location 4
+        /// and the shader lights the fragment with the interpolated normal instead of the
+        /// screen-space derivative fallback.
+        /// </summary>
+        public float[] Normals { get; set; }
+
+        /// <summary>
         /// Named uniform values passed to the shader each frame.
         /// Supported value types: <see cref="float"/>, <see cref="int"/> and
         /// <see cref="System.Drawing.Color"/> (uploaded as a <c>vec4</c>).

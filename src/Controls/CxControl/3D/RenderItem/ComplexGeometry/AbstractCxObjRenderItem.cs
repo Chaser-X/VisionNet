@@ -295,16 +295,19 @@ namespace VisionNet.Controls
             layout (location = 1) in vec2 aTexCoord;
             layout (location = 2) in float aDiff;
             layout (location = 3) in float aIntensity;
+            layout (location = 4) in vec3 aNormal;
 
             uniform mat4 view;
             uniform mat4 projection;
             uniform mat4 model;
+            uniform mat3 normalMatrix;
 
             out float height;
             out vec2 TexCoord;
             out float diffValue;
             out float vertexIntensity;
             out vec3 viewPos;
+            out vec3 vNormal;
             out vec3 lightDirView;
 
             void main()
@@ -316,6 +319,10 @@ namespace VisionNet.Controls
                 diffValue = aDiff;
                 vertexIntensity = aIntensity;
                 viewPos = (view * worldPos).xyz;
+                // normalMatrix maps the local normal to world space; the view rotation
+                // brings it into the same frame as viewPos / lightDirView so the lighting
+                // dot products stay consistent.
+                vNormal = mat3(view) * (normalMatrix * aNormal);
                 lightDirView = normalize(vec3(0.3, 0.4, 0.85));
             }";
 
@@ -326,6 +333,7 @@ namespace VisionNet.Controls
             in float diffValue;
             in float vertexIntensity;
             in vec3 viewPos;
+            in vec3 vNormal;
             in vec3 lightDirView;
             out vec4 FragColor;
 
@@ -333,6 +341,7 @@ namespace VisionNet.Controls
             uniform float colorMax;
             uniform int colorMode;
             uniform int surfaceMode;
+            uniform int useVertexNormal;
             uniform vec4 solidColor;
             uniform float opacity;
             uniform sampler2D intensityTexture;
@@ -360,7 +369,9 @@ namespace VisionNet.Controls
                 vec3 lightFactor = vec3(1.0);
                 if (surfaceMode == 1)
                 {
-                    vec3 N = normalize(cross(dFdx(viewPos), dFdy(viewPos)));
+                    vec3 N = useVertexNormal == 1
+                        ? normalize(vNormal)
+                        : normalize(cross(dFdx(viewPos), dFdy(viewPos)));
                     vec3 V = normalize(-viewPos);
                     if (dot(N, V) < 0.0) N = -N;
                     if (!(dot(N, N) > 1e-6)) N = V;
@@ -476,6 +487,9 @@ namespace VisionNet.Controls
             {
                 data.Uniforms["solidColor"] = _solidColor;
                 data.Uniforms["opacity"] = _opacity;
+                // Lit fragments use the interpolated normal only when the item actually built
+                // one; otherwise the shader falls back to the screen-space derivative normal.
+                data.Uniforms["useVertexNormal"] = data.Normals != null ? 1 : 0;
             }
             return data;
         }
@@ -501,6 +515,8 @@ namespace VisionNet.Controls
             gl.BindVertexArray(handle.VaoId);
 
             renderer.UploadSceneMatrices(gl, handle, ModelMatrix);
+            // Reuses the cached pose inverse (also used by picking) instead of inverting again.
+            renderer.UploadNormalMatrix(gl, handle, ModelMatrixInverse);
 
             foreach (var kv in data.Uniforms)
             {

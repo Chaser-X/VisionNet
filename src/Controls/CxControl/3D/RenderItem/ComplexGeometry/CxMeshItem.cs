@@ -93,12 +93,15 @@ namespace VisionNet.Controls
                 ? GenerateIntensityTextureData(textureWidth, textureHeight)
                 : new byte[] { 255, 255, 255, 255 };
             var indices = CurrentSurfaceMode == SurfaceMode.Mesh ? Mesh.Indices : null;
+            // Smoothed normals from the index buffer; only the lit (Mesh) path uses them.
+            float[] normals = CxExtension.ComputeTriangleNormals(vertices, indices);
 
             _cachedRenderData = new RenderData
             {
                 Vertices    = vertices,
                 UVCoords    = uvCoords,
                 Indices     = indices,
+                Normals     = normals,
                 VertexCount = Mesh.Vertices.Length,
                 IndexCount  = indices?.Length ?? 0,
                 ShaderSource = new ShaderSource

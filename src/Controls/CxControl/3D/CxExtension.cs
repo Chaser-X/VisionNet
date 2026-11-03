@@ -264,6 +264,136 @@ namespace VisionNet.Controls
         }
 
         /// <summary>
+        /// Computes per-vertex normals for an organized grid (structured surface or ordered
+        /// point cloud) from its sampled vertex positions. Normals are the cross product of the
+        /// two grid tangents (central differences, one-sided at the borders). A vertex whose
+        /// neighbourhood contains an invalid (non-finite) position, or whose tangents are
+        /// degenerate, receives the <c>+Z</c> fallback so lighting never receives a NaN.
+        /// </summary>
+        /// <param name="vertices">Row-major <c>width × height</c> positions as <c>float[n × 3]</c>.</param>
+        /// <param name="width">Number of columns in the grid.</param>
+        /// <param name="height">Number of rows in the grid.</param>
+        /// <returns>
+        /// Row-major <c>float[n × 3]</c> unit normals, or <c>null</c> when the input is unusable.
+        /// </returns>
+        internal static float[] ComputeGridNormals(float[] vertices, int width, int height)
+        {
+            if (vertices == null || width <= 0 || height <= 0
+                || vertices.Length < width * height * 3)
+                return null;
+
+            var normals = new float[width * height * 3];
+            for (int y = 0; y < height; y++)
+            {
+                int yPrev = y > 0 ? y - 1 : y;
+                int yNext = y < height - 1 ? y + 1 : y;
+                for (int x = 0; x < width; x++)
+                {
+                    int xPrev = x > 0 ? x - 1 : x;
+                    int xNext = x < width - 1 ? x + 1 : x;
+
+                    int i = (y * width + x) * 3;
+                    int iU0 = (y * width + xPrev) * 3;
+                    int iU1 = (y * width + xNext) * 3;
+                    int iV0 = (yPrev * width + x) * 3;
+                    int iV1 = (yNext * width + x) * 3;
+
+                    if (!IsFinite3(vertices, iU0) || !IsFinite3(vertices, iU1)
+                        || !IsFinite3(vertices, iV0) || !IsFinite3(vertices, iV1))
+                    {
+                        normals[i] = 0f; normals[i + 1] = 0f; normals[i + 2] = 1f;
+                        continue;
+                    }
+
+                    float ux = vertices[iU1] - vertices[iU0];
+                    float uy = vertices[iU1 + 1] - vertices[iU0 + 1];
+                    float uz = vertices[iU1 + 2] - vertices[iU0 + 2];
+                    float vx = vertices[iV1] - vertices[iV0];
+                    float vy = vertices[iV1 + 1] - vertices[iV0 + 1];
+                    float vz = vertices[iV1 + 2] - vertices[iV0 + 2];
+
+                    float nx = uy * vz - uz * vy;
+                    float ny = uz * vx - ux * vz;
+                    float nz = ux * vy - uy * vx;
+                    float len = (float)Math.Sqrt(nx * nx + ny * ny + nz * nz);
+                    if (len > 1e-6f)
+                    {
+                        normals[i] = nx / len; normals[i + 1] = ny / len; normals[i + 2] = nz / len;
+                    }
+                    else
+                    {
+                        normals[i] = 0f; normals[i + 1] = 0f; normals[i + 2] = 1f;
+                    }
+                }
+            }
+            return normals;
+        }
+
+        /// <summary>
+        /// Computes smoothed per-vertex normals for an indexed triangle mesh: each triangle's
+        /// face normal is accumulated into its three vertices, then the accumulated vectors are
+        /// normalized. Vertices touched by no valid triangle receive the <c>+Z</c> fallback.
+        /// </summary>
+        /// <param name="vertices">Row-major positions as <c>float[n × 3]</c>.</param>
+        /// <param name="indices">Triangle indices (three per triangle).</param>
+        /// <returns>
+        /// Row-major <c>float[n × 3]</c> unit normals, or <c>null</c> when no triangle produced a
+        /// usable normal (so the caller falls back to the derivative-based normal).
+        /// </returns>
+        internal static float[] ComputeTriangleNormals(float[] vertices, uint[] indices)
+        {
+            if (vertices == null || indices == null || indices.Length < 3) return null;
+
+            int vertexCount = vertices.Length / 3;
+            if (vertexCount == 0) return null;
+
+            var normals = new float[vertices.Length];
+            for (int t = 0; t + 2 < indices.Length; t += 3)
+            {
+                uint i0 = indices[t], i1 = indices[t + 1], i2 = indices[t + 2];
+                if (i0 >= vertexCount || i1 >= vertexCount || i2 >= vertexCount) continue;
+
+                int a = (int)i0 * 3, b = (int)i1 * 3, c = (int)i2 * 3;
+                float e1x = vertices[b] - vertices[a];
+                float e1y = vertices[b + 1] - vertices[a + 1];
+                float e1z = vertices[b + 2] - vertices[a + 2];
+                float e2x = vertices[c] - vertices[a];
+                float e2y = vertices[c + 1] - vertices[a + 1];
+                float e2z = vertices[c + 2] - vertices[a + 2];
+
+                float nx = e1y * e2z - e1z * e2y;
+                float ny = e1z * e2x - e1x * e2z;
+                float nz = e1x * e2y - e1y * e2x;
+                normals[a] += nx; normals[a + 1] += ny; normals[a + 2] += nz;
+                normals[b] += nx; normals[b + 1] += ny; normals[b + 2] += nz;
+                normals[c] += nx; normals[c + 1] += ny; normals[c + 2] += nz;
+            }
+
+            bool anyValid = false;
+            for (int i = 0; i < vertexCount; i++)
+            {
+                int o = i * 3;
+                float nx = normals[o], ny = normals[o + 1], nz = normals[o + 2];
+                float len = (float)Math.Sqrt(nx * nx + ny * ny + nz * nz);
+                if (len > 1e-6f)
+                {
+                    normals[o] = nx / len; normals[o + 1] = ny / len; normals[o + 2] = nz / len;
+                    anyValid = true;
+                }
+                else
+                {
+                    normals[o] = 0f; normals[o + 1] = 0f; normals[o + 2] = 1f;
+                }
+            }
+            return anyValid ? normals : null;
+        }
+
+        private static bool IsFinite3(float[] v, int i)
+            => !float.IsInfinity(v[i]) && !float.IsNaN(v[i])
+            && !float.IsInfinity(v[i + 1]) && !float.IsNaN(v[i + 1])
+            && !float.IsInfinity(v[i + 2]) && !float.IsNaN(v[i + 2]);
+
+        /// <summary>
         /// Maps a Z height value to an RGB colour using a 7-band rainbow gradient
         /// (dark-blue → sky-blue → green → yellow → red → pink → white).
         /// </summary>

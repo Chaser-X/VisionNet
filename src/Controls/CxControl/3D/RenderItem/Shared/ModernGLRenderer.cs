@@ -148,6 +148,9 @@ namespace VisionNet.Controls
         private readonly float[] _projectionQuery = new float[16];
         private readonly float[] _viewQuery = new float[16];
         private bool _hasSceneMatrices;
+        // Reusable 3×3 normal matrix (inverse-transpose of an item's model rotation/scale),
+        // rebuilt per item from its cached pose inverse.
+        private readonly float[] _normalMatrix = new float[9];
 
         // Overlay draws are issued between BeginFrame and EndFrame. Capture the
         // caller's GL state once for that interval instead of synchronously querying
