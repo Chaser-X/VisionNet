@@ -100,6 +100,7 @@ namespace VisionNet.Controls
                 if (atlas.Texture != 0)
                     gl.DeleteTextures(1, new[] { atlas.Texture });
             _glyphAtlases.Clear();
+            ReleaseIbl(gl);
             _state.Reset();
             _frameStateCaptured = false;
             _hasSceneMatrices = false;

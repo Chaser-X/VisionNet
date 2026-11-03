@@ -60,6 +60,15 @@ namespace VisionNet.Controls
         private SurfaceMode      _surfaceMode      = SurfaceMode.PointCloud;
         private SurfaceColorMode _surfaceColorMode = SurfaceColorMode.ColorWithIntensity;
 
+        // Frame-global lighting model and IBL environment (P2). Unlike the surface/colour modes
+        // these are not propagated per item: they are applied once per frame to the shared
+        // surface program, so every built-in item picks them up.
+        private SurfaceLightingMode      _surfaceLightingMode = SurfaceLightingMode.Legacy;
+        private SurfaceEnvironmentPreset _environmentPreset   = SurfaceEnvironmentPreset.Studio;
+        private float                    _iblIntensity        = 1.5f;
+        private bool                     _pointImpostor       = true;
+        private bool                     _environmentFollowsCamera = false;
+
         // ── Render background colour (OpenGL clear colour); default: transparent black ──
         private Color _backColor = Color.FromArgb(0, 0, 0, 0);
 
@@ -154,6 +163,140 @@ namespace VisionNet.Controls
                 var snapshot = _registry.CopyItems();
                 foreach (var item in snapshot)
                     if (!item.IsDisposed) item.SurfaceColorMode = value;
+            }
+        }
+
+        /// <summary>
+        /// Gets or sets the Mesh-mode lighting model applied to every surface item.
+        /// Default <see cref="SurfaceLightingMode.Legacy"/>. <see cref="SurfaceLightingMode.Pbr"/>
+        /// uses the procedural image-based environment selected by <see cref="EnvironmentPreset"/>.
+        /// Only affects items drawn as meshes; point clouds are drawn unlit.
+        /// </summary>
+        public SurfaceLightingMode SurfaceLightingMode
+        {
+            get => _surfaceLightingMode;
+            set
+            {
+                if (_surfaceLightingMode == value) return;
+                _surfaceLightingMode = value;
+                SafeInvalidate();
+            }
+        }
+
+        /// <summary>
+        /// Gets or sets the procedural IBL environment used by
+        /// <see cref="SurfaceLightingMode.Pbr"/>. Default <see cref="SurfaceEnvironmentPreset.Studio"/>.
+        /// Changing it re-generates/re-uploads the environment on the next frame.
+        /// </summary>
+        public SurfaceEnvironmentPreset EnvironmentPreset
+        {
+            get => _environmentPreset;
+            set
+            {
+                if (_environmentPreset == value) return;
+                _environmentPreset = value;
+                SafeInvalidate();
+            }
+        }
+
+        /// <summary>
+        /// Gets or sets the IBL intensity multiplier for <see cref="SurfaceLightingMode.Pbr"/>
+        /// (clamped to &gt;= 0; <see cref="float.NaN"/> becomes 0). Default <c>1</c>.
+        /// </summary>
+        public float IblIntensity
+        {
+            get => _iblIntensity;
+            set
+            {
+                float clamped = float.IsNaN(value) ? 0f : (value < 0f ? 0f : value);
+                if (_iblIntensity == clamped) return;
+                _iblIntensity = clamped;
+                SafeInvalidate();
+            }
+        }
+
+        /// <summary>
+        /// Gets or sets whether point-cloud items are drawn as pseudo-3D sphere impostors
+        /// (a shaded highlight ball per point) instead of flat points. Default <c>true</c>.
+        /// Only affects <see cref="SurfaceMode.PointCloud"/>; mesh items are unaffected.
+        /// </summary>
+        public bool PointImpostor
+        {
+            get => _pointImpostor;
+            set
+            {
+                if (_pointImpostor == value) return;
+                _pointImpostor = value;
+                SafeInvalidate();
+            }
+        }
+
+        private float _pbrMetallic = 0f;
+
+        /// <summary>
+        /// Gets or sets the PBR metallic factor applied to every surface item (clamped to [0, 1];
+        /// <see cref="float.NaN"/> becomes 0). Default <c>0</c>. Newly added items inherit the
+        /// current value; only used by <see cref="SurfaceLightingMode.Pbr"/>.
+        /// </summary>
+        public float PbrMetallic
+        {
+            get => _pbrMetallic;
+            set
+            {
+                float clamped = float.IsNaN(value) ? 0f : (value < 0f ? 0f : (value > 1f ? 1f : value));
+                if (_pbrMetallic == clamped) return;
+                _pbrMetallic = clamped;
+                ApplyPbrMaterialToItems();
+            }
+        }
+
+        private float _pbrRoughness = 0.5f;
+
+        /// <summary>
+        /// Gets or sets the PBR roughness factor applied to every surface item (clamped to [0, 1];
+        /// <see cref="float.NaN"/> becomes 0.5). Default <c>0.5</c>. Newly added items inherit the
+        /// current value; only used by <see cref="SurfaceLightingMode.Pbr"/>.
+        /// </summary>
+        public float PbrRoughness
+        {
+            get => _pbrRoughness;
+            set
+            {
+                float clamped = float.IsNaN(value) ? 0.5f : (value < 0f ? 0f : (value > 1f ? 1f : value));
+                if (_pbrRoughness == clamped) return;
+                _pbrRoughness = clamped;
+                ApplyPbrMaterialToItems();
+            }
+        }
+
+        /// <summary>Pushes <see cref="PbrMetallic"/>/<see cref="PbrRoughness"/> onto every item.</summary>
+        private void ApplyPbrMaterialToItems()
+        {
+            var snapshot = _registry.CopyItems();
+            foreach (var item in snapshot)
+                if (!item.IsDisposed && item is AbstractCxObjRenderItem obj)
+                {
+                    obj.Metallic = _pbrMetallic;
+                    obj.Roughness = _pbrRoughness;
+                }
+            SafeInvalidate();
+        }
+
+        /// <summary>
+        /// Gets or sets whether the PBR environment rotates with the camera. Default <c>false</c>:
+        /// the environment is fixed in world space, so the brightness of a face is a property of
+        /// the object and does not change when the view is orbited. Set to <c>true</c> to sample
+        /// the environment in view space (headlight-like) so orbiting relights the object.
+        /// Only used by <see cref="SurfaceLightingMode.Pbr"/>.
+        /// </summary>
+        public bool EnvironmentFollowsCamera
+        {
+            get => _environmentFollowsCamera;
+            set
+            {
+                if (_environmentFollowsCamera == value) return;
+                _environmentFollowsCamera = value;
+                SafeInvalidate();
             }
         }
 

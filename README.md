@@ -237,6 +237,7 @@ VisionNet/
 - **线程安全**：`_resourceLock` 保护资源池；`Render()` 取快照遍历，不持锁执行 GL 调用
 - **现代 3D 管线**：`CxDisplay` 的 Surface、PointCloud、Mesh 及几何叠加层统一使用 VAO/VBO + GLSL，显式上传投影 / 视图 / 模型矩阵；`CxSurfaceItem`、`CxPointCloudItem`、`CxMeshItem` 是统一渲染入口。
 - **逐顶点法线**：Mesh 模式下优先使用逐顶点法线做光照——索引网格由面法线累积平滑（`CxExtension.ComputeTriangleNormals`），结构化曲面 / 有序点云由采样网格叉积（`CxExtension.ComputeGridNormals`）；无可用法线时回退到屏幕空间导数法线。点云模式不生成法线（不参与光照）。
+- **PBR / IBL 光照**：`CxDisplay.SurfaceLightingMode = Pbr` 时 Mesh 走 split-sum 图像光照——程序化生成的环境（`EnvironmentPreset` = `Studio` / `Neutral`）经余弦卷积 irradiance、GGX 预滤波 specular 与 BRDF LUT 合成；材质由 item 的 `Metallic` / `Roughness` 控制，`IblIntensity` 调整体亮度。默认 `Legacy`（原 Blinn-Phong）画面不变；点云模式不受光照影响。环境数据由 `ProceduralIbl` 进程级缓存，不依赖外部资产文件。
 - **数据预算**：`Set*` / `Add*` 默认按最多 200 万个顶点采样后上传；可通过 `maxPointCount` 调整 Surface 和 PointCloud 的预算。
 
 #### CxDisplay2D（2D，ScottPlot）

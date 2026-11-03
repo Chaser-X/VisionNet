@@ -125,6 +125,8 @@
     <Compile Include="3D\RenderItem\Shared\ModernGLRenderer.Programs.cs" />
     <Compile Include="3D\RenderItem\Shared\ModernGLRenderer.State.cs" />
     <Compile Include="3D\RenderItem\Shared\ModernGLRenderer.Matrix.cs" />
+    <Compile Include="3D\RenderItem\Shared\ProceduralIbl.cs" />
+    <Compile Include="3D\RenderItem\Shared\ModernGLRenderer.Ibl.cs" />
     <Compile Include="3D\RenderItem\ComplexGeometry\Enums.cs" />
     <Compile Include="3D\RenderItem\ComplexGeometry\ICxObjRenderItem.cs" />
     <Compile Include="3D\RenderItem\ComplexGeometry\AbstractCxObjRenderItem.cs" />

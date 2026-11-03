@@ -36,24 +36,42 @@
 
 > 注：P1 未新增公开枚举/方法；`Normals` 为 `RenderData`（内部管线数据）的新属性。
 
-## P2 PBR / IBL（预烘焙资产）
+## P2 PBR / IBL ✅（代码完成，待目视回归 + 提交确认）
 
-- [ ] 新增 `enum SurfaceLightingMode { Legacy, Pbr }` + `CxDisplay.SurfaceLightingMode`（默认 `Legacy`）
-- [ ] 材质参数：`Metallic` / `Roughness` / `SpecularIntensity`（item 级，纯 uniform）
-- [ ] 离线烘焙并内嵌 `irradiance` cubemap、`prefilter` cubemap（带 mip）、`brdf` LUT（原始二进制 + 极简头）
-- [ ] `ModernGLRenderer`：IBL 纹理上传/释放、环境预设切换（2~3 套），纳入 `ReleasePrograms`
-- [ ] 片元 Cook-Torrance GGX：`albedo` = 现有数据映射色，`F0 = mix(0.04, albedo, metallic)`，
-      漫反射 = irradiance × albedo，镜面 = prefilter(`textureLod` roughness) × `(F0*brdf.x + brdf.y)`
-- [ ] 纹理单元：0 = intensity，1 = irradiance cube，2 = prefilter cube，3 = brdf LUT
-- [ ] 文档（README「渲染模式」/ CHANGELOG）+ 右键菜单项（`Enum.Parse` 依赖 Text == 枚举名）
+> 资产方式改为**程序内程序化生成**（`ProceduralIbl`，进程级缓存），不引入外部文件/解码器。
 
-## P3 点云伪 3D 高光球（point-sprite impostor）
+- [x] 新增 `enum SurfaceLightingMode { Legacy, Pbr }` + `CxDisplay.SurfaceLightingMode`（默认 `Legacy`，帧级全局）
+- [x] 材质参数：`Metallic`（默认 0）/ `Roughness`（默认 0.5），item 级、纯 uniform
+- [x] `ProceduralIbl`：解析式环境 → irradiance cubemap（16²）+ prefilter cubemap（32²×5 mip）+ BRDF LUT（128²）
+- [x] `ModernGLRenderer.Ibl.cs`：IBL 纹理上传/释放、`EnvironmentPreset` 切换，`ReleaseIbl` 纳入 `ReleasePrograms`
+- [x] 片元 split-sum GGX：`albedo` = 现有数据映射色，`F0 = mix(0.04, albedo, metallic)`，
+      漫反射 = irradiance × albedo，镜面 = prefilter(`textureLod` roughness) × `(F*brdf.x + brdf.y)`
+- [x] 纹理单元：0 = intensity，1 = irradiance cube，2 = prefilter cube，3 = brdf LUT
+- [x] 新增测试 `ProceduralIblTests`（6）+ `PbrMaterialTests`（4）；`dotnet test` 123/123
+- [x] 文档（README / CHANGELOG）
+- [ ] **待办**：本机目视回归（`Pbr` 出图、`Legacy` 与 P1 一致）后提交
+- [ ] **未做**：右键菜单的照明模式开关（`Enum.Parse` 依赖 Text == 枚举名）；`SpecularIntensity` / per-item 覆盖
 
-- [ ] 点云路径保持 `GL_POINTS` + `gl.PointSize`，片元用 `gl_PointCoord` 反解球面法线
-- [ ] `gl_FragDepth` 球面深度修正；`discard` 圆形外像素
-- [ ] 与 PBR 共用光照；`Legacy` 下也给出简单高光
-- [ ] （P3.5 可选）大点超过驱动点尺寸上限时，降级到已有实例化球体路径（`DrawSpheres`）
-- [ ] 密集点云性能实测（`gl_FragDepth` 关闭 early-Z 的影响）
+## P3 点云伪 3D 高光球（point-sprite impostor）✅（代码完成，待目视回归 + 提交确认）
+
+- [x] 点云路径保持 `GL_POINTS` + `gl.PointSize`，片元用 `gl_PointCoord` 反解球面法线
+- [x] `discard` 圆盘外像素（方形 sprite 裁成圆）
+- [x] 与 PBR / Legacy 共用光照（`pbrShade` / `legacyLightFactor` 改为接收法线）
+- [x] `glEnable(GL_POINT_SPRITE)`（兼容 profile 必需，否则 `gl_PointCoord` 全 0 → 点全被裁）；`CxDisplay.PointImpostor`（默认 true）
+- [x] `CxDisplay.PbrMetallic` / `PbrRoughness`（全局材质，新 item 继承）
+- [x] Demo 新增「光照/PBR 测试」Tab：左侧控件（Legacy/PBR、Studio/Neutral、Impostor、**Metallic / Roughness / IBL 强度滑条**、Mesh/点云/**文件加载**）+ **右侧内嵌实时预览 CxDisplay**；控件同时作用于预览与两个主 CxDisplay
+- [ ] **待办**：目视确认 `gl_PointCoord` 的 y 方向（不对就翻转 `pc.y` 符号，一行）后提交
+- [ ] **未做（P3.5）**：`gl_FragDepth` 球面深度修正（会关 early-Z，密集点云有代价）；大点超过驱动尺寸上限时降级到实例化 quad
+
+## P2/P3 修复：环境轴向 / 法线 / 预览 / 环境跟随相机 ✅
+
+- [x] **A（bug）** 环境上方向 +Y → **+Z**，与场景/相机的 Z-up 一致
+- [x] **B** 索引绕序统一为 **CCW（从 +Z 看）**（`GenerateMeshIndices` + Demo `BuildBumpyMesh` / Diff Demo）
+- [x] **C** Demo 预览：新增球体预览 + 「Mesh 预览」斜置 3/4
+- [x] **D** `CxDisplay.EnvironmentFollowsCamera`（默认 false，视空间采样）+ Demo 勾选框
+- [x] 默认值保留调试值（metallic 0.2 / pointSize 3 / iblIntensity 1.5），测试与 Demo 滑条同步
+- [x] `dotnet test` 123/123；`CxControl` / `DemoFrom` 0 错误
+- [ ] **待办**：上机确认（顶面最亮 / 环境跟随相机）后提交
 
 ## P4（独立专项）回读性能
 

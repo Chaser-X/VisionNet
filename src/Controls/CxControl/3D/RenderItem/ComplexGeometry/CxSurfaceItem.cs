@@ -217,12 +217,14 @@ namespace VisionNet.Controls
                     uint tr = tl + 1;
                     uint bl = nextStart + x;
                     uint br = bl + 1;
+                    // Counter-clockwise seen from +Z, so face normals point up like
+                    // CxExtension.ComputeGridNormals (the two conventions used to disagree).
                     indices[idx++] = tl;
-                    indices[idx++] = bl;
-                    indices[idx++] = tr;
                     indices[idx++] = tr;
                     indices[idx++] = bl;
+                    indices[idx++] = tr;
                     indices[idx++] = br;
+                    indices[idx++] = bl;
                 }
             }
 

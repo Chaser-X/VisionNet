@@ -209,6 +209,50 @@ namespace VisionNet.Controls
             }
         }
 
+        private float _metallic = 0.2f;
+
+        /// <summary>
+        /// Gets or sets the PBR metallic factor in the range [0, 1] (clamped; <see cref="float.NaN"/>
+        /// becomes 0). Default <c>0</c> (dielectric). Only used by
+        /// <see cref="SurfaceLightingMode.Pbr"/>. Changing this value updates a shader uniform
+        /// only — no GL resources are rebuilt, and it does not by itself request a repaint.
+        /// </summary>
+        public float Metallic
+        {
+            get => _metallic;
+            set
+            {
+                float clamped = ClampUnit(value, 0f);
+                if (_metallic == clamped) return;
+                _metallic = clamped;
+                if (_cachedRenderData?.Uniforms != null)
+                    _cachedRenderData.Uniforms["metallic"] = clamped;
+            }
+        }
+
+        private float _roughness = 0.5f;
+
+        /// <summary>
+        /// Gets or sets the PBR roughness factor in the range [0, 1] (clamped; <see cref="float.NaN"/>
+        /// becomes 0.5). Default <c>0.5</c>. Only used by <see cref="SurfaceLightingMode.Pbr"/>.
+        /// Changing this value updates a shader uniform only — no GL resources are rebuilt.
+        /// </summary>
+        public float Roughness
+        {
+            get => _roughness;
+            set
+            {
+                float clamped = ClampUnit(value, 0.5f);
+                if (_roughness == clamped) return;
+                _roughness = clamped;
+                if (_cachedRenderData?.Uniforms != null)
+                    _cachedRenderData.Uniforms["roughness"] = clamped;
+            }
+        }
+
+        private static float ClampUnit(float value, float nanFallback)
+            => float.IsNaN(value) ? nanFallback : (value < 0f ? 0f : (value > 1f ? 1f : value));
+
         private float _opacity = 1f;
 
         /// <summary>
@@ -246,7 +290,7 @@ namespace VisionNet.Controls
         /// <summary>True when this item must be drawn in the translucent pass.</summary>
         protected bool IsTranslucent => _opacity < 1f;
 
-        private float _pointSize = 2f;
+        private float _pointSize = 3f;
 
         /// <summary>
         /// Gets or sets the point size in pixels used when <see cref="SurfaceMode.PointCloud"/>
@@ -308,6 +352,8 @@ namespace VisionNet.Controls
             out float vertexIntensity;
             out vec3 viewPos;
             out vec3 vNormal;
+            out vec3 vWorldPos;
+            out vec3 vWorldNormal;
             out vec3 lightDirView;
 
             void main()
@@ -320,9 +366,12 @@ namespace VisionNet.Controls
                 vertexIntensity = aIntensity;
                 viewPos = (view * worldPos).xyz;
                 // normalMatrix maps the local normal to world space; the view rotation
-                // brings it into the same frame as viewPos / lightDirView so the lighting
-                // dot products stay consistent.
-                vNormal = mat3(view) * (normalMatrix * aNormal);
+                // brings it into the same frame as viewPos / lightDirView so the legacy
+                // lighting dot products stay consistent. The world-space pair feeds the
+                // PBR/IBL path, whose cubemap lookups live in world space.
+                vWorldNormal = normalMatrix * aNormal;
+                vNormal = mat3(view) * vWorldNormal;
+                vWorldPos = worldPos.xyz;
                 lightDirView = normalize(vec3(0.3, 0.4, 0.85));
             }";
 
@@ -334,14 +383,27 @@ namespace VisionNet.Controls
             in float vertexIntensity;
             in vec3 viewPos;
             in vec3 vNormal;
+            in vec3 vWorldPos;
+            in vec3 vWorldNormal;
             in vec3 lightDirView;
             out vec4 FragColor;
 
+            uniform mat4 view;
             uniform float colorMin;
             uniform float colorMax;
             uniform int colorMode;
             uniform int surfaceMode;
             uniform int useVertexNormal;
+            uniform int lightingMode;
+            uniform int impostor;
+            uniform int envFollowsCamera;
+            uniform float metallic;
+            uniform float roughness;
+            uniform float iblIntensity;
+            uniform float prefilterMaxMip;
+            uniform samplerCube irradianceMap;
+            uniform samplerCube prefilterMap;
+            uniform sampler2D brdfLUT;
             uniform vec4 solidColor;
             uniform float opacity;
             uniform sampler2D intensityTexture;
@@ -360,39 +422,112 @@ namespace VisionNet.Controls
                 return mix(vec3(1,0,1), vec3(1,1,1), (n - 6.0/7.0) * 7.0);
             }
 
+            vec3 fresnelSchlickRoughness(float cosTheta, vec3 f0, float r)
+            {
+                return f0 + (max(vec3(1.0 - r), f0) - f0)
+                    * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
+            }
+
+            // Legacy per-fragment Blinn-Phong term (kept identical to the pre-PBR path).
+            // N is a view-space normal supplied by the caller.
+            vec3 legacyLightFactor(vec3 N)
+            {
+                vec3 V = normalize(-viewPos);
+                if (dot(N, V) < 0.0) N = -N;
+                if (!(dot(N, N) > 1e-6)) N = V;
+                vec3 L = normalize(lightDirView);
+                vec3 H = normalize(V + L);
+                float diff = max(dot(N, L), 0.0);
+                float spec = pow(max(dot(N, H), 0.0), 24.0) * 0.4;
+                return vec3((0.35 + 0.8 * diff) + 0.4 * spec);
+            }
+
+            // Split-sum image-based lighting. Everything is evaluated in world space so the
+            // irradiance / prefilter cubemaps (baked in world space) are sampled correctly.
+            // N is a world-space normal supplied by the caller.
+            vec3 pbrShade(vec3 albedo, vec3 N)
+            {
+                vec3 camPos = -transpose(mat3(view)) * view[3].xyz;
+                vec3 V = normalize(camPos - vWorldPos);
+                if (dot(N, V) < 0.0) N = -N;
+                if (!(dot(N, N) > 1e-6)) N = V;
+
+                float NdotV = max(dot(N, V), 0.0);
+                vec3 R = reflect(-V, N);
+
+                vec3 F0 = mix(vec3(0.04), albedo, metallic);
+                vec3 F = fresnelSchlickRoughness(NdotV, F0, roughness);
+                vec3 kD = (1.0 - F) * (1.0 - metallic);
+
+                // The environment is baked in world space (world-fixed lighting: rotating the
+                // camera does not relight a face). When envFollowsCamera is on, look it up in
+                // view space instead, so the environment rotates with the camera.
+                vec3 envN = envFollowsCamera == 1 ? mat3(view) * N : N;
+                vec3 envR = envFollowsCamera == 1 ? mat3(view) * R : R;
+
+                vec3 irradiance = texture(irradianceMap, envN).rgb;
+                vec3 diffuse = irradiance * albedo;
+
+                vec3 prefiltered = textureLod(prefilterMap, envR, roughness * prefilterMaxMip).rgb;
+                vec2 brdf = texture(brdfLUT, vec2(NdotV, roughness)).rg;
+                vec3 specular = prefiltered * (F * brdf.x + brdf.y);
+
+                return (kD * diffuse + specular) * iblIntensity;
+            }
+
             void main()
             {
                 if (isinf(height)) discard;
                 float intensity = useIntensityAttribute == 1
                     ? vertexIntensity : texture(intensityTexture, TexCoord).r;
 
-                vec3 lightFactor = vec3(1.0);
-                if (surfaceMode == 1)
-                {
-                    vec3 N = useVertexNormal == 1
-                        ? normalize(vNormal)
-                        : normalize(cross(dFdx(viewPos), dFdy(viewPos)));
-                    vec3 V = normalize(-viewPos);
-                    if (dot(N, V) < 0.0) N = -N;
-                    if (!(dot(N, N) > 1e-6)) N = V;
-                    vec3 L = normalize(lightDirView);
-                    vec3 H = normalize(V + L);
-                    float diff = max(dot(N, L), 0.0);
-                    float spec = pow(max(dot(N, H), 0.0), 24.0) * 0.4;
-                    lightFactor = vec3((0.35 + 0.8 * diff) + 0.4 * spec);
-                }
+                vec3 baseColor;
                 if (colorMode == 3) {
                     if (isinf(diffValue)) discard;
-                    FragColor = vec4(getColorByHeight(diffValue) * lightFactor, opacity);
+                    baseColor = getColorByHeight(diffValue);
                 } else if (colorMode == 0) {
-                    FragColor = vec4(getColorByHeight(height) * lightFactor, opacity);
+                    baseColor = getColorByHeight(height);
                 } else if (colorMode == 1) {
-                    FragColor = vec4(vec3(intensity) * lightFactor, opacity);
+                    baseColor = vec3(intensity);
                 } else if (colorMode == 4) {
-                    FragColor = vec4(solidColor.rgb * lightFactor, opacity);
+                    baseColor = solidColor.rgb;
                 } else {
-                    FragColor = vec4(mix(vec3(intensity), getColorByHeight(height), 0.5) * lightFactor, opacity);
+                    baseColor = mix(vec3(intensity), getColorByHeight(height), 0.5);
                 }
+
+                vec3 shaded = baseColor;
+                if (surfaceMode == 1)
+                {
+                    // Mesh: real normals when available, else the screen-space derivative.
+                    if (lightingMode == 1)
+                    {
+                        vec3 N = useVertexNormal == 1
+                            ? normalize(vWorldNormal)
+                            : normalize(cross(dFdx(vWorldPos), dFdy(vWorldPos)));
+                        shaded = pbrShade(baseColor, N);
+                    }
+                    else
+                    {
+                        vec3 N = useVertexNormal == 1
+                            ? normalize(vNormal)
+                            : normalize(cross(dFdx(viewPos), dFdy(viewPos)));
+                        shaded = baseColor * legacyLightFactor(N);
+                    }
+                }
+                else if (impostor == 1)
+                {
+                    // Point cloud: shade each point as a small sphere (point-sprite impostor).
+                    // gl_PointCoord is (0,0) at the top-left of the sprite, so negate y to get a
+                    // view-space up direction; the discard trims the square sprite to a disc.
+                    vec2 pc = gl_PointCoord * 2.0 - 1.0;
+                    float r2 = dot(pc, pc);
+                    if (r2 > 1.0) discard;
+                    vec3 Nview = normalize(vec3(pc.x, -pc.y, sqrt(max(0.0, 1.0 - r2))));
+                    shaded = lightingMode == 1
+                        ? pbrShade(baseColor, transpose(mat3(view)) * Nview)
+                        : baseColor * legacyLightFactor(Nview);
+                }
+                FragColor = vec4(shaded, opacity);
             }";
         #endregion Shader 源码
 
@@ -487,6 +622,8 @@ namespace VisionNet.Controls
             {
                 data.Uniforms["solidColor"] = _solidColor;
                 data.Uniforms["opacity"] = _opacity;
+                data.Uniforms["metallic"] = _metallic;
+                data.Uniforms["roughness"] = _roughness;
                 // Lit fragments use the interpolated normal only when the item actually built
                 // one; otherwise the shader falls back to the screen-space derivative normal.
                 data.Uniforms["useVertexNormal"] = data.Normals != null ? 1 : 0;

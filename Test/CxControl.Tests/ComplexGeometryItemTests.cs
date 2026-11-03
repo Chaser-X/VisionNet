@@ -86,9 +86,9 @@ namespace VisionNet.Controls.Tests
         }
 
         [Fact]
-        public void PointSize_DefaultsToTwo()
+        public void PointSize_DefaultsToThree()
         {
-            Assert.Equal(2f, NewItem().PointSize);
+            Assert.Equal(3f, NewItem().PointSize);
         }
 
         [Fact]

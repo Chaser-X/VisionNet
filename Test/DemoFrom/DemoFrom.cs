@@ -47,6 +47,7 @@ namespace DemoFrom
             cxDisplay1.Camera.IsLeftHanded = true;
             cxDisplay1.Camera.Enable2DView = false;
             BuildGroupSimButton();
+            BuildLightingTab();
         }
         CxSurface surface = null;
         CxSurface surface2 = null;
@@ -190,6 +191,7 @@ namespace DemoFrom
             GocatorHandle.GocatorHandle.Instance.DisConnect();
             cxDisplay1.Dispose();
             cxDisplay2.Dispose();
+            _cxDisplayPbr?.Dispose();
             _cxDisplay2D?.Dispose();
             _currentImage?.Dispose();
             VisionOperator.DestroyLib();
@@ -1047,8 +1049,8 @@ namespace DemoFrom
                     uint tr = tl + 1;
                     uint bl = next + (uint)x;
                     uint br = bl + 1;
-                    indices[i++] = tl; indices[i++] = bl; indices[i++] = tr;
-                    indices[i++] = tr; indices[i++] = bl; indices[i++] = br;
+                    indices[i++] = tl; indices[i++] = tr; indices[i++] = bl;
+                    indices[i++] = tr; indices[i++] = br; indices[i++] = bl;
                 }
             }
 
@@ -1750,6 +1752,39 @@ namespace DemoFrom
             return new CxMesh { Vertices = v, Indices = idx };
         }
 
+        private static CxMesh BuildSphereMesh(float radius, int slices, int stacks)
+        {
+            var verts = new CxPoint3D[(stacks + 1) * (slices + 1)];
+            for (int i = 0; i <= stacks; i++)
+            {
+                float phi = (float)(Math.PI * i / stacks);   // 0 at +Z pole
+                float z = radius * (float)Math.Cos(phi);
+                float r = radius * (float)Math.Sin(phi);
+                for (int j = 0; j <= slices; j++)
+                {
+                    float theta = (float)(2 * Math.PI * j / slices);
+                    verts[i * (slices + 1) + j] = new CxPoint3D(
+                        r * (float)Math.Cos(theta),
+                        r * (float)Math.Sin(theta),
+                        z);
+                }
+            }
+
+            var idx = new uint[stacks * slices * 6];
+            int k = 0;
+            for (int i = 0; i < stacks; i++)
+                for (int j = 0; j < slices; j++)
+                {
+                    uint a = (uint)(i * (slices + 1) + j);
+                    uint b = a + 1;
+                    uint c = a + (uint)(slices + 1);
+                    uint d = c + 1;
+                    idx[k++] = a; idx[k++] = c; idx[k++] = b;   // CCW, outward
+                    idx[k++] = b; idx[k++] = c; idx[k++] = d;
+                }
+            return new CxMesh { Vertices = verts, Indices = idx };
+        }
+
         private static CxMesh BuildBumpyMesh(int nx, int ny, float spacing, CxPoint3D origin)
         {
             var verts = new CxPoint3D[nx * ny];
@@ -1767,10 +1802,277 @@ namespace DemoFrom
                 for (int x = 0; x < nx - 1; x++)
                 {
                     uint tl = (uint)(y * nx + x), tr = tl + 1, bl = tl + (uint)nx, br = bl + 1;
-                    idx[i++] = tl; idx[i++] = bl; idx[i++] = tr;
-                    idx[i++] = tr; idx[i++] = bl; idx[i++] = br;
+                    // CCW seen from +Z, so face normals point up (matches ComputeGridNormals).
+                    idx[i++] = tl; idx[i++] = tr; idx[i++] = bl;
+                    idx[i++] = tr; idx[i++] = br; idx[i++] = bl;
                 }
             return new CxMesh { Vertices = verts, Indices = idx };
+        }
+
+        // ── Lighting / PBR switch test ──────────────────────────────────────────
+
+        private CxDisplay _cxDisplayPbr;
+
+        private void BuildLightingTab()
+        {
+            var page = new TabPage("光照/PBR 测试") { Padding = new Padding(8) };
+            var split = new SplitContainer
+            {
+                Dock = DockStyle.Fill,
+                FixedPanel = FixedPanel.Panel1,
+                SplitterWidth = 4,
+            };
+
+            // SplitterDistance can only be set once the container has a real width.
+            bool splitInit = false;
+            split.SizeChanged += (s, e) =>
+            {
+                if (!splitInit && split.Width > 400)
+                {
+                    splitInit = true;
+                    split.SplitterDistance = 360;
+                }
+            };
+
+            var panel = new FlowLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                FlowDirection = FlowDirection.TopDown,
+                WrapContents = false,
+                AutoScroll = true,
+            };
+
+            // Controls that only take effect in PBR mode; greyed out while Legacy is selected.
+            var pbrOnly = new List<Control>();
+
+            Label Header(string text) => new Label
+            {
+                Text = text,
+                AutoSize = true,
+                Font = new Font(Font, FontStyle.Bold),
+                Margin = new Padding(3, 10, 3, 2),
+            };
+
+            Control[] AddSlider(string name, int min, int max, int value, Action<float> onChanged)
+            {
+                var lbl = new Label { Text = $"{name}: {value / 100f:F2}", AutoSize = true };
+                var track = new TrackBar
+                {
+                    Minimum = min,
+                    Maximum = max,
+                    Value = value,
+                    TickFrequency = Math.Max(1, (max - min) / 6),
+                    Width = 320,
+                    Height = 34,
+                };
+                track.ValueChanged += (s, e) =>
+                {
+                    float v = track.Value / 100f;
+                    lbl.Text = $"{name}: {v:F2}";
+                    onChanged(v);
+                };
+                panel.Controls.Add(lbl);
+                panel.Controls.Add(track);
+                return new Control[] { lbl, track };
+            }
+
+            Button Btn(string text, Action click)
+            {
+                var b = new Button { Text = text, AutoSize = true };
+                b.Click += (s, e) => click();
+                return b;
+            }
+
+            // WinForms groups radio buttons by their parent container (there is no GroupName
+            // property, unlike WPF), so each concept gets its own inner container to keep the two
+            // groups independent instead of one mutually-exclusive set.
+            FlowLayoutPanel RadioGroup(params Control[] children)
+            {
+                var g = new FlowLayoutPanel
+                {
+                    FlowDirection = FlowDirection.TopDown,
+                    WrapContents = false,
+                    AutoSize = true,
+                    AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                    Margin = new Padding(0),
+                };
+                g.Controls.AddRange(children);
+                return g;
+            }
+
+            panel.Controls.Add(Header("Mesh 光照模式（本页 + 两个主 CxDisplay）"));
+            var rbLegacy = new RadioButton { Text = "Legacy（Blinn-Phong，默认）", AutoSize = true, Checked = true };
+            var rbPbr = new RadioButton { Text = "PBR / IBL", AutoSize = true };
+            panel.Controls.Add(RadioGroup(rbLegacy, rbPbr));
+
+            panel.Controls.Add(Header("环境 / 材质 / 强度（仅 PBR 生效）"));
+            var rbStudio = new RadioButton { Text = "Studio", AutoSize = true, Checked = true };
+            var rbNeutral = new RadioButton { Text = "Neutral", AutoSize = true };
+            rbStudio.CheckedChanged += (s, e) => { if (rbStudio.Checked) ApplyEnvironment(SurfaceEnvironmentPreset.Studio); };
+            rbNeutral.CheckedChanged += (s, e) => { if (rbNeutral.Checked) ApplyEnvironment(SurfaceEnvironmentPreset.Neutral); };
+            panel.Controls.Add(RadioGroup(rbStudio, rbNeutral));
+            pbrOnly.Add(rbStudio);
+            pbrOnly.Add(rbNeutral);
+
+            // Initial slider positions mirror the library defaults (0.2 / 0.5 / 1.5).
+            pbrOnly.AddRange(AddSlider("Metallic", 0, 100, 20, v => ForEachDisplay(d => d.PbrMetallic = v)));
+            pbrOnly.AddRange(AddSlider("Roughness", 0, 100, 50, v => ForEachDisplay(d => d.PbrRoughness = v)));
+            pbrOnly.AddRange(AddSlider("IBL 强度", 0, 300, 150, v => ForEachDisplay(d => d.IblIntensity = v)));
+
+            var chkEnvFollows = new CheckBox { Text = "环境跟随相机（旋转视角时重新打光，仅 PBR）", AutoSize = true, Checked = false };
+            chkEnvFollows.CheckedChanged += (s, e) => ForEachDisplay(d => d.EnvironmentFollowsCamera = chkEnvFollows.Checked);
+            panel.Controls.Add(chkEnvFollows);
+            pbrOnly.Add(chkEnvFollows);
+
+            var chkImpostor = new CheckBox { Text = "点云伪 3D 高光球（Point Impostor，两种模式都生效）", AutoSize = true, Checked = true };
+            chkImpostor.CheckedChanged += (s, e) => ForEachDisplay(d => d.PointImpostor = chkImpostor.Checked);
+            panel.Controls.Add(chkImpostor);
+
+            rbLegacy.CheckedChanged += (s, e) =>
+            {
+                if (!rbLegacy.Checked) return;
+                ApplyLighting(SurfaceLightingMode.Legacy);
+                foreach (var c in pbrOnly) c.Enabled = false;
+            };
+            rbPbr.CheckedChanged += (s, e) =>
+            {
+                if (!rbPbr.Checked) return;
+                ApplyLighting(SurfaceLightingMode.Pbr);
+                foreach (var c in pbrOnly) c.Enabled = true;
+            };
+            foreach (var c in pbrOnly) c.Enabled = false;   // starts in Legacy
+
+            panel.Controls.Add(Header("本页预览（右侧 CxDisplay）"));
+            panel.Controls.Add(Btn("Mesh 预览（斜置板）", LoadLightingMeshDemo));
+            panel.Controls.Add(Btn("球体预览（看 IBL 最直观）", LoadLightingSphereDemo));
+            panel.Controls.Add(Btn("点云预览", LoadLightingCloudDemo));
+            panel.Controls.Add(Btn("加载文件…（Mesh / Surface）", LoadLightingFileDemo));
+
+            panel.Controls.Add(Header("同步到主页面（3D 页两个 CxDisplay）"));
+            panel.Controls.Add(Btn("两个都加载 Mesh", LoadLightingBothDemo));
+
+            // Live preview control. A code-created OpenGLControl needs the ISupportInitialize
+            // round-trip so its GL context is created (the designer normally emits this).
+            _cxDisplayPbr = new CxDisplay { Dock = DockStyle.Fill, Size = new Size(600, 600) };
+            var init = (System.ComponentModel.ISupportInitialize)_cxDisplayPbr;
+            init.BeginInit();
+            init.EndInit();
+            _cxDisplayPbr.Camera.IsLeftHanded = true;
+            _cxDisplayPbr.SurfaceMode = SurfaceMode.Mesh;
+            _cxDisplayPbr.ShowCoordinateSystem = false;
+
+            split.Panel1.Controls.Add(panel);
+            split.Panel2.Controls.Add(_cxDisplayPbr);
+            page.Controls.Add(split);
+            tabControl1.TabPages.Add(page);
+
+            LoadLightingMeshDemo();
+        }
+
+        private void ForEachDisplay(Action<CxDisplay> action)
+        {
+            action(cxDisplay1);
+            action(cxDisplay2);
+            if (_cxDisplayPbr != null) action(_cxDisplayPbr);
+        }
+
+        private void ApplyLighting(SurfaceLightingMode mode) => ForEachDisplay(d => d.SurfaceLightingMode = mode);
+
+        private void ApplyEnvironment(SurfaceEnvironmentPreset preset) => ForEachDisplay(d => d.EnvironmentPreset = preset);
+
+        private void LoadLightingMeshDemo()
+        {
+            if (_cxDisplayPbr == null) return;
+            var mesh = BuildBumpyMesh(60, 60, 0.15f, new CxPoint3D(0, 0, 0));
+            // Tilt the plate to a 3/4 orientation so its normals span a range of the environment
+            // instead of all pointing straight up (which made the shading look flat).
+            var tilt = CxMatrix4X4.RotationX(35f) * CxMatrix4X4.RotationY(25f);
+            _cxDisplayPbr.SurfaceMode = SurfaceMode.Mesh;
+            _cxDisplayPbr.ResetView();
+            _cxDisplayPbr.SetMesh(mesh, pose: tilt);
+            lbl_markPos.Text = "Mesh preview（斜置 3/4）-> 光照/PBR 页";
+        }
+
+        private void LoadLightingSphereDemo()
+        {
+            if (_cxDisplayPbr == null) return;
+            _cxDisplayPbr.SurfaceMode = SurfaceMode.Mesh;
+            _cxDisplayPbr.ResetView();
+            _cxDisplayPbr.SetMesh(BuildSphereMesh(4f, 48, 32));
+            lbl_markPos.Text = "Sphere preview -> 光照/PBR 页";
+        }
+
+        private void LoadLightingCloudDemo()
+        {
+            if (_cxDisplayPbr == null) return;
+            const int W = 90, L = 90;
+            const float xScale = 0.15f, yScale = 0.15f, zScale = 0.02f;
+            var data = new short[W * L * 3];
+            for (int y = 0; y < L; y++)
+                for (int x = 0; x < W; x++)
+                {
+                    int idx = y * W + x;
+                    data[idx * 3] = (short)x;
+                    data[idx * 3 + 1] = (short)y;
+                    data[idx * 3 + 2] = (short)(50 * Math.Sin(x * 0.15f) * Math.Cos(y * 0.15f));
+                }
+            var cloud = new CxPointCloud(W, L, data, null,
+                xOffset: 0f, yOffset: 0f, zOffset: 0f,
+                xScale: xScale, yScale: yScale, zScale: zScale);
+            _cxDisplayPbr.SurfaceMode = SurfaceMode.PointCloud;
+            _cxDisplayPbr.ResetView();
+            _cxDisplayPbr.SetPointCloud(cloud);
+            lbl_markPos.Text = "PointCloud preview -> 光照/PBR 页";
+        }
+
+        private void LoadLightingFileDemo()
+        {
+            if (_cxDisplayPbr == null) return;
+            using (var dlg = new OpenFileDialog
+            {
+                Filter = "Mesh / Surface|*.obj;*.cxmesh;*.stl;*.stla;*.cxsurface"
+                       + "|Mesh files|*.obj;*.cxmesh;*.stl;*.stla"
+                       + "|Surface files|*.cxsurface"
+                       + "|All files|*.*"
+            })
+            {
+                if (dlg.ShowDialog() != DialogResult.OK) return;
+
+                string ext = Path.GetExtension(dlg.FileName).ToLowerInvariant();
+                if (ext == ".cxsurface")
+                {
+                    var loaded = VisionOperator.LoadSurface(dlg.FileName);
+                    if (loaded == null) { MessageBox.Show("Failed to load surface.", "Load"); return; }
+                    surface = loaded;
+                    _cxDisplayPbr.SurfaceMode = SurfaceMode.Mesh;
+                    _cxDisplayPbr.ResetView();
+                    _cxDisplayPbr.SetSurface(loaded);
+                    lbl_markPos.Text = "Surface loaded -> 预览";
+                }
+                else
+                {
+                    var mesh = VisionOperator.LoadMesh(dlg.FileName);
+                    if (mesh == null) { MessageBox.Show("Failed to load mesh.", "Load"); return; }
+                    _currentMesh = mesh;
+                    _cxDisplayPbr.SurfaceMode = SurfaceMode.Mesh;
+                    _cxDisplayPbr.ResetView();
+                    _cxDisplayPbr.SetMesh(mesh);
+                    lbl_markPos.Text = "Mesh loaded -> 预览";
+                }
+            }
+        }
+
+        private void LoadLightingBothDemo()
+        {
+            cxDisplay1.SurfaceMode = SurfaceMode.Mesh;
+            cxDisplay1.ResetView();
+            cxDisplay1.SetMesh(BuildBumpyMesh(50, 50, 0.2f, new CxPoint3D(0, 0, 0)));
+
+            cxDisplay2.SurfaceMode = SurfaceMode.Mesh;
+            cxDisplay2.ResetView();
+            cxDisplay2.SetMesh(BuildBumpyMesh(50, 50, 0.2f, new CxPoint3D(0, 0, 0)));
+
+            lbl_markPos.Text = "Mesh -> 两个主 CxDisplay";
         }
     }
 }

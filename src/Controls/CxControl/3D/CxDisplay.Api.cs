@@ -103,6 +103,13 @@ namespace VisionNet.Controls
             if (item == null)
                 throw new ArgumentNullException(nameof(item));
 
+            // Newly added items inherit the display's current PBR material.
+            if (item is AbstractCxObjRenderItem material)
+            {
+                material.Metallic = _pbrMetallic;
+                material.Roughness = _pbrRoughness;
+            }
+
             CxBox3D? combined = null;
             bool alreadyRegistered;
             lock (_renderLock)

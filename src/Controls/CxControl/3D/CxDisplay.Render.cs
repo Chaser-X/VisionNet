@@ -77,6 +77,10 @@ namespace VisionNet.Controls
                 overlayRenderer.BeginFrame(gl);
                 try
                 {
+                    // Selects the Mesh lighting model (and binds the IBL textures in Pbr mode)
+                    // for every built-in surface item of this frame.
+                    overlayRenderer.BeginSurfaceLighting(gl, _surfaceLightingMode, _environmentPreset,
+                        _iblIntensity, _pointImpostor, _environmentFollowsCamera);
                     Render(gl);
                 }
                 finally

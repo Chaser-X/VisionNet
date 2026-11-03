@@ -36,4 +36,23 @@ namespace VisionNet.Controls
         /// </summary>
         Lit,
     }
+
+    /// <summary>
+    /// Specifies how a Mesh-mode surface item is lit. Applies only when the item is drawn as a
+    /// mesh (<see cref="SurfaceMode.Mesh"/>); point clouds are drawn unlit.
+    /// </summary>
+    public enum SurfaceLightingMode
+    {
+        /// <summary>
+        /// Per-fragment Blinn-Phong with a fixed view-space key light (the historical look).
+        /// </summary>
+        Legacy = 0,
+
+        /// <summary>
+        /// Physically-based shading with image-based lighting (split-sum: irradiance + prefiltered
+        /// specular + BRDF LUT). The environment is generated procedurally; see
+        /// <see cref="SurfaceEnvironmentPreset"/>.
+        /// </summary>
+        Pbr = 1,
+    }
 }
