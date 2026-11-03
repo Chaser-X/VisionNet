@@ -63,11 +63,11 @@ namespace VisionNet.Controls
         // Frame-global lighting model and IBL environment (P2). Unlike the surface/colour modes
         // these are not propagated per item: they are applied once per frame to the shared
         // surface program, so every built-in item picks them up.
-        private SurfaceLightingMode      _surfaceLightingMode = SurfaceLightingMode.Legacy;
-        private SurfaceEnvironmentPreset _environmentPreset   = SurfaceEnvironmentPreset.Studio;
-        private float                    _iblIntensity        = 1.5f;
+        private SurfaceLightingMode      _surfaceLightingMode = SurfaceLightingMode.Pbr;
+        private SurfaceEnvironmentPreset _environmentPreset   = SurfaceEnvironmentPreset.Neutral;
+        private float                    _iblIntensity        = 1.3f;
         private bool                     _pointImpostor       = true;
-        private bool                     _environmentFollowsCamera = false;
+        private bool                     _environmentFollowsCamera = true;
 
         // ── Render background colour (OpenGL clear colour); default: transparent black ──
         private Color _backColor = Color.FromArgb(0, 0, 0, 0);
@@ -168,9 +168,9 @@ namespace VisionNet.Controls
 
         /// <summary>
         /// Gets or sets the Mesh-mode lighting model applied to every surface item.
-        /// Default <see cref="SurfaceLightingMode.Legacy"/>. <see cref="SurfaceLightingMode.Pbr"/>
-        /// uses the procedural image-based environment selected by <see cref="EnvironmentPreset"/>.
-        /// Only affects items drawn as meshes; point clouds are drawn unlit.
+        /// Default <see cref="SurfaceLightingMode.Pbr"/>. <see cref="SurfaceLightingMode.Legacy"/>
+        /// is the historical fixed-direction Blinn-Phong look. Only affects items drawn as meshes;
+        /// point clouds use the impostor shading of <see cref="PointImpostor"/>.
         /// </summary>
         public SurfaceLightingMode SurfaceLightingMode
         {
@@ -185,7 +185,7 @@ namespace VisionNet.Controls
 
         /// <summary>
         /// Gets or sets the procedural IBL environment used by
-        /// <see cref="SurfaceLightingMode.Pbr"/>. Default <see cref="SurfaceEnvironmentPreset.Studio"/>.
+        /// <see cref="SurfaceLightingMode.Pbr"/>. Default <see cref="SurfaceEnvironmentPreset.Neutral"/>.
         /// Changing it re-generates/re-uploads the environment on the next frame.
         /// </summary>
         public SurfaceEnvironmentPreset EnvironmentPreset
@@ -201,7 +201,7 @@ namespace VisionNet.Controls
 
         /// <summary>
         /// Gets or sets the IBL intensity multiplier for <see cref="SurfaceLightingMode.Pbr"/>
-        /// (clamped to &gt;= 0; <see cref="float.NaN"/> becomes 0). Default <c>1</c>.
+        /// (clamped to &gt;= 0; <see cref="float.NaN"/> becomes 0). Default <c>1.3</c>.
         /// </summary>
         public float IblIntensity
         {
@@ -231,11 +231,11 @@ namespace VisionNet.Controls
             }
         }
 
-        private float _pbrMetallic = 0f;
+        private float _pbrMetallic = 0.2f;
 
         /// <summary>
         /// Gets or sets the PBR metallic factor applied to every surface item (clamped to [0, 1];
-        /// <see cref="float.NaN"/> becomes 0). Default <c>0</c>. Newly added items inherit the
+        /// <see cref="float.NaN"/> becomes 0). Default <c>0.2</c>. Newly added items inherit the
         /// current value; only used by <see cref="SurfaceLightingMode.Pbr"/>.
         /// </summary>
         public float PbrMetallic
@@ -283,10 +283,10 @@ namespace VisionNet.Controls
         }
 
         /// <summary>
-        /// Gets or sets whether the PBR environment rotates with the camera. Default <c>false</c>:
-        /// the environment is fixed in world space, so the brightness of a face is a property of
-        /// the object and does not change when the view is orbited. Set to <c>true</c> to sample
-        /// the environment in view space (headlight-like) so orbiting relights the object.
+        /// Gets or sets whether the PBR environment rotates with the camera. Default <c>true</c>:
+        /// the environment is sampled in view space, so orbiting the view relights the object
+        /// (headlight-like). Set to <c>false</c> to keep the environment fixed in world space,
+        /// where a face's brightness is a property of the object and does not change with the view.
         /// Only used by <see cref="SurfaceLightingMode.Pbr"/>.
         /// </summary>
         public bool EnvironmentFollowsCamera

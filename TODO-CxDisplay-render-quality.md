@@ -73,6 +73,14 @@
 - [x] `dotnet test` 123/123；`CxControl` / `DemoFrom` 0 错误
 - [ ] **待办**：上机确认（顶面最亮 / 环境跟随相机）后提交
 
+## 默认切换为 PBR/IBL + Demo 读 cxpc ✅
+
+- [x] `CxDisplay` 默认：`Pbr` / `Neutral` / `IblIntensity 1.3` / `EnvironmentFollowsCamera true` / `PointImpostor true` / `PbrMetallic 0.2`
+- [x] Demo「加载文件…」支持 `.cxpc` / `.pcd` 点云（`VisionOperator.LoadPointCloud`）
+- [x] Demo 控件初值同步默认（PBR / Neutral / 环境跟随相机 / 1.3 / 0.2）
+- [x] `dotnet test` 123/123；`CxControl` / `DemoFrom` 0 错误
+- [ ] **待办**：上机确认后提交
+
 ## P4（独立专项）回读性能
 
 - [ ] 量化每帧全分辨率 `glReadPixels` + `BitBlt` 开销（4K ≈ 33 MB/帧）

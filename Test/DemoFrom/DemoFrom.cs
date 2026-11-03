@@ -1901,25 +1901,25 @@ namespace DemoFrom
             }
 
             panel.Controls.Add(Header("Mesh 光照模式（本页 + 两个主 CxDisplay）"));
-            var rbLegacy = new RadioButton { Text = "Legacy（Blinn-Phong，默认）", AutoSize = true, Checked = true };
-            var rbPbr = new RadioButton { Text = "PBR / IBL", AutoSize = true };
+            var rbLegacy = new RadioButton { Text = "Legacy（Blinn-Phong）", AutoSize = true };
+            var rbPbr = new RadioButton { Text = "PBR / IBL（默认）", AutoSize = true, Checked = true };
             panel.Controls.Add(RadioGroup(rbLegacy, rbPbr));
 
             panel.Controls.Add(Header("环境 / 材质 / 强度（仅 PBR 生效）"));
-            var rbStudio = new RadioButton { Text = "Studio", AutoSize = true, Checked = true };
-            var rbNeutral = new RadioButton { Text = "Neutral", AutoSize = true };
+            var rbStudio = new RadioButton { Text = "Studio", AutoSize = true };
+            var rbNeutral = new RadioButton { Text = "Neutral（默认）", AutoSize = true, Checked = true };
             rbStudio.CheckedChanged += (s, e) => { if (rbStudio.Checked) ApplyEnvironment(SurfaceEnvironmentPreset.Studio); };
             rbNeutral.CheckedChanged += (s, e) => { if (rbNeutral.Checked) ApplyEnvironment(SurfaceEnvironmentPreset.Neutral); };
             panel.Controls.Add(RadioGroup(rbStudio, rbNeutral));
             pbrOnly.Add(rbStudio);
             pbrOnly.Add(rbNeutral);
 
-            // Initial slider positions mirror the library defaults (0.2 / 0.5 / 1.5).
+            // Initial slider positions mirror the library defaults (0.2 / 0.5 / 1.3).
             pbrOnly.AddRange(AddSlider("Metallic", 0, 100, 20, v => ForEachDisplay(d => d.PbrMetallic = v)));
             pbrOnly.AddRange(AddSlider("Roughness", 0, 100, 50, v => ForEachDisplay(d => d.PbrRoughness = v)));
-            pbrOnly.AddRange(AddSlider("IBL 强度", 0, 300, 150, v => ForEachDisplay(d => d.IblIntensity = v)));
+            pbrOnly.AddRange(AddSlider("IBL 强度", 0, 300, 130, v => ForEachDisplay(d => d.IblIntensity = v)));
 
-            var chkEnvFollows = new CheckBox { Text = "环境跟随相机（旋转视角时重新打光，仅 PBR）", AutoSize = true, Checked = false };
+            var chkEnvFollows = new CheckBox { Text = "环境跟随相机（旋转视角时重新打光，仅 PBR）", AutoSize = true, Checked = true };
             chkEnvFollows.CheckedChanged += (s, e) => ForEachDisplay(d => d.EnvironmentFollowsCamera = chkEnvFollows.Checked);
             panel.Controls.Add(chkEnvFollows);
             pbrOnly.Add(chkEnvFollows);
@@ -1940,13 +1940,13 @@ namespace DemoFrom
                 ApplyLighting(SurfaceLightingMode.Pbr);
                 foreach (var c in pbrOnly) c.Enabled = true;
             };
-            foreach (var c in pbrOnly) c.Enabled = false;   // starts in Legacy
+            foreach (var c in pbrOnly) c.Enabled = true;   // library default is PBR
 
             panel.Controls.Add(Header("本页预览（右侧 CxDisplay）"));
             panel.Controls.Add(Btn("Mesh 预览（斜置板）", LoadLightingMeshDemo));
             panel.Controls.Add(Btn("球体预览（看 IBL 最直观）", LoadLightingSphereDemo));
             panel.Controls.Add(Btn("点云预览", LoadLightingCloudDemo));
-            panel.Controls.Add(Btn("加载文件…（Mesh / Surface）", LoadLightingFileDemo));
+            panel.Controls.Add(Btn("加载文件…（Mesh / Surface / 点云 cxpc）", LoadLightingFileDemo));
 
             panel.Controls.Add(Header("同步到主页面（3D 页两个 CxDisplay）"));
             panel.Controls.Add(Btn("两个都加载 Mesh", LoadLightingBothDemo));
@@ -2030,9 +2030,10 @@ namespace DemoFrom
             if (_cxDisplayPbr == null) return;
             using (var dlg = new OpenFileDialog
             {
-                Filter = "Mesh / Surface|*.obj;*.cxmesh;*.stl;*.stla;*.cxsurface"
+                Filter = "Mesh / Surface / PointCloud|*.obj;*.cxmesh;*.stl;*.stla;*.cxsurface;*.cxpc;*.pcd"
                        + "|Mesh files|*.obj;*.cxmesh;*.stl;*.stla"
                        + "|Surface files|*.cxsurface"
+                       + "|Point cloud files|*.cxpc;*.pcd"
                        + "|All files|*.*"
             })
             {
@@ -2048,6 +2049,15 @@ namespace DemoFrom
                     _cxDisplayPbr.ResetView();
                     _cxDisplayPbr.SetSurface(loaded);
                     lbl_markPos.Text = "Surface loaded -> 预览";
+                }
+                else if (ext == ".cxpc" || ext == ".pcd")
+                {
+                    var cloud = VisionOperator.LoadPointCloud(dlg.FileName);
+                    if (cloud == null) { MessageBox.Show("Failed to load point cloud.", "Load"); return; }
+                    _cxDisplayPbr.SurfaceMode = SurfaceMode.PointCloud;
+                    _cxDisplayPbr.ResetView();
+                    _cxDisplayPbr.SetPointCloud(cloud);
+                    lbl_markPos.Text = "PointCloud loaded -> 预览";
                 }
                 else
                 {

@@ -6,6 +6,16 @@
 
 ## 未发布（工作区，尚未提交）
 
+### 默认切换为 PBR/IBL（Neutral + 环境跟随相机）+ Demo 支持读 cxpc
+
+**默认渲染（`CxDisplay`）**：`SurfaceLightingMode` = **Pbr**、`EnvironmentPreset` = **Neutral**、`IblIntensity` = **1.3**、`EnvironmentFollowsCamera` = **true**、`PointImpostor` = **true**、`PbrMetallic` = **0.2**。即开箱即用 PBR/IBL + 点云高光球；需要旧观感时显式设 `SurfaceLightingMode.Legacy`。
+
+**Demo（`Test/DemoFrom`）**
+- 「加载文件…」支持 **`.cxpc` / `.pcd`** 点云（`VisionOperator.LoadPointCloud`），加载后切到 `SurfaceMode.PointCloud`，直接看高光球。
+- 光照/PBR 测试页的初始控件状态与库默认一致：PBR / Neutral / 环境跟随相机 / IBL 1.3 / Metallic 0.2。
+
+- 验证：`dotnet test` → **123/123 通过**；`CxControl` 与 `DemoFrom` 0 错误。
+
 ### P2/P3 修复：环境轴向 / 法线朝向 / 预览物体 / 环境跟随相机
 
 **A. 环境轴向 Y-up → Z-up（bug 修复）**
@@ -20,7 +30,7 @@
 **D. 环境跟随相机**
 新增 `CxDisplay.EnvironmentFollowsCamera`（默认 `false`）。为 `true` 时片元在**视空间**采样环境（`mat3(view) * N/R`），旋转视角即重新打光；默认保持世界空间固定（面的明暗是物体自身的属性，不随视角变化）。Demo 增加「环境跟随相机」勾选框（仅 PBR 可用）。
 
-**默认值调整（保留调试值）**：`AbstractCxObjRenderItem._metallic` 0 → **0.2**、`_pointSize` 2 → **3**；`CxDisplay._iblIntensity` 1 → **1.5**。测试与 Demo 滑条初值已同步。
+**默认值调整（保留调试值）**：`AbstractCxObjRenderItem._metallic` 0 → **0.2**、`_pointSize` 2 → **3**；`CxDisplay._iblIntensity` → **1.3**（后续条目）。测试与 Demo 滑条初值已同步。
 
 - 验证：`dotnet test` → **123/123 通过**；`CxControl` 与 `DemoFrom` 0 错误。
 - **需本机目视确认**：PBR 下 Top 视角时物体**顶面应最亮**（天空在 +Z）；勾选「环境跟随相机」后旋转视角应重新打光；点云高光球的 y 方向。
@@ -52,7 +62,7 @@
 
 **库侧改动**
 - 新增 `enum SurfaceLightingMode { Legacy = 0, Pbr = 1 }` 与 `enum SurfaceEnvironmentPreset { Studio, Neutral }`。
-- `CxDisplay` 新增 `SurfaceLightingMode`（默认 `Legacy`）、`EnvironmentPreset`（默认 `Studio`）、`IblIntensity`（默认 1.5，clamp ≥ 0）。三者是**帧级全局**设置：`DoOpenGLDraw` 每帧在 `ModernGLRenderer.BeginSurfaceLighting` 里一次性写入共享 surface program，不逐 item 传播（新建 item 无需继承）。
+- `CxDisplay` 新增 `SurfaceLightingMode`、`EnvironmentPreset`、`IblIntensity`（默认值见后续「默认切换为 PBR/IBL」条目）。三者是**帧级全局**设置：`DoOpenGLDraw` 每帧在 `ModernGLRenderer.BeginSurfaceLighting` 里一次性写入共享 surface program，不逐 item 传播（新建 item 无需继承）。
 - `AbstractCxObjRenderItem` 新增 `Metallic`（默认 0.2）、`Roughness`（默认 0.5），clamp 到 [0,1]、NaN 有回退；纯 uniform，不重建 GL 资源。
 - `CxDisplay` 新增 `PbrMetallic` / `PbrRoughness`（默认 0.2 / 0.5）：设置后推送到所有表面 item；且**新加入的 item 在 `SetSurfaceItem` 里继承当前值**（`SetSurfaceItem` 是所有 `Set*` 的公共 upsert 入口）。
 - 新增 `ProceduralIbl`（纯 CPU）：解析式环境（Studio = 冷色天空 + 两个软箱高光；Neutral = 中性灰穹顶 + 单高光）→ 余弦卷积 irradiance cubemap（16²，2048 方向）、GGX 重要性采样 prefilter cubemap（32²，5 级 mip，64 采样）、split-sum BRDF LUT（128²，64 采样）。按 preset **进程级缓存**，只生成一次；GL 上传每个上下文一次。
