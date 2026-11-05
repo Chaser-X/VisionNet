@@ -290,6 +290,22 @@ namespace VisionNet.Controls
         /// <summary>True when this item must be drawn in the translucent pass.</summary>
         protected bool IsTranslucent => _opacity < 1f;
 
+        private bool _translucentWritesDepth = true;
+
+        /// <summary>
+        /// Gets or sets whether a translucent item (<see cref="Opacity"/> below 1) still writes the
+        /// depth buffer. Default <c>true</c>: the translucent surface is then part of the depth
+        /// buffer, so depth-based picking (selection, coordinate tooltip) and occlusion keep
+        /// working, and a farther translucent item can no longer blend over a nearer one. Set to
+        /// <c>false</c> for the historical behaviour where translucent items do not write depth
+        /// (they blend over each other in draw order, but are invisible to picking).
+        /// </summary>
+        public bool TranslucentWritesDepth
+        {
+            get => _translucentWritesDepth;
+            set => _translucentWritesDepth = value;
+        }
+
         private float _pointSize = 3f;
 
         /// <summary>
@@ -668,9 +684,10 @@ namespace VisionNet.Controls
             gl.BindTexture(OpenGL.GL_TEXTURE_2D, handle.TextureId);
             gl.Uniform1(handle.GetUniformLocation(gl, "intensityTexture"), 0);
 
-            // Translucent items must not write depth: they are drawn after the opaque pass and
-            // have to blend with what is already in the framebuffer.
-            if (IsTranslucent) gl.DepthMask(0);
+            // Translucent items write depth by default, so they stay part of the depth buffer
+            // (depth-based picking and occlusion keep working). Opting out restores the historical
+            // behaviour where they only blend over what is already in the framebuffer.
+            if (IsTranslucent && !_translucentWritesDepth) gl.DepthMask(0);
 
             if (_surfaceMode == SurfaceMode.PointCloud)
             {

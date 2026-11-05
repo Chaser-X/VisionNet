@@ -1954,6 +1954,10 @@ namespace DemoFrom
             // Initial value mirrors the library default (1.0).
             AddSlider("Opacity", 0, 100, 100, v => ForEachDisplay(d => d.Opacity = v));
 
+            var chkTranslucentDepth = new CheckBox { Text = "半透明写深度（拾取 / 标签可用，默认开）", AutoSize = true, Checked = true };
+            chkTranslucentDepth.CheckedChanged += (s, e) => ForEachDisplay(d => d.TranslucentWritesDepth = chkTranslucentDepth.Checked);
+            panel.Controls.Add(chkTranslucentDepth);
+
             rbLegacy.CheckedChanged += (s, e) =>
             {
                 if (!rbLegacy.Checked) return;

@@ -6,6 +6,21 @@
 
 ## 未发布（工作区，尚未提交）
 
+### 修复：半透明（Opacity < 1）物体无法拾取 / 无标签 / 深度错位
+
+**根因**：`AbstractCxObjRenderItem.Draw` 对半透明 item 关闭深度写（`gl.DepthMask(0)`），而拾取（`CxPickingService.ScreenToWorld`）完全依赖 `glReadPixels(GL_DEPTH_COMPONENT)`——半透明物体不在深度缓冲里，于是选不中、无坐标标签，且背后物体的深度被误当作命中点。半透明之间都不写深度还会让"后画的盖在前面"，造成前后颠倒。
+
+**改动（对策 A）**
+- `AbstractCxObjRenderItem` 新增 `TranslucentWritesDepth`（默认 **true**）：半透明 item 默认**照常写深度**。深度测试（`GL_LESS`）因此保证近者优先，不再出现"后面的物体看起来在前面"；拾取、选择、坐标标签恢复。
+- 设为 `false` 可回到旧行为（半透明之间按绘制顺序互相混合，但对拾取不可见）。
+- `CxDisplay.TranslucentWritesDepth`（默认 true）应用到所有表面 item，新加入的 item 继承。
+- Demo「光照/PBR 测试」页新增勾选框「半透明写深度（拾取 / 标签可用，默认开）」。
+
+**取舍**：默认（写深度）下，重叠的两个半透明物体之间**不再互相透出**（远者被深度测试剔除）；要"半透明互相透出且顺序正确"需要排序 + 不写深度 + 独立拾取深度（对策 B，本次未做，见 TODO）。
+
+- 验证：`dotnet test` → **123/123 通过**；`CxControl` / `DemoFrom` 0 错误。
+- **需本机目视确认**：`Opacity < 1` 时可选中、有坐标标签；两个半透明物体不再前后颠倒；关掉勾选恢复旧的混合观感。
+
 ### 新增 `CxDisplay.SolidColor` / `CxDisplay.Opacity` + Demo 纯色/透明度测试
 
 - `CxDisplay` 新增 `SolidColor`（默认 `RGB(217,217,217)`，配合 `SurfaceColorMode.Lit`）与 `Opacity`（默认 1，clamp [0,1]，`NaN` → 1）——设置后推送到所有表面 item，且**新加入的 item 在 `SetSurfaceItem` 里继承**。

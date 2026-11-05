@@ -321,6 +321,26 @@ namespace VisionNet.Controls
             }
         }
 
+        private bool _translucentWritesDepth = true;
+
+        /// <summary>
+        /// Gets or sets whether translucent items (<see cref="Opacity"/> below 1) still write the
+        /// depth buffer. Default <c>true</c>, which keeps depth-based picking (selection, coordinate
+        /// tooltip) and occlusion working for translucent items. Set to <c>false</c> for the
+        /// historical behaviour where translucent items blend over each other in draw order but are
+        /// invisible to picking. Newly added items inherit the current value.
+        /// </summary>
+        public bool TranslucentWritesDepth
+        {
+            get => _translucentWritesDepth;
+            set
+            {
+                if (_translucentWritesDepth == value) return;
+                _translucentWritesDepth = value;
+                ApplyToItems(o => o.TranslucentWritesDepth = value);
+            }
+        }
+
         /// <summary>
         /// Gets or sets whether the PBR environment rotates with the camera. Default <c>true</c>:
         /// the environment is sampled in view space, so orbiting the view relights the object

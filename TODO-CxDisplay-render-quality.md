@@ -81,6 +81,15 @@
 - [x] `dotnet test` 123/123；`CxControl` / `DemoFrom` 0 错误
 - [ ] **待办**：上机确认后提交
 
+## 半透明拾取修复（对策 A）✅
+
+- [x] `AbstractCxObjRenderItem.TranslucentWritesDepth`（默认 true）：半透明默认写深度 → 深度拾取/遮挡正确、不再前后颠倒
+- [x] `CxDisplay.TranslucentWritesDepth`（默认 true）应用到所有 item + 新 item 继承
+- [x] Demo 勾选框「半透明写深度（拾取 / 标签可用，默认开）」
+- [x] `dotnet test` 123/123；`CxControl` / `DemoFrom` 0 错误
+- [ ] **待办**：上机确认（`Opacity < 1` 可选中有标签、不颠倒）后提交
+- [ ] **未做（对策 B）**：若要"半透明互相透出且顺序正确"，需 ①半透明按 item 距离从远到近排序 ②半透明不写深度 ③悬停帧跑一次 depth-only pass 供拾取。单深度缓冲下"正确拾取"与"半透明互相混合"不可兼得
+
 ## 抗锯齿（AA）
 
 - [x] **AA-0 已试 → 已回撤**：点云高光球边缘按 `fwidth(r)` 做覆盖率 alpha（约 1 像素）软化。

@@ -238,7 +238,7 @@ VisionNet/
 - **现代 3D 管线**：`CxDisplay` 的 Surface、PointCloud、Mesh 及几何叠加层统一使用 VAO/VBO + GLSL，显式上传投影 / 视图 / 模型矩阵；`CxSurfaceItem`、`CxPointCloudItem`、`CxMeshItem` 是统一渲染入口。
 - **逐顶点法线**：Mesh 模式下优先使用逐顶点法线做光照——索引网格由面法线累积平滑（`CxExtension.ComputeTriangleNormals`），结构化曲面 / 有序点云由采样网格叉积（`CxExtension.ComputeGridNormals`）；无可用法线时回退到屏幕空间导数法线。点云模式不生成法线（不参与光照）。
 - **PBR / IBL 光照**：`CxDisplay.SurfaceLightingMode` 默认 `Pbr`——Mesh 走 split-sum 图像光照，环境由 `ProceduralIbl` **程序化生成**（`EnvironmentPreset` = `Studio` / `Neutral`，进程级缓存，不依赖外部资产文件），经余弦卷积 irradiance、GGX 预滤波 specular 与 BRDF LUT 合成；材质由 `Metallic` / `Roughness` 控制，`IblIntensity` 调整体亮度，`EnvironmentFollowsCamera` 控制环境是否随相机旋转（默认 `true`）。设 `Legacy` 回到原 Blinn-Phong 观感；点云模式不受光照影响（见上方点云高光球）。
-- **纯色 / 透明度**：`CxDisplay.SolidColor`（配合 `SurfaceColorMode.Lit`）与 `CxDisplay.Opacity`（< 1 时走半透明 pass）会应用到所有表面 item，新加入的 item 自动继承。
+- **纯色 / 透明度**：`CxDisplay.SolidColor`（配合 `SurfaceColorMode.Lit`）与 `CxDisplay.Opacity`（< 1 时走半透明 pass）会应用到所有表面 item，新加入的 item 自动继承。`CxDisplay.TranslucentWritesDepth`（默认 `true`）决定半透明是否写深度：写 → 深度拾取（选中 / 坐标标签）与遮挡正确，但半透明之间不互相透出；不写 → 半透明按绘制顺序互相混合，但对拾取不可见。
 - **数据预算**：`Set*` / `Add*` 默认按最多 200 万个顶点采样后上传；可通过 `maxPointCount` 调整 Surface 和 PointCloud 的预算。
 
 #### CxDisplay2D（2D，ScottPlot）

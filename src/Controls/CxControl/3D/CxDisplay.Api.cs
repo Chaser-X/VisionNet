@@ -110,6 +110,7 @@ namespace VisionNet.Controls
                 material.Roughness = _pbrRoughness;
                 material.SolidColor = _solidColor;
                 material.Opacity = _opacity;
+                material.TranslucentWritesDepth = _translucentWritesDepth;
             }
 
             CxBox3D? combined = null;
