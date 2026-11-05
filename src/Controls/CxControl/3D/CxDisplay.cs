@@ -271,15 +271,54 @@ namespace VisionNet.Controls
 
         /// <summary>Pushes <see cref="PbrMetallic"/>/<see cref="PbrRoughness"/> onto every item.</summary>
         private void ApplyPbrMaterialToItems()
+            => ApplyToItems(o => { o.Metallic = _pbrMetallic; o.Roughness = _pbrRoughness; });
+
+        /// <summary>Runs <paramref name="apply"/> on every surface item, then requests a repaint.</summary>
+        private void ApplyToItems(Action<AbstractCxObjRenderItem> apply)
         {
             var snapshot = _registry.CopyItems();
             foreach (var item in snapshot)
                 if (!item.IsDisposed && item is AbstractCxObjRenderItem obj)
-                {
-                    obj.Metallic = _pbrMetallic;
-                    obj.Roughness = _pbrRoughness;
-                }
+                    apply(obj);
             SafeInvalidate();
+        }
+
+        private Color _solidColor = Color.FromArgb(217, 217, 217);
+
+        /// <summary>
+        /// Gets or sets the flat colour used by <see cref="SurfaceColorMode.Lit"/> on every surface
+        /// item. Default <c>RGB(217,217,217)</c>. Newly added items inherit the current value; it is
+        /// only visible while <see cref="SurfaceColorMode"/> is <see cref="SurfaceColorMode.Lit"/>.
+        /// </summary>
+        public Color SolidColor
+        {
+            get => _solidColor;
+            set
+            {
+                if (_solidColor == value) return;
+                _solidColor = value;
+                ApplyToItems(o => o.SolidColor = _solidColor);
+            }
+        }
+
+        private float _opacity = 1f;
+
+        /// <summary>
+        /// Gets or sets the opacity applied to every surface item (clamped to [0, 1];
+        /// <see cref="float.NaN"/> becomes 1). Default <c>1</c>. Values below 1 draw the items in the
+        /// translucent pass (no depth write, blended over the opaque scene). Newly added items
+        /// inherit the current value.
+        /// </summary>
+        public float Opacity
+        {
+            get => _opacity;
+            set
+            {
+                float clamped = float.IsNaN(value) ? 1f : (value < 0f ? 0f : (value > 1f ? 1f : value));
+                if (_opacity == clamped) return;
+                _opacity = clamped;
+                ApplyToItems(o => o.Opacity = clamped);
+            }
         }
 
         /// <summary>

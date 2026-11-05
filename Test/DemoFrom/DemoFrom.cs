@@ -1928,6 +1928,32 @@ namespace DemoFrom
             chkImpostor.CheckedChanged += (s, e) => ForEachDisplay(d => d.PointImpostor = chkImpostor.Checked);
             panel.Controls.Add(chkImpostor);
 
+            panel.Controls.Add(Header("纯色 / 透明度（测试）"));
+            var chkSolid = new CheckBox { Text = "纯色模式（SurfaceColorMode = Lit）", AutoSize = true, Checked = false };
+            chkSolid.CheckedChanged += (s, e) => ForEachDisplay(d =>
+                d.SurfaceColorMode = chkSolid.Checked ? SurfaceColorMode.Lit : SurfaceColorMode.ColorWithIntensity);
+            panel.Controls.Add(chkSolid);
+
+            var btnSolidColor = new Button
+            {
+                Text = "选择纯色…（SolidColor）",
+                AutoSize = true,
+                BackColor = Color.FromArgb(217, 217, 217),
+            };
+            btnSolidColor.Click += (s, e) =>
+            {
+                using (var dlg = new ColorDialog { Color = btnSolidColor.BackColor, FullOpen = true })
+                {
+                    if (dlg.ShowDialog() != DialogResult.OK) return;
+                    btnSolidColor.BackColor = dlg.Color;
+                    ForEachDisplay(d => d.SolidColor = dlg.Color);
+                }
+            };
+            panel.Controls.Add(btnSolidColor);
+
+            // Initial value mirrors the library default (1.0).
+            AddSlider("Opacity", 0, 100, 100, v => ForEachDisplay(d => d.Opacity = v));
+
             rbLegacy.CheckedChanged += (s, e) =>
             {
                 if (!rbLegacy.Checked) return;

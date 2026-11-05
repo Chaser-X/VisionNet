@@ -81,6 +81,15 @@
 - [x] `dotnet test` 123/123；`CxControl` / `DemoFrom` 0 错误
 - [ ] **待办**：上机确认后提交
 
+## 抗锯齿（AA）
+
+- [x] **AA-0 已试 → 已回撤**：点云高光球边缘按 `fwidth(r)` 做覆盖率 alpha（约 1 像素）软化。
+  - **结论：效果变差，已 `git restore` 回撤（未提交）**。原因：默认 `PointSize = 3` 时 `fwidth(r) ≈ 0.67`，`smoothstep(1 - fw, 1, r)` 的软化区覆盖了半径外侧约 **2/3**，点被糊开、整体变暗、密集点云互相混合发虚。
+  - **教训**：按像素的**逐点 rim AA 不适合小点云**。若以后再做，应窄化到 ~0.35 像素，或仅当点足够大（`fwidth(r)` 足够小，如 ≥ ~7px）才启用。
+- [ ] **AA-1 SSAA 2×**：**已评估，暂不做**（决定）。真超采样，不会让点发虚；代价 fill ×4 + 自建离屏 FBO + 下采样 pass + 拾取坐标 ×2。
+- [ ] **AA-2 MSAA 4×**：自建多重采样 FBO（`TexStorage2DMultisample` + `RenderbufferStorageMultisampleEXT`）+ `sampler2DMS` resolve + `GL_SAMPLE_ALPHA_TO_COVERAGE`；**风险**：MS 附件深度不能用 `glReadPixels` 直接读，拾取需解析深度。
+- **约束备忘**：SharpGL 3.1.1 **无 `glBlitFramebuffer`**、无 MSAA RenderContextProvider；渲染目标是 SharpGL 的 FBO（非多重采样 renderbuffer），每帧 `glReadPixels` 回读 + `BitBlt`。凡 AA 都要自建 FBO + 一次 resolve/后处理 pass，并动拾取链路。
+
 ## P4（独立专项）回读性能
 
 - [ ] 量化每帧全分辨率 `glReadPixels` + `BitBlt` 开销（4K ≈ 33 MB/帧）

@@ -6,6 +6,16 @@
 
 ## 未发布（工作区，尚未提交）
 
+### 新增 `CxDisplay.SolidColor` / `CxDisplay.Opacity` + Demo 纯色/透明度测试
+
+- `CxDisplay` 新增 `SolidColor`（默认 `RGB(217,217,217)`，配合 `SurfaceColorMode.Lit`）与 `Opacity`（默认 1，clamp [0,1]，`NaN` → 1）——设置后推送到所有表面 item，且**新加入的 item 在 `SetSurfaceItem` 里继承**。
+- 内部：`ApplyPbrMaterialToItems` 收敛到通用 `ApplyToItems(Action<AbstractCxObjRenderItem>)`；`SetSurfaceItem` 一并套用 `SolidColor` / `Opacity`。
+- Demo「光照/PBR 测试」页新增「纯色 / 透明度（测试）」区：`纯色模式（SurfaceColorMode = Lit）` 勾选、`选择纯色…`（`ColorDialog` → `SolidColor`）、`Opacity` 滑条（0–1，初值 1），均作用于本页预览与两个主 CxDisplay。
+- README 更正：PBR/IBL 默认已由 `Legacy` 改为 `Pbr`（补 `EnvironmentFollowsCamera` / `SolidColor` / `Opacity`）。
+
+- 验证：`dotnet test` → **123/123 通过**；`CxControl` / `DemoFrom` 0 错误。
+- **需本机目视确认**：`Lit` + `SolidColor` 生效；`Opacity < 1` 走半透明（不写深度、与不透明场景混合）；新加载的数据继承当前纯色/透明度。
+
 ### 默认切换为 PBR/IBL（Neutral + 环境跟随相机）+ Demo 支持读 cxpc
 
 **默认渲染（`CxDisplay`）**：`SurfaceLightingMode` = **Pbr**、`EnvironmentPreset` = **Neutral**、`IblIntensity` = **1.3**、`EnvironmentFollowsCamera` = **true**、`PointImpostor` = **true**、`PbrMetallic` = **0.2**。即开箱即用 PBR/IBL + 点云高光球；需要旧观感时显式设 `SurfaceLightingMode.Legacy`。
