@@ -9,130 +9,7 @@
 
 ## 未发布（工作区，尚未提交）
 
-### 修复（库）：左手系（IsLeftHanded）下相机未随镜像世界 —— 初始不居中 / 拖动不自洽
-
-**现象**：Demo 光照/PBR 测试页预览切到左手系后，初始 Top 视图的 Mesh **不居中**（偏出画面），拖动手感也不自洽。
-
-**根因**：`IsLeftHanded` 在视图矩阵里镜像了**世界**（`LookAt(camera) · M`，`M = diag(1,-1,1,1)`），但相机自身的世界状态（`_target` / `_position` / 旋转支点）仍按**未镜像世界**设置。于是物体中心 `c` 被画到 `M c`，而相机盯着 `c` → 不在视轴 → 不居中；同理相机世界与屏幕显示的世界差一个 `M`，拖动也不自洽。`FocusOnPoint` 其实**早已**按此约定补偿（`if (_isLeftHanded) target.Y = -target.Y;`），但 `FitView` 与旋转支点漏了。
-
-**改动**（`CxAdvancedTrackBallCamera`）
-- 新增私有 `Mirror(v)`：`IsLeftHanded` 时返回 `(x, -y, z)`。
-- `FitView`：把预设算出的 `_target` 用 `Mirror` 映射到相机世界，`_position = _target + 逻辑偏移`；`_up` **不镜像**（镜像 up 会同时翻转屏幕 X 轴）。
-- `RotateCamera`：支点 `RotationPoint` / `_sceneCenter` 先 `Mirror` 再参与轨道旋转。
-- 与既有 `FocusOnPoint` 的约定保持一致。
-
-**Demo**：光照/PBR 测试页新增勾选框「左手系（镜像显示，仅预览）」——切换后自动 `FitView()` 重新取景（取景依赖手性）。
-
-- 验证：`CxControl` / `DemoFrom` 0 错误；`dotnet test` → **123/123 通过**。
-- **需本机目视确认**：勾选左手系后初始视图**居中**、拖动/平移方向自洽；取消勾选（右手系）无回归。
-
-### 修复（Demo）：光照/PBR 测试页预览拖动旋转反向 —— 手性约定不匹配
-
-**现象**：光照/PBR 测试页右侧预览 `CxDisplay` 加载 3D 对象后，鼠标拖动旋转方向与 3D 页（`cxDisplay2`）不一致，出现「反转 / 不跟手」。
-
-**根因（修正结论）**：**数据约定不匹配，不是相机 bug**。预览最初被配置为 `Camera.IsLeftHanded = true`（照抄 `cxDisplay1`），但预览加载的是 Demo 自建的 Mesh——它们按**右手系**约定构建。`IsLeftHanded` 会给视图矩阵追加一个世界 Y 镜像（`GetMatrices` 里 `view[1] / view[5] / view[9] / view[13]` 取反），于是**对象被镜像渲染**，拖动旋转的表观方向也随之反向。对照组全部自洽：`cxDisplay1`（左手渲染 + Gocator 左手数据）正常、`cxDisplay2`（右手渲染 + Demo 右手数据）正常——**渲染约定必须与数据约定一致**。
-
-**改动**
-- `Test/DemoFrom/DemoFrom.cs`：预览 `_cxDisplayPbr.Camera.IsLeftHanded` 由 `true` 改为 `false`，与数据约定（及 `cxDisplay2`）对齐。
-
-**已试并回退（库侧共轭）**：曾尝试在库侧对 `IsLeftHanded` 做旋转/平移共轭（`RotateCamera` 的 `R → M·R·M`、`PanCamera` 的 `offset → M·offset`），**实测无效**——因为"左手系本身是相机缺陷"这一前提不成立；若保留反而会破坏 `cxDisplay1` 这类"左手数据 + 左手渲染"的正确组合。已 `git restore` 回退 `CxAdvancedTrackBallCamera.cs`，**库保持原样**。
-
-- 验证：`CxControl` / `DemoFrom` 0 错误；`dotnet test` → **123/123 通过**。
-- **需本机目视确认**：预览对象不再被镜像、拖动旋转方向与 `cxDisplay2` 一致。
-
-### 修复：半透明（Opacity < 1）物体无法拾取 / 无标签 / 深度错位
-
-**根因**：`AbstractCxObjRenderItem.Draw` 对半透明 item 关闭深度写（`gl.DepthMask(0)`），而拾取（`CxPickingService.ScreenToWorld`）完全依赖 `glReadPixels(GL_DEPTH_COMPONENT)`——半透明物体不在深度缓冲里，于是选不中、无坐标标签，且背后物体的深度被误当作命中点。半透明之间都不写深度还会让"后画的盖在前面"，造成前后颠倒。
-
-**改动（对策 A）**
-- `AbstractCxObjRenderItem` 新增 `TranslucentWritesDepth`（默认 **true**）：半透明 item 默认**照常写深度**。深度测试（`GL_LESS`）因此保证近者优先，不再出现"后面的物体看起来在前面"；拾取、选择、坐标标签恢复。
-- 设为 `false` 可回到旧行为（半透明之间按绘制顺序互相混合，但对拾取不可见）。
-- `CxDisplay.TranslucentWritesDepth`（默认 true）应用到所有表面 item，新加入的 item 继承。
-- Demo「光照/PBR 测试」页新增勾选框「半透明写深度（拾取 / 标签可用，默认开）」。
-
-**取舍**：默认（写深度）下，重叠的两个半透明物体之间**不再互相透出**（远者被深度测试剔除）；要"半透明互相透出且顺序正确"需要排序 + 不写深度 + 独立拾取深度（对策 B，本次未做，见 TODO）。
-
-- 验证：`dotnet test` → **123/123 通过**；`CxControl` / `DemoFrom` 0 错误。
-- **需本机目视确认**：`Opacity < 1` 时可选中、有坐标标签；两个半透明物体不再前后颠倒；关掉勾选恢复旧的混合观感。
-
-### 新增 `CxDisplay.SolidColor` / `CxDisplay.Opacity` + Demo 纯色/透明度测试
-
-- `CxDisplay` 新增 `SolidColor`（默认 `RGB(217,217,217)`，配合 `SurfaceColorMode.Lit`）与 `Opacity`（默认 1，clamp [0,1]，`NaN` → 1）——设置后推送到所有表面 item，且**新加入的 item 在 `SetSurfaceItem` 里继承**。
-- 内部：`ApplyPbrMaterialToItems` 收敛到通用 `ApplyToItems(Action<AbstractCxObjRenderItem>)`；`SetSurfaceItem` 一并套用 `SolidColor` / `Opacity`。
-- Demo「光照/PBR 测试」页新增「纯色 / 透明度（测试）」区：`纯色模式（SurfaceColorMode = Lit）` 勾选、`选择纯色…`（`ColorDialog` → `SolidColor`）、`Opacity` 滑条（0–1，初值 1），均作用于本页预览与两个主 CxDisplay。
-- README 更正：PBR/IBL 默认已由 `Legacy` 改为 `Pbr`（补 `EnvironmentFollowsCamera` / `SolidColor` / `Opacity`）。
-
-- 验证：`dotnet test` → **123/123 通过**；`CxControl` / `DemoFrom` 0 错误。
-- **需本机目视确认**：`Lit` + `SolidColor` 生效；`Opacity < 1` 走半透明（不写深度、与不透明场景混合）；新加载的数据继承当前纯色/透明度。
-
-### 默认切换为 PBR/IBL（Neutral + 环境跟随相机）+ Demo 支持读 cxpc
-
-**默认渲染（`CxDisplay`）**：`SurfaceLightingMode` = **Pbr**、`EnvironmentPreset` = **Neutral**、`IblIntensity` = **1.3**、`EnvironmentFollowsCamera` = **true**、`PointImpostor` = **true**、`PbrMetallic` = **0.2**。即开箱即用 PBR/IBL + 点云高光球；需要旧观感时显式设 `SurfaceLightingMode.Legacy`。
-
-**Demo（`Test/DemoFrom`）**
-- 「加载文件…」支持 **`.cxpc` / `.pcd`** 点云（`VisionOperator.LoadPointCloud`），加载后切到 `SurfaceMode.PointCloud`，直接看高光球。
-- 光照/PBR 测试页的初始控件状态与库默认一致：PBR / Neutral / 环境跟随相机 / IBL 1.3 / Metallic 0.2。
-
-- 验证：`dotnet test` → **123/123 通过**；`CxControl` 与 `DemoFrom` 0 错误。
-
-### P2/P3 修复：环境轴向 / 法线朝向 / 预览物体 / 环境跟随相机
-
-**A. 环境轴向 Y-up → Z-up（bug 修复）**
-`ProceduralIbl.SampleEnvironment` 此前把 **+Y** 当"上"，而场景与相机是 **Z-up**（曲面高度是 Z，`FitView(Top)` 把相机放在 +Z）——于是环境的"天空"指向场景的水平方向，顶面采到的是地平线色，看起来像被侧后方打光、转动视角也没有明显变化。现改为以 **+Z** 为"上"：天空/地面渐变、地平线与两个软箱光方向全部改为 Z-up（key `(0.35,0.50,0.80)`、fill `(-0.60,-0.35,0.45)`）。
-
-**B. 法线朝向统一**
-`CxSurfaceItem` / `CxPointCloudItem` 的 `GenerateMeshIndices` 与 Demo 的 `BuildBumpyMesh` / Diff Demo 索引绕序由 CW 改为 **CCW（从 +Z 看）**，使面法线与 `CxExtension.ComputeGridNormals` 的 +Z 约定一致，减少对片元 `dot(N,V)<0` 翻转的依赖。
-
-**C. 预览物体 / 视角（Demo）**
-新增 `BuildSphereMesh` 与「球体预览」按钮；「Mesh 预览」改为斜置 3/4 pose（`RotationX(35)*RotationY(25)`），避免正对相机的平板看不出明暗。
-
-**D. 环境跟随相机**
-新增 `CxDisplay.EnvironmentFollowsCamera`（默认 `false`）。为 `true` 时片元在**视空间**采样环境（`mat3(view) * N/R`），旋转视角即重新打光；默认保持世界空间固定（面的明暗是物体自身的属性，不随视角变化）。Demo 增加「环境跟随相机」勾选框（仅 PBR 可用）。
-
-**默认值调整（保留调试值）**：`AbstractCxObjRenderItem._metallic` 0 → **0.2**、`_pointSize` 2 → **3**；`CxDisplay._iblIntensity` → **1.3**（后续条目）。测试与 Demo 滑条初值已同步。
-
-- 验证：`dotnet test` → **123/123 通过**；`CxControl` 与 `DemoFrom` 0 错误。
-- **需本机目视确认**：PBR 下 Top 视角时物体**顶面应最亮**（天空在 +Z）；勾选「环境跟随相机」后旋转视角应重新打光；点云高光球的 y 方向。
-
-### P3 点云伪 3D 高光球（渲染质量提升第 3 阶段）
-
-**目标**：点云模式下每个点渲染为「伪 3D 高光球」（point-sprite impostor），复用 P2 的照明模型。
-
-**库侧改动**
-- 共享 surface program：片元着色器新增 `uniform int impostor`。当 `surfaceMode == 0`（点云）且 `impostor == 1` 时，用 `gl_PointCoord` 反解视空间球面法线 `N = normalize(vec3(pc.x, -pc.y, sqrt(1 - |pc|²)))`，`|pc|² > 1` 的像素 `discard`（方形 sprite 裁成圆盘），再走 `legacyLightFactor(N)` 或 `pbrShade(albedo, transpose(mat3(view)) * N)`。
-- `legacyLightFactor` / `pbrShade` 改为接收调用方传入的法线（Mesh 路径传真实/导数法线，点云路径传球面法线），光照结果不变。
-- `ModernGLRenderer.BeginSurfaceLighting` 新增 `impostor` 参数：写 `impostor` uniform，并在开启时 `glEnable(GL_POINT_SPRITE)`（`0x8861`，SharpGL 未导出该常量）。兼容 profile 下不启用则 `gl_PointCoord` 全为 0、所有点会被裁掉；核心 profile 下该调用无害。
-- `CxDisplay` 新增 `PointImpostor`（默认 `true`），帧级全局。
-- **未做**（记入 TODO）：`gl_FragDepth` 球面深度修正（会关闭 early-Z，密集点云有性能代价，P3 先保留 early-Z）；大点超过驱动点尺寸上限时的实例化 quad 降级。
-
-**Demo（`Test/DemoFrom`）**
-- 新增「光照/PBR 测试」Tab：左侧控制面板 + **右侧内嵌一个独立 `CxDisplay` 作实时预览**（代码创建，需 `ISupportInitialize` 往返才会建 GL 上下文）。
-- 控件：Legacy/PBR、Studio/Neutral、Point Impostor 开关、**Metallic / Roughness / IBL 强度三个滑条**，以及 Mesh / 点云预览加载、「加载文件…（Mesh / Surface，`.obj/.cxmesh/.stl/.stla/.cxsurface`）」与「两个主 CxDisplay 都加载 Mesh」按钮。
-- 所有控件**同时作用于本页预览与两个主 CxDisplay**；`FormClosing` 中一并 `Dispose` 预览控件。
-- 修复：两个单选组各自放入独立内层容器（WinForms 按**父容器**分组，`System.Windows.Forms.RadioButton` 没有 `GroupName`，那是 WPF）——此前四者同容器会被当成一个互斥组，点 Studio 会取消 Legacy 的勾选，表现为"Legacy 下切环境没反应、必须先切 PBR"。
-- Legacy 模式下把"仅 PBR 生效"的控件（环境单选 + Metallic/Roughness/IBL 强度滑条）灰显，避免误以为失效；Point Impostor 两种模式都生效，保持可用。
-
-- 验证：`dotnet test` → **123/123 通过**；`CxControl` 与 `DemoFrom` 0 错误。
-- **需本机目视确认**：`gl_PointCoord` 的 y 方向——若高光出现在球的下方而非上方，去掉 `pc.y` 前的负号即可（仅一行）；点云高光球观感与性能；`PointImpostor = false` 时点云与改动前一致。
-
-### P2 PBR / IBL（渲染质量提升第 2 阶段）
-
-**目标**：Mesh 模式支持 PBR/IBL 光照。环境贴图**程序化生成**（不引入外部资产文件与 HDR/DDS 解码器），计划见 `TODO-CxDisplay-render-quality.md`。
-
-**库侧改动**
-- 新增 `enum SurfaceLightingMode { Legacy = 0, Pbr = 1 }` 与 `enum SurfaceEnvironmentPreset { Studio, Neutral }`。
-- `CxDisplay` 新增 `SurfaceLightingMode`、`EnvironmentPreset`、`IblIntensity`（默认值见后续「默认切换为 PBR/IBL」条目）。三者是**帧级全局**设置：`DoOpenGLDraw` 每帧在 `ModernGLRenderer.BeginSurfaceLighting` 里一次性写入共享 surface program，不逐 item 传播（新建 item 无需继承）。
-- `AbstractCxObjRenderItem` 新增 `Metallic`（默认 0.2）、`Roughness`（默认 0.5），clamp 到 [0,1]、NaN 有回退；纯 uniform，不重建 GL 资源。
-- `CxDisplay` 新增 `PbrMetallic` / `PbrRoughness`（默认 0.2 / 0.5）：设置后推送到所有表面 item；且**新加入的 item 在 `SetSurfaceItem` 里继承当前值**（`SetSurfaceItem` 是所有 `Set*` 的公共 upsert 入口）。
-- 新增 `ProceduralIbl`（纯 CPU）：解析式环境（Studio = 冷色天空 + 两个软箱高光；Neutral = 中性灰穹顶 + 单高光）→ 余弦卷积 irradiance cubemap（16²，2048 方向）、GGX 重要性采样 prefilter cubemap（32²，5 级 mip，64 采样）、split-sum BRDF LUT（128²，64 采样）。按 preset **进程级缓存**，只生成一次；GL 上传每个上下文一次。
-- 新增 `ModernGLRenderer.Ibl.cs`：IBL 纹理（unit 1 = irradiance cube、2 = prefilter cube、3 = brdf LUT）懒生成/上传；`ReleaseIbl` 并入 `ReleasePrograms`，随上下文一起释放。
-- 共享 surface program：顶点着色器新增 `vWorldPos` / `vWorldNormal`；片元着色器新增 `lightingMode` / `metallic` / `roughness` / `iblIntensity` / `prefilterMaxMip` 与三个 IBL sampler，以及 `pbrShade`（世界空间 split-sum IBL：`F0 = mix(0.04, albedo, metallic)`、`kD = (1-F)(1-metallic)`、漫反射 = irradiance×albedo、镜面 = prefilter×`(F·brdf.x + brdf.y)`）。原 Blinn-Phong 抽为 `legacyLightFactor()`。
-
-**行为**：默认 `Legacy`，画面与 P1 完全一致；仅当 `SurfaceLightingMode.Pbr` 且 `SurfaceMode.Mesh` 时才走 IBL。点云模式仍不受光照影响（`surfaceMode == 0`）。
-
-- 验证：`dotnet test` → **123/123 通过**（新增 `ProceduralIblTests` 6 项 + `PbrMaterialTests` 4 项）；`CxControl` 与 `DemoFrom` 0 错误。
-- **需本机目视确认**（本机无 GL 环境，GLSL 只能上机编译）：切到 `Pbr` 后 Mesh 是否正常出图（若 shader 编译失败会整片空白）、`Studio`/`Neutral` 观感、`Metallic`/`Roughness`/`IblIntensity` 效果、`Legacy` 与 P1 逐像素一致。
-- 未做（记入 TODO）：`CxDisplay` 右键菜单的照明模式开关（切换测试改在 `DemoFrom` 的「光照/PBR 测试」Tab 提供）；`SpecularIntensity` / per-item 覆盖。
+（无）
 
 ## 已提交
 
@@ -161,6 +38,132 @@
 - `CxControl` / `DemoFrom` 0 错误 0 警告；`CxControl.dll` 引用程序集仅 `OpenTK` / `OpenTK.GLControl`（无 SharpGL）。
 - `dotnet test` → **127/127 通过**（新增 4 项 `OpenTkMigrationTests`：不引用 SharpGL、引用 OpenTK、基类为 `OpenTK.GLControl`、公共 API 不暴露 SharpGL 类型）。
 - **需上机目视确认**：点云 impostor、Mesh PBR/IBL、色带、坐标轴、悬停 tooltip、选择拾取、半透明、resize、多控件、上下文重建；以及宽线/点精灵在目标驱动器的兼容 profile 下是否生效。
+
+
+### d89e081（2026-11-06）修复（库）：左手系（IsLeftHanded）下相机未随镜像世界 —— 初始不居中 / 拖动不自洽
+
+**现象**：Demo 光照/PBR 测试页预览切到左手系后，初始 Top 视图的 Mesh **不居中**（偏出画面），拖动手感也不自洽。
+
+**根因**：`IsLeftHanded` 在视图矩阵里镜像了**世界**（`LookAt(camera) · M`，`M = diag(1,-1,1,1)`），但相机自身的世界状态（`_target` / `_position` / 旋转支点）仍按**未镜像世界**设置。于是物体中心 `c` 被画到 `M c`，而相机盯着 `c` → 不在视轴 → 不居中；同理相机世界与屏幕显示的世界差一个 `M`，拖动也不自洽。`FocusOnPoint` 其实**早已**按此约定补偿（`if (_isLeftHanded) target.Y = -target.Y;`），但 `FitView` 与旋转支点漏了。
+
+**改动**（`CxAdvancedTrackBallCamera`）
+- 新增私有 `Mirror(v)`：`IsLeftHanded` 时返回 `(x, -y, z)`。
+- `FitView`：把预设算出的 `_target` 用 `Mirror` 映射到相机世界，`_position = _target + 逻辑偏移`；`_up` **不镜像**（镜像 up 会同时翻转屏幕 X 轴）。
+- `RotateCamera`：支点 `RotationPoint` / `_sceneCenter` 先 `Mirror` 再参与轨道旋转。
+- 与既有 `FocusOnPoint` 的约定保持一致。
+
+**Demo**：光照/PBR 测试页新增勾选框「左手系（镜像显示，仅预览）」——切换后自动 `FitView()` 重新取景（取景依赖手性）。
+
+- 验证：`CxControl` / `DemoFrom` 0 错误；`dotnet test` → **123/123 通过**。
+- **需本机目视确认**：勾选左手系后初始视图**居中**、拖动/平移方向自洽；取消勾选（右手系）无回归。
+
+### d89e081（2026-11-06）修复（Demo）：光照/PBR 测试页预览拖动旋转反向 —— 手性约定不匹配
+
+**现象**：光照/PBR 测试页右侧预览 `CxDisplay` 加载 3D 对象后，鼠标拖动旋转方向与 3D 页（`cxDisplay2`）不一致，出现「反转 / 不跟手」。
+
+**根因（修正结论）**：**数据约定不匹配，不是相机 bug**。预览最初被配置为 `Camera.IsLeftHanded = true`（照抄 `cxDisplay1`），但预览加载的是 Demo 自建的 Mesh——它们按**右手系**约定构建。`IsLeftHanded` 会给视图矩阵追加一个世界 Y 镜像（`GetMatrices` 里 `view[1] / view[5] / view[9] / view[13]` 取反），于是**对象被镜像渲染**，拖动旋转的表观方向也随之反向。对照组全部自洽：`cxDisplay1`（左手渲染 + Gocator 左手数据）正常、`cxDisplay2`（右手渲染 + Demo 右手数据）正常——**渲染约定必须与数据约定一致**。
+
+**改动**
+- `Test/DemoFrom/DemoFrom.cs`：预览 `_cxDisplayPbr.Camera.IsLeftHanded` 由 `true` 改为 `false`，与数据约定（及 `cxDisplay2`）对齐。
+
+**已试并回退（库侧共轭）**：曾尝试在库侧对 `IsLeftHanded` 做旋转/平移共轭（`RotateCamera` 的 `R → M·R·M`、`PanCamera` 的 `offset → M·offset`），**实测无效**——因为"左手系本身是相机缺陷"这一前提不成立；若保留反而会破坏 `cxDisplay1` 这类"左手数据 + 左手渲染"的正确组合。已 `git restore` 回退 `CxAdvancedTrackBallCamera.cs`，**库保持原样**。
+
+- 验证：`CxControl` / `DemoFrom` 0 错误；`dotnet test` → **123/123 通过**。
+- **需本机目视确认**：预览对象不再被镜像、拖动旋转方向与 `cxDisplay2` 一致。
+
+### 6ac5042（2026-11-05）修复：半透明（Opacity < 1）物体无法拾取 / 无标签 / 深度错位
+
+**根因**：`AbstractCxObjRenderItem.Draw` 对半透明 item 关闭深度写（`gl.DepthMask(0)`），而拾取（`CxPickingService.ScreenToWorld`）完全依赖 `glReadPixels(GL_DEPTH_COMPONENT)`——半透明物体不在深度缓冲里，于是选不中、无坐标标签，且背后物体的深度被误当作命中点。半透明之间都不写深度还会让"后画的盖在前面"，造成前后颠倒。
+
+**改动（对策 A）**
+- `AbstractCxObjRenderItem` 新增 `TranslucentWritesDepth`（默认 **true**）：半透明 item 默认**照常写深度**。深度测试（`GL_LESS`）因此保证近者优先，不再出现"后面的物体看起来在前面"；拾取、选择、坐标标签恢复。
+- 设为 `false` 可回到旧行为（半透明之间按绘制顺序互相混合，但对拾取不可见）。
+- `CxDisplay.TranslucentWritesDepth`（默认 true）应用到所有表面 item，新加入的 item 继承。
+- Demo「光照/PBR 测试」页新增勾选框「半透明写深度（拾取 / 标签可用，默认开）」。
+
+**取舍**：默认（写深度）下，重叠的两个半透明物体之间**不再互相透出**（远者被深度测试剔除）；要"半透明互相透出且顺序正确"需要排序 + 不写深度 + 独立拾取深度（对策 B，本次未做，见 TODO）。
+
+- 验证：`dotnet test` → **123/123 通过**；`CxControl` / `DemoFrom` 0 错误。
+- **需本机目视确认**：`Opacity < 1` 时可选中、有坐标标签；两个半透明物体不再前后颠倒；关掉勾选恢复旧的混合观感。
+
+### b14d176（2026-11-05）新增 `CxDisplay.SolidColor` / `CxDisplay.Opacity` + Demo 纯色/透明度测试
+
+- `CxDisplay` 新增 `SolidColor`（默认 `RGB(217,217,217)`，配合 `SurfaceColorMode.Lit`）与 `Opacity`（默认 1，clamp [0,1]，`NaN` → 1）——设置后推送到所有表面 item，且**新加入的 item 在 `SetSurfaceItem` 里继承**。
+- 内部：`ApplyPbrMaterialToItems` 收敛到通用 `ApplyToItems(Action<AbstractCxObjRenderItem>)`；`SetSurfaceItem` 一并套用 `SolidColor` / `Opacity`。
+- Demo「光照/PBR 测试」页新增「纯色 / 透明度（测试）」区：`纯色模式（SurfaceColorMode = Lit）` 勾选、`选择纯色…`（`ColorDialog` → `SolidColor`）、`Opacity` 滑条（0–1，初值 1），均作用于本页预览与两个主 CxDisplay。
+- README 更正：PBR/IBL 默认已由 `Legacy` 改为 `Pbr`（补 `EnvironmentFollowsCamera` / `SolidColor` / `Opacity`）。
+
+- 验证：`dotnet test` → **123/123 通过**；`CxControl` / `DemoFrom` 0 错误。
+- **需本机目视确认**：`Lit` + `SolidColor` 生效；`Opacity < 1` 走半透明（不写深度、与不透明场景混合）；新加载的数据继承当前纯色/透明度。
+
+### 8e6ab72（2026-11-03）默认切换为 PBR/IBL（Neutral + 环境跟随相机）+ Demo 支持读 cxpc
+
+**默认渲染（`CxDisplay`）**：`SurfaceLightingMode` = **Pbr**、`EnvironmentPreset` = **Neutral**、`IblIntensity` = **1.3**、`EnvironmentFollowsCamera` = **true**、`PointImpostor` = **true**、`PbrMetallic` = **0.2**。即开箱即用 PBR/IBL + 点云高光球；需要旧观感时显式设 `SurfaceLightingMode.Legacy`。
+
+**Demo（`Test/DemoFrom`）**
+- 「加载文件…」支持 **`.cxpc` / `.pcd`** 点云（`VisionOperator.LoadPointCloud`），加载后切到 `SurfaceMode.PointCloud`，直接看高光球。
+- 光照/PBR 测试页的初始控件状态与库默认一致：PBR / Neutral / 环境跟随相机 / IBL 1.3 / Metallic 0.2。
+
+- 验证：`dotnet test` → **123/123 通过**；`CxControl` 与 `DemoFrom` 0 错误。
+
+### f98e426（2026-11-03）P2/P3 修复：环境轴向 / 法线朝向 / 预览物体 / 环境跟随相机
+
+**A. 环境轴向 Y-up → Z-up（bug 修复）**
+`ProceduralIbl.SampleEnvironment` 此前把 **+Y** 当"上"，而场景与相机是 **Z-up**（曲面高度是 Z，`FitView(Top)` 把相机放在 +Z）——于是环境的"天空"指向场景的水平方向，顶面采到的是地平线色，看起来像被侧后方打光、转动视角也没有明显变化。现改为以 **+Z** 为"上"：天空/地面渐变、地平线与两个软箱光方向全部改为 Z-up（key `(0.35,0.50,0.80)`、fill `(-0.60,-0.35,0.45)`）。
+
+**B. 法线朝向统一**
+`CxSurfaceItem` / `CxPointCloudItem` 的 `GenerateMeshIndices` 与 Demo 的 `BuildBumpyMesh` / Diff Demo 索引绕序由 CW 改为 **CCW（从 +Z 看）**，使面法线与 `CxExtension.ComputeGridNormals` 的 +Z 约定一致，减少对片元 `dot(N,V)<0` 翻转的依赖。
+
+**C. 预览物体 / 视角（Demo）**
+新增 `BuildSphereMesh` 与「球体预览」按钮；「Mesh 预览」改为斜置 3/4 pose（`RotationX(35)*RotationY(25)`），避免正对相机的平板看不出明暗。
+
+**D. 环境跟随相机**
+新增 `CxDisplay.EnvironmentFollowsCamera`（默认 `false`）。为 `true` 时片元在**视空间**采样环境（`mat3(view) * N/R`），旋转视角即重新打光；默认保持世界空间固定（面的明暗是物体自身的属性，不随视角变化）。Demo 增加「环境跟随相机」勾选框（仅 PBR 可用）。
+
+**默认值调整（保留调试值）**：`AbstractCxObjRenderItem._metallic` 0 → **0.2**、`_pointSize` 2 → **3**；`CxDisplay._iblIntensity` → **1.3**（后续条目）。测试与 Demo 滑条初值已同步。
+
+- 验证：`dotnet test` → **123/123 通过**；`CxControl` 与 `DemoFrom` 0 错误。
+- **需本机目视确认**：PBR 下 Top 视角时物体**顶面应最亮**（天空在 +Z）；勾选「环境跟随相机」后旋转视角应重新打光；点云高光球的 y 方向。
+
+### f98e426（2026-11-03）P3 点云伪 3D 高光球（渲染质量提升第 3 阶段）
+
+**目标**：点云模式下每个点渲染为「伪 3D 高光球」（point-sprite impostor），复用 P2 的照明模型。
+
+**库侧改动**
+- 共享 surface program：片元着色器新增 `uniform int impostor`。当 `surfaceMode == 0`（点云）且 `impostor == 1` 时，用 `gl_PointCoord` 反解视空间球面法线 `N = normalize(vec3(pc.x, -pc.y, sqrt(1 - |pc|²)))`，`|pc|² > 1` 的像素 `discard`（方形 sprite 裁成圆盘），再走 `legacyLightFactor(N)` 或 `pbrShade(albedo, transpose(mat3(view)) * N)`。
+- `legacyLightFactor` / `pbrShade` 改为接收调用方传入的法线（Mesh 路径传真实/导数法线，点云路径传球面法线），光照结果不变。
+- `ModernGLRenderer.BeginSurfaceLighting` 新增 `impostor` 参数：写 `impostor` uniform，并在开启时 `glEnable(GL_POINT_SPRITE)`（`0x8861`，SharpGL 未导出该常量）。兼容 profile 下不启用则 `gl_PointCoord` 全为 0、所有点会被裁掉；核心 profile 下该调用无害。
+- `CxDisplay` 新增 `PointImpostor`（默认 `true`），帧级全局。
+- **未做**（记入 TODO）：`gl_FragDepth` 球面深度修正（会关闭 early-Z，密集点云有性能代价，P3 先保留 early-Z）；大点超过驱动点尺寸上限时的实例化 quad 降级。
+
+**Demo（`Test/DemoFrom`）**
+- 新增「光照/PBR 测试」Tab：左侧控制面板 + **右侧内嵌一个独立 `CxDisplay` 作实时预览**（代码创建，需 `ISupportInitialize` 往返才会建 GL 上下文）。
+- 控件：Legacy/PBR、Studio/Neutral、Point Impostor 开关、**Metallic / Roughness / IBL 强度三个滑条**，以及 Mesh / 点云预览加载、「加载文件…（Mesh / Surface，`.obj/.cxmesh/.stl/.stla/.cxsurface`）」与「两个主 CxDisplay 都加载 Mesh」按钮。
+- 所有控件**同时作用于本页预览与两个主 CxDisplay**；`FormClosing` 中一并 `Dispose` 预览控件。
+- 修复：两个单选组各自放入独立内层容器（WinForms 按**父容器**分组，`System.Windows.Forms.RadioButton` 没有 `GroupName`，那是 WPF）——此前四者同容器会被当成一个互斥组，点 Studio 会取消 Legacy 的勾选，表现为"Legacy 下切环境没反应、必须先切 PBR"。
+- Legacy 模式下把"仅 PBR 生效"的控件（环境单选 + Metallic/Roughness/IBL 强度滑条）灰显，避免误以为失效；Point Impostor 两种模式都生效，保持可用。
+
+- 验证：`dotnet test` → **123/123 通过**；`CxControl` 与 `DemoFrom` 0 错误。
+- **需本机目视确认**：`gl_PointCoord` 的 y 方向——若高光出现在球的下方而非上方，去掉 `pc.y` 前的负号即可（仅一行）；点云高光球观感与性能；`PointImpostor = false` 时点云与改动前一致。
+
+### f98e426（2026-11-03）P2 PBR / IBL（渲染质量提升第 2 阶段）
+
+**目标**：Mesh 模式支持 PBR/IBL 光照。环境贴图**程序化生成**（不引入外部资产文件与 HDR/DDS 解码器），计划见 `TODO-CxDisplay-render-quality.md`。
+
+**库侧改动**
+- 新增 `enum SurfaceLightingMode { Legacy = 0, Pbr = 1 }` 与 `enum SurfaceEnvironmentPreset { Studio, Neutral }`。
+- `CxDisplay` 新增 `SurfaceLightingMode`、`EnvironmentPreset`、`IblIntensity`（默认值见后续「默认切换为 PBR/IBL」条目）。三者是**帧级全局**设置：`DoOpenGLDraw` 每帧在 `ModernGLRenderer.BeginSurfaceLighting` 里一次性写入共享 surface program，不逐 item 传播（新建 item 无需继承）。
+- `AbstractCxObjRenderItem` 新增 `Metallic`（默认 0.2）、`Roughness`（默认 0.5），clamp 到 [0,1]、NaN 有回退；纯 uniform，不重建 GL 资源。
+- `CxDisplay` 新增 `PbrMetallic` / `PbrRoughness`（默认 0.2 / 0.5）：设置后推送到所有表面 item；且**新加入的 item 在 `SetSurfaceItem` 里继承当前值**（`SetSurfaceItem` 是所有 `Set*` 的公共 upsert 入口）。
+- 新增 `ProceduralIbl`（纯 CPU）：解析式环境（Studio = 冷色天空 + 两个软箱高光；Neutral = 中性灰穹顶 + 单高光）→ 余弦卷积 irradiance cubemap（16²，2048 方向）、GGX 重要性采样 prefilter cubemap（32²，5 级 mip，64 采样）、split-sum BRDF LUT（128²，64 采样）。按 preset **进程级缓存**，只生成一次；GL 上传每个上下文一次。
+- 新增 `ModernGLRenderer.Ibl.cs`：IBL 纹理（unit 1 = irradiance cube、2 = prefilter cube、3 = brdf LUT）懒生成/上传；`ReleaseIbl` 并入 `ReleasePrograms`，随上下文一起释放。
+- 共享 surface program：顶点着色器新增 `vWorldPos` / `vWorldNormal`；片元着色器新增 `lightingMode` / `metallic` / `roughness` / `iblIntensity` / `prefilterMaxMip` 与三个 IBL sampler，以及 `pbrShade`（世界空间 split-sum IBL：`F0 = mix(0.04, albedo, metallic)`、`kD = (1-F)(1-metallic)`、漫反射 = irradiance×albedo、镜面 = prefilter×`(F·brdf.x + brdf.y)`）。原 Blinn-Phong 抽为 `legacyLightFactor()`。
+
+**行为**：默认 `Legacy`，画面与 P1 完全一致；仅当 `SurfaceLightingMode.Pbr` 且 `SurfaceMode.Mesh` 时才走 IBL。点云模式仍不受光照影响（`surfaceMode == 0`）。
+
+- 验证：`dotnet test` → **123/123 通过**（新增 `ProceduralIblTests` 6 项 + `PbrMaterialTests` 4 项）；`CxControl` 与 `DemoFrom` 0 错误。
+- **需本机目视确认**（本机无 GL 环境，GLSL 只能上机编译）：切到 `Pbr` 后 Mesh 是否正常出图（若 shader 编译失败会整片空白）、`Studio`/`Neutral` 观感、`Metallic`/`Roughness`/`IblIntensity` 效果、`Legacy` 与 P1 逐像素一致。
+- 未做（记入 TODO）：`CxDisplay` 右键菜单的照明模式开关（切换测试改在 `DemoFrom` 的「光照/PBR 测试」Tab 提供）；`SpecularIntensity` / per-item 覆盖。
 
 ### be069ee（2026-11-03）P1 逐顶点法线通道
 

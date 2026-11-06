@@ -2,19 +2,41 @@
 
 > 本文件是工作区任务的**汇总视图**，已合并原 「重构专项」（重构 S0–S6）与 「渲染质量专项」（渲染质量 P1–P4 / AA / 半透明）。
 > 接入说明见 [Agents.md](Agents.md)，变更记录见 [Changlog.md](Changlog.md)。
-> 快照日期：**2026-11-05** · 分支：`feature/cxdisplay-modern-pipeline`
+> 快照日期：**2026-11-06** · 分支：`feature/cxdisplay-opentk-port`（OpenTK 迁移基线，自 `feature/cxdisplay-modern-pipeline` 拉出）
 
-## 待办
+## 待办（当前活跃）
 
-- [ ] **上机目视回归**（本机无 OpenGL 环境，`dotnet test` 不覆盖任何渲染）：
-  - [ ] PBR/IBL 正常出图（默认 `Neutral` + `EnvironmentFollowsCamera`）；Top 视角下物体**顶面应最亮**（环境天空在 +Z）
-  - [ ] 点云伪 3D 高光球的 `gl_PointCoord` y 方向（若高光在球下方 → 翻转 `pc.y` 符号，一行）
-  - [ ] 半透明（`Opacity < 1`）可选中、有坐标标签、不再前后颠倒
-  - [ ] Demo「加载文件…」能读 `.cxpc` / `.pcd` 点云并显示高光球
-- [ ] **`Changlog.md` 归档**：把「未发布」中的 P2 / P3 / P2-P3 修复 / 默认切换 / SolidColor-Opacity / 半透明修复 条目移入「已提交」并补各自提交哈希（遵循仓库既有约定：下次提交时归档）
+### A. 上机验证（本机无 OpenGL 环境，`dotnet test` 不覆盖任何渲染）
+
+- [ ] **OpenTK 迁移回归**（最高优先，见 `Changlog.md` → `3c61519`）：
+  - [ ] **兼容 profile 3.3 是否成立** —— 决定 `LineWidth > 1`（Box 边线 / 多边形）与 point sprite 是否生效（本次最大运行期风险）
+  - [ ] 点云 impostor、Mesh PBR/IBL（默认 `Neutral` + 环境跟随相机）、色带、坐标轴、悬停 tooltip、选择拾取、半透明、resize、多控件
+  - [ ] 上下文重建（最小化/恢复、改分辨率）无花屏 / 崩溃 / 句柄泄漏
+  - [ ] `CxExtension.IsOpenGLAvailable` / `GetOpenGLVersion`（一次性隐藏 `GameWindow` 探测）可用
+  - [ ] 4K 帧率相对旧版的实际提升（量化）
+  - [ ] **透明背景移除**行为确认并取得产品方签字（破坏性变更）
+- [ ] PBR/IBL 正常出图（默认 `Neutral` + `EnvironmentFollowsCamera`）；Top 视角下物体**顶面应最亮**（环境天空在 +Z）
+- [ ] 点云伪 3D 高光球的 `gl_PointCoord` y 方向（若高光在球下方 → 翻转 `pc.y` 符号，一行）
+- [ ] 半透明（`Opacity < 1`）可选中、有坐标标签、不再前后颠倒
+- [ ] Demo「加载文件…」能读 `.cxpc` / `.pcd` 点云并显示高光球
 - [ ] 确认**目标机 GPU 级别**（是否集显）——影响抗锯齿与大点云的性能取舍
-- [ ] 上机确认：光照页预览勾选「左手系」后初始视图**居中**、拖动/平移自洽；取消勾选（右手系）无回归
-- [ ] （库侧）左手系修复：`CxAdvancedTrackBallCamera.Mirror` + `FitView` / `RotateCamera` 支点已按镜像世界映射；`PanCamera` / `ZoomCamera` 操作的是自洽状态，无需改
+- [ ] 左手系预览：勾选后初始视图**居中**、拖动/平移自洽；取消勾选（右手系）无回归
+
+### B. 库侧技术债
+
+- [ ] S5 线程与锁：registry 回调移出锁内、缩小 `_renderLock` 范围、`Dispose` 非 UI 线程改 `BeginInvoke`（迁移后需一并覆盖「显式 `MakeCurrent`」路径）
+- [ ] S6 效能：色条/标签脏标记、Uniforms 强类型化、projection/view 每帧一次、overlay 合批、缓冲复用、遍历合并、拾取节流
+- [ ] （S4 未做）`ModernGLRenderer` 的 `Text` / `Programs` / `State` 提升为独立类
+- [ ] 清理 `[Obsolete]` 代理（`CxDisplay.cs`：`SurfaceViewMode` / `IsLeftHanded`）与 `CxControl.csproj_bak`（需先确认无外部调用）
+- [ ] 清理已无引用的 `3rd/SharpGL.dll` / `SharpGL.SceneGraph.dll` / `SharpGL.WinForms.dll`
+
+### C. 渲染质量（未做）
+
+- [ ] **抗锯齿 AA-1（SSAA 2×）/ AA-2（MSAA 4×）**：迁移到 OpenTK 3.3.3 后 `glBlitFramebuffer` 与多重采样 renderbuffer 已可用，可重新评估；需自建离屏 FBO + resolve pass 并动拾取链路
+- [ ] **半透明对策 B**：按 item 距离排序 + 不写深度 + 悬停帧 depth-only pass（单深度缓冲下与「正确拾取」不可兼得）
+- [ ] P2 未做：右键菜单照明模式开关（`Enum.Parse` 依赖菜单 Text == 枚举名）；`SpecularIntensity` / per-item 覆盖
+- [ ] P3.5 未做：`gl_FragDepth` 球面深度修正（会关 early-Z）；大点超驱动尺寸上限时降级为实例化 quad
+- [ ] 开放项：PBR 开关粒度（先全局、per-item 留后续）；环境预设 2~3 套 / 是否提供「加载外部 cubemap」API
 
 ## 进行中
 
@@ -22,6 +44,7 @@
 
 ## 已完成
 
+- [x] **OpenTK 迁移**：`CxDisplay` 渲染后端 SharpGL → OpenTK 3.3.3（直绘，去掉 FBO 回读）（提交 `3c61519`，归档 `07e0ec2`）
 - [x] **工作区文档初始化**（2026-11-05）：创建 `Agents.md` / `Changlog.md` / `ToDo.md`，并合并 `CHANGELOG.md` 与两份 `TODO-CxDisplay-*.md` 后删除原文件
 - [x] **P1 逐顶点法线**：Mesh 光照改用真法线（提交 `be069ee`）
 - [x] **P2 PBR / IBL**：`SurfaceLightingMode` / `EnvironmentPreset` / `IblIntensity`；程序化 IBL（`ProceduralIbl`）；item 级 `Metallic` / `Roughness`（提交 `f98e426`）
@@ -30,12 +53,14 @@
 - [x] **默认切换为 PBR/IBL**：`Neutral` + 环境跟随相机 + `IblIntensity 1.3` + `PbrMetallic 0.2`；Demo 支持读 `.cxpc`（提交 `8e6ab72`）
 - [x] **`CxDisplay.SolidColor` / `Opacity`** + Demo「纯色 / 透明度」测试（提交 `b14d176`）
 - [x] **半透明拾取修复（对策 A）**：`TranslucentWritesDepth`（默认 true）（提交 `6ac5042`）
+- [x] **左手系相机修复** + Demo 手系开关（提交 `d89e081`）
+- [x] **`Changlog.md` 归档积压清理**（2026-11-06）：`未发布` 中 8 条早已提交的条目已移入「已提交」并补哈希
 
 ## 阻塞 / 待确认
 
 - [ ] **抗锯齿 AA-1 / AA-2（暂缓）**：AA-0（逐点 rim alpha）已试并回撤（小点云变虚）；SSAA 2× / MSAA 4× 已评估未做。约束：原 SharpGL 后端无 `glBlitFramebuffer` / MSAA provider；**迁移到 OpenTK 3.3.3 后这些限制已解除**，AA 可重新评估。详见 「渲染质量专项」 的「抗锯齿（AA）」
-- [ ] **半透明对策 B（暂缓）**：若需"半透明互相透出且顺序正确"，需 ①按 item 距离排序 ②半透明不写深度 ③悬停帧 depth-only pass 供拾取。单深度缓冲下与"正确拾取"不可兼得
-- [x] ~~**P4 回读性能专项**~~：**已由 OpenTK 迁移解决**——`CxDisplay` 改为直绘 `SwapBuffers`，删除 FBO + 每帧全分辨率 `glReadPixels` + `BitBlt`（4K ≈ 33 MB/帧）；拾取仍按需 `ReadPixels` 单像素。见 `Changlog.md`「未发布」
+- [ ] **半透明对策 B（暂缓）**：若需「半透明互相透出且顺序正确」，需 ①按 item 距离排序 ②半透明不写深度 ③悬停帧 depth-only pass 供拾取。单深度缓冲下与「正确拾取」不可兼得
+- [x] ~~**P4 回读性能专项**~~：**已由 OpenTK 迁移解决**——`CxDisplay` 改为直绘 `SwapBuffers`，删除 FBO + 每帧全分辨率 `glReadPixels` + `BitBlt`（4K ≈ 33 MB/帧）；拾取仍按需 `ReadPixels` 单像素。见 `Changlog.md`「已提交」→ `3c61519`
 - [ ] **右键菜单照明模式开关**（`Enum.Parse` 依赖菜单 Text == 枚举名）
 - [ ] 清理 `[Obsolete]` 代理与 `CxControl.csproj_bak`（需先确认无外部调用）
 - [x] ~~`RotateCamera` / `PanCamera` 补偿 `IsLeftHanded`~~：**已试并回退**——分析性共轭实测无效；根因是 Demo **数据约定不匹配**（右手系 Mesh 用了左手渲染），非相机缺陷，库保持原样
@@ -63,7 +88,7 @@
 - [x] 菜单 foreach 抽 `SyncMenuSelection` / `UncheckAllMenuItems`
 - [x] `ModernGLRenderer.Geometry` 三份绘制流程抽 `BeginGeometryDraw` / `EndGeometryDraw`
 - [x] 魔法数字提常量：`InitialPointSize`、色条 `TickDivisions`、`SphereSlices/Stacks`、`CxExtension.NoDataValue`
-- [ ] 5×5 邻域与阈值常量 —— 挪到 S2 与拾取算法抽取一起做
+- [x] 5×5 邻域与阈值常量 —— 已挪到 `CxExtension`（`PickNeighbourhoodRadius` / `PickNeighbourhoodTolerance`），随 S2/S3 完成
 
 ### S3 多态替换类型分支
 
@@ -89,10 +114,7 @@
 
 ### 后续待办
 
-- [ ] S5 线程与锁：registry 回调移出锁内、缩小 `_renderLock` 范围、`Dispose` 非 UI 线程改 `BeginInvoke`
-- [ ] S6 效能：色条/标签脏标记、Uniforms 强类型化、projection/view 每帧一次、overlay 合批、缓冲复用、遍历合并、拾取节流
-- [ ] 清理 `[Obsolete]` 代理（`CxDisplay.cs`）与 `CxControl.csproj_bak` —— 需先确认无外部调用
-- [ ] （S4 未做）`ModernGLRenderer` 的 `Text / Programs / State` 提升为独立类 —— 按你的要求本轮跳过
+> 已并入顶部「待办 → B. 库侧技术债」，此处不再重复维护。
 
 ## 渲染质量专项（P1–P4 / AA / 半透明）
 
@@ -104,15 +126,16 @@
 > - 允许光照/高光调制数据映射颜色（`Color` / `Intensity` / `Diff`）。
 > - **不做 EDL**（点云是有序的，且高光球已提供立体感，边际收益不足）。
 > - IBL 资产**离线预烘焙**并随程序分发（不引入运行期预滤波与 HDR/DDS 解码器）。
-> - 结论：**不需要引入自建 FBO / 额外渲染 pass**，渲染目标仍是 SharpGL 的 FBO。
+> - 结论（2026-11-06 更新）：迁移到 OpenTK 后渲染目标为**窗口默认帧缓冲（直绘）**；AA 等需要离屏 pass 的能力已具备（见「抗锯齿（AA）」）。
 
 ### 背景（现状基线）
 
 - 共享 surface program：Lambert + Blinn-Phong，光向硬编码，法线靠 `cross(dFdx,dFdy)`（仅 Mesh）。
 - 顶点属性：0=pos、1=uv/color、2=diff、3=intensity；**无法线**。
 - `GLResourceHandle.VboIds` 固定长度 4；`RenderData` 无 `Normals`。
-- SharpGL 3.1.1 能力：有 EXT FBO / `DrawBuffers` / 实例化 / cubemap 常量 / `UniformMatrix3`；
+- ~~SharpGL 3.1.1 能力~~（历史）：有 EXT FBO / `DrawBuffers` / 实例化 / cubemap 常量 / `UniformMatrix3`；
   **无 `glBlitFramebuffer`、无 UBO、无 `glTexStorage2D`、无图像加载器**。
+  2026-11-06 起后端为 **OpenTK 3.3.3**，上述缺失均已补齐。
 
 ### P1 法线通道 + Legacy 光照改用真法线 ✅（代码完成，待目视回归 + 提交确认）
 
@@ -128,7 +151,7 @@
 - [x] `AbstractCxObjRenderItem.PrepareRenderData` 统一注入 `useVertexNormal` uniform
 - [x] 新增 CPU 特征测试 `NormalGenerationTests`（10 项）
 - [x] `dotnet test` 113/113 通过；`CxControl` / `DemoFrom` 0 错误
-- [ ] **待办**：本机目视回归（Mesh 光照、带姿态 item、点云不受影响）后提交
+- [x] 已提交（`be069ee`）；**待办**：本机目视回归（Mesh 光照、带姿态 item、点云不受影响）
 
 > 注：P1 未新增公开枚举/方法；`Normals` 为 `RenderData`（内部管线数据）的新属性。
 
@@ -145,7 +168,7 @@
 - [x] 纹理单元：0 = intensity，1 = irradiance cube，2 = prefilter cube，3 = brdf LUT
 - [x] 新增测试 `ProceduralIblTests`（6）+ `PbrMaterialTests`（4）；`dotnet test` 123/123
 - [x] 文档（README / CHANGELOG）
-- [ ] **待办**：本机目视回归（`Pbr` 出图、`Legacy` 与 P1 一致）后提交
+- [x] 已提交（`f98e426`）；**待办**：本机目视回归（`Pbr` 出图、`Legacy` 与 P1 一致）
 - [ ] **未做**：右键菜单的照明模式开关（`Enum.Parse` 依赖 Text == 枚举名）；`SpecularIntensity` / per-item 覆盖
 
 ### P3 点云伪 3D 高光球（point-sprite impostor）✅（代码完成，待目视回归 + 提交确认）
@@ -156,7 +179,7 @@
 - [x] `glEnable(GL_POINT_SPRITE)`（兼容 profile 必需，否则 `gl_PointCoord` 全 0 → 点全被裁）；`CxDisplay.PointImpostor`（默认 true）
 - [x] `CxDisplay.PbrMetallic` / `PbrRoughness`（全局材质，新 item 继承）
 - [x] Demo 新增「光照/PBR 测试」Tab：左侧控件（Legacy/PBR、Studio/Neutral、Impostor、**Metallic / Roughness / IBL 强度滑条**、Mesh/点云/**文件加载**）+ **右侧内嵌实时预览 CxDisplay**；控件同时作用于预览与两个主 CxDisplay
-- [ ] **待办**：目视确认 `gl_PointCoord` 的 y 方向（不对就翻转 `pc.y` 符号，一行）后提交
+- [x] 已提交（`f98e426`）；**待办**：目视确认 `gl_PointCoord` 的 y 方向（不对就翻转 `pc.y` 符号，一行）
 - [ ] **未做（P3.5）**：`gl_FragDepth` 球面深度修正（会关 early-Z，密集点云有代价）；大点超过驱动尺寸上限时降级到实例化 quad
 
 ### P2/P3 修复：环境轴向 / 法线 / 预览 / 环境跟随相机 ✅
@@ -167,7 +190,7 @@
 - [x] **D** `CxDisplay.EnvironmentFollowsCamera`（默认 false，视空间采样）+ Demo 勾选框
 - [x] 默认值保留调试值（metallic 0.2 / pointSize 3 / iblIntensity 1.5），测试与 Demo 滑条同步
 - [x] `dotnet test` 123/123；`CxControl` / `DemoFrom` 0 错误
-- [ ] **待办**：上机确认（顶面最亮 / 环境跟随相机）后提交
+- [x] 已提交（`f98e426`）；**待办**：上机确认（顶面最亮 / 环境跟随相机）
 
 ### 默认切换为 PBR/IBL + Demo 读 cxpc ✅
 
@@ -175,7 +198,7 @@
 - [x] Demo「加载文件…」支持 `.cxpc` / `.pcd` 点云（`VisionOperator.LoadPointCloud`）
 - [x] Demo 控件初值同步默认（PBR / Neutral / 环境跟随相机 / 1.3 / 0.2）
 - [x] `dotnet test` 123/123；`CxControl` / `DemoFrom` 0 错误
-- [ ] **待办**：上机确认后提交
+- [x] 已提交（`8e6ab72`）；**待办**：上机确认
 
 ### 半透明拾取修复（对策 A）✅
 
@@ -183,7 +206,7 @@
 - [x] `CxDisplay.TranslucentWritesDepth`（默认 true）应用到所有 item + 新 item 继承
 - [x] Demo 勾选框「半透明写深度（拾取 / 标签可用，默认开）」
 - [x] `dotnet test` 123/123；`CxControl` / `DemoFrom` 0 错误
-- [ ] **待办**：上机确认（`Opacity < 1` 可选中有标签、不颠倒）后提交
+- [x] 已提交（`6ac5042`）；**待办**：上机确认（`Opacity < 1` 可选中有标签、不颠倒）
 - [ ] **未做（对策 B）**：若要"半透明互相透出且顺序正确"，需 ①半透明按 item 距离从远到近排序 ②半透明不写深度 ③悬停帧跑一次 depth-only pass 供拾取。单深度缓冲下"正确拾取"与"半透明互相混合"不可兼得
 
 ### 抗锯齿（AA）
@@ -218,9 +241,9 @@
 7. 字形图集排版保真度：坐标提示 / 色条标签与旧的"整串纹理"排版是否像素级一致（`Advance` / `LegacyLeftBearing` 为启发式）。
 8. 球体实例化：`Sphere` 模式外观与旧实现一致（半径 = `Size / 2`、模型矩阵直传）。
 9. 共享 surface 程序 + 上下文重建：GL 上下文重建后三个内建项正常绘制、无残留/重复释放的句柄。
-10. FBO 尺寸缓存：resize 路径（基类 `OnSizeChanged` 已 `SetDimensions`，首帧是否重复）行为正常。
+10. ~~FBO 尺寸缓存：resize 路径~~ —— **已失效**：OpenTK 迁移后 FBO 路径（`SetDimensions`）已删除，改为直绘窗口默认帧缓冲；resize 只需确认 `Viewport` 与画面同步（已并入第 9 条上下文重建）。
 11. `Lit` 纯色模式：`SolidColor` 生效（Mesh 下保留光照立体感、PointCloud 下为纯平色），且纯色 Item 不再触发颜色条。
-12. 按需重绘（E1）：相机旋转/平移/缩放、数据加载、选中与拖拽、组变换、GL 上下文重建后画面是否都及时刷新（不再有 10 FPS 定时兜底）；后台线程准备完数据后未经过 `Set*` / `Redraw()` 时不刷新（预期行为，README 已注明）。
+12. 按需重绘（E1）：相机旋转/平移/缩放、数据加载、选中与拖拽、组变换、GL 上下文重建后画面是否都及时刷新（OpenTK `GLControl` 只在 `Invalidate()` 时重绘，无定时兜底）；后台线程准备完数据后未经过 `Set*` / `Redraw()` 时不刷新（预期行为，README 已注明）。
 13. 延迟拾取（E2）：悬停坐标标签是否随鼠标及时更新、与旧行为一致；`CoordinatesChanged` 现在在渲染帧内触发，处理器若用同步 `Invoke` 会卡帧。
 14. 半透明（M2）：`Opacity < 1` 的 Item 是否正确混合在不透明场景之上；全不透明场景的渲染结果与改动前逐像素一致；`CxBox3DItem` 等半透明 overlay 不再遮挡其后绘制的几何。
 15. 注册/替换/释放路径（M1 第 2/3 步）：
