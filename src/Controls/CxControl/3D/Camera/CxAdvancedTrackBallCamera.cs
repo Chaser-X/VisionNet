@@ -499,49 +499,26 @@ namespace VisionNet.Controls
         }
 
         /// <summary>
-        /// Legacy matrix-stack adapter retained for callers outside CxDisplay.
+        /// Publishes the camera to the renderer for the current frame, so world-space draws
+        /// (including the standalone text helpers) use this projection/view pair.
         /// </summary>
+        /// <remarks>
+        /// This used to also load the legacy fixed-function matrix stack, for callers that issued
+        /// fixed-function draws afterwards. That path was removed with the OpenTK migration: under a
+        /// core profile it silently produced an identity projection, and CxDisplay never used it (it
+        /// uploads the matrices as shader uniforms). Standalone callers must draw through
+        /// <see cref="ModernGLRenderer"/>/<see cref="CxGlContext"/>.
+        /// </remarks>
         /// <param name="gl">Active OpenGL context.</param>
         public void LookAtMatrix(CxGlContext gl)
         {
-            GL.Viewport(0, 0, _gl.Width, _gl.Height);
-            float[] projection, view;
-            GetMatrices(_gl.Width, _gl.Height, out projection, out view);
-            ModernGLRenderer.For(gl).SetSceneMatrices(projection, view);
-
-            // Preserve the ICamera contract for callers that still issue fixed-
-            // function draw calls after applying the camera. CxDisplay itself uses
-            // GetMatrices and does not need this compatibility matrix stack path.
-            GL.MatrixMode(MatrixMode.Projection);
-            GL.LoadIdentity();
-            float aspect = _gl.Height > 0
-                ? (float)_gl.Width / _gl.Height : 1f;
-            if (!Enable2DView)
+            gl.RunOnContext(() =>
             {
-                var perspective = OpenTK.Matrix4.CreatePerspectiveFieldOfView(
-                    OpenTK.MathHelper.DegreesToRadians(_fieldOfView), aspect, _nearPlane, _farPlane);
-                GL.LoadMatrix(ref perspective);
-            }
-            else
-            {
-                float height = (float)(2.0 * Math.Abs(_position.Z - _target.Z));
-                if (height < 1e-4f) height = 1.0f;
-                float width = height * aspect;
-                var ortho = OpenTK.Matrix4.CreateOrthographic(width, height, _nearPlane, _farPlane);
-                GL.LoadMatrix(ref ortho);
-            }
-
-            GL.MatrixMode(MatrixMode.Modelview);
-            GL.LoadIdentity();
-            var lookAt = OpenTK.Matrix4.LookAt(
-                new OpenTK.Vector3(_position.X, _position.Y, _position.Z),
-                new OpenTK.Vector3(_target.X, _target.Y, _target.Z),
-                new OpenTK.Vector3(_up.X, _up.Y, _up.Z));
-            GL.LoadMatrix(ref lookAt);
-            if (_isLeftHanded)
-                GL.Scale(1.0f, -1.0f, 1.0f);
-            if (Math.Abs(_zScale - 1.0f) > 1e-6f)
-                GL.Scale(1.0f, 1.0f, _zScale);
+                GL.Viewport(0, 0, _gl.Width, _gl.Height);
+                float[] projection, view;
+                GetMatrices(_gl.Width, _gl.Height, out projection, out view);
+                ModernGLRenderer.For(gl).SetSceneMatrices(projection, view);
+            });
         }
 
         #endregion
@@ -556,27 +533,28 @@ namespace VisionNet.Controls
         {
             var gl = _gl;
             if (gl == null || !gl.IsValid) return null;
-            // Bind the context: this runs from a double-click handler, outside the render frame.
-            gl.MakeCurrent();
+            // Runs from a double-click handler, outside the render frame.
+            return gl.RunOnContext<Vector3?>(() =>
+            {
+                int[] viewport = new int[4];
+                GL.GetInteger(GetPName.Viewport, viewport);
+                int adjustedY = viewport[3] - screenY;   // Flip Y to OpenGL convention.
 
-            int[] viewport = new int[4];
-            GL.GetInteger(GetPName.Viewport, viewport);
-            int adjustedY = viewport[3] - screenY;   // Flip Y to OpenGL convention.
+                float[] depthBytes = new float[1];
+                GL.ReadPixels(screenX, adjustedY, 1, 1,
+                    PixelFormat.DepthComponent, PixelType.Float, depthBytes);
+                float depth = depthBytes[0];
 
-            float[] depthBytes = new float[1];
-            GL.ReadPixels(screenX, adjustedY, 1, 1,
-                PixelFormat.DepthComponent, PixelType.Float, depthBytes);
-            float depth = depthBytes[0];
+                if (Math.Abs(depth - 1.0f) < 0.00001f) return null;
 
-            if (Math.Abs(depth - 1.0f) < 0.00001f) return null;
-
-            float[] projection, view;
-            GetMatrices(_gl.Width, _gl.Height, out projection, out view);
-            var renderer = ModernGLRenderer.For(gl);
-            renderer.SetSceneMatrices(projection, view);
-            CxPoint3D world;
-            if (!renderer.Unproject(gl, screenX, adjustedY, depth, out world)) return null;
-            return new Vector3(world.X, world.Y, world.Z);
+                float[] projection, view;
+                GetMatrices(_gl.Width, _gl.Height, out projection, out view);
+                var renderer = ModernGLRenderer.For(gl);
+                renderer.SetSceneMatrices(projection, view);
+                CxPoint3D world;
+                if (!renderer.Unproject(gl, screenX, adjustedY, depth, out world)) return null;
+                return new Vector3(world.X, world.Y, world.Z);
+            });
         }
 
         #endregion

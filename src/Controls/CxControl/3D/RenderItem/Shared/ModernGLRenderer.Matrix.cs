@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using OpenTK.Graphics.OpenGL;
 
 namespace VisionNet.Controls
@@ -98,35 +99,29 @@ namespace VisionNet.Controls
             _state.Reset();
             _frameStateCaptured = false;
             _hasSceneMatrices = false;
+            _missingSceneMatricesLogged = false;
             _viewportWidth = _viewportHeight = -1;
         }
 
         /// <summary>
-        /// Preserves the standalone public text helpers' historical behaviour by
-        /// using the caller's active fixed-function matrices when no CxDisplay frame
-        /// has supplied explicit scene matrices.
+        /// Verifies that explicit scene matrices were supplied before a world-space draw.
         /// </summary>
-        private void ReadCurrentGLMatrices(CxGlContext gl)
-        {
-            GL.GetFloat(GetPName.ProjectionMatrix, _projectionQuery);
-            GL.GetFloat(GetPName.ModelviewMatrix, _viewQuery);
-            for (int row = 0; row < 4; row++)
-                for (int col = 0; col < 4; col++)
-                {
-                    _projection[row * 4 + col] = _projectionQuery[col * 4 + row];
-                    _view[row * 4 + col] = _viewQuery[col * 4 + row];
-                }
-        }
-
-        /// <summary>
-        /// Supplies the caller's active fixed-function matrices for standalone draws.
-        /// CxDisplay sets explicit matrices for a frame, so its shader path does not
-        /// depend on whatever legacy matrix state happens to be active.
-        /// </summary>
+        /// <remarks>
+        /// CxDisplay calls <see cref="SetSceneMatrices"/> once per frame, so its draws always have a
+        /// projection/view pair. Standalone callers (the public text helpers, custom overlays) must
+        /// supply one too — <c>ICamera.LookAtMatrix</c> or <see cref="SetSceneMatrices"/>.
+        /// <para>The historical fallback that read the legacy fixed-function matrices was removed:
+        /// under a core profile it silently produced an identity projection, so a missing pair is
+        /// now reported once instead of failing invisibly.</para>
+        /// </remarks>
         internal void EnsureSceneMatrices(CxGlContext gl)
         {
-            if (!_hasSceneMatrices)
-                ReadCurrentGLMatrices(gl);
+            if (_hasSceneMatrices) return;
+            if (_missingSceneMatricesLogged) return;
+            _missingSceneMatricesLogged = true;
+            Debug.WriteLine(
+                "[CxControl] ModernGLRenderer: no scene matrices supplied; using identity. " +
+                "Call SetSceneMatrices (or ICamera.LookAtMatrix) before standalone world-space draws.");
         }
 
         /// <summary>Expands 2D screen vertices to z=0 positions for the geometry shader.</summary>

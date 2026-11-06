@@ -225,10 +225,13 @@ namespace VisionNet.Controls
         /// <inheritdoc/>
         public void LookAtMatrix(CxGlContext gl)
         {
-            GL.Viewport(0, 0, _gl.Width, _gl.Height);
-            float[] projection, view;
-            GetMatrices(_gl.Width, _gl.Height, out projection, out view);
-            ModernGLRenderer.For(gl).SetSceneMatrices(projection, view);
+            gl.RunOnContext(() =>
+            {
+                GL.Viewport(0, 0, _gl.Width, _gl.Height);
+                float[] projection, view;
+                GetMatrices(_gl.Width, _gl.Height, out projection, out view);
+                ModernGLRenderer.For(gl).SetSceneMatrices(projection, view);
+            });
         }
 
         /// <summary>Computes the modern row-major projection and view matrices.</summary>
@@ -359,27 +362,28 @@ namespace VisionNet.Controls
         {
             var gl = _gl;
             if (gl == null || !gl.IsValid) return null;
-            // Bind the context: this runs from a mouse handler, outside the render frame.
-            gl.MakeCurrent();
+            // Runs from a mouse handler, outside the render frame.
+            return gl.RunOnContext<CxPoint3D?>(() =>
+            {
+                int[] viewport = new int[4];
+                GL.GetInteger(GetPName.Viewport, viewport);
+                int adjustedY = viewport[3] - mouseY;
 
-            int[] viewport = new int[4];
-            GL.GetInteger(GetPName.Viewport, viewport);
-            int adjustedY = viewport[3] - mouseY;
+                float[] depthBytes = new float[1];
+                GL.ReadPixels(mouseX, adjustedY, 1, 1,
+                    PixelFormat.DepthComponent, PixelType.Float, depthBytes);
+                float depth = depthBytes[0];
 
-            float[] depthBytes = new float[1];
-            GL.ReadPixels(mouseX, adjustedY, 1, 1,
-                PixelFormat.DepthComponent, PixelType.Float, depthBytes);
-            float depth = depthBytes[0];
+                if (Math.Abs(depth - 1.0f) < 0.00001f) return null;
 
-            if (Math.Abs(depth - 1.0f) < 0.00001f) return null;
-
-            float[] projection, view;
-            GetMatrices(_gl.Width, _gl.Height, out projection, out view);
-            var renderer = ModernGLRenderer.For(gl);
-            renderer.SetSceneMatrices(projection, view);
-            CxPoint3D world;
-            if (!renderer.Unproject(gl, mouseX, adjustedY, depth, out world)) return null;
-            return world;
+                float[] projection, view;
+                GetMatrices(_gl.Width, _gl.Height, out projection, out view);
+                var renderer = ModernGLRenderer.For(gl);
+                renderer.SetSceneMatrices(projection, view);
+                CxPoint3D world;
+                if (!renderer.Unproject(gl, mouseX, adjustedY, depth, out world)) return null;
+                return world;
+            });
         }
 
         /// <summary>

@@ -24,12 +24,17 @@ namespace VisionNet.Controls
         {
             if (DesignMode || _camera == null) { base.OnPaint(e); return; }
 
+            // Raise the Paint event first: GLControl.OnPaint validates the control state and may
+            // recreate the handle (and therefore the GL context), which must happen before the frame
+            // uses the context rather than after the frame has drawn into the old one.
+            base.OnPaint(e);
+
             lock (_renderLock)
             {
                 var gl = _gl;
                 if (gl != null && gl.IsValid)
                 {
-                    gl.MakeCurrent();
+                    gl.EnsureCurrent();
                     GL.Viewport(0, 0, Width, Height);
                     GL.ClearColor(_backColor.R / 255f, _backColor.G / 255f, _backColor.B / 255f, _backColor.A / 255f);
                     GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
@@ -69,8 +74,6 @@ namespace VisionNet.Controls
                     gl.Present();
                 }
             }
-
-            base.OnPaint(e);
 
             // CoordinatesChanged is raised here, outside the render lock, so a handler may call back
             // into the display (the contract RenderItemFailed already documents). The tooltip was

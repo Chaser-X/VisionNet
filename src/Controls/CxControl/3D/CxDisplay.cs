@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Drawing;
 using System.Numerics;
 using System.Threading;
@@ -463,6 +464,9 @@ namespace VisionNet.Controls
         private static GraphicsMode CreateGraphicsMode()
             => new GraphicsMode(new ColorFormat(32), 24, 8, 0, new ColorFormat(0), 2);
 
+        // Scratch for the one-time context capability log (see LogContextCapabilities).
+        private static readonly float[] _lineWidthRange = new float[2];
+
         /// <summary>
         /// Applies the context-owned GL defaults. Runs after the base handle-created handler has
         /// created the context and made it current, and again whenever the handle is recreated.
@@ -481,6 +485,37 @@ namespace VisionNet.Controls
                 ModernGLRenderer.ResetForContextRecreate(_gl);
                 GL.ClearColor(_backColor.R / 255f, _backColor.G / 255f, _backColor.B / 255f, _backColor.A / 255f);
                 GL.PointSize(InitialPointSize);
+                LogContextCapabilities();
+            }
+        }
+
+        /// <summary>
+        /// Writes the actual context version/renderer and the aliased line-width range to the debug
+        /// output. Diagnostics only — nothing in the render path depends on the result.
+        /// </summary>
+        /// <remarks>
+        /// The context is requested as a compatibility-profile 3.3 context (see
+        /// <see cref="CreateGraphicsMode"/> and the base-constructor call), and the wide-line /
+        /// point-sprite behaviour this control relies on is compatibility-only. Logging what the
+        /// driver actually handed back turns "does compatibility 3.3 work on this machine?" from an
+        /// unanswerable question into a line in the debug output.
+        /// </remarks>
+        [Conditional("DEBUG")]
+        private void LogContextCapabilities()
+        {
+            try
+            {
+                GL.GetFloat(GetPName.AliasedLineWidthRange, _lineWidthRange);
+                Debug.WriteLine(string.Format(
+                    "[CxControl] GL context: {0} | renderer: {1} | shading language: {2} | aliased line width: [{3}, {4}]",
+                    GL.GetString(StringName.Version) ?? "?",
+                    GL.GetString(StringName.Renderer) ?? "?",
+                    GL.GetString(StringName.ShadingLanguageVersion) ?? "?",
+                    _lineWidthRange[0], _lineWidthRange[1]));
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine("[CxControl] GL capability probe failed: " + ex.Message);
             }
         }
 
@@ -640,7 +675,7 @@ namespace VisionNet.Controls
                 bool glValid = gl != null && gl.IsValid;
                 if (glValid)
                 {
-                    try { gl.MakeCurrent(); }
+                    try { gl.EnsureCurrent(); }
                     catch { glValid = false; }
                 }
 

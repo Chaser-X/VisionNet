@@ -9,6 +9,25 @@
 
 ## 未发布（工作区，尚未提交）
 
+### 加固（库）：迁移后审计修复 —— GL 绑定纪律 / 去 FFP / OnPaint 顺序 / 门面单例 + 兼容 3.3 可观测
+
+**来源**：迁移后对 `src/Controls/CxControl/3D/` 做 critic-in-the-loop 审计（Top 5 坏味道），本轮处理 **P1/P2/P3/P5**；**P4**（拆分 `ModernGLRenderer`）按负责人决定**不做**，并从 `ToDo.md` 移除。
+
+**改动**
+- **P1 `MakeCurrent` 纪律收敛**（`CxGlContext`）：新增 `EnsureCurrent()` 与 `RunOnContext(Action)` / `RunOnContext<T>(Func<T>)`，作为「帧外 GL 工作」的唯一入口；`EnsureCurrent` 在 DEBUG 下断言绑定生效。原散落的 `MakeCurrent` 全部改走该入口：`CxPickingService.ScreenToWorld`、`CxAdvancedTrackBallCamera.ScreenToWorld` / `LookAtMatrix`、`CxTrackBallCamera.GetMouseWorldPosition` / `LookAtMatrix`、`CxExtension.DrawTextLabel3D` / `DrawTextLabel2D`、`CxDisplay.DisposeResources`、`ModernGLRenderer.Release`、`CxDisplay.OnPaint`（帧首）。
+- **P2 删除残留 FFP 依赖**：删除 `ModernGLRenderer.ReadCurrentGLMatrices`（读 `GL_PROJECTION_MATRIX` / `GL_MODELVIEW_MATRIX`）与 `_projectionQuery` / `_viewQuery` 字段；`EnsureSceneMatrices` 不再回退，改为「缺矩阵则一次性 `Debug.WriteLine` 警告 + 用单位矩阵」。`CxAdvancedTrackBallCamera.LookAtMatrix` 删除 `MatrixMode` / `LoadMatrix` 矩阵栈段，只保留 `SetSceneMatrices`。**破坏性**：依赖 `LookAtMatrix` 设置固定管线矩阵的外部调用方需改走 `ModernGLRenderer` / `CxGlContext`。
+- **P3 `OnPaint` 顺序**：改为**先** `base.OnPaint(e)`（让 `GLControl.ValidateState()` 的句柄/上下文重建发生在使用上下文之前）**再**渲染，消除「画完才可能重建句柄」的窗口。副作用：外部 `Paint` 订阅者的 GDI 绘制不再覆盖 GL 画面（`Opaque` 控件下本就是死代码）。
+- **P5 `CxGlContext` 单实例守卫**：以 `ConditionalWeakTable<GLControl, CxGlContext>` 保证一个控件只有一个门面，重复创建抛 `InvalidOperationException`（避免 `ModernGLRenderer` 的 per-context 状态被分裂成两份 program/VAO）。
+- **兼容 3.3 可观测**：`CxDisplay.InitializeGlState` 在 DEBUG 构建输出一行 `[CxControl] GL context: <version> | renderer: … | shading language: … | aliased line width: [min, max]`，把「兼容 profile 3.3 是否成立」从不可答问题变成日志可判定。
+
+**行为影响**
+- 独立使用 `CxExtension.DrawTextLabel3D` / `DrawTextLabel2D` 的调用方：帧外必须先 `ICamera.LookAtMatrix(ctx)`（或 `ModernGLRenderer.SetSceneMatrices`）——旧的固定管线回退已移除。
+- `ICamera.LookAtMatrix` 不再写固定管线矩阵（同上）。
+
+**验证**：`CxControl` / `DemoFrom` 0 error 0 warning；`dotnet test` **127/127 通过**。
+
+- **需上机目视确认**：宽线（Box 边线 / 多边形）与点精灵是否生效（直接看新增的上下文日志）；独立文本助手在 `LookAtMatrix` 之后仍能正确投影。
+
 （无）
 
 ## 已提交

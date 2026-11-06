@@ -32,24 +32,24 @@ namespace VisionNet.Controls
         public CxPoint3D? ScreenToWorld(CxGlContext gl, int mouseX, int mouseY)
         {
             if (gl == null || !gl.IsValid) return null;
-            // OpenTK's GL entry points act on the current context and do not make it current
-            // implicitly (unlike the old SharpGL wrapper). A mouse handler may call this outside a
-            // frame, so bind the context first.
-            gl.MakeCurrent();
+            // Runs outside the render frame when called from a mouse handler, so the context is
+            // bound explicitly (OpenTK does not make it current implicitly).
+            return gl.RunOnContext<CxPoint3D?>(() =>
+            {
+                GL.GetInteger(GetPName.Viewport, _viewport);
+                int adjustedY = _viewport[3] - mouseY;   // OpenGL Y is bottom-up.
 
-            GL.GetInteger(GetPName.Viewport, _viewport);
-            int adjustedY = _viewport[3] - mouseY;   // OpenGL Y is bottom-up.
+                GL.ReadPixels(mouseX, adjustedY, 1, 1,
+                    PixelFormat.DepthComponent, PixelType.Float, _depth);
+                float depth = _depth[0];
 
-            GL.ReadPixels(mouseX, adjustedY, 1, 1,
-                PixelFormat.DepthComponent, PixelType.Float, _depth);
-            float depth = _depth[0];
+                if (Math.Abs(depth - 1.0f) < 0.00001f) return null;
 
-            if (Math.Abs(depth - 1.0f) < 0.00001f) return null;
-
-            CxPoint3D world;
-            if (!ModernGLRenderer.For(gl).Unproject(gl, mouseX, adjustedY, depth, out world))
-                return null;
-            return world;
+                CxPoint3D world;
+                if (!ModernGLRenderer.For(gl).Unproject(gl, mouseX, adjustedY, depth, out world))
+                    return null;
+                return world;
+            });
         }
 
         /// <summary>

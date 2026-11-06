@@ -9,7 +9,7 @@
 ### A. 上机验证（本机无 OpenGL 环境，`dotnet test` 不覆盖任何渲染）
 
 - [ ] **OpenTK 迁移回归**（最高优先，见 `Changlog.md` → `3c61519`）：
-  - [ ] **兼容 profile 3.3 是否成立** —— 决定 `LineWidth > 1`（Box 边线 / 多边形）与 point sprite 是否生效（本次最大运行期风险）
+  - [ ] **兼容 profile 3.3 是否成立** —— 决定 `LineWidth > 1`（Box 边线 / 多边形）与 point sprite 是否生效（本次最大运行期风险）。**已加固**：`CxDisplay` 在上下文创建时（DEBUG 构建）输出 `[CxControl] GL context: <version> | renderer: … | aliased line width: [min, max]`，上机直接看这一行即可判定（见 `Changlog.md`「未发布」）
   - [ ] 点云 impostor、Mesh PBR/IBL（默认 `Neutral` + 环境跟随相机）、色带、坐标轴、悬停 tooltip、选择拾取、半透明、resize、多控件
   - [ ] 上下文重建（最小化/恢复、改分辨率）无花屏 / 崩溃 / 句柄泄漏
   - [ ] `CxExtension.IsOpenGLAvailable` / `GetOpenGLVersion`（一次性隐藏 `GameWindow` 探测）可用
@@ -24,9 +24,8 @@
 
 ### B. 库侧技术债
 
-- [ ] S5 线程与锁：registry 回调移出锁内、缩小 `_renderLock` 范围、`Dispose` 非 UI 线程改 `BeginInvoke`（迁移后需一并覆盖「显式 `MakeCurrent`」路径）
+- [ ] S5 线程与锁：registry 回调移出锁内、缩小 `_renderLock` 范围、`Dispose` 非 UI 线程改 `BeginInvoke`（`MakeCurrent` 纪律已由 `CxGlContext.RunOnContext` 收敛，见「已完成」）
 - [ ] S6 效能：色条/标签脏标记、Uniforms 强类型化、projection/view 每帧一次、overlay 合批、缓冲复用、遍历合并、拾取节流
-- [ ] （S4 未做）`ModernGLRenderer` 的 `Text` / `Programs` / `State` 提升为独立类
 - [ ] 清理 `[Obsolete]` 代理（`CxDisplay.cs`：`SurfaceViewMode` / `IsLeftHanded`）与 `CxControl.csproj_bak`（需先确认无外部调用）
 - [ ] 清理已无引用的 `3rd/SharpGL.dll` / `SharpGL.SceneGraph.dll` / `SharpGL.WinForms.dll`
 
@@ -45,6 +44,7 @@
 ## 已完成
 
 - [x] **OpenTK 迁移**：`CxDisplay` 渲染后端 SharpGL → OpenTK 3.3.3（直绘，去掉 FBO 回读）（提交 `3c61519`，归档 `07e0ec2`）
+- [x] **迁移后加固（critic-in-the-loop 审计 P1/P2/P3/P5）**：`CxGlContext.RunOnContext` 收敛帧外 GL 绑定（P1）；删除残留 FFP 回退 `ReadCurrentGLMatrices` 与 `LookAtMatrix` 的矩阵栈段（P2）；`OnPaint` 改为先 `base.OnPaint` 再渲染（P3）；`CxGlContext` 单实例守卫（P5）；新增上下文能力日志，使「兼容 3.3 是否成立」可观测
 - [x] **工作区文档初始化**（2026-11-05）：创建 `Agents.md` / `Changlog.md` / `ToDo.md`，并合并 `CHANGELOG.md` 与两份 `TODO-CxDisplay-*.md` 后删除原文件
 - [x] **P1 逐顶点法线**：Mesh 光照改用真法线（提交 `be069ee`）
 - [x] **P2 PBR / IBL**：`SurfaceLightingMode` / `EnvironmentPreset` / `IblIntensity`；程序化 IBL（`ProceduralIbl`）；item 级 `Metallic` / `Roughness`（提交 `f98e426`）

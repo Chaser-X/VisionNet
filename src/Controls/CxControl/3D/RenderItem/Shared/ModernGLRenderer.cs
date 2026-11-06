@@ -144,9 +144,10 @@ namespace VisionNet.Controls
         // to match the row-major convention used by CxMatrix4X4 and the camera code.
         private float[] _projection = IdentityData();
         private float[] _view = IdentityData();
-        private readonly float[] _projectionQuery = new float[16];
-        private readonly float[] _viewQuery = new float[16];
         private bool _hasSceneMatrices;
+        // Set once when a world-space draw runs without explicit scene matrices, so the warning is
+        // emitted once per context rather than on every draw.
+        private bool _missingSceneMatricesLogged;
         // Reusable 3×3 normal matrix (inverse-transpose of an item's model rotation/scale),
         // rebuilt per item from its cached pose inverse.
         private readonly float[] _normalMatrix = new float[9];
@@ -281,7 +282,7 @@ void main() { FragColor = vertexColor; }";
                     return;
                 try
                 {
-                    gl.MakeCurrent();
+                    gl.EnsureCurrent();
                 }
                 catch (Exception ex)
                 {

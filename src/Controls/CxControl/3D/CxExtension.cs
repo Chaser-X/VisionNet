@@ -448,6 +448,12 @@ namespace VisionNet.Controls
         /// at a roughly constant pixel size regardless of depth.
         /// The label is skipped if it projects outside the viewport or behind the camera.
         /// </summary>
+        /// <remarks>
+        /// Binds <paramref name="gl"/> for the call, so it is safe to invoke outside a render frame.
+        /// World-space projection needs a projection/view pair: outside a frame, call
+        /// <c>ICamera.LookAtMatrix(gl)</c> (or <c>ModernGLRenderer.SetSceneMatrices</c>) first — the
+        /// old fixed-function fallback no longer exists.
+        /// </remarks>
         /// <param name="gl">Active OpenGL context.</param>
         /// <param name="x">World X coordinate.</param>
         /// <param name="y">World Y coordinate.</param>
@@ -456,17 +462,26 @@ namespace VisionNet.Controls
         /// <param name="text">Text string to draw.</param>
         public static void DrawTextLabel3D(CxGlContext gl, float x, float y, float z, float size, string text)
         {
-            var renderer = ModernGLRenderer.For(gl);
-            float sx, sy, sz;
-            if (!renderer.Project(gl, x, y, z, out sx, out sy, out sz)) return;
-            renderer.DrawText(gl, (int)sx, (int)sy, System.Drawing.Color.White,
-                size * (1f + sz), text);
+            if (gl == null) return;
+            gl.RunOnContext(() =>
+            {
+                var renderer = ModernGLRenderer.For(gl);
+                float sx, sy, sz;
+                if (!renderer.Project(gl, x, y, z, out sx, out sy, out sz)) return;
+                renderer.DrawText(gl, (int)sx, (int)sy, System.Drawing.Color.White,
+                    size * (1f + sz), text);
+            });
         }
 
         /// <summary>
         /// Renders a text label at the screen position corresponding to the given world-space point.
         /// The label is skipped if it projects outside the viewport or behind the camera.
         /// </summary>
+        /// <remarks>
+        /// Binds <paramref name="gl"/> for the call; world-space projection needs a projection/view
+        /// pair supplied via <c>ICamera.LookAtMatrix(gl)</c> or
+        /// <c>ModernGLRenderer.SetSceneMatrices</c> when called outside a render frame.
+        /// </remarks>
         /// <param name="gl">Active OpenGL context.</param>
         /// <param name="x">World X coordinate.</param>
         /// <param name="y">World Y coordinate.</param>
@@ -475,10 +490,14 @@ namespace VisionNet.Controls
         /// <param name="text">Text string to draw.</param>
         public static void DrawTextLabel2D(CxGlContext gl, float x, float y, float z, float size, string text)
         {
-            var renderer = ModernGLRenderer.For(gl);
-            float sx, sy, sz;
-            if (!renderer.Project(gl, x, y, z, out sx, out sy, out sz)) return;
-            renderer.DrawText(gl, (int)sx, (int)sy, System.Drawing.Color.White, size, text);
+            if (gl == null) return;
+            gl.RunOnContext(() =>
+            {
+                var renderer = ModernGLRenderer.For(gl);
+                float sx, sy, sz;
+                if (!renderer.Project(gl, x, y, z, out sx, out sy, out sz)) return;
+                renderer.DrawText(gl, (int)sx, (int)sy, System.Drawing.Color.White, size, text);
+            });
         }
 
         /// <summary>
