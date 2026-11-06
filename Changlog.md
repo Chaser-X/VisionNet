@@ -9,14 +9,19 @@
 
 ## 未发布（工作区，尚未提交）
 
-### 清理（库）：删除 SharpGL 时代的遗留文件 + 更新嵌套 README
+（无）
+
+## 已提交
+
+
+### 2bc721d（2026-11-06）清理（库）：删除 SharpGL 时代的遗留文件 + 更新嵌套 README
 
 - 删除 `src/Controls/CxControl/CxControl.csproj_bak` 与 `src/Controls/CxControl/.CxControl.csproj.swp_bak`：迁移前的 csproj 备份（仍带 `SharpGL` 引用），**无任何引用**（未被 `CxControl.csproj` 的 `Compile`/`None`/`Content` 引用，`git grep` 亦无外部引用）。
 - 更新 `src/Controls/CxControl/README.md`（项目结构说明）：`基于 OpenGL（SharpGL）` → `OpenTK 3.3.3`；`CxDisplay` 基类 `OpenGLControl` → `OpenTK.GLControl`；补齐迁移后新增的核心文件（`CxGlContext` / `CxItemRegistry` / `CxGroupManager` / `CxGLResourceManager` / `CxPickingService` / `RenderItem/Shared` / `2D/`）。
 
 **验证**：`git grep -l SharpGL` 仅剩 4 处**有意保留**的引用 —— `Changlog.md`（历史记录）、`ToDo.md`（历史记录）、`OpenTkMigrationTests.cs`（迁移守卫测试）、`CxGlContext.cs`（一句解释性注释）；`CxControl` / `DemoFrom` 0 error 0 warning；`dotnet test` 127/127。
 
-## 已提交
+
 
 
 ### 55dbf1b（2026-11-06）清理（库）：移除 SharpGL 残留 DLL
