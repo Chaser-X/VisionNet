@@ -1,4 +1,4 @@
-using SharpGL;
+using OpenTK.Graphics.OpenGL;
 using System;
 using System.Drawing;
 using System.Numerics;
@@ -24,7 +24,7 @@ namespace VisionNet.Controls
     {
         #region Private fields
 
-        private readonly OpenGLControl _glControl;
+        private readonly CxGlContext _gl;
 
         // View state.
         private Vector3 _position    = new Vector3(0, 0, -10);
@@ -85,7 +85,7 @@ namespace VisionNet.Controls
         public bool IsLeftHanded
         {
             get => _isLeftHanded;
-            set { _isLeftHanded = value; _glControl.Invalidate(); }
+            set { _isLeftHanded = value; _gl.Host.Invalidate(); }
         }
 
         /// <summary>
@@ -96,7 +96,7 @@ namespace VisionNet.Controls
         public float ZScale
         {
             get => _zScale;
-            set { _zScale = Math.Max(0.01f, value); _glControl.Invalidate(); }
+            set { _zScale = Math.Max(0.01f, value); _gl.Host.Invalidate(); }
         }
 
         #endregion
@@ -107,11 +107,11 @@ namespace VisionNet.Controls
         /// Initializes the camera and subscribes to the mouse / resize events of
         /// <paramref name="glControl"/>.
         /// </summary>
-        /// <param name="glControl">The OpenGL host control. Must not be <c>null</c>.</param>
-        /// <exception cref="ArgumentNullException">Thrown when <paramref name="glControl"/> is <c>null</c>.</exception>
-        public CxAdvancedTrackBallCamera(OpenGLControl glControl)
+        /// <param name="gl">The GL context of the host control. Must not be <c>null</c>.</param>
+        /// <exception cref="ArgumentNullException">Thrown when <paramref name="gl"/> is <c>null</c>.</exception>
+        public CxAdvancedTrackBallCamera(CxGlContext gl)
         {
-            _glControl = glControl ?? throw new ArgumentNullException(nameof(glControl));
+            _gl = gl ?? throw new ArgumentNullException(nameof(gl));
             RegisterEvents();
         }
 
@@ -121,22 +121,22 @@ namespace VisionNet.Controls
 
         private void RegisterEvents()
         {
-            _glControl.MouseDown        += GlControl_MouseDown;
-            _glControl.MouseMove        += GlControl_MouseMove;
-            _glControl.MouseUp          += GlControl_MouseUp;
-            _glControl.MouseWheel       += GlControl_MouseWheel;
-            _glControl.MouseDoubleClick += GlControl_MouseDoubleClick;
-            _glControl.Resize           += GlControl_Resize;
+            _gl.Host.MouseDown        += GlControl_MouseDown;
+            _gl.Host.MouseMove        += GlControl_MouseMove;
+            _gl.Host.MouseUp          += GlControl_MouseUp;
+            _gl.Host.MouseWheel       += GlControl_MouseWheel;
+            _gl.Host.MouseDoubleClick += GlControl_MouseDoubleClick;
+            _gl.Host.Resize           += GlControl_Resize;
         }
 
         private void UnregisterEvents()
         {
-            _glControl.MouseDown        -= GlControl_MouseDown;
-            _glControl.MouseMove        -= GlControl_MouseMove;
-            _glControl.MouseUp          -= GlControl_MouseUp;
-            _glControl.MouseWheel       -= GlControl_MouseWheel;
-            _glControl.MouseDoubleClick -= GlControl_MouseDoubleClick;
-            _glControl.Resize           -= GlControl_Resize;
+            _gl.Host.MouseDown        -= GlControl_MouseDown;
+            _gl.Host.MouseMove        -= GlControl_MouseMove;
+            _gl.Host.MouseUp          -= GlControl_MouseUp;
+            _gl.Host.MouseWheel       -= GlControl_MouseWheel;
+            _gl.Host.MouseDoubleClick -= GlControl_MouseDoubleClick;
+            _gl.Host.Resize           -= GlControl_Resize;
         }
 
         #endregion
@@ -150,13 +150,13 @@ namespace VisionNet.Controls
             if (e.Button == MouseButtons.Left)
             {
                 _isRotating = true;
-                _glControl.Cursor = Cursors.Hand;
+                _gl.Host.Cursor = Cursors.Hand;
             }
             else if (e.Button == MouseButtons.Middle ||
                      (e.Button == MouseButtons.Left && Control.ModifierKeys.HasFlag(Keys.Shift)))
             {
                 _isPanning = true;
-                _glControl.Cursor = Cursors.SizeAll;
+                _gl.Host.Cursor = Cursors.SizeAll;
             }
         }
 
@@ -183,14 +183,14 @@ namespace VisionNet.Controls
             // hover already repaints through CxDisplay's tooltip path; invalidating on every
             // hover as well would keep a WM_PAINT permanently pending while the mouse moves,
             // which starves low-priority WM_TIMER work in the host application.
-            if (moved) _glControl.Invalidate();
+            if (moved) _gl.Host.Invalidate();
         }
 
         private void GlControl_MouseUp(object sender, MouseEventArgs e)
         {
             _isRotating = false;
             _isPanning  = false;
-            _glControl.Cursor = Cursors.Default;
+            _gl.Host.Cursor = Cursors.Default;
         }
 
         private void GlControl_MouseWheel(object sender, MouseEventArgs e)
@@ -205,7 +205,7 @@ namespace VisionNet.Controls
             {
                 // 5 % zoom step per wheel notch.
                 ZoomCamera(e.Delta > 0 ? 1.05f : 0.95f);
-                _glControl.Invalidate();
+                _gl.Host.Invalidate();
             }
         }
 
@@ -217,7 +217,7 @@ namespace VisionNet.Controls
                 if (worldPos.HasValue)
                 {
                     FocusOnPoint(worldPos.Value);
-                    _glControl.Invalidate();
+                    _gl.Host.Invalidate();
                 }
             }
         }
@@ -502,43 +502,46 @@ namespace VisionNet.Controls
         /// Legacy matrix-stack adapter retained for callers outside CxDisplay.
         /// </summary>
         /// <param name="gl">Active OpenGL context.</param>
-        public void LookAtMatrix(OpenGL gl)
+        public void LookAtMatrix(CxGlContext gl)
         {
-            gl.Viewport(0, 0, _glControl.Width, _glControl.Height);
+            GL.Viewport(0, 0, _gl.Width, _gl.Height);
             float[] projection, view;
-            GetMatrices(_glControl.Width, _glControl.Height, out projection, out view);
+            GetMatrices(_gl.Width, _gl.Height, out projection, out view);
             ModernGLRenderer.For(gl).SetSceneMatrices(projection, view);
 
             // Preserve the ICamera contract for callers that still issue fixed-
             // function draw calls after applying the camera. CxDisplay itself uses
             // GetMatrices and does not need this compatibility matrix stack path.
-            gl.MatrixMode(OpenGL.GL_PROJECTION);
-            gl.LoadIdentity();
-            double aspect = _glControl.Height > 0
-                ? (double)_glControl.Width / _glControl.Height : 1.0;
+            GL.MatrixMode(MatrixMode.Projection);
+            GL.LoadIdentity();
+            float aspect = _gl.Height > 0
+                ? (float)_gl.Width / _gl.Height : 1f;
             if (!Enable2DView)
             {
-                gl.Perspective(_fieldOfView, aspect, _nearPlane, _farPlane);
+                var perspective = OpenTK.Matrix4.CreatePerspectiveFieldOfView(
+                    OpenTK.MathHelper.DegreesToRadians(_fieldOfView), aspect, _nearPlane, _farPlane);
+                GL.LoadMatrix(ref perspective);
             }
             else
             {
-                double height = 2.0 * Math.Abs(_position.Z - _target.Z);
-                if (height < 1e-4) height = 1.0;
-                double width = height * aspect;
-                gl.Ortho(-width / 2, width / 2, -height / 2, height / 2,
-                    _nearPlane, _farPlane);
+                float height = (float)(2.0 * Math.Abs(_position.Z - _target.Z));
+                if (height < 1e-4f) height = 1.0f;
+                float width = height * aspect;
+                var ortho = OpenTK.Matrix4.CreateOrthographic(width, height, _nearPlane, _farPlane);
+                GL.LoadMatrix(ref ortho);
             }
 
-            gl.MatrixMode(OpenGL.GL_MODELVIEW);
-            gl.LoadIdentity();
-            gl.LookAt(
-                _position.X, _position.Y, _position.Z,
-                _target.X, _target.Y, _target.Z,
-                _up.X, _up.Y, _up.Z);
+            GL.MatrixMode(MatrixMode.Modelview);
+            GL.LoadIdentity();
+            var lookAt = OpenTK.Matrix4.LookAt(
+                new OpenTK.Vector3(_position.X, _position.Y, _position.Z),
+                new OpenTK.Vector3(_target.X, _target.Y, _target.Z),
+                new OpenTK.Vector3(_up.X, _up.Y, _up.Z));
+            GL.LoadMatrix(ref lookAt);
             if (_isLeftHanded)
-                gl.Scale(1.0f, -1.0f, 1.0f);
+                GL.Scale(1.0f, -1.0f, 1.0f);
             if (Math.Abs(_zScale - 1.0f) > 1e-6f)
-                gl.Scale(1.0f, 1.0f, _zScale);
+                GL.Scale(1.0f, 1.0f, _zScale);
         }
 
         #endregion
@@ -551,21 +554,24 @@ namespace VisionNet.Controls
         /// </summary>
         private Vector3? ScreenToWorld(int screenX, int screenY)
         {
-            var gl = _glControl.OpenGL;
+            var gl = _gl;
+            if (gl == null || !gl.IsValid) return null;
+            // Bind the context: this runs from a double-click handler, outside the render frame.
+            gl.MakeCurrent();
 
             int[] viewport = new int[4];
-            gl.GetInteger(OpenGL.GL_VIEWPORT, viewport);
+            GL.GetInteger(GetPName.Viewport, viewport);
             int adjustedY = viewport[3] - screenY;   // Flip Y to OpenGL convention.
 
-            byte[] depthBytes = new byte[4];
-            gl.ReadPixels(screenX, adjustedY, 1, 1,
-                OpenGL.GL_DEPTH_COMPONENT, OpenGL.GL_FLOAT, depthBytes);
-            float depth = BitConverter.ToSingle(depthBytes, 0);
+            float[] depthBytes = new float[1];
+            GL.ReadPixels(screenX, adjustedY, 1, 1,
+                PixelFormat.DepthComponent, PixelType.Float, depthBytes);
+            float depth = depthBytes[0];
 
             if (Math.Abs(depth - 1.0f) < 0.00001f) return null;
 
             float[] projection, view;
-            GetMatrices(_glControl.Width, _glControl.Height, out projection, out view);
+            GetMatrices(_gl.Width, _gl.Height, out projection, out view);
             var renderer = ModernGLRenderer.For(gl);
             renderer.SetSceneMatrices(projection, view);
             CxPoint3D world;

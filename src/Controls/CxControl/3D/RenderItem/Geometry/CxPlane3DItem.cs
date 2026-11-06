@@ -1,4 +1,4 @@
-using SharpGL;
+using OpenTK.Graphics.OpenGL;
 using System;
 using System.Drawing;
 using VisionNet.DataType;
@@ -29,7 +29,7 @@ namespace VisionNet.Controls
         public override bool SupportsGroupTransform => true;
 
         /// <inheritdoc/>
-        public override void Draw(OpenGL gl)
+        public override void Draw(CxGlContext gl)
         {
             if (Planes == null || Planes.Length == 0) return;
 
@@ -53,7 +53,7 @@ namespace VisionNet.Controls
                 WritePoint(ref offset, p0x, p0y, p0z); WritePoint(ref offset, p1x, p1y, p1z); WritePoint(ref offset, p2x, p2y, p2z);
                 WritePoint(ref offset, p0x, p0y, p0z); WritePoint(ref offset, p2x, p2y, p2z); WritePoint(ref offset, p3x, p3y, p3z);
             }
-            renderer.Draw(gl, OpenGL.GL_TRIANGLES, _positionsBuffer, DrawColor);
+            renderer.Draw(gl, PrimitiveType.Triangles, _positionsBuffer, DrawColor);
             PopModelMatrix(gl);
         }
 

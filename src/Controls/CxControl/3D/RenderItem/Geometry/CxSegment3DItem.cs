@@ -1,4 +1,4 @@
-using SharpGL;
+using OpenTK.Graphics.OpenGL;
 using System;
 using System.Drawing;
 using VisionNet.DataType;
@@ -113,7 +113,7 @@ namespace VisionNet.Controls
         public override bool SupportsGroupTransform => true;
 
         /// <inheritdoc/>
-        public override void Draw(OpenGL gl)
+        public override void Draw(CxGlContext gl)
         {
             if (Segment3Ds == null || Segment3Ds.Length == 0) return;
 
@@ -127,7 +127,7 @@ namespace VisionNet.Controls
                 positions[offset++] = seg.End.X; positions[offset++] = seg.End.Y; positions[offset++] = seg.End.Z;
             }
             var renderer = ModernGLRenderer.For(gl);
-            renderer.Draw(gl, OpenGL.GL_LINES, positions, DrawColor, Size);
+            renderer.Draw(gl, PrimitiveType.Lines, positions, DrawColor, Size);
 
             // Endpoint markers on the hit segment when active and selected.
             if (IsActiveObj && IsSelected && _hitSegIndex >= 0 && _hitSegIndex < Segment3Ds.Length)
@@ -135,7 +135,7 @@ namespace VisionNet.Controls
                 var s = Segment3Ds[_hitSegIndex];
                 _endpointBuffer[0] = s.Start.X; _endpointBuffer[1] = s.Start.Y; _endpointBuffer[2] = s.Start.Z;
                 _endpointBuffer[3] = s.End.X; _endpointBuffer[4] = s.End.Y; _endpointBuffer[5] = s.End.Z;
-                renderer.Draw(gl, OpenGL.GL_POINTS, _endpointBuffer, DrawColor, 10f);
+                renderer.Draw(gl, PrimitiveType.Points, _endpointBuffer, DrawColor, 10f);
             }
             PopModelMatrix(gl);
         }

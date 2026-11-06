@@ -33,14 +33,11 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="SharpGL">
-      <HintPath>..\..\..\3rd\SharpGL.dll</HintPath>
+    <Reference Include="OpenTK">
+      <HintPath>..\..\..\3rd\OpenTK.dll</HintPath>
     </Reference>
-    <Reference Include="SharpGL.SceneGraph">
-      <HintPath>..\..\..\3rd\SharpGL.SceneGraph.dll</HintPath>
-    </Reference>
-    <Reference Include="SharpGL.WinForms">
-      <HintPath>..\..\..\3rd\SharpGL.WinForms.dll</HintPath>
+    <Reference Include="OpenTK.GLControl">
+      <HintPath>..\..\..\3rd\OpenTK.GLControl.dll</HintPath>
     </Reference>
     <Reference Include="ScottPlot">
       <HintPath>..\..\..\3rd\ScottPlot.dll</HintPath>
@@ -146,6 +143,7 @@
     <Compile Include="3D\RenderItem\Overlay\CxText2DItem.cs" />
     <Compile Include="3D\RenderItem\Overlay\CxTextInfoItem.cs" />
     <Compile Include="3D\CxExtension.cs" />
+    <Compile Include="3D\CxGlContext.cs" />
     <Compile Include="3D\CxGLResourceManager.cs" />
     <Compile Include="3D\CxGroup.cs" />
     <Compile Include="3D\CxGroupManager.cs" />

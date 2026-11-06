@@ -1,7 +1,7 @@
-using SharpGL;
 using System;
 using System.Collections.Generic;
 using System.Drawing;
+using OpenTK.Graphics.OpenGL;
 using VisionNet.DataType;
 
 namespace VisionNet.Controls
@@ -647,7 +647,7 @@ namespace VisionNet.Controls
             return data;
         }
 
-        public void Draw(OpenGL gl, GLResourceHandle handle)
+        public void Draw(CxGlContext gl, GLResourceHandle handle)
         {
             if (!handle.IsValid || IsDisposed) return;
             var data = _cachedRenderData;
@@ -664,8 +664,8 @@ namespace VisionNet.Controls
             ModernGLRenderer.RenderStateSnapshot previous = default;
             if (changesState) previous = renderer.CaptureState(gl);
 
-            gl.UseProgram(handle.ShaderProgram);
-            gl.BindVertexArray(handle.VaoId);
+            GL.UseProgram(handle.ShaderProgram);
+            GL.BindVertexArray(handle.VaoId);
 
             renderer.UploadSceneMatrices(gl, handle, ModelMatrix);
             // Reuses the cached pose inverse (also used by picking) instead of inverting again.
@@ -674,34 +674,34 @@ namespace VisionNet.Controls
             foreach (var kv in data.Uniforms)
             {
                 int loc = handle.GetUniformLocation(gl, kv.Key);
-                if (kv.Value is float f) gl.Uniform1(loc, f);
-                else if (kv.Value is int i) gl.Uniform1(loc, i);
+                if (kv.Value is float f) GL.Uniform1(loc, f);
+                else if (kv.Value is int i) GL.Uniform1(loc, i);
                 else if (kv.Value is Color c)
-                    gl.Uniform4(loc, c.R / 255f, c.G / 255f, c.B / 255f, c.A / 255f);
+                    GL.Uniform4(loc, c.R / 255f, c.G / 255f, c.B / 255f, c.A / 255f);
             }
 
-            gl.ActiveTexture(OpenGL.GL_TEXTURE0);
-            gl.BindTexture(OpenGL.GL_TEXTURE_2D, handle.TextureId);
-            gl.Uniform1(handle.GetUniformLocation(gl, "intensityTexture"), 0);
+            GL.ActiveTexture(TextureUnit.Texture0);
+            GL.BindTexture(TextureTarget.Texture2D, handle.TextureId);
+            GL.Uniform1(handle.GetUniformLocation(gl, "intensityTexture"), 0);
 
             // Translucent items write depth by default, so they stay part of the depth buffer
             // (depth-based picking and occlusion keep working). Opting out restores the historical
             // behaviour where they only blend over what is already in the framebuffer.
-            if (IsTranslucent && !_translucentWritesDepth) gl.DepthMask(0);
+            if (IsTranslucent && !_translucentWritesDepth) GL.DepthMask(false);
 
             if (_surfaceMode == SurfaceMode.PointCloud)
             {
-                gl.PointSize(Math.Max(1f, _pointSize));
-                gl.DrawArrays(OpenGL.GL_POINTS, 0, data.VertexCount);
+                GL.PointSize(Math.Max(1f, _pointSize));
+                GL.DrawArrays(PrimitiveType.Points, 0, data.VertexCount);
             }
             else
             {
-                gl.DrawElements(OpenGL.GL_TRIANGLES, data.IndexCount, OpenGL.GL_UNSIGNED_INT, IntPtr.Zero);
+                GL.DrawElements(PrimitiveType.Triangles, data.IndexCount, DrawElementsType.UnsignedInt, IntPtr.Zero);
             }
 
-            gl.BindTexture(OpenGL.GL_TEXTURE_2D, 0);
-            gl.BindVertexArray(0);
-            gl.UseProgram(0);
+            GL.BindTexture(TextureTarget.Texture2D, 0);
+            GL.BindVertexArray(0);
+            GL.UseProgram(0);
             if (changesState) renderer.RestoreState(gl, previous);
         }
 

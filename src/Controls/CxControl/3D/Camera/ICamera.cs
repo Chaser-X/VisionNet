@@ -1,4 +1,3 @@
-using SharpGL;
 using System;
 using VisionNet.DataType;
 
@@ -56,6 +55,6 @@ namespace VisionNet.Controls
         /// Must be called every render frame before issuing draw calls.
         /// </summary>
         /// <param name="gl">Active OpenGL context.</param>
-        void LookAtMatrix(OpenGL gl);
+        void LookAtMatrix(CxGlContext gl);
     }
 }

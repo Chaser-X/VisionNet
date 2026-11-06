@@ -1,11 +1,5 @@
 using System;
-using System.Collections.Generic;
-using System.Drawing;
-using System.Drawing.Imaging;
-using System.Globalization;
-using System.Runtime.InteropServices;
-using SharpGL;
-using VisionNet.DataType;
+using OpenTK.Graphics.OpenGL;
 
 namespace VisionNet.Controls
 {
@@ -16,18 +10,18 @@ namespace VisionNet.Controls
         /// Deletes programs, buffers, textures, and model-stack state owned by this
         /// renderer. The caller must have made the owning context current.
         /// </summary>
-        private void ReleasePrograms(OpenGL gl)
+        private void ReleasePrograms(CxGlContext gl)
         {
-            gl.BindVertexArray(0);
-            gl.BindBuffer(OpenGL.GL_ARRAY_BUFFER, 0);
+            GL.BindVertexArray(0);
+            GL.BindBuffer(BufferTarget.ArrayBuffer, 0);
             if (_geometryProgram != 0)
             {
-                gl.DeleteProgram(_geometryProgram);
+                GL.DeleteProgram(_geometryProgram);
                 _geometryProgram = 0;
             }
             if (_surfaceProgram != 0)
             {
-                gl.DeleteProgram(_surfaceProgram);
+                GL.DeleteProgram(_surfaceProgram);
                 _surfaceProgram = 0;
             }
             _surfaceProgramFailed = false;
@@ -37,13 +31,13 @@ namespace VisionNet.Controls
             _geometryUseVertexColor = _geometryColor = -1;
             if (_textProgram != 0)
             {
-                gl.DeleteProgram(_textProgram);
+                GL.DeleteProgram(_textProgram);
                 _textProgram = 0;
             }
             _textProjection = _textColor = _textGlyph = -1;
             if (_sphereProgram != 0)
             {
-                gl.DeleteProgram(_sphereProgram);
+                GL.DeleteProgram(_sphereProgram);
                 _sphereProgram = 0;
             }
             _sphereProgramFailed = false;
@@ -51,54 +45,54 @@ namespace VisionNet.Controls
             _sphereColor = _sphereRadius = -1;
             if (_geometryVbo != 0)
             {
-                gl.DeleteBuffers(1, new[] { _geometryVbo });
+                GL.DeleteBuffers(1, new[] { _geometryVbo });
                 _geometryVbo = 0;
             }
             if (_geometryVao != 0)
             {
-                gl.DeleteVertexArrays(1, new[] { _geometryVao });
+                GL.DeleteVertexArrays(1, new[] { _geometryVao });
                 _geometryVao = 0;
             }
             if (_textVbo != 0)
             {
-                gl.DeleteBuffers(1, new[] { _textVbo });
+                GL.DeleteBuffers(1, new[] { _textVbo });
                 _textVbo = 0;
             }
             if (_textVao != 0)
             {
-                gl.DeleteVertexArrays(1, new[] { _textVao });
+                GL.DeleteVertexArrays(1, new[] { _textVao });
                 _textVao = 0;
             }
             if (_sphereInstanceVbo != 0)
             {
-                gl.DeleteBuffers(1, new[] { _sphereInstanceVbo });
+                GL.DeleteBuffers(1, new[] { _sphereInstanceVbo });
                 _sphereInstanceVbo = 0;
             }
             if (_sphereEbo != 0)
             {
-                gl.DeleteBuffers(1, new[] { _sphereEbo });
+                GL.DeleteBuffers(1, new[] { _sphereEbo });
                 _sphereEbo = 0;
             }
             if (_sphereVbo != 0)
             {
-                gl.DeleteBuffers(1, new[] { _sphereVbo });
+                GL.DeleteBuffers(1, new[] { _sphereVbo });
                 _sphereVbo = 0;
             }
             if (_sphereVao != 0)
             {
-                gl.DeleteVertexArrays(1, new[] { _sphereVao });
+                GL.DeleteVertexArrays(1, new[] { _sphereVao });
                 _sphereVao = 0;
             }
             _sphereIndexCount = 0;
             foreach (var cached in _textTextures.Values)
                 if (cached.Texture != 0)
-                    gl.DeleteTextures(1, new[] { cached.Texture });
+                    GL.DeleteTextures(1, new[] { cached.Texture });
             _textTextures.Clear();
             _textTextureOrder.Clear();
             _textTexturesUsedThisFrame.Clear();
             foreach (var atlas in _glyphAtlases.Values)
                 if (atlas.Texture != 0)
-                    gl.DeleteTextures(1, new[] { atlas.Texture });
+                    GL.DeleteTextures(1, new[] { atlas.Texture });
             _glyphAtlases.Clear();
             ReleaseIbl(gl);
             _state.Reset();
@@ -112,10 +106,10 @@ namespace VisionNet.Controls
         /// using the caller's active fixed-function matrices when no CxDisplay frame
         /// has supplied explicit scene matrices.
         /// </summary>
-        private void ReadCurrentGLMatrices(OpenGL gl)
+        private void ReadCurrentGLMatrices(CxGlContext gl)
         {
-            gl.GetFloat(OpenGL.GL_PROJECTION_MATRIX, _projectionQuery);
-            gl.GetFloat(OpenGL.GL_MODELVIEW_MATRIX, _viewQuery);
+            GL.GetFloat(GetPName.ProjectionMatrix, _projectionQuery);
+            GL.GetFloat(GetPName.ModelviewMatrix, _viewQuery);
             for (int row = 0; row < 4; row++)
                 for (int col = 0; col < 4; col++)
                 {
@@ -129,7 +123,7 @@ namespace VisionNet.Controls
         /// CxDisplay sets explicit matrices for a frame, so its shader path does not
         /// depend on whatever legacy matrix state happens to be active.
         /// </summary>
-        internal void EnsureSceneMatrices(OpenGL gl)
+        internal void EnsureSceneMatrices(CxGlContext gl)
         {
             if (!_hasSceneMatrices)
                 ReadCurrentGLMatrices(gl);
@@ -166,13 +160,12 @@ namespace VisionNet.Controls
                         + left[row * 4 + 3] * right[12 + col];
         }
 
-        private void RefreshViewport(OpenGL gl)
+        private void RefreshViewport(CxGlContext gl)
         {
-            if (gl.RenderContextProvider == null) return;
-            int width = gl.RenderContextProvider.Width;
-            int height = gl.RenderContextProvider.Height;
+            int width = gl.Width;
+            int height = gl.Height;
             if (width == _viewportWidth && height == _viewportHeight) return;
-            gl.GetInteger(OpenGL.GL_VIEWPORT, _viewport);
+            GL.GetInteger(GetPName.Viewport, _viewport);
             _viewportWidth = width;
             _viewportHeight = height;
         }

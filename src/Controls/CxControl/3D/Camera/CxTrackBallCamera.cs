@@ -2,7 +2,7 @@ using System;
 using System.Drawing;
 using System.Numerics;
 using System.Windows.Forms;
-using SharpGL;
+using OpenTK.Graphics.OpenGL;
 using VisionNet.DataType;
 
 namespace VisionNet.Controls
@@ -18,7 +18,7 @@ namespace VisionNet.Controls
     {
         #region Private fields
 
-        private OpenGLControl _glControl;
+        private CxGlContext _gl;
         private float _translateX    = 0f;
         private float _translateY    = 0f;
         private float _translateZ    = -10f;
@@ -57,20 +57,20 @@ namespace VisionNet.Controls
         /// Initializes the camera, resets the rotation matrix to identity,
         /// and subscribes to control mouse events.
         /// </summary>
-        /// <param name="glControl">The OpenGL host control.</param>
-        public CxTrackBallCamera(OpenGLControl glControl)
+        /// <param name="gl">The GL context of the host control.</param>
+        public CxTrackBallCamera(CxGlContext gl)
         {
-            _glControl = glControl;
+            _gl = gl;
 
             // Identity rotation matrix.
             for (int i = 0; i < 16; i++)
                 _rotationMatrix[i] = (i % 5 == 0) ? 1.0f : 0.0f;
 
-            _glControl.MouseDown        += GlControl_MouseDown;
-            _glControl.MouseMove        += GlControl_MouseMove;
-            _glControl.MouseUp          += GlControl_MouseUp;
-            _glControl.MouseWheel       += GlControl_MouseWheel;
-            _glControl.MouseDoubleClick += GlControl_MouseDoubleClick;
+            _gl.Host.MouseDown        += GlControl_MouseDown;
+            _gl.Host.MouseMove        += GlControl_MouseMove;
+            _gl.Host.MouseUp          += GlControl_MouseUp;
+            _gl.Host.MouseWheel       += GlControl_MouseWheel;
+            _gl.Host.MouseDoubleClick += GlControl_MouseDoubleClick;
         }
 
         #endregion
@@ -122,7 +122,7 @@ namespace VisionNet.Controls
                 _lastMouseY = e.Y;
             }
 
-            _glControl.Invalidate();
+            _gl.Host.Invalidate();
         }
 
         private void GlControl_MouseUp(object sender, MouseEventArgs e)
@@ -138,7 +138,7 @@ namespace VisionNet.Controls
             // Adaptive zoom: speed scales with current distance.
             float speed = Math.Max(Math.Abs(_translateZ) * 0.02f, 0.005f);
             _translateZ += e.Delta > 0 ? speed : -speed;
-            _glControl.Invalidate();
+            _gl.Host.Invalidate();
         }
 
         private void GlControl_MouseDoubleClick(object sender, MouseEventArgs e)
@@ -151,7 +151,7 @@ namespace VisionNet.Controls
                     CxPoint3D adjusted = ApplyInverseRotation(worldPos.Value);
                     _translateX = -adjusted.X;
                     _translateY = -adjusted.Y;
-                    _glControl.Invalidate();
+                    _gl.Host.Invalidate();
                 }
             }
         }
@@ -193,7 +193,7 @@ namespace VisionNet.Controls
                 else if (min2 == min3) _translateSpeed = (float)min1 / 400f;
                 else                   _translateSpeed = (float)min2 / 400f;
 
-                double aspect   = (double)_glControl.Width / _glControl.Height;
+                double aspect   = (double)_gl.Width / _gl.Height;
                 double zoomDist = Math.Max(w / aspect, h);
 
                 _translateX = -(float)viewBox.Value.Center.X;
@@ -207,8 +207,8 @@ namespace VisionNet.Controls
                 {
                     double scaledW = w / aspect;
                     _translateZ = scaledW > h
-                        ? (float)(_glControl.Width  / scaledW)
-                        : (float)(_glControl.Height / h);
+                        ? (float)(_gl.Width  / scaledW)
+                        : (float)(_gl.Height / h);
                 }
 
                 _originalZ = _translateZ;
@@ -223,11 +223,11 @@ namespace VisionNet.Controls
         }
 
         /// <inheritdoc/>
-        public void LookAtMatrix(OpenGL gl)
+        public void LookAtMatrix(CxGlContext gl)
         {
-            gl.Viewport(0, 0, _glControl.Width, _glControl.Height);
+            GL.Viewport(0, 0, _gl.Width, _gl.Height);
             float[] projection, view;
-            GetMatrices(_glControl.Width, _glControl.Height, out projection, out view);
+            GetMatrices(_gl.Width, _gl.Height, out projection, out view);
             ModernGLRenderer.For(gl).SetSceneMatrices(projection, view);
         }
 
@@ -357,21 +357,24 @@ namespace VisionNet.Controls
         /// </summary>
         private CxPoint3D? GetMouseWorldPosition(int mouseX, int mouseY)
         {
-            var gl = _glControl.OpenGL;
+            var gl = _gl;
+            if (gl == null || !gl.IsValid) return null;
+            // Bind the context: this runs from a mouse handler, outside the render frame.
+            gl.MakeCurrent();
 
             int[] viewport = new int[4];
-            gl.GetInteger(OpenGL.GL_VIEWPORT, viewport);
+            GL.GetInteger(GetPName.Viewport, viewport);
             int adjustedY = viewport[3] - mouseY;
 
-            byte[] depthBytes = new byte[4];
-            gl.ReadPixels(mouseX, adjustedY, 1, 1,
-                OpenGL.GL_DEPTH_COMPONENT, OpenGL.GL_FLOAT, depthBytes);
-            float depth = BitConverter.ToSingle(depthBytes, 0);
+            float[] depthBytes = new float[1];
+            GL.ReadPixels(mouseX, adjustedY, 1, 1,
+                PixelFormat.DepthComponent, PixelType.Float, depthBytes);
+            float depth = depthBytes[0];
 
             if (Math.Abs(depth - 1.0f) < 0.00001f) return null;
 
             float[] projection, view;
-            GetMatrices(_glControl.Width, _glControl.Height, out projection, out view);
+            GetMatrices(_gl.Width, _gl.Height, out projection, out view);
             var renderer = ModernGLRenderer.For(gl);
             renderer.SetSceneMatrices(projection, view);
             CxPoint3D world;
@@ -425,13 +428,13 @@ namespace VisionNet.Controls
         {
             if (!_disposed)
             {
-                if (disposing && _glControl != null)
+                if (disposing && _gl != null)
                 {
-                    _glControl.MouseDown        -= GlControl_MouseDown;
-                    _glControl.MouseMove        -= GlControl_MouseMove;
-                    _glControl.MouseUp          -= GlControl_MouseUp;
-                    _glControl.MouseWheel       -= GlControl_MouseWheel;
-                    _glControl.MouseDoubleClick -= GlControl_MouseDoubleClick;
+                    _gl.Host.MouseDown        -= GlControl_MouseDown;
+                    _gl.Host.MouseMove        -= GlControl_MouseMove;
+                    _gl.Host.MouseUp          -= GlControl_MouseUp;
+                    _gl.Host.MouseWheel       -= GlControl_MouseWheel;
+                    _gl.Host.MouseDoubleClick -= GlControl_MouseDoubleClick;
                 }
                 _disposed = true;
             }

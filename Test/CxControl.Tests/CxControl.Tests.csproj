@@ -26,17 +26,13 @@
       <HintPath>..\..\bin\Debug\VisionNet.dll</HintPath>
       <SpecificVersion>False</SpecificVersion>
     </Reference>
-    <!-- CxDisplay derives from SharpGL's OpenGLControl, so its base type must be referenceable. -->
-    <Reference Include="SharpGL">
-      <HintPath>..\..\3rd\SharpGL.dll</HintPath>
+    <!-- CxDisplay derives from OpenTK's GLControl, so its base type must be referenceable. -->
+    <Reference Include="OpenTK">
+      <HintPath>..\..\3rd\OpenTK.dll</HintPath>
       <SpecificVersion>False</SpecificVersion>
     </Reference>
-    <Reference Include="SharpGL.SceneGraph">
-      <HintPath>..\..\3rd\SharpGL.SceneGraph.dll</HintPath>
-      <SpecificVersion>False</SpecificVersion>
-    </Reference>
-    <Reference Include="SharpGL.WinForms">
-      <HintPath>..\..\3rd\SharpGL.WinForms.dll</HintPath>
+    <Reference Include="OpenTK.GLControl">
+      <HintPath>..\..\3rd\OpenTK.GLControl.dll</HintPath>
       <SpecificVersion>False</SpecificVersion>
     </Reference>
   </ItemGroup>

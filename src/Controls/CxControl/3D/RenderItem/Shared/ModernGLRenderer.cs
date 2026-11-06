@@ -5,7 +5,7 @@ using System.Drawing;
 using System.Drawing.Imaging;
 using System.Globalization;
 using System.Runtime.InteropServices;
-using SharpGL;
+using OpenTK.Graphics.OpenGL;
 using VisionNet.DataType;
 
 namespace VisionNet.Controls
@@ -19,8 +19,7 @@ namespace VisionNet.Controls
     /// <remarks>
     /// Items only provide CPU-side vertices; they never create or destroy GL objects and never
     /// call the legacy Begin/End or matrix-stack API. One instance is kept for each
-    /// <see cref="OpenGL"/> wrapper because all GL object names are local to the wrapper's current
-    /// context.
+    /// <see cref="CxGlContext"/> because all GL object names are local to that context.
     /// <para>This type is deliberately not overlay-specific: the built-in surface items acquire
     /// their shared shader program from it (<see cref="EnsureSurfaceProgram"/>) and upload their
     /// matrices through it (<see cref="UploadSceneMatrices(OpenGL, GLResourceHandle, CxMatrix4X4)"/>),
@@ -58,8 +57,8 @@ namespace VisionNet.Controls
         // Access to the wrapper-to-renderer map is synchronized because resource
         // disposal can happen on a UI/lifecycle callback while drawing is in progress.
         private static readonly object Sync = new object();
-        private static readonly Dictionary<OpenGL, ModernGLRenderer> Instances
-            = new Dictionary<OpenGL, ModernGLRenderer>();
+        private static readonly Dictionary<CxGlContext, ModernGLRenderer> Instances
+            = new Dictionary<CxGlContext, ModernGLRenderer>();
 
         // One renderer instance already exists per OpenGL wrapper (see For), so the model stack
         // needs no further per-context indirection: a single State field is context-scoped
@@ -159,7 +158,6 @@ namespace VisionNet.Controls
         private RenderStateSnapshot _frameState;
         private readonly float[] _pointSizeQuery = new float[1];
         private readonly float[] _lineWidthQuery = new float[1];
-        private readonly byte[] _depthWriteQuery = new byte[1];
 
         // Reusable CPU upload buffers for the screen-space paths.
         private float[] _screenPositions3D = new float[0];
@@ -238,7 +236,7 @@ void main() { FragColor = vertexColor; }";
         /// Returns the renderer associated with <paramref name="gl"/>, creating it
         /// lazily before the first overlay draw.
         /// </summary>
-        internal static ModernGLRenderer For(OpenGL gl)
+        internal static ModernGLRenderer For(CxGlContext gl)
         {
             lock (Sync)
             {
@@ -256,7 +254,7 @@ void main() { FragColor = vertexColor; }";
         /// Forgets the renderer for a context that has been recreated. The old GL names are
         /// invalid in the new context, so this path must not MakeCurrent or call Delete*.
         /// </summary>
-        internal static void ResetForContextRecreate(OpenGL gl)
+        internal static void ResetForContextRecreate(CxGlContext gl)
         {
             if (gl == null) return;
             lock (Sync)
@@ -267,7 +265,7 @@ void main() { FragColor = vertexColor; }";
         /// Drops the renderer associated with a GL context and releases its programs.
         /// Program handles are context-owned, so this must run while the context is current.
         /// </summary>
-        internal static void Release(OpenGL gl)
+        internal static void Release(CxGlContext gl)
         {
             if (gl == null) return;
             lock (Sync)
@@ -276,10 +274,10 @@ void main() { FragColor = vertexColor; }";
                 if (!Instances.TryGetValue(gl, out renderer)) return;
                 Instances.Remove(gl);
                 // Program names are only meaningful in the context in which they
-                // were created.  OpenGLControl may invoke disposal while another
+                // were created.  GLControl may invoke disposal while another
                 // hidden context is current, so explicitly bind this wrapper's
                 // context before deleting its programs.
-                if (gl.RenderContextProvider == null)
+                if (!gl.IsValid)
                     return;
                 try
                 {
@@ -299,21 +297,21 @@ void main() { FragColor = vertexColor; }";
         }
 
         /// <summary>Pushes the current overlay model matrix and selects <paramref name="model"/>.</summary>
-        internal void PushModel(OpenGL gl, CxMatrix4X4 model)
+        internal void PushModel(CxGlContext gl, CxMatrix4X4 model)
         {
             _state.Models.Push(_state.Current);
             _state.Current = model ?? CxMatrix4X4.Identity();
         }
 
         /// <summary>Restores the model matrix saved by the matching <see cref="PushModel"/> call.</summary>
-        internal void PopModel(OpenGL gl)
+        internal void PopModel(CxGlContext gl)
         {
             _state.Current = _state.Models.Count == 0
                 ? CxMatrix4X4.Identity() : _state.Models.Pop();
         }
 
         /// <summary>Gets the model matrix currently applied to world-space overlay vertices.</summary>
-        internal CxMatrix4X4 CurrentModel(OpenGL gl) => _state.Current;
+        internal CxMatrix4X4 CurrentModel(CxGlContext gl) => _state.Current;
 
         /// <summary>
         /// Stores the camera matrices for subsequent world-space draws and CPU-side
@@ -334,7 +332,7 @@ void main() { FragColor = vertexColor; }";
         /// current frame are kept together so a scene with slightly more than the
         /// nominal cache size does not evict its own working set while it is drawn.
         /// </summary>
-        internal void BeginFrame(OpenGL gl)
+        internal void BeginFrame(CxGlContext gl)
         {
             _frameState = CaptureRenderStateUncached(gl);
             _frameStateCaptured = true;
@@ -347,14 +345,14 @@ void main() { FragColor = vertexColor; }";
         /// frame working set is allowed to exceed the nominal limit; only entries
         /// not used by this frame are evicted.
         /// </summary>
-        internal void EndFrame(OpenGL gl)
+        internal void EndFrame(CxGlContext gl)
         {
             int targetCount = Math.Max(MaxCachedTextTextures, _textTexturesUsedThisFrame.Count);
             TrimTextCache(gl, targetCount);
             _textTexturesUsedThisFrame.Clear();
             if (_frameStateCaptured)
             {
-                RestoreRenderState(gl, _frameState);
+                RestoreRenderState(_frameState);
                 _frameStateCaptured = false;
             }
             // Explicit camera matrices belong only to the CxDisplay frame.  Public

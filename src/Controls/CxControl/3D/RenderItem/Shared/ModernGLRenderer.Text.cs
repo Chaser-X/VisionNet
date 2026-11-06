@@ -4,8 +4,9 @@ using System.Drawing;
 using System.Drawing.Imaging;
 using System.Globalization;
 using System.Runtime.InteropServices;
-using SharpGL;
+using OpenTK.Graphics.OpenGL;
 using VisionNet.DataType;
+using GdiPixelFormat = System.Drawing.Imaging.PixelFormat;
 
 namespace VisionNet.Controls
 {
@@ -17,11 +18,11 @@ namespace VisionNet.Controls
         /// screen position. Public 3D text APIs pass point sizes, so the method keeps
         /// the historical 96-DPI point-to-pixel conversion.
         /// </summary>
-        internal void DrawText(OpenGL gl, int x, int y, Color color, float fontSize, string text)
+        internal void DrawText(CxGlContext gl, int x, int y, Color color, float fontSize, string text)
         {
-            if (string.IsNullOrEmpty(text) || gl.RenderContextProvider == null) return;
-            // The public 3D text APIs historically pass point sizes to SharpGL,
-            // whose FontBitmaps implementation converts points to pixels using
+            if (string.IsNullOrEmpty(text) || gl == null || !gl.IsValid) return;
+            // The public 3D text APIs historically pass point sizes, whose
+            // FontBitmaps implementation converts points to pixels using
             // 96 DPI (fontSize * 96 / 72). Keep that visual contract for the
             // System.Drawing texture path as well.
             float effectiveFontSize = Math.Max(1f, fontSize * 4f / 3f);
@@ -56,7 +57,7 @@ namespace VisionNet.Controls
             return true;
         }
 
-        private void DrawNumericGlyphText(OpenGL gl, int x, int y, Color color,
+        private void DrawNumericGlyphText(CxGlContext gl, int x, int y, Color color,
             float fontSize, string text)
         {
             var atlas = GetOrCreateGlyphAtlas(gl, fontSize);
@@ -108,14 +109,14 @@ namespace VisionNet.Controls
             vertices[offset++] = v;
         }
 
-        private GlyphAtlas GetOrCreateGlyphAtlas(OpenGL gl, float fontSize)
+        private GlyphAtlas GetOrCreateGlyphAtlas(CxGlContext gl, float fontSize)
         {
             string key = fontSize.ToString("R", CultureInfo.InvariantCulture);
             GlyphAtlas atlas;
             if (_glyphAtlases.TryGetValue(key, out atlas)) return atlas;
 
             using (var font = new Font("Arial", fontSize, GraphicsUnit.Pixel))
-            using (var measure = new Bitmap(1, 1, PixelFormat.Format32bppArgb))
+            using (var measure = new Bitmap(1, 1, GdiPixelFormat.Format32bppArgb))
             using (var measuringGraphics = Graphics.FromImage(measure))
             {
                 int cellWidth = 1;
@@ -141,7 +142,7 @@ namespace VisionNet.Controls
                 int rows = (NumericGlyphCharacters.Length + columns - 1) / columns;
                 int atlasWidth = columns * cellWidth;
                 int atlasHeight = rows * cellHeight;
-                using (var bitmap = new Bitmap(atlasWidth, atlasHeight, PixelFormat.Format32bppArgb))
+                using (var bitmap = new Bitmap(atlasWidth, atlasHeight, GdiPixelFormat.Format32bppArgb))
                 using (var graphics = Graphics.FromImage(bitmap))
                 using (var brush = new SolidBrush(Color.White))
                 {
@@ -191,7 +192,7 @@ namespace VisionNet.Controls
         /// entries are recorded as active for the current frame and become eligible
         /// for deletion only after EndFrame has completed.
         /// </summary>
-        private CachedText GetOrCreateTextTexture(OpenGL gl, float fontSize, string text)
+        private CachedText GetOrCreateTextTexture(CxGlContext gl, float fontSize, string text)
         {
             string key = fontSize.ToString("R", CultureInfo.InvariantCulture) + "\0" + text;
             CachedText cached;
@@ -202,13 +203,13 @@ namespace VisionNet.Controls
             }
 
             using (var font = new Font("Arial", fontSize, GraphicsUnit.Pixel))
-            using (var measure = new Bitmap(1, 1, PixelFormat.Format32bppArgb))
+            using (var measure = new Bitmap(1, 1, GdiPixelFormat.Format32bppArgb))
             using (var mg = Graphics.FromImage(measure))
             {
                 SizeF measured = mg.MeasureString(text, font);
                 int width = Math.Max(1, (int)Math.Ceiling(measured.Width) + 4);
                 int height = Math.Max(1, (int)Math.Ceiling(measured.Height) + 4);
-                using (var bitmap = new Bitmap(width, height, PixelFormat.Format32bppArgb))
+                using (var bitmap = new Bitmap(width, height, GdiPixelFormat.Format32bppArgb))
                 using (var graphics = Graphics.FromImage(bitmap))
                 {
                     graphics.Clear(Color.Transparent);
@@ -231,7 +232,7 @@ namespace VisionNet.Controls
             return cached;
         }
 
-        private void TrimTextCache(OpenGL gl, int targetCount)
+        private void TrimTextCache(CxGlContext gl, int targetCount)
         {
             while (_textTextures.Count > targetCount && _textTextureOrder.Count > 0)
             {
@@ -247,7 +248,7 @@ namespace VisionNet.Controls
                 {
                     _textTextures.Remove(evictedKey);
                     if (evicted.Texture != 0)
-                        gl.DeleteTextures(1, new[] { evicted.Texture });
+                        GL.DeleteTextures(1, new[] { evicted.Texture });
                 }
             }
         }
@@ -257,10 +258,10 @@ namespace VisionNet.Controls
         /// matrix convention as the GLSL path. Returns false when the point is behind
         /// the camera or outside the normalized depth range.
         /// </summary>
-        internal bool Project(OpenGL gl, float x, float y, float z, out float sx, out float sy, out float sz)
+        internal bool Project(CxGlContext gl, float x, float y, float z, out float sx, out float sy, out float sz)
         {
             sx = sy = sz = 0f;
-            if (gl.RenderContextProvider == null) return false;
+            if (gl == null || !gl.IsValid) return false;
             EnsureSceneMatrices(gl);
             RefreshViewport(gl);
             // CxMatrix4X4 and the camera expose row-major matrices with column-vector
@@ -287,10 +288,10 @@ namespace VisionNet.Controls
         /// Converts viewport pixels and a depth-buffer value back to world space by
         /// inverting the current projection/view product.
         /// </summary>
-        internal bool Unproject(OpenGL gl, float sx, float sy, float depth, out CxPoint3D point)
+        internal bool Unproject(CxGlContext gl, float sx, float sy, float depth, out CxPoint3D point)
         {
             point = new CxPoint3D();
-            if (gl.RenderContextProvider == null) return false;
+            if (gl == null || !gl.IsValid) return false;
             RefreshViewport(gl);
             if (_viewport[2] <= 0 || _viewport[3] <= 0) return false;
             float nx = (sx - _viewport[0]) / _viewport[2] * 2f - 1f;
@@ -302,20 +303,20 @@ namespace VisionNet.Controls
         }
 
         /// <summary>Uploads one screen quad and composites a cached text alpha mask.</summary>
-        private void DrawTextQuad(OpenGL gl, float[] quad, uint texture, Color color)
+        private void DrawTextQuad(CxGlContext gl, float[] quad, uint texture, Color color)
         {
-            DrawTextVertices(gl, quad, 4, OpenGL.GL_TRIANGLE_FAN, texture, color);
+            DrawTextVertices(gl, quad, 4, PrimitiveType.TriangleFan, texture, color);
         }
 
         /// <summary>Uploads a batched text triangle list and composites a cached text alpha mask.</summary>
-        private void DrawTextTriangles(OpenGL gl, float[] vertices, int vertexCount,
+        private void DrawTextTriangles(CxGlContext gl, float[] vertices, int vertexCount,
             uint texture, Color color)
         {
-            DrawTextVertices(gl, vertices, vertexCount, OpenGL.GL_TRIANGLES, texture, color);
+            DrawTextVertices(gl, vertices, vertexCount, PrimitiveType.Triangles, texture, color);
         }
 
-        private void DrawTextVertices(OpenGL gl, float[] vertices, int vertexCount,
-            uint primitive, uint texture, Color color)
+        private void DrawTextVertices(CxGlContext gl, float[] vertices, int vertexCount,
+            PrimitiveType primitive, uint texture, Color color)
         {
             if (vertices == null || vertexCount <= 0
                 || vertices.Length < vertexCount * 4)
@@ -323,51 +324,51 @@ namespace VisionNet.Controls
             if (!EnsureTextProgram(gl)) return;
             EnsureTextBuffers(gl);
             RenderStateSnapshot previous = CaptureRenderState(gl);
-            SetRenderState(gl, false, true);
-            gl.DepthMask(0);
-            gl.BindVertexArray(_textVao);
-            gl.BindBuffer(OpenGL.GL_ARRAY_BUFFER, _textVbo);
+            SetRenderState(false, true);
+            GL.DepthMask(false);
+            GL.BindVertexArray(_textVao);
+            GL.BindBuffer(BufferTarget.ArrayBuffer, _textVbo);
             GCHandle pinned = default(GCHandle);
             try
             {
                 pinned = GCHandle.Alloc(vertices, GCHandleType.Pinned);
-                gl.BufferData(OpenGL.GL_ARRAY_BUFFER, vertexCount * 4 * sizeof(float),
-                    pinned.AddrOfPinnedObject(), OpenGL.GL_STREAM_DRAW);
+                GL.BufferData(BufferTarget.ArrayBuffer, vertexCount * 4 * sizeof(float),
+                    pinned.AddrOfPinnedObject(), BufferUsageHint.StreamDraw);
             }
             finally
             {
                 if (pinned.IsAllocated) pinned.Free();
             }
-            gl.VertexAttribPointer(0, 2, OpenGL.GL_FLOAT, false, 4 * sizeof(float), IntPtr.Zero);
-            gl.EnableVertexAttribArray(0);
-            gl.VertexAttribPointer(1, 2, OpenGL.GL_FLOAT, false, 4 * sizeof(float), new IntPtr(2 * sizeof(float)));
-            gl.EnableVertexAttribArray(1);
-            gl.UseProgram(_textProgram);
-            gl.UniformMatrix4(_textProjection, 1, true,
-                Ortho(gl.RenderContextProvider.Width, gl.RenderContextProvider.Height));
-            gl.Uniform4(_textColor,
+            GL.VertexAttribPointer(0, 2, VertexAttribPointerType.Float, false, 4 * sizeof(float), IntPtr.Zero);
+            GL.EnableVertexAttribArray(0);
+            GL.VertexAttribPointer(1, 2, VertexAttribPointerType.Float, false, 4 * sizeof(float), new IntPtr(2 * sizeof(float)));
+            GL.EnableVertexAttribArray(1);
+            GL.UseProgram(_textProgram);
+            GL.UniformMatrix4(_textProjection, 1, true,
+                Ortho(gl.Width, gl.Height));
+            GL.Uniform4(_textColor,
                 color.R / 255f, color.G / 255f, color.B / 255f, color.A / 255f);
-            gl.ActiveTexture(OpenGL.GL_TEXTURE0);
-            gl.BindTexture(OpenGL.GL_TEXTURE_2D, texture);
-            gl.Uniform1(_textGlyph, 0);
-            gl.DrawArrays(primitive, 0, vertexCount);
-            gl.BindTexture(OpenGL.GL_TEXTURE_2D, 0);
-            gl.UseProgram(0);
-            gl.DisableVertexAttribArray(0);
-            gl.DisableVertexAttribArray(1);
-            gl.BindVertexArray(0);
-            gl.BindBuffer(OpenGL.GL_ARRAY_BUFFER, 0);
-            RestoreRenderState(gl, previous);
+            GL.ActiveTexture(TextureUnit.Texture0);
+            GL.BindTexture(TextureTarget.Texture2D, texture);
+            GL.Uniform1(_textGlyph, 0);
+            GL.DrawArrays(primitive, 0, vertexCount);
+            GL.BindTexture(TextureTarget.Texture2D, 0);
+            GL.UseProgram(0);
+            GL.DisableVertexAttribArray(0);
+            GL.DisableVertexAttribArray(1);
+            GL.BindVertexArray(0);
+            GL.BindBuffer(BufferTarget.ArrayBuffer, 0);
+            RestoreRenderState(previous);
         }
 
         /// <summary>
         /// Converts a GDI+ bitmap into an RGBA OpenGL texture. The source alpha is
         /// copied into all colour channels so the shader can sample the red channel.
         /// </summary>
-        private uint UploadGlyph(OpenGL gl, Bitmap bitmap)
+        private uint UploadGlyph(CxGlContext gl, Bitmap bitmap)
         {
             Rectangle rect = new Rectangle(0, 0, bitmap.Width, bitmap.Height);
-            BitmapData bits = bitmap.LockBits(rect, ImageLockMode.ReadOnly, PixelFormat.Format32bppArgb);
+            BitmapData bits = bitmap.LockBits(rect, ImageLockMode.ReadOnly, GdiPixelFormat.Format32bppArgb);
             byte[] rgba = new byte[bitmap.Width * bitmap.Height * 4];
             Marshal.Copy(bits.Scan0, rgba, 0, rgba.Length);
             bitmap.UnlockBits(bits);
@@ -384,15 +385,16 @@ namespace VisionNet.Controls
             {
                 Marshal.Copy(rgba, 0, ptr, rgba.Length);
                 uint[] ids = new uint[1];
-                gl.GenTextures(1, ids);
-                gl.BindTexture(OpenGL.GL_TEXTURE_2D, ids[0]);
-                gl.TexParameter(OpenGL.GL_TEXTURE_2D, OpenGL.GL_TEXTURE_MIN_FILTER, OpenGL.GL_LINEAR);
-                gl.TexParameter(OpenGL.GL_TEXTURE_2D, OpenGL.GL_TEXTURE_MAG_FILTER, OpenGL.GL_LINEAR);
-                gl.TexParameter(OpenGL.GL_TEXTURE_2D, OpenGL.GL_TEXTURE_WRAP_S, OpenGL.GL_CLAMP_TO_EDGE);
-                gl.TexParameter(OpenGL.GL_TEXTURE_2D, OpenGL.GL_TEXTURE_WRAP_T, OpenGL.GL_CLAMP_TO_EDGE);
-                gl.TexImage2D(OpenGL.GL_TEXTURE_2D, 0, OpenGL.GL_RGBA,
-                    bitmap.Width, bitmap.Height, 0, OpenGL.GL_RGBA, OpenGL.GL_UNSIGNED_BYTE, ptr);
-                gl.BindTexture(OpenGL.GL_TEXTURE_2D, 0);
+                GL.GenTextures(1, ids);
+                GL.BindTexture(TextureTarget.Texture2D, ids[0]);
+                GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)All.Linear);
+                GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)All.Linear);
+                GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)All.ClampToEdge);
+                GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)All.ClampToEdge);
+                GL.TexImage2D(TextureTarget.Texture2D, 0, PixelInternalFormat.Rgba,
+                    bitmap.Width, bitmap.Height, 0, OpenTK.Graphics.OpenGL.PixelFormat.Rgba,
+                    PixelType.UnsignedByte, ptr);
+                GL.BindTexture(TextureTarget.Texture2D, 0);
                 return ids[0];
             }
             finally { Marshal.FreeHGlobal(ptr); }

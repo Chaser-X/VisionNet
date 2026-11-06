@@ -1,6 +1,9 @@
-using SharpGL;
 using System;
 using System.Collections.Generic;
+using OpenTK;
+using OpenTK.Graphics;
+using OpenTK.Graphics.OpenGL;
+using OpenTK.Platform;
 using VisionNet.DataType;
 
 namespace VisionNet.Controls
@@ -451,7 +454,7 @@ namespace VisionNet.Controls
         /// <param name="z">World Z coordinate.</param>
         /// <param name="size">Base font size before depth scaling.</param>
         /// <param name="text">Text string to draw.</param>
-        public static void DrawTextLabel3D(OpenGL gl, float x, float y, float z, float size, string text)
+        public static void DrawTextLabel3D(CxGlContext gl, float x, float y, float z, float size, string text)
         {
             var renderer = ModernGLRenderer.For(gl);
             float sx, sy, sz;
@@ -470,7 +473,7 @@ namespace VisionNet.Controls
         /// <param name="z">World Z coordinate.</param>
         /// <param name="size">Font size in points.</param>
         /// <param name="text">Text string to draw.</param>
-        public static void DrawTextLabel2D(OpenGL gl, float x, float y, float z, float size, string text)
+        public static void DrawTextLabel2D(CxGlContext gl, float x, float y, float z, float size, string text)
         {
             var renderer = ModernGLRenderer.For(gl);
             float sx, sy, sz;
@@ -490,22 +493,26 @@ namespace VisionNet.Controls
         {
             try
             {
-                var gl       = new OpenGL();
-                string ver   = gl.GetString(OpenGL.GL_VERSION);
-                string rend  = gl.GetString(OpenGL.GL_RENDERER);
-                string vend  = gl.GetString(OpenGL.GL_VENDOR);
+                using (var probe = OpenGlProbe.Open())
+                {
+                    if (probe == null) return false;
 
-                Console.WriteLine($"OpenGL version: {ver}");
-                Console.WriteLine($"Renderer: {rend}");
-                Console.WriteLine($"Vendor: {vend}");
+                    string ver  = GL.GetString(StringName.Version);
+                    string rend = GL.GetString(StringName.Renderer);
+                    string vend = GL.GetString(StringName.Vendor);
 
-                bool isSoftware = rend.Contains("Software") ||
-                                  rend.Contains("Microsoft") ||
-                                  rend.Contains("GDI Generic");
-                if (isSoftware)
-                    Console.WriteLine("Warning: software renderer detected — performance may be limited.");
+                    Console.WriteLine($"OpenGL version: {ver}");
+                    Console.WriteLine($"Renderer: {rend}");
+                    Console.WriteLine($"Vendor: {vend}");
 
-                return true;
+                    bool isSoftware = rend.Contains("Software") ||
+                                      rend.Contains("Microsoft") ||
+                                      rend.Contains("GDI Generic");
+                    if (isSoftware)
+                        Console.WriteLine("Warning: software renderer detected — performance may be limited.");
+
+                    return true;
+                }
             }
             catch (Exception ex)
             {
@@ -523,16 +530,52 @@ namespace VisionNet.Controls
         {
             try
             {
-                var gl      = new OpenGL();
-                string ver  = gl.GetString(OpenGL.GL_VERSION);
-                string rend = gl.GetString(OpenGL.GL_RENDERER);
-                string vend = gl.GetString(OpenGL.GL_VENDOR);
-                return $"OpenGL version: {ver}\r\nRenderer: {rend}\r\nVendor: {vend}";
+                using (var probe = OpenGlProbe.Open())
+                {
+                    if (probe == null) return "No OpenGL context could be created.";
+
+                    string ver  = GL.GetString(StringName.Version);
+                    string rend = GL.GetString(StringName.Renderer);
+                    string vend = GL.GetString(StringName.Vendor);
+                    return $"OpenGL version: {ver}\r\nRenderer: {rend}\r\nVendor: {vend}";
+                }
             }
             catch (Exception ex)
             {
                 return ex.Message;
             }
+        }
+
+        /// <summary>
+        /// Creates a throwaway OpenGL context for capability probing, independent of any
+        /// <see cref="CxDisplay"/>. OpenTK has no standalone context type, so this wraps a hidden
+        /// 1×1 <see cref="GameWindow"/>. Dispose it to release the context.
+        /// </summary>
+        private sealed class OpenGlProbe : IDisposable
+        {
+            private readonly GameWindow _window;
+
+            private OpenGlProbe(GameWindow window) { _window = window; }
+
+            internal static OpenGlProbe Open()
+            {
+                Toolkit.Init(new ToolkitOptions { Backend = PlatformBackend.PreferNative });
+                var window = new GameWindow(1, 1, GraphicsMode.Default, "CxControl GL probe",
+                    GameWindowFlags.Default, DisplayDevice.Default, 3, 3, GraphicsContextFlags.Default);
+                try
+                {
+                    window.Visible = false;
+                    window.Context.MakeCurrent(window.WindowInfo);
+                }
+                catch
+                {
+                    window.Dispose();
+                    throw;
+                }
+                return new OpenGlProbe(window);
+            }
+
+            public void Dispose() => _window?.Dispose();
         }
     }
 }

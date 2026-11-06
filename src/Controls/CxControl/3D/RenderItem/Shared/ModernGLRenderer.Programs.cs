@@ -1,10 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Drawing;
-using System.Drawing.Imaging;
-using System.Globalization;
-using System.Runtime.InteropServices;
-using SharpGL;
+using OpenTK.Graphics.OpenGL;
 using VisionNet.DataType;
 
 namespace VisionNet.Controls
@@ -18,22 +15,22 @@ namespace VisionNet.Controls
         private const int SphereStacks = 10;
 
         /// <summary>Uploads camera matrices and one item model matrix to a shader program.</summary>
-        internal void UploadSceneMatrices(OpenGL gl, uint program, CxMatrix4X4 model)
+        internal void UploadSceneMatrices(CxGlContext gl, uint program, CxMatrix4X4 model)
         {
             EnsureSceneMatrices(gl);
-            gl.UniformMatrix4(gl.GetUniformLocation(program, "projection"), 1, true, _projection);
-            gl.UniformMatrix4(gl.GetUniformLocation(program, "view"), 1, true, _view);
-            gl.UniformMatrix4(gl.GetUniformLocation(program, "model"), 1, true,
+            GL.UniformMatrix4(GL.GetUniformLocation(program, "projection"), 1, true, _projection);
+            GL.UniformMatrix4(GL.GetUniformLocation(program, "view"), 1, true, _view);
+            GL.UniformMatrix4(GL.GetUniformLocation(program, "model"), 1, true,
                 (model ?? CxMatrix4X4.Identity()).Data);
         }
 
         /// <summary>Uploads scene matrices using locations cached with the resource handle.</summary>
-        internal void UploadSceneMatrices(OpenGL gl, GLResourceHandle handle, CxMatrix4X4 model)
+        internal void UploadSceneMatrices(CxGlContext gl, GLResourceHandle handle, CxMatrix4X4 model)
         {
             EnsureSceneMatrices(gl);
-            gl.UniformMatrix4(handle.GetUniformLocation(gl, "projection"), 1, true, _projection);
-            gl.UniformMatrix4(handle.GetUniformLocation(gl, "view"), 1, true, _view);
-            gl.UniformMatrix4(handle.GetUniformLocation(gl, "model"), 1, true,
+            GL.UniformMatrix4(handle.GetUniformLocation(gl, "projection"), 1, true, _projection);
+            GL.UniformMatrix4(handle.GetUniformLocation(gl, "view"), 1, true, _view);
+            GL.UniformMatrix4(handle.GetUniformLocation(gl, "model"), 1, true,
                 (model ?? CxMatrix4X4.Identity()).Data);
         }
 
@@ -43,20 +40,20 @@ namespace VisionNet.Controls
         /// <b>inverse</b> so no extra inversion happens here; the array is transposed into the
         /// row-major layout the other matrices use.
         /// </summary>
-        internal void UploadNormalMatrix(OpenGL gl, GLResourceHandle handle, CxMatrix4X4 modelInverse)
+        internal void UploadNormalMatrix(CxGlContext gl, GLResourceHandle handle, CxMatrix4X4 modelInverse)
         {
             var inv = (modelInverse ?? CxMatrix4X4.Identity()).Data;
             _normalMatrix[0] = inv[0]; _normalMatrix[1] = inv[4]; _normalMatrix[2] = inv[8];
             _normalMatrix[3] = inv[1]; _normalMatrix[4] = inv[5]; _normalMatrix[5] = inv[9];
             _normalMatrix[6] = inv[2]; _normalMatrix[7] = inv[6]; _normalMatrix[8] = inv[10];
-            gl.UniformMatrix3(handle.GetUniformLocation(gl, "normalMatrix"), 1, true, _normalMatrix);
+            GL.UniformMatrix3(handle.GetUniformLocation(gl, "normalMatrix"), 1, true, _normalMatrix);
         }
 
         /// <summary>Gets the context-owned shader shared by the built-in surface items.</summary>
         internal uint SurfaceProgram => _surfaceProgram;
 
         /// <summary>Compiles the built-in surface shader once per GL context.</summary>
-        internal bool EnsureSurfaceProgram(OpenGL gl)
+        internal bool EnsureSurfaceProgram(CxGlContext gl)
         {
             if (_surfaceProgram != 0) return true;
             if (_surfaceProgramFailed) return false;
@@ -77,7 +74,7 @@ namespace VisionNet.Controls
         /// Draws instanced unit spheres for a point overlay. The sphere mesh and shader are
         /// context-owned; only the instance positions are streamed for each draw.
         /// </summary>
-        internal void DrawSpheres(OpenGL gl, float[] positions, Color color, float radius,
+        internal void DrawSpheres(CxGlContext gl, float[] positions, Color color, float radius,
             CxMatrix4X4 model)
         {
             if (positions == null || positions.Length < 3) return;
@@ -85,27 +82,28 @@ namespace VisionNet.Controls
             EnsureSphereBuffers(gl);
 
             EnsureSceneMatrices(gl);
-            gl.BindVertexArray(_sphereVao);
-            gl.BindBuffer(OpenGL.GL_ARRAY_BUFFER, _sphereInstanceVbo);
-            gl.BufferData(OpenGL.GL_ARRAY_BUFFER, positions, OpenGL.GL_STREAM_DRAW);
+            GL.BindVertexArray(_sphereVao);
+            GL.BindBuffer(BufferTarget.ArrayBuffer, _sphereInstanceVbo);
+            GL.BufferData(BufferTarget.ArrayBuffer, positions.Length * sizeof(float),
+                positions, BufferUsageHint.StreamDraw);
 
-            gl.UseProgram(_sphereProgram);
-            gl.UniformMatrix4(_sphereProjection, 1, true, _projection);
-            gl.UniformMatrix4(_sphereView, 1, true, _view);
-            gl.UniformMatrix4(_sphereModel, 1, true,
+            GL.UseProgram(_sphereProgram);
+            GL.UniformMatrix4(_sphereProjection, 1, true, _projection);
+            GL.UniformMatrix4(_sphereView, 1, true, _view);
+            GL.UniformMatrix4(_sphereModel, 1, true,
                 (model ?? CxMatrix4X4.Identity()).Data);
-            gl.Uniform1(_sphereRadius, radius);
-            gl.Uniform4(_sphereColor,
+            GL.Uniform1(_sphereRadius, radius);
+            GL.Uniform4(_sphereColor,
                 color.R / 255f, color.G / 255f, color.B / 255f, color.A / 255f);
-            gl.DrawElementsInstanced(OpenGL.GL_TRIANGLES, _sphereIndexCount,
-                OpenGL.GL_UNSIGNED_SHORT, IntPtr.Zero, positions.Length / 3);
+            GL.DrawElementsInstanced(PrimitiveType.Triangles, _sphereIndexCount,
+                DrawElementsType.UnsignedShort, IntPtr.Zero, positions.Length / 3);
 
-            gl.BindVertexArray(0);
-            gl.BindBuffer(OpenGL.GL_ARRAY_BUFFER, 0);
-            gl.UseProgram(0);
+            GL.BindVertexArray(0);
+            GL.BindBuffer(BufferTarget.ArrayBuffer, 0);
+            GL.UseProgram(0);
         }
 
-        private bool EnsureSphereProgram(OpenGL gl)
+        private bool EnsureSphereProgram(CxGlContext gl)
         {
             if (_sphereProgram != 0) return true;
             if (_sphereProgramFailed) return false;
@@ -116,50 +114,52 @@ namespace VisionNet.Controls
                 _sphereProgramFailed = true;
                 return false;
             }
-            _sphereProjection = gl.GetUniformLocation(_sphereProgram, "projection");
-            _sphereView = gl.GetUniformLocation(_sphereProgram, "view");
-            _sphereModel = gl.GetUniformLocation(_sphereProgram, "model");
-            _sphereColor = gl.GetUniformLocation(_sphereProgram, "aColor");
-            _sphereRadius = gl.GetUniformLocation(_sphereProgram, "radius");
+            _sphereProjection = GL.GetUniformLocation(_sphereProgram, "projection");
+            _sphereView = GL.GetUniformLocation(_sphereProgram, "view");
+            _sphereModel = GL.GetUniformLocation(_sphereProgram, "model");
+            _sphereColor = GL.GetUniformLocation(_sphereProgram, "aColor");
+            _sphereRadius = GL.GetUniformLocation(_sphereProgram, "radius");
             return true;
         }
 
-        private void EnsureSphereBuffers(OpenGL gl)
+        private void EnsureSphereBuffers(CxGlContext gl)
         {
             if (_sphereVao != 0) return;
 
             var ids = new uint[1];
-            gl.GenVertexArrays(1, ids);
+            GL.GenVertexArrays(1, ids);
             _sphereVao = ids[0];
-            gl.BindVertexArray(_sphereVao);
+            GL.BindVertexArray(_sphereVao);
 
-            gl.GenBuffers(1, ids);
+            GL.GenBuffers(1, ids);
             _sphereVbo = ids[0];
-            gl.BindBuffer(OpenGL.GL_ARRAY_BUFFER, _sphereVbo);
+            GL.BindBuffer(BufferTarget.ArrayBuffer, _sphereVbo);
             var vertices = new List<float>();
             var indices = new List<ushort>();
             GenerateUnitSphereData(SphereSlices, SphereStacks, vertices, indices);
-            gl.BufferData(OpenGL.GL_ARRAY_BUFFER, vertices.ToArray(), OpenGL.GL_STATIC_DRAW);
-            gl.EnableVertexAttribArray(0);
-            gl.VertexAttribPointer(0, 3, OpenGL.GL_FLOAT, false,
+            GL.BufferData(BufferTarget.ArrayBuffer, vertices.Count * sizeof(float),
+                vertices.ToArray(), BufferUsageHint.StaticDraw);
+            GL.EnableVertexAttribArray(0);
+            GL.VertexAttribPointer(0, 3, VertexAttribPointerType.Float, false,
                 3 * sizeof(float), IntPtr.Zero);
 
-            gl.GenBuffers(1, ids);
+            GL.GenBuffers(1, ids);
             _sphereEbo = ids[0];
-            gl.BindBuffer(OpenGL.GL_ELEMENT_ARRAY_BUFFER, _sphereEbo);
-            gl.BufferData(OpenGL.GL_ELEMENT_ARRAY_BUFFER, indices.ToArray(), OpenGL.GL_STATIC_DRAW);
+            GL.BindBuffer(BufferTarget.ElementArrayBuffer, _sphereEbo);
+            GL.BufferData(BufferTarget.ElementArrayBuffer, indices.Count * sizeof(ushort),
+                indices.ToArray(), BufferUsageHint.StaticDraw);
             _sphereIndexCount = indices.Count;
 
-            gl.GenBuffers(1, ids);
+            GL.GenBuffers(1, ids);
             _sphereInstanceVbo = ids[0];
-            gl.BindBuffer(OpenGL.GL_ARRAY_BUFFER, _sphereInstanceVbo);
-            gl.EnableVertexAttribArray(1);
-            gl.VertexAttribPointer(1, 3, OpenGL.GL_FLOAT, false,
+            GL.BindBuffer(BufferTarget.ArrayBuffer, _sphereInstanceVbo);
+            GL.EnableVertexAttribArray(1);
+            GL.VertexAttribPointer(1, 3, VertexAttribPointerType.Float, false,
                 3 * sizeof(float), IntPtr.Zero);
-            gl.VertexAttribDivisor(1, 1);
+            GL.VertexAttribDivisor(1, 1);
 
-            gl.BindVertexArray(0);
-            gl.BindBuffer(OpenGL.GL_ARRAY_BUFFER, 0);
+            GL.BindVertexArray(0);
+            GL.BindBuffer(BufferTarget.ArrayBuffer, 0);
         }
 
         private static void GenerateUnitSphereData(int slices, int stacks,
@@ -197,7 +197,7 @@ namespace VisionNet.Controls
         }
 
         /// <summary>Compiles the shared geometry program once per GL context.</summary>
-        private bool EnsureGeometryProgram(OpenGL gl)
+        private bool EnsureGeometryProgram(CxGlContext gl)
         {
             if (_geometryProgram != 0) return true;
             if (_geometryProgramFailed) return false;
@@ -207,33 +207,33 @@ namespace VisionNet.Controls
                 _geometryProgramFailed = true;
                 return false;
             }
-            _geometryProjection = gl.GetUniformLocation(_geometryProgram, "projection");
-            _geometryView = gl.GetUniformLocation(_geometryProgram, "view");
-            _geometryModel = gl.GetUniformLocation(_geometryProgram, "model");
-            _geometryUseVertexColor = gl.GetUniformLocation(_geometryProgram, "useVertexColor");
-            _geometryColor = gl.GetUniformLocation(_geometryProgram, "color");
+            _geometryProjection = GL.GetUniformLocation(_geometryProgram, "projection");
+            _geometryView = GL.GetUniformLocation(_geometryProgram, "view");
+            _geometryModel = GL.GetUniformLocation(_geometryProgram, "model");
+            _geometryUseVertexColor = GL.GetUniformLocation(_geometryProgram, "useVertexColor");
+            _geometryColor = GL.GetUniformLocation(_geometryProgram, "color");
             return true;
         }
 
         /// <summary>Allocates the reusable geometry VAO/VBO on first use.</summary>
-        private void EnsureGeometryBuffers(OpenGL gl)
+        private void EnsureGeometryBuffers(CxGlContext gl)
         {
             if (_geometryVao == 0)
             {
                 var ids = new uint[1];
-                gl.GenVertexArrays(1, ids);
+                GL.GenVertexArrays(1, ids);
                 _geometryVao = ids[0];
             }
             if (_geometryVbo == 0)
             {
                 var ids = new uint[1];
-                gl.GenBuffers(1, ids);
+                GL.GenBuffers(1, ids);
                 _geometryVbo = ids[0];
             }
         }
 
         /// <summary>Compiles the screen-text program once per GL context.</summary>
-        private bool EnsureTextProgram(OpenGL gl)
+        private bool EnsureTextProgram(CxGlContext gl)
         {
             if (_textProgram != 0) return true;
             if (_textProgramFailed) return false;
@@ -243,25 +243,25 @@ namespace VisionNet.Controls
                 _textProgramFailed = true;
                 return false;
             }
-            _textProjection = gl.GetUniformLocation(_textProgram, "projection");
-            _textColor = gl.GetUniformLocation(_textProgram, "color");
-            _textGlyph = gl.GetUniformLocation(_textProgram, "glyph");
+            _textProjection = GL.GetUniformLocation(_textProgram, "projection");
+            _textColor = GL.GetUniformLocation(_textProgram, "color");
+            _textGlyph = GL.GetUniformLocation(_textProgram, "glyph");
             return true;
         }
 
         /// <summary>Allocates the reusable text quad VAO/VBO on first use.</summary>
-        private void EnsureTextBuffers(OpenGL gl)
+        private void EnsureTextBuffers(CxGlContext gl)
         {
             if (_textVao == 0)
             {
                 var ids = new uint[1];
-                gl.GenVertexArrays(1, ids);
+                GL.GenVertexArrays(1, ids);
                 _textVao = ids[0];
             }
             if (_textVbo == 0)
             {
                 var ids = new uint[1];
-                gl.GenBuffers(1, ids);
+                GL.GenBuffers(1, ids);
                 _textVbo = ids[0];
             }
         }

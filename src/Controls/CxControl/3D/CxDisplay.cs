@@ -4,8 +4,9 @@ using System.Drawing;
 using System.Numerics;
 using System.Threading;
 using System.Windows.Forms;
-using SharpGL;
-using SharpGL.SceneGraph;
+using OpenTK;
+using OpenTK.Graphics;
+using OpenTK.Graphics.OpenGL;
 using VisionNet.DataType;
 
 namespace VisionNet.Controls
@@ -14,8 +15,13 @@ namespace VisionNet.Controls
     /// OpenGL-based 3D display control for rendering point clouds, meshes, and geometric primitives.
     /// Manages all GL resources internally; render items provide only CPU-side data.
     /// </summary>
-    public partial class CxDisplay : OpenGLControl, IDisposable
+    public partial class CxDisplay : GLControl, IDisposable
     {
+        // ── GL context facade ────────────────────────────────────────────────────
+        // The only GL-related object the render items and helper services see; it hides the
+        // concrete OpenTK binding from the rest of the control and from its public surface.
+        private readonly CxGlContext _gl;
+
         // ── Camera & interaction state ───────────────────────────────────────────
         private CxAdvancedTrackBallCamera _camera;
         private bool _isMouseDown;
@@ -35,8 +41,6 @@ namespace VisionNet.Controls
         private readonly object _renderLock = new object();
         private readonly object _cameraLock = new object();
         private int _invalidatePending;
-        private int _fboWidth = -1;
-        private int _fboHeight = -1;
 
         // Items whose shader failed while processing the resource pool this frame. Collected during
         // the locked pass and reported through RenderItemFailed once the lock has been released, so
@@ -69,8 +73,11 @@ namespace VisionNet.Controls
         private bool                     _pointImpostor       = true;
         private bool                     _environmentFollowsCamera = true;
 
-        // ── Render background colour (OpenGL clear colour); default: transparent black ──
-        private Color _backColor = Color.FromArgb(0, 0, 0, 0);
+        // ── Render background colour (OpenGL clear colour); default: opaque black ──
+        // The control renders straight to the window (no FBO round trip), so the window itself is
+        // opaque: the alpha component is no longer composited with the parent. Default changed from
+        // transparent black to opaque black as part of the OpenTK migration.
+        private Color _backColor = Color.FromArgb(255, 0, 0, 0);
 
         // ── Manual colour / diff display ranges (override the per-frame auto-aggregated ranges) ──
         // When non-null, the renderer propagates the range to every item instead of the
@@ -411,7 +418,12 @@ namespace VisionNet.Controls
         public CxDisplay(ViewMode viewMode = ViewMode.Top,
             SurfaceMode surfaceMode = SurfaceMode.PointCloud,
             SurfaceColorMode surfaceColorMode = SurfaceColorMode.ColorWithIntensity)
+            : base(CreateGraphicsMode(), 3, 3, GraphicsContextFlags.Default)
         {
+            _gl = new CxGlContext(this);
+            // On-demand rendering: do not let SwapBuffers block on the display refresh.
+            VSync = false;
+
             // The group manager is independent of the GL context and must exist in every mode
             // (including the WinForms designer). It takes the registry and this control's narrow
             // IDisplayHost contract rather than the control itself, so the two do not reference
@@ -421,7 +433,7 @@ namespace VisionNet.Controls
             if (!DesignMode)
             {
                 InitializeComponent();
-                _camera = new CxAdvancedTrackBallCamera(this);
+                _camera = new CxAdvancedTrackBallCamera(_gl);
                 _camera.ViewMode = viewMode;
                 SurfaceMode      = surfaceMode;
                 SurfaceColorMode = surfaceColorMode;
@@ -430,11 +442,46 @@ namespace VisionNet.Controls
             }
         }
 
-        /// <summary>Clears a coalesced invalidation left over from a newly created handle.</summary>
+        /// <summary>
+        /// Clears a coalesced invalidation left over from a newly created handle and (re)applies the
+        /// context-owned GL state. The base handler creates the context and makes it current, so
+        /// this is the migration's replacement for the old <c>DoOpenGLInitialized</c> hook.
+        /// </summary>
         protected override void OnHandleCreated(EventArgs e)
         {
             base.OnHandleCreated(e);
             Interlocked.Exchange(ref _invalidatePending, 0);
+            InitializeGlState();
+        }
+
+        /// <summary>
+        /// Requests a double-buffered 32-bit colour / 24-bit depth context with no MSAA, so
+        /// depth-based picking and occlusion keep their precision. The context is created as a
+        /// <b>compatibility</b> profile 3.3 context: the shared shaders are <c>#version 330 core</c>,
+        /// while wide lines and point sprites still rely on compatibility-profile behaviour.
+        /// </summary>
+        private static GraphicsMode CreateGraphicsMode()
+            => new GraphicsMode(new ColorFormat(32), 24, 8, 0, new ColorFormat(0), 2);
+
+        /// <summary>
+        /// Applies the context-owned GL defaults. Runs after the base handle-created handler has
+        /// created the context and made it current, and again whenever the handle is recreated.
+        /// </summary>
+        private void InitializeGlState()
+        {
+            // Field initializers and the constructor body may not have run yet if the handle is
+            // created during the base constructor; nothing to do in that case.
+            if (DesignMode || _gl == null || _renderLock == null || !_gl.IsValid) return;
+            lock (_renderLock)
+            {
+                // A context can be recreated on the same control. Forget all names belonging to the
+                // old context and rebuild active items on the next frame.
+                _registry.ForEachPoolHandle(handle => handle.ResetForContextRecreate());
+                _registry.DropReleases();
+                ModernGLRenderer.ResetForContextRecreate(_gl);
+                GL.ClearColor(_backColor.R / 255f, _backColor.G / 255f, _backColor.B / 255f, _backColor.A / 255f);
+                GL.PointSize(InitialPointSize);
+            }
         }
 
         /// <summary>Allows invalidation requests to be queued after the handle is recreated.</summary>
@@ -584,11 +631,20 @@ namespace VisionNet.Controls
         /// Releases all GL resources, surface items, and overlay items held by this control.
         /// Called by <see cref="Dispose(bool)"/> in Designer.cs.
         /// </summary>
-        private void DisposeResources(OpenGL gl)
+        private void DisposeResources(CxGlContext gl)
         {
             lock (_renderLock)
             {
-                if (gl != null)
+                // Deleting GL objects needs a current context. Dispose may run on any thread and
+                // OpenTK does not make the context current implicitly.
+                bool glValid = gl != null && gl.IsValid;
+                if (glValid)
+                {
+                    try { gl.MakeCurrent(); }
+                    catch { glValid = false; }
+                }
+
+                if (glValid)
                     _registry.DrainReleases(p => CxGLResourceManager.Release(gl, p));
 
                 Groups.Clear();
@@ -600,7 +656,7 @@ namespace VisionNet.Controls
 
                         // Disposal runs with the context current, so the handle is released directly
                         // instead of being queued for the render pass.
-                        if (gl != null && handle != null) CxGLResourceManager.Release(gl, handle);
+                        if (glValid && handle != null) CxGLResourceManager.Release(gl, handle);
                         item.Dispose();
                     },
                     overlay => overlay.Dispose());
@@ -609,7 +665,7 @@ namespace VisionNet.Controls
                 _handleSnapshot.Clear();
                 _overlaySnapshot.Clear();
 
-                ModernGLRenderer.Release(gl);
+                if (glValid) ModernGLRenderer.Release(gl);
             }
         }
     }

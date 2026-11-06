@@ -1,11 +1,4 @@
-using System;
-using System.Collections.Generic;
-using System.Drawing;
-using System.Drawing.Imaging;
-using System.Globalization;
-using System.Runtime.InteropServices;
-using SharpGL;
-using VisionNet.DataType;
+using OpenTK.Graphics.OpenGL;
 
 namespace VisionNet.Controls
 {
@@ -13,7 +6,7 @@ namespace VisionNet.Controls
     {
 
         /// <summary>Reads mutable GL state that overlay draws temporarily change.</summary>
-        private RenderStateSnapshot CaptureRenderState(OpenGL gl)
+        private RenderStateSnapshot CaptureRenderState(CxGlContext gl)
         {
             return _frameStateCaptured ? _frameState : CaptureRenderStateUncached(gl);
         }
@@ -23,21 +16,21 @@ namespace VisionNet.Controls
         /// During a <see cref="BeginFrame"/> window this returns the frame-start snapshot, which
         /// is the state every item in the frame should observe; outside a frame it queries GL.
         /// </summary>
-        internal RenderStateSnapshot CaptureState(OpenGL gl) => CaptureRenderState(gl);
+        internal RenderStateSnapshot CaptureState(CxGlContext gl) => CaptureRenderState(gl);
 
         /// <summary>Restores state captured by <see cref="CaptureState"/>.</summary>
-        internal void RestoreState(OpenGL gl, RenderStateSnapshot state)
-            => RestoreRenderState(gl, state);
+        internal void RestoreState(CxGlContext gl, RenderStateSnapshot state)
+            => RestoreRenderState(state);
 
-        private RenderStateSnapshot CaptureRenderStateUncached(OpenGL gl)
+        private RenderStateSnapshot CaptureRenderStateUncached(CxGlContext gl)
         {
-            gl.GetFloat(OpenGL.GL_POINT_SIZE, _pointSizeQuery);
-            gl.GetFloat(OpenGL.GL_LINE_WIDTH, _lineWidthQuery);
+            GL.GetFloat(GetPName.PointSize, _pointSizeQuery);
+            GL.GetFloat(GetPName.LineWidth, _lineWidthQuery);
             return new RenderStateSnapshot
             {
-                DepthTest = gl.IsEnabled(OpenGL.GL_DEPTH_TEST),
-                DepthWrite = GetDepthWrite(gl),
-                Blend = gl.IsEnabled(OpenGL.GL_BLEND),
+                DepthTest = GL.IsEnabled(EnableCap.DepthTest),
+                DepthWrite = GL.GetBoolean(GetPName.DepthWritemask),
+                Blend = GL.IsEnabled(EnableCap.Blend),
                 PointSize = _pointSizeQuery[0],
                 LineWidth = _lineWidthQuery[0]
             };
@@ -49,36 +42,29 @@ namespace VisionNet.Controls
         /// surface would occlude geometry drawn later and could not blend with what is
         /// already in the framebuffer. <see cref="RestoreRenderState"/> puts it back.
         /// </summary>
-        private static void SetRenderState(OpenGL gl, bool depth, bool blend)
+        private static void SetRenderState(bool depth, bool blend)
         {
-            if (depth) gl.Enable(OpenGL.GL_DEPTH_TEST); else gl.Disable(OpenGL.GL_DEPTH_TEST);
+            if (depth) GL.Enable(EnableCap.DepthTest); else GL.Disable(EnableCap.DepthTest);
             if (blend)
             {
-                gl.Enable(OpenGL.GL_BLEND);
-                gl.BlendFunc(OpenGL.GL_SRC_ALPHA, OpenGL.GL_ONE_MINUS_SRC_ALPHA);
-                gl.DepthMask(0);
+                GL.Enable(EnableCap.Blend);
+                GL.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
+                GL.DepthMask(false);
             }
             else
             {
-                gl.Disable(OpenGL.GL_BLEND);
+                GL.Disable(EnableCap.Blend);
             }
         }
 
         /// <summary>Restores state captured before an overlay draw.</summary>
-        private static void RestoreRenderState(OpenGL gl, RenderStateSnapshot state)
+        private static void RestoreRenderState(RenderStateSnapshot state)
         {
-            if (state.DepthTest) gl.Enable(OpenGL.GL_DEPTH_TEST); else gl.Disable(OpenGL.GL_DEPTH_TEST);
-            gl.DepthMask((byte)(state.DepthWrite ? 1 : 0));
-            if (state.Blend) gl.Enable(OpenGL.GL_BLEND); else gl.Disable(OpenGL.GL_BLEND);
-            gl.PointSize(state.PointSize);
-            gl.LineWidth(state.LineWidth);
-        }
-
-        /// <summary>Reads the depth write mask through SharpGL's boolean query API.</summary>
-        private bool GetDepthWrite(OpenGL gl)
-        {
-            gl.GetBooleanv(OpenGL.GL_DEPTH_WRITEMASK, _depthWriteQuery);
-            return _depthWriteQuery[0] != 0;
+            if (state.DepthTest) GL.Enable(EnableCap.DepthTest); else GL.Disable(EnableCap.DepthTest);
+            GL.DepthMask(state.DepthWrite);
+            if (state.Blend) GL.Enable(EnableCap.Blend); else GL.Disable(EnableCap.Blend);
+            GL.PointSize(state.PointSize);
+            GL.LineWidth(state.LineWidth);
         }
     }
 }

@@ -1,4 +1,4 @@
-using SharpGL;
+using OpenTK.Graphics.OpenGL;
 using System;
 using System.Drawing;
 using VisionNet.DataType;
@@ -47,7 +47,7 @@ namespace VisionNet.Controls
         public override bool SupportsGroupTransform => true;
 
         /// <inheritdoc/>
-        public override void Draw(OpenGL gl)
+        public override void Draw(CxGlContext gl)
         {
             if (Point3Ds == null || Point3Ds.Length == 0) return;
 
@@ -56,7 +56,7 @@ namespace VisionNet.Controls
             if (Shape == PointShape.Point)
             {
                 PushModelMatrix(gl);
-                renderer.Draw(gl, OpenGL.GL_POINTS, positions, DrawColor, Size);
+                renderer.Draw(gl, PrimitiveType.Points, positions, DrawColor, Size);
                 PopModelMatrix(gl);
             }
             else

@@ -747,10 +747,10 @@ namespace VisionNet.Controls
                 _camera.SetDefaultUpView(new Vector3(upDirection.X, upDirection.Y, upDirection.Z));
         }
 
-        /// <summary>refresh fbo viewer size</summary>
+        /// <summary>Requests a repaint after the host changed the view size.</summary>
         public void RefreshViewSize()
         {
-            if (this.OpenGL.RenderContextProvider == null) return;
+            if (_gl == null || !_gl.IsValid) return;
             this.SafeInvalidate();
         }
         /// <summary>

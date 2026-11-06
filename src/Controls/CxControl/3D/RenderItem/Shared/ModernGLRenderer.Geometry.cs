@@ -1,11 +1,6 @@
 using System;
-using System.Collections.Generic;
 using System.Drawing;
-using System.Drawing.Imaging;
-using System.Globalization;
-using System.Runtime.InteropServices;
-using SharpGL;
-using VisionNet.DataType;
+using OpenTK.Graphics.OpenGL;
 
 namespace VisionNet.Controls
 {
@@ -16,32 +11,33 @@ namespace VisionNet.Controls
         /// Draws world-space positions with the shared geometry shader. The current
         /// model matrix is combined with the camera matrices before the draw.
         /// </summary>
-        internal void Draw(OpenGL gl, uint primitive, float[] positions, Color color,
+        internal void Draw(CxGlContext gl, PrimitiveType primitive, float[] positions, Color color,
             float size = 1f, bool depthTest = true)
         {
             if (positions == null || positions.Length < 3) return;
             EnsureSceneMatrices(gl);
             RenderStateSnapshot previous;
             if (!BeginGeometryDraw(gl, out previous)) return;
-            SetRenderState(gl, depthTest, color.A < 255);
+            SetRenderState(depthTest, color.A < 255);
 
-            gl.BindVertexArray(_geometryVao);
-            gl.BindBuffer(OpenGL.GL_ARRAY_BUFFER, _geometryVbo);
-            gl.BufferData(OpenGL.GL_ARRAY_BUFFER, positions, OpenGL.GL_STREAM_DRAW);
-            gl.VertexAttribPointer(0, 3, OpenGL.GL_FLOAT, false, 3 * sizeof(float), IntPtr.Zero);
-            gl.EnableVertexAttribArray(0);
+            GL.BindVertexArray(_geometryVao);
+            GL.BindBuffer(BufferTarget.ArrayBuffer, _geometryVbo);
+            GL.BufferData(BufferTarget.ArrayBuffer, positions.Length * sizeof(float),
+                positions, BufferUsageHint.StreamDraw);
+            GL.VertexAttribPointer(0, 3, VertexAttribPointerType.Float, false, 3 * sizeof(float), IntPtr.Zero);
+            GL.EnableVertexAttribArray(0);
 
-            gl.UseProgram(_geometryProgram);
-            gl.UniformMatrix4(_geometryProjection, 1, true, _projection);
-            gl.UniformMatrix4(_geometryView, 1, true, _view);
-            gl.UniformMatrix4(_geometryModel, 1, true, CurrentModel(gl).Data);
-            gl.Uniform1(_geometryUseVertexColor, 0);
-            gl.Uniform4(_geometryColor,
+            GL.UseProgram(_geometryProgram);
+            GL.UniformMatrix4(_geometryProjection, 1, true, _projection);
+            GL.UniformMatrix4(_geometryView, 1, true, _view);
+            GL.UniformMatrix4(_geometryModel, 1, true, CurrentModel(gl).Data);
+            GL.Uniform1(_geometryUseVertexColor, 0);
+            GL.Uniform4(_geometryColor,
                 color.R / 255f, color.G / 255f, color.B / 255f, color.A / 255f);
-            if (primitive == OpenGL.GL_LINES || primitive == OpenGL.GL_LINE_STRIP ||
-                primitive == OpenGL.GL_LINE_LOOP) gl.LineWidth(Math.Max(1f, size));
-            if (primitive == OpenGL.GL_POINTS) gl.PointSize(Math.Max(1f, size));
-            gl.DrawArrays(primitive, 0, positions.Length / 3);
+            if (primitive == PrimitiveType.Lines || primitive == PrimitiveType.LineStrip ||
+                primitive == PrimitiveType.LineLoop) GL.LineWidth(Math.Max(1f, size));
+            if (primitive == PrimitiveType.Points) GL.PointSize(Math.Max(1f, size));
+            GL.DrawArrays(primitive, 0, positions.Length / 3);
 
             EndGeometryDraw(gl, previous, vertexColorAttribute: false);
         }
@@ -52,7 +48,7 @@ namespace VisionNet.Controls
         /// Returns <c>false</c> when the program is unavailable, in which case nothing was bound
         /// and nothing needs restoring.
         /// </summary>
-        private bool BeginGeometryDraw(OpenGL gl, out RenderStateSnapshot previous)
+        private bool BeginGeometryDraw(CxGlContext gl, out RenderStateSnapshot previous)
         {
             previous = default(RenderStateSnapshot);
             if (!EnsureGeometryProgram(gl)) return false;
@@ -68,45 +64,47 @@ namespace VisionNet.Controls
         /// <param name="vertexColorAttribute">
         /// <c>true</c> when the draw enabled attribute 1 for per-vertex colours.
         /// </param>
-        private void EndGeometryDraw(OpenGL gl, RenderStateSnapshot previous, bool vertexColorAttribute)
+        private void EndGeometryDraw(CxGlContext gl, RenderStateSnapshot previous, bool vertexColorAttribute)
         {
-            if (vertexColorAttribute) gl.DisableVertexAttribArray(1);
-            gl.DisableVertexAttribArray(0);
-            gl.BindVertexArray(0);
-            gl.BindBuffer(OpenGL.GL_ARRAY_BUFFER, 0);
-            gl.UseProgram(0);
-            RestoreRenderState(gl, previous);
+            if (vertexColorAttribute) GL.DisableVertexAttribArray(1);
+            GL.DisableVertexAttribArray(0);
+            GL.BindVertexArray(0);
+            GL.BindBuffer(BufferTarget.ArrayBuffer, 0);
+            GL.UseProgram(0);
+            RestoreRenderState(previous);
         }
 
         /// <summary>
         /// Draws 2D pixel coordinates using an orthographic projection. Depth testing
         /// and depth writes are disabled for the call, then restored to their prior state.
         /// </summary>
-        internal void DrawScreenGeometry(OpenGL gl, uint primitive, float[] positions, Color color,
-            float width = 1f)
+        internal void DrawScreenGeometry(CxGlContext gl, PrimitiveType primitive, float[] positions,
+            Color color, float width = 1f)
         {
             if (positions == null || positions.Length < 2) return;
             RenderStateSnapshot previous;
             if (!BeginGeometryDraw(gl, out previous)) return;
-            SetRenderState(gl, false, color.A < 255);
-            gl.DepthMask(0);
+            SetRenderState(false, color.A < 255);
+            GL.DepthMask(false);
 
-            gl.BindVertexArray(_geometryVao);
-            gl.BindBuffer(OpenGL.GL_ARRAY_BUFFER, _geometryVbo);
-            gl.BufferData(OpenGL.GL_ARRAY_BUFFER, To3D(positions), OpenGL.GL_STREAM_DRAW);
-            gl.VertexAttribPointer(0, 3, OpenGL.GL_FLOAT, false, 3 * sizeof(float), IntPtr.Zero);
-            gl.EnableVertexAttribArray(0);
-            gl.UseProgram(_geometryProgram);
-            float[] projection = Ortho(gl.RenderContextProvider.Width, gl.RenderContextProvider.Height);
-            gl.UniformMatrix4(_geometryProjection, 1, true, projection);
-            gl.UniformMatrix4(_geometryView, 1, true, _identity);
-            gl.UniformMatrix4(_geometryModel, 1, true, _identity);
-            gl.Uniform1(_geometryUseVertexColor, 0);
-            gl.Uniform4(_geometryColor,
+            float[] expanded = To3D(positions);
+            GL.BindVertexArray(_geometryVao);
+            GL.BindBuffer(BufferTarget.ArrayBuffer, _geometryVbo);
+            GL.BufferData(BufferTarget.ArrayBuffer, expanded.Length * sizeof(float),
+                expanded, BufferUsageHint.StreamDraw);
+            GL.VertexAttribPointer(0, 3, VertexAttribPointerType.Float, false, 3 * sizeof(float), IntPtr.Zero);
+            GL.EnableVertexAttribArray(0);
+            GL.UseProgram(_geometryProgram);
+            float[] projection = Ortho(gl.Width, gl.Height);
+            GL.UniformMatrix4(_geometryProjection, 1, true, projection);
+            GL.UniformMatrix4(_geometryView, 1, true, _identity);
+            GL.UniformMatrix4(_geometryModel, 1, true, _identity);
+            GL.Uniform1(_geometryUseVertexColor, 0);
+            GL.Uniform4(_geometryColor,
                 color.R / 255f, color.G / 255f, color.B / 255f, color.A / 255f);
-            if (primitive == OpenGL.GL_LINES || primitive == OpenGL.GL_LINE_STRIP ||
-                primitive == OpenGL.GL_LINE_LOOP) gl.LineWidth(Math.Max(1f, width));
-            gl.DrawArrays(primitive, 0, positions.Length / 2);
+            if (primitive == PrimitiveType.Lines || primitive == PrimitiveType.LineStrip ||
+                primitive == PrimitiveType.LineLoop) GL.LineWidth(Math.Max(1f, width));
+            GL.DrawArrays(primitive, 0, positions.Length / 2);
 
             EndGeometryDraw(gl, previous, vertexColorAttribute: false);
         }
@@ -115,7 +113,7 @@ namespace VisionNet.Controls
         /// Draws screen-space geometry with a per-vertex RGBA colour. The interleaved
         /// position/colour data is uploaded to the shared geometry VBO for one draw.
         /// </summary>
-        internal void DrawScreenGeometryColored(OpenGL gl, uint primitive, float[] positions,
+        internal void DrawScreenGeometryColored(CxGlContext gl, PrimitiveType primitive, float[] positions,
             float[] colors, float width = 1f)
         {
             if (positions == null || positions.Length < 2 || colors == null
@@ -123,8 +121,8 @@ namespace VisionNet.Controls
 
             RenderStateSnapshot previous;
             if (!BeginGeometryDraw(gl, out previous)) return;
-            SetRenderState(gl, false, true);
-            gl.DepthMask(0);
+            SetRenderState(false, true);
+            GL.DepthMask(false);
 
             int vertexCount = positions.Length / 2;
             EnsureCapacity(ref _coloredInterleaved, vertexCount * 7);
@@ -140,27 +138,28 @@ namespace VisionNet.Controls
                 interleaved[i * 7 + 6] = colors[i * 4 + 3];
             }
 
-            gl.BindVertexArray(_geometryVao);
-            gl.BindBuffer(OpenGL.GL_ARRAY_BUFFER, _geometryVbo);
-            gl.BufferData(OpenGL.GL_ARRAY_BUFFER, interleaved, OpenGL.GL_STREAM_DRAW);
+            GL.BindVertexArray(_geometryVao);
+            GL.BindBuffer(BufferTarget.ArrayBuffer, _geometryVbo);
+            GL.BufferData(BufferTarget.ArrayBuffer, interleaved.Length * sizeof(float),
+                interleaved, BufferUsageHint.StreamDraw);
             int stride = 7 * sizeof(float);
-            gl.VertexAttribPointer(0, 3, OpenGL.GL_FLOAT, false, stride, IntPtr.Zero);
-            gl.EnableVertexAttribArray(0);
-            gl.VertexAttribPointer(1, 4, OpenGL.GL_FLOAT, false, stride, new IntPtr(3 * sizeof(float)));
-            gl.EnableVertexAttribArray(1);
+            GL.VertexAttribPointer(0, 3, VertexAttribPointerType.Float, false, stride, IntPtr.Zero);
+            GL.EnableVertexAttribArray(0);
+            GL.VertexAttribPointer(1, 4, VertexAttribPointerType.Float, false, stride, new IntPtr(3 * sizeof(float)));
+            GL.EnableVertexAttribArray(1);
 
-            gl.UseProgram(_geometryProgram);
-            float[] projection = Ortho(gl.RenderContextProvider.Width, gl.RenderContextProvider.Height);
-            gl.UniformMatrix4(_geometryProjection, 1, true, projection);
-            gl.UniformMatrix4(_geometryView, 1, true, _identity);
-            gl.UniformMatrix4(_geometryModel, 1, true, _identity);
-            gl.Uniform4(_geometryColor, 1f, 1f, 1f, 1f);
-            gl.Uniform1(_geometryUseVertexColor, 1);
-            if (primitive == OpenGL.GL_LINES || primitive == OpenGL.GL_LINE_STRIP
-                || primitive == OpenGL.GL_LINE_LOOP)
-                gl.LineWidth(Math.Max(1f, width));
-            gl.DrawArrays(primitive, 0, vertexCount);
-            gl.Uniform1(_geometryUseVertexColor, 0);
+            GL.UseProgram(_geometryProgram);
+            float[] projection = Ortho(gl.Width, gl.Height);
+            GL.UniformMatrix4(_geometryProjection, 1, true, projection);
+            GL.UniformMatrix4(_geometryView, 1, true, _identity);
+            GL.UniformMatrix4(_geometryModel, 1, true, _identity);
+            GL.Uniform4(_geometryColor, 1f, 1f, 1f, 1f);
+            GL.Uniform1(_geometryUseVertexColor, 1);
+            if (primitive == PrimitiveType.Lines || primitive == PrimitiveType.LineStrip
+                || primitive == PrimitiveType.LineLoop)
+                GL.LineWidth(Math.Max(1f, width));
+            GL.DrawArrays(primitive, 0, vertexCount);
+            GL.Uniform1(_geometryUseVertexColor, 0);
 
             EndGeometryDraw(gl, previous, vertexColorAttribute: true);
         }

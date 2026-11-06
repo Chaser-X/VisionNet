@@ -1,4 +1,4 @@
-using SharpGL;
+using OpenTK.Graphics.OpenGL;
 using System.Drawing;
 using VisionNet.DataType;
 
@@ -38,14 +38,14 @@ namespace VisionNet.Controls
         }
 
         /// <inheritdoc/>
-        public override void Draw(OpenGL gl)
+        public override void Draw(CxGlContext gl)
         {
             if (!Visible) return;
 
             var renderer = ModernGLRenderer.For(gl);
             float sx, sy, sz;
             if (!renderer.Project(gl, Point.X, Point.Y, Point.Z, out sx, out sy, out sz)) return;
-            if (sx < 0 || sx > gl.RenderContextProvider.Width || sy < 0 || sy > gl.RenderContextProvider.Height)
+            if (sx < 0 || sx > gl.Width || sy < 0 || sy > gl.Height)
                 return;
 
             int rectWidth  = 80;
@@ -58,12 +58,12 @@ namespace VisionNet.Controls
             _backgroundPositions[6] = startX; _backgroundPositions[7] = startY;
             _backgroundPositions[8] = startX + rectWidth; _backgroundPositions[9] = startY - rectHeight;
             _backgroundPositions[10] = startX; _backgroundPositions[11] = startY - rectHeight;
-            renderer.DrawScreenGeometry(gl, OpenGL.GL_TRIANGLES, _backgroundPositions, Color.FromArgb(128, 0, 0, 0));
+            renderer.DrawScreenGeometry(gl, PrimitiveType.Triangles, _backgroundPositions, Color.FromArgb(128, 0, 0, 0));
             _borderPositions[0] = startX - 1; _borderPositions[1] = startY + 1;
             _borderPositions[2] = startX + rectWidth + 1; _borderPositions[3] = startY + 1;
             _borderPositions[4] = startX + rectWidth + 1; _borderPositions[5] = startY - rectHeight - 1;
             _borderPositions[6] = startX - 1; _borderPositions[7] = startY - rectHeight - 1;
-            renderer.DrawScreenGeometry(gl, OpenGL.GL_LINE_LOOP, _borderPositions, Color.White);
+            renderer.DrawScreenGeometry(gl, PrimitiveType.LineLoop, _borderPositions, Color.White);
 
             // Coordinate text labels.
             int   tx = startX + 10;

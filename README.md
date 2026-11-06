@@ -23,7 +23,7 @@ VisionNet 由两个互相独立的库组成：
 | 库                 | 说明                                                            |
 | ----------------- | ------------------------------------------------------------- |
 | **VisionNet.dll** | 核心数据类型（点云、网格、几何体）+ 静态算子 API（通过 P/Invoke 调用本地 C++ 库）           |
-| **CxControl.dll** | 基于 SharpGL/OpenGL 的高性能 3D 渲染控件 `CxDisplay` + 基于 ScottPlot 的 2D 渲染控件 `CxDisplay2D`，支持点云、网格、2D/3D 几何叠加层的实时渲染 |
+| **CxControl.dll** | 基于 OpenTK/OpenGL 的高性能 3D 渲染控件 `CxDisplay` + 基于 ScottPlot 的 2D 渲染控件 `CxDisplay2D`，支持点云、网格、2D/3D 几何叠加层的实时渲染 |
 
 ### 主要特性
 
@@ -82,9 +82,8 @@ VisionNet 由两个互相独立的库组成：
 ```
 bin\Debug\VisionNet.dll
 bin\Debug\CxControl.dll
-3rd\SharpGL.dll
-3rd\SharpGL.WinForms.dll
-3rd\SharpGL.SceneGraph.dll
+3rd\OpenTK.dll
+3rd\OpenTK.GLControl.dll
 ```
 
 ### 2. 添加 CxDisplay 控件
@@ -210,7 +209,7 @@ VisionNet/
 ├── Test/
 │   ├── Test/                       # 控制台单元测试
 │   └── DemoFrom/                   # WinForms 演示应用
-└── 3rd/                            # 第三方 DLL（SharpGL, OpenCvSharp, ScottPlot 等）
+└── 3rd/                            # 第三方 DLL（OpenTK, OpenCvSharp, ScottPlot 等）
 ```
 
 ### CxDisplay / CxDisplay2D 设计原则
@@ -771,9 +770,10 @@ display2D.SetBackgroundColor(Color.Black);
 > Diff 模式 Item 使用差分范围而非 Z 范围；混合场景（Diff + 非 Diff 共存）时颜色条自动隐藏。
 
 > **线程安全与重绘**
-> `SetPointCloud` 等数据设置 API 可在后台线程调用；GL 资源的创建与释放由 `CxDisplay` 在**渲染帧内**完成（WinForms 的 UI 线程 —— SharpGL 在 `OnPaint` 中绘制，`glReadPixels` 等调用因此必须发生在渲染帧内）。
-> 渲染为**按需重绘**：控件设了 `FrameRate = 10` 但 `RenderTrigger = Manual`，即**没有渲染定时器**；数据 / 相机 / 选中 / 叠加层变化时由 `SafeInvalidate()`（线程安全）触发重绘。
+> `SetPointCloud` 等数据设置 API 可在后台线程调用；GL 资源的创建与释放由 `CxDisplay` 在**渲染帧内**完成（WinForms 的 UI 线程 —— OpenTK 的 `GLControl` 在 `OnPaint` 中绘制并 `SwapBuffers`，`glReadPixels` 等调用因此必须发生在渲染帧内）。
+> 渲染为**按需重绘**：`GLControl` 只在 `Invalidate()` 时重绘，即**没有渲染定时器**；数据 / 相机 / 选中 / 叠加层变化时由 `SafeInvalidate()`（线程安全）触发重绘。
 > ⚠ 因此若在后台线程准备好数据后**没有**经过 `Set*` / `Redraw()` 等会触发重绘的入口，画面不会自动更新 —— 请显式调用 `Redraw()`。
+> ⚠ 渲染直接输出到窗口（无 FBO 回读），**不再支持透明背景**：默认清屏色为不透明黑。
 
 ---
 

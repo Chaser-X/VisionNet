@@ -59,7 +59,7 @@ namespace VisionNet.Controls
 
             if (e.Button == MouseButtons.Left)
             {
-                worldPos = _picking.ScreenToWorld(OpenGL, e.X, e.Y);
+                worldPos = _picking.ScreenToWorld(_gl, e.X, e.Y);
                 if (worldPos.HasValue)
                 {
                     var hit = FindActiveItemHit(worldPos.Value);
@@ -104,7 +104,7 @@ namespace VisionNet.Controls
         /// </summary>
         private CxPoint3D? ResolveRotationPoint(int x, int y, CxPoint3D? worldAtPixel)
         {
-            var world = worldAtPixel ?? _picking.ScreenToWorld(OpenGL, x, y);
+            var world = worldAtPixel ?? _picking.ScreenToWorld(_gl, x, y);
             return world.HasValue ? GetNearestSurfacePoint(world.Value).Location : null;
         }
 
@@ -129,7 +129,7 @@ namespace VisionNet.Controls
                 _coordTagItem.Visible = false;
                 CancelPendingPick();
                 SafeInvalidate();
-                var worldPos = _picking.ScreenToWorld(OpenGL, e.X, e.Y);
+                var worldPos = _picking.ScreenToWorld(_gl, e.X, e.Y);
                 if (worldPos.HasValue && _lastDragWorldPos.HasValue)
                 {
                     var cur  = worldPos.Value;
@@ -256,7 +256,7 @@ namespace VisionNet.Controls
 
         /// <summary>
         /// Raises <see cref="CoordinatesChanged"/> for the result resolved by the last frame.
-        /// Called by <c>DoOpenGLDraw</c> after the render lock has been released, so a handler may
+        /// Called by <c>OnPaint</c> after the render lock has been released, so a handler may
         /// safely call back into the display (the same contract <c>RenderItemFailed</c> documents).
         /// </summary>
         private void RaisePendingCoordinatesChanged()
@@ -310,7 +310,7 @@ namespace VisionNet.Controls
         /// </summary>
         /// <returns>Nearest world-space location and its intensity, or <c>(null, null)</c> if no hit.</returns>
         public (CxPoint3D? Location, float? Intensity) GetNearestSurfacePoint(int mouseX, int mouseY)
-            => _picking.FindNearest(_registry, OpenGL, mouseX, mouseY, SurfaceColorMode);
+            => _picking.FindNearest(_registry, _gl, mouseX, mouseY, SurfaceColorMode);
 
         /// <summary>
         /// Finds the surface point nearest to an already-unprojected world position, so a caller

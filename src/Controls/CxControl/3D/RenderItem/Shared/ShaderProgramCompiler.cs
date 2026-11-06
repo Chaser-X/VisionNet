@@ -1,66 +1,57 @@
 using System;
 using System.Diagnostics;
-using System.Text;
-using SharpGL;
+using OpenTK.Graphics.OpenGL;
 
 namespace VisionNet.Controls
 {
     /// <summary>Compiles and links GLSL programs for the modern 3D renderers.</summary>
     internal static class ShaderProgramCompiler
     {
-        internal static uint CompileProgram(OpenGL gl, string vertexSource, string fragmentSource)
+        internal static uint CompileProgram(CxGlContext gl, string vertexSource, string fragmentSource)
         {
-            if (gl == null || string.IsNullOrEmpty(vertexSource) || string.IsNullOrEmpty(fragmentSource))
+            if (string.IsNullOrEmpty(vertexSource) || string.IsNullOrEmpty(fragmentSource))
                 return 0;
 
-            uint vertex = CompileShader(gl, OpenGL.GL_VERTEX_SHADER, vertexSource);
-            uint fragment = CompileShader(gl, OpenGL.GL_FRAGMENT_SHADER, fragmentSource);
+            int vertex = CompileShader(ShaderType.VertexShader, vertexSource);
+            int fragment = CompileShader(ShaderType.FragmentShader, fragmentSource);
             if (vertex == 0 || fragment == 0)
             {
-                if (vertex != 0) gl.DeleteShader(vertex);
-                if (fragment != 0) gl.DeleteShader(fragment);
+                if (vertex != 0) GL.DeleteShader(vertex);
+                if (fragment != 0) GL.DeleteShader(fragment);
                 return 0;
             }
 
-            uint program = gl.CreateProgram();
-            gl.AttachShader(program, vertex);
-            gl.AttachShader(program, fragment);
-            gl.LinkProgram(program);
+            int program = GL.CreateProgram();
+            GL.AttachShader(program, vertex);
+            GL.AttachShader(program, fragment);
+            GL.LinkProgram(program);
 
-            int[] status = new int[1];
-            gl.GetProgram(program, OpenGL.GL_LINK_STATUS, status);
-            gl.DeleteShader(vertex);
-            gl.DeleteShader(fragment);
-            if (status[0] == OpenGL.GL_FALSE)
+            GL.GetProgram(program, GetProgramParameterName.LinkStatus, out int status);
+            GL.DeleteShader(vertex);
+            GL.DeleteShader(fragment);
+            if (status == 0)
             {
-                int[] length = new int[1];
-                gl.GetProgram(program, OpenGL.GL_INFO_LOG_LENGTH, length);
-                var log = new StringBuilder(Math.Max(1, length[0]));
-                gl.GetProgramInfoLog(program, length[0], System.IntPtr.Zero, log);
+                string log = GL.GetProgramInfoLog(program);
                 Debug.WriteLine("Shader link error: " + log);
-                gl.DeleteProgram(program);
+                GL.DeleteProgram(program);
                 return 0;
             }
 
-            return program;
+            return (uint)program;
         }
 
-        private static uint CompileShader(OpenGL gl, uint type, string source)
+        private static int CompileShader(ShaderType type, string source)
         {
-            uint shader = gl.CreateShader(type);
-            gl.ShaderSource(shader, source);
-            gl.CompileShader(shader);
+            int shader = GL.CreateShader(type);
+            GL.ShaderSource(shader, source);
+            GL.CompileShader(shader);
 
-            int[] status = new int[1];
-            gl.GetShader(shader, OpenGL.GL_COMPILE_STATUS, status);
-            if (status[0] != OpenGL.GL_FALSE) return shader;
+            GL.GetShader(shader, ShaderParameter.CompileStatus, out int status);
+            if (status != 0) return shader;
 
-            int[] length = new int[1];
-            gl.GetShader(shader, OpenGL.GL_INFO_LOG_LENGTH, length);
-            var log = new StringBuilder(Math.Max(1, length[0]));
-            gl.GetShaderInfoLog(shader, length[0], System.IntPtr.Zero, log);
+            string log = GL.GetShaderInfoLog(shader);
             Debug.WriteLine("Shader compile error: " + log);
-            gl.DeleteShader(shader);
+            GL.DeleteShader(shader);
             return 0;
         }
     }

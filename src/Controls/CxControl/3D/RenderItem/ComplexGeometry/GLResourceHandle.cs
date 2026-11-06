@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-using SharpGL;
+using OpenTK.Graphics.OpenGL;
 
 namespace VisionNet.Controls
 {
@@ -95,12 +95,12 @@ namespace VisionNet.Controls
         internal readonly Dictionary<string, int> UniformLocations
             = new Dictionary<string, int>(System.StringComparer.Ordinal);
 
-        internal int GetUniformLocation(OpenGL gl, string name)
+        internal int GetUniformLocation(CxGlContext gl, string name)
         {
             int location;
             if (!UniformLocations.TryGetValue(name, out location))
             {
-                location = gl.GetUniformLocation(ShaderProgram, name);
+                location = GL.GetUniformLocation(ShaderProgram, name);
                 UniformLocations[name] = location;
             }
             return location;

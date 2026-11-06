@@ -38,7 +38,7 @@ namespace VisionNet.Controls
                 if (disposing)
                 {
                     // GL resource release is encapsulated in DisposeResources() (CxDisplay.cs).
-                    DisposeResources(this.OpenGL);
+                    DisposeResources(_gl);
 
                     components?.Dispose();
                     _hoverPickThrottle?.Stop();
@@ -79,7 +79,6 @@ namespace VisionNet.Controls
             this.diffToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.litToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.menu_right.SuspendLayout();
-            ((System.ComponentModel.ISupportInitialize)(this)).BeginInit();
             this.SuspendLayout();
 
             this.menu_right.ImageScalingSize = new System.Drawing.Size(20, 20);
@@ -191,17 +190,12 @@ namespace VisionNet.Controls
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.BackColor = System.Drawing.SystemColors.ActiveCaptionText;
             this.ContextMenuStrip = this.menu_right;
-            this.FrameRate = 10;
             // Redraw on demand only: CxDisplay invalidates explicitly (SafeInvalidate /
-            // Invalidate) whenever data, camera, selection or overlays change. With the
-            // default TimerBased trigger the control also repainted 10x/s while idle,
-            // burning CPU/GPU for an unchanged scene.
-            this.RenderTrigger = SharpGL.RenderTrigger.Manual;
+            // Invalidate) whenever data, camera, selection or overlays change. OpenTK's
+            // GLControl repaints only when invalidated, so no timer trigger is involved.
             this.Margin = new System.Windows.Forms.Padding(4, 4, 4, 4);
             this.Name = "CxDisplay";
-            this.RenderContextType = SharpGL.RenderContextType.FBO;
             this.menu_right.ResumeLayout(false);
-            ((System.ComponentModel.ISupportInitialize)(this)).EndInit();
             this.ResumeLayout(false);
         }
     }

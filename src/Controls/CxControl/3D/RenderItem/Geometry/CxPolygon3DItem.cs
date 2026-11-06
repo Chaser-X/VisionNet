@@ -1,4 +1,4 @@
-using SharpGL;
+using OpenTK.Graphics.OpenGL;
 using System;
 using System.Drawing;
 using VisionNet.DataType;
@@ -115,7 +115,7 @@ namespace VisionNet.Controls
         public override bool SupportsGroupTransform => true;
 
         /// <inheritdoc/>
-        public override void Draw(OpenGL gl)
+        public override void Draw(CxGlContext gl)
         {
             if (Polygon3Ds == null || Polygon3Ds.Length == 0) return;
 
@@ -135,7 +135,7 @@ namespace VisionNet.Controls
                     positions[i * 3 + 1] = polygon.Points[i].Y;
                     positions[i * 3 + 2] = polygon.Points[i].Z;
                 }
-                renderer.Draw(gl, polygon.IsClosed ? OpenGL.GL_LINE_LOOP : OpenGL.GL_LINE_STRIP,
+                renderer.Draw(gl, polygon.IsClosed ? PrimitiveType.LineLoop : PrimitiveType.LineStrip,
                     positions, DrawColor, Size);
             }
 
@@ -153,7 +153,7 @@ namespace VisionNet.Controls
                         positions[i * 3 + 1] = pts[i].Y;
                         positions[i * 3 + 2] = pts[i].Z;
                     }
-                    renderer.Draw(gl, OpenGL.GL_POINTS, positions, DrawColor, 10f);
+                    renderer.Draw(gl, PrimitiveType.Points, positions, DrawColor, 10f);
                 }
             }
             PopModelMatrix(gl);

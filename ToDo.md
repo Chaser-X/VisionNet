@@ -33,9 +33,9 @@
 
 ## 阻塞 / 待确认
 
-- [ ] **抗锯齿 AA-1 / AA-2（暂缓）**：AA-0（逐点 rim alpha）已试并回撤（小点云变虚）；SSAA 2× / MSAA 4× 已评估未做。约束：SharpGL 3.1.1 无 `glBlitFramebuffer`、无 MSAA provider，需自建 FBO + resolve 并动拾取链路。详见 「渲染质量专项」 的「抗锯齿（AA）」
+- [ ] **抗锯齿 AA-1 / AA-2（暂缓）**：AA-0（逐点 rim alpha）已试并回撤（小点云变虚）；SSAA 2× / MSAA 4× 已评估未做。约束：原 SharpGL 后端无 `glBlitFramebuffer` / MSAA provider；**迁移到 OpenTK 3.3.3 后这些限制已解除**，AA 可重新评估。详见 「渲染质量专项」 的「抗锯齿（AA）」
 - [ ] **半透明对策 B（暂缓）**：若需"半透明互相透出且顺序正确"，需 ①按 item 距离排序 ②半透明不写深度 ③悬停帧 depth-only pass 供拾取。单深度缓冲下与"正确拾取"不可兼得
-- [ ] **P4 回读性能专项**：量化每帧 `glReadPixels` + `BitBlt` 开销，评估 `RenderContextType.NativeWindow`
+- [x] ~~**P4 回读性能专项**~~：**已由 OpenTK 迁移解决**——`CxDisplay` 改为直绘 `SwapBuffers`，删除 FBO + 每帧全分辨率 `glReadPixels` + `BitBlt`（4K ≈ 33 MB/帧）；拾取仍按需 `ReadPixels` 单像素。见 `Changlog.md`「未发布」
 - [ ] **右键菜单照明模式开关**（`Enum.Parse` 依赖菜单 Text == 枚举名）
 - [ ] 清理 `[Obsolete]` 代理与 `CxControl.csproj_bak`（需先确认无外部调用）
 - [x] ~~`RotateCamera` / `PanCamera` 补偿 `IsLeftHanded`~~：**已试并回退**——分析性共轭实测无效；根因是 Demo **数据约定不匹配**（右手系 Mesh 用了左手渲染），非相机缺陷，库保持原样
@@ -193,13 +193,13 @@
   - **教训**：按像素的**逐点 rim AA 不适合小点云**。若以后再做，应窄化到 ~0.35 像素，或仅当点足够大（`fwidth(r)` 足够小，如 ≥ ~7px）才启用。
 - [ ] **AA-1 SSAA 2×**：**已评估，暂不做**（决定）。真超采样，不会让点发虚；代价 fill ×4 + 自建离屏 FBO + 下采样 pass + 拾取坐标 ×2。
 - [ ] **AA-2 MSAA 4×**：自建多重采样 FBO（`TexStorage2DMultisample` + `RenderbufferStorageMultisampleEXT`）+ `sampler2DMS` resolve + `GL_SAMPLE_ALPHA_TO_COVERAGE`；**风险**：MS 附件深度不能用 `glReadPixels` 直接读，拾取需解析深度。
-- **约束备忘**：SharpGL 3.1.1 **无 `glBlitFramebuffer`**、无 MSAA RenderContextProvider；渲染目标是 SharpGL 的 FBO（非多重采样 renderbuffer），每帧 `glReadPixels` 回读 + `BitBlt`。凡 AA 都要自建 FBO + 一次 resolve/后处理 pass，并动拾取链路。
+- **约束备忘（已更新）**：迁移到 OpenTK 3.3.3 后，`glBlitFramebuffer` 与多重采样 renderbuffer 均可用；渲染目标改为**窗口默认帧缓冲（直绘）**，不再有每帧 `glReadPixels` + `BitBlt`。AA 若要恢复，需自建离屏 FBO + resolve pass，并动拾取链路。
 
 ### P4（独立专项）回读性能
 
-- [ ] 量化每帧全分辨率 `glReadPixels` + `BitBlt` 开销（4K ≈ 33 MB/帧）
-- [ ] 评估 `RenderContextType.NativeWindow` 的可行性与 GDI/半透明语义代价
-- [ ] 结论可能反向影响 P2/P3 的取舍
+- [x] ~~量化每帧全分辨率 `glReadPixels` + `BitBlt` 开销（4K ≈ 33 MB/帧）~~：已随 OpenTK 迁移**移除**该路径。
+- [x] ~~评估 `RenderContextType.NativeWindow` 的可行性与 GDI/半透明语义代价~~：迁移后直接使用窗口默认帧缓冲；代价是**放弃透明背景**（见 `Changlog.md`「未发布」破坏性变更）。
+- [ ] 量化迁移后 4K 帧率相对旧版的实际提升（需上机）。
 
 ### 开放项 / 待确认
 

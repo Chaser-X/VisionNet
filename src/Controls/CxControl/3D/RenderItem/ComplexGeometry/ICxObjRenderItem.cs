@@ -1,5 +1,4 @@
 using System;
-using SharpGL;
 using VisionNet.DataType;
 
 namespace VisionNet.Controls
@@ -87,7 +86,7 @@ namespace VisionNet.Controls
         RenderData PrepareRenderData();
 
         /// <summary>Renders the item using the provided GL resource handle.</summary>
-        void Draw(OpenGL gl, GLResourceHandle handle);
+        void Draw(CxGlContext gl, GLResourceHandle handle);
 
         /// <summary>
         /// Called by CxDisplay before each frame with the global Z range across all items.

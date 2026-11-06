@@ -1,6 +1,6 @@
 using System;
 using System.Runtime.InteropServices;
-using SharpGL;
+using OpenTK.Graphics.OpenGL;
 
 namespace VisionNet.Controls
 {
@@ -14,14 +14,13 @@ namespace VisionNet.Controls
     /// </remarks>
     internal static class CxGLResourceManager
     {
-        private static void UploadPinned(OpenGL gl, uint target, Array data,
-            int bytes, uint usage)
+        private static void UploadPinned(BufferTarget target, Array data, int bytes, BufferUsageHint usage)
         {
             GCHandle pinned = default(GCHandle);
             try
             {
                 pinned = GCHandle.Alloc(data, GCHandleType.Pinned);
-                gl.BufferData(target, bytes, pinned.AddrOfPinnedObject(), usage);
+                GL.BufferData(target, bytes, pinned.AddrOfPinnedObject(), usage);
             }
             finally
             {
@@ -38,18 +37,18 @@ namespace VisionNet.Controls
         /// <param name="componentCount">Components per vertex (3 for positions/colours, 2 for UVs, 1 for scalars).</param>
         /// <param name="stride">Byte stride between vertices; 0 means tightly packed.</param>
         /// <returns>The next free VBO slot index.</returns>
-        private static int UploadVertexBuffer(OpenGL gl, GLResourceHandle handle, int vboIndex,
+        private static int UploadVertexBuffer(GLResourceHandle handle, int vboIndex,
             Array data, uint attributeIndex, int componentCount, int stride)
         {
             var tempId = new uint[1];
-            gl.GenBuffers(1, tempId);
+            GL.GenBuffers(1, tempId);
             handle.VboIds[vboIndex] = tempId[0];
-            gl.BindBuffer(OpenGL.GL_ARRAY_BUFFER, handle.VboIds[vboIndex]);
-            UploadPinned(gl, OpenGL.GL_ARRAY_BUFFER, data,
-                data.Length * sizeof(float), OpenGL.GL_STATIC_DRAW);
-            gl.VertexAttribPointer(attributeIndex, componentCount, OpenGL.GL_FLOAT, false,
+            GL.BindBuffer(BufferTarget.ArrayBuffer, handle.VboIds[vboIndex]);
+            UploadPinned(BufferTarget.ArrayBuffer, data,
+                data.Length * sizeof(float), BufferUsageHint.StaticDraw);
+            GL.VertexAttribPointer(attributeIndex, componentCount, VertexAttribPointerType.Float, false,
                 stride, IntPtr.Zero);
-            gl.EnableVertexAttribArray(attributeIndex);
+            GL.EnableVertexAttribArray(attributeIndex);
             return vboIndex + 1;
         }
 
@@ -64,7 +63,7 @@ namespace VisionNet.Controls
         /// invalid so the caller can report the failure. A missing render data set is a no-op
         /// and still reports success.
         /// </returns>
-        public static bool Create(OpenGL gl, ICxObjRenderItem item, GLResourceHandle handle)
+        public static bool Create(CxGlContext gl, ICxObjRenderItem item, GLResourceHandle handle)
         {
             var data = item.PrepareRenderData();
             if (data == null) return true;
@@ -109,59 +108,59 @@ namespace VisionNet.Controls
             if (data.VertexCount > 0)
             {
                 var tempId = new uint[1];
-                gl.GenVertexArrays(1, tempId);
+                GL.GenVertexArrays(1, tempId);
                 handle.VaoId = tempId[0];
                 handle.HasVAO = true;
-                gl.BindVertexArray(handle.VaoId);
+                GL.BindVertexArray(handle.VaoId);
 
                 int vboIndex = 0;
 
                 if (data.Vertices != null && data.Vertices.Length >= data.VertexCount * 3)
-                    vboIndex = UploadVertexBuffer(gl, handle, vboIndex, data.Vertices,
+                    vboIndex = UploadVertexBuffer(handle, vboIndex, data.Vertices,
                         attributeIndex: 0, componentCount: 3, stride: 3 * sizeof(float));
 
                 if (data.Colors != null && data.Colors.Length >= data.VertexCount * 3)
-                    vboIndex = UploadVertexBuffer(gl, handle, vboIndex, data.Colors,
+                    vboIndex = UploadVertexBuffer(handle, vboIndex, data.Colors,
                         attributeIndex: 1, componentCount: 3, stride: 3 * sizeof(float));
                 else if (data.UVCoords != null && data.UVCoords.Length >= data.VertexCount * 2)
-                    vboIndex = UploadVertexBuffer(gl, handle, vboIndex, data.UVCoords,
+                    vboIndex = UploadVertexBuffer(handle, vboIndex, data.UVCoords,
                         attributeIndex: 1, componentCount: 2, stride: 2 * sizeof(float));
 
                 if (data.DiffValues != null && data.DiffValues.Length >= data.VertexCount)
-                    vboIndex = UploadVertexBuffer(gl, handle, vboIndex, data.DiffValues,
+                    vboIndex = UploadVertexBuffer(handle, vboIndex, data.DiffValues,
                         attributeIndex: 2, componentCount: 1, stride: 0);
 
                 if (data.IntensityValues != null && data.IntensityValues.Length >= data.VertexCount)
-                    vboIndex = UploadVertexBuffer(gl, handle, vboIndex, data.IntensityValues,
+                    vboIndex = UploadVertexBuffer(handle, vboIndex, data.IntensityValues,
                         attributeIndex: 3, componentCount: 1, stride: sizeof(float));
 
                 if (data.Normals != null && data.Normals.Length >= data.VertexCount * 3)
-                    vboIndex = UploadVertexBuffer(gl, handle, vboIndex, data.Normals,
+                    vboIndex = UploadVertexBuffer(handle, vboIndex, data.Normals,
                         attributeIndex: 4, componentCount: 3, stride: 3 * sizeof(float));
 
                 handle.VboCount = vboIndex;
 
                 if (data.Indices != null && data.Indices.Length > 0)
                 {
-                    gl.GenBuffers(1, tempId);
+                    GL.GenBuffers(1, tempId);
                     handle.ElementBufferId = tempId[0];
                     handle.HasEBO = true;
 
-                    gl.BindBuffer(OpenGL.GL_ELEMENT_ARRAY_BUFFER, handle.ElementBufferId);
+                    GL.BindBuffer(BufferTarget.ElementArrayBuffer, handle.ElementBufferId);
                     int bytes = data.Indices.Length * sizeof(uint);
-                    UploadPinned(gl, OpenGL.GL_ELEMENT_ARRAY_BUFFER, data.Indices,
-                        bytes, OpenGL.GL_STATIC_DRAW);
+                    UploadPinned(BufferTarget.ElementArrayBuffer, data.Indices,
+                        bytes, BufferUsageHint.StaticDraw);
                 }
             }
 
             if (data.TextureData?.Data != null)
             {
-                handle.TextureId = CreateTexture(gl, data.TextureData);
+                handle.TextureId = CreateTexture(data.TextureData);
                 handle.HasTexture = true;
             }
 
             if (handle.HasVAO)
-                gl.BindVertexArray(0);
+                GL.BindVertexArray(0);
 
             handle.IsValid = true;
             handle.NeedsUpdate = false;
@@ -172,32 +171,32 @@ namespace VisionNet.Controls
         /// Deletes every GL object named by <paramref name="handle"/> and resets it to the
         /// "no resources" state. Safe to call on a handle that owns nothing.
         /// </summary>
-        public static void Release(OpenGL gl, GLResourceHandle handle)
+        public static void Release(CxGlContext gl, GLResourceHandle handle)
         {
             if (handle.VboCount > 0)
             {
-                gl.DeleteBuffers(handle.VboCount, handle.VboIds);
+                GL.DeleteBuffers(handle.VboCount, handle.VboIds);
                 for (int i = 0; i < handle.VboIds.Length; i++) handle.VboIds[i] = 0;
                 handle.VboCount = 0;
             }
 
             if (handle.HasVAO && handle.VaoId != 0)
             {
-                gl.DeleteVertexArrays(1, new[] { handle.VaoId });
+                GL.DeleteVertexArrays(1, new[] { handle.VaoId });
                 handle.VaoId = 0;
                 handle.HasVAO = false;
             }
 
             if (handle.HasEBO && handle.ElementBufferId != 0)
             {
-                gl.DeleteBuffers(1, new[] { handle.ElementBufferId });
+                GL.DeleteBuffers(1, new[] { handle.ElementBufferId });
                 handle.ElementBufferId = 0;
                 handle.HasEBO = false;
             }
 
             if (handle.HasShader && handle.OwnsShader && handle.ShaderProgram != 0)
             {
-                gl.DeleteProgram(handle.ShaderProgram);
+                GL.DeleteProgram(handle.ShaderProgram);
             }
             handle.ShaderProgram = 0;
             handle.HasShader = false;
@@ -206,7 +205,7 @@ namespace VisionNet.Controls
 
             if (handle.HasTexture && handle.TextureId != 0)
             {
-                gl.DeleteTextures(1, new[] { handle.TextureId });
+                GL.DeleteTextures(1, new[] { handle.TextureId });
                 handle.TextureId = 0;
                 handle.HasTexture = false;
             }
@@ -214,11 +213,9 @@ namespace VisionNet.Controls
             handle.IsValid = false;
         }
 
-        private static uint CreateTexture(OpenGL gl, TextureData tex)
+        private static uint CreateTexture(TextureData tex)
         {
-            int[] maxSizeArr = new int[1];
-            gl.GetInteger(OpenGL.GL_MAX_TEXTURE_SIZE, maxSizeArr);
-            int maxSize = maxSizeArr[0];
+            int maxSize = GL.GetInteger(GetPName.MaxTextureSize);
 
             int uploadW = Math.Min(tex.Width,  maxSize);
             int uploadH = Math.Min(tex.Height, maxSize);
@@ -227,25 +224,25 @@ namespace VisionNet.Controls
                 : tex.Data;
 
             var ids = new uint[1];
-            gl.GenTextures(1, ids);
-            gl.BindTexture(OpenGL.GL_TEXTURE_2D, ids[0]);
-            gl.TexParameter(OpenGL.GL_TEXTURE_2D, OpenGL.GL_TEXTURE_MIN_FILTER, OpenGL.GL_LINEAR);
-            gl.TexParameter(OpenGL.GL_TEXTURE_2D, OpenGL.GL_TEXTURE_MAG_FILTER, OpenGL.GL_LINEAR);
-            gl.TexParameter(OpenGL.GL_TEXTURE_2D, OpenGL.GL_TEXTURE_WRAP_S, OpenGL.GL_CLAMP_TO_EDGE);
-            gl.TexParameter(OpenGL.GL_TEXTURE_2D, OpenGL.GL_TEXTURE_WRAP_T, OpenGL.GL_CLAMP_TO_EDGE);
+            GL.GenTextures(1, ids);
+            GL.BindTexture(TextureTarget.Texture2D, ids[0]);
+            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)All.Linear);
+            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)All.Linear);
+            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)All.ClampToEdge);
+            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, (int)All.ClampToEdge);
 
             GCHandle pinned = default(GCHandle);
             try
             {
                 pinned = GCHandle.Alloc(uploadData, GCHandleType.Pinned);
-                gl.TexImage2D(OpenGL.GL_TEXTURE_2D, 0, OpenGL.GL_RGBA,
-                    uploadW, uploadH, 0, OpenGL.GL_RGBA, OpenGL.GL_UNSIGNED_BYTE,
+                GL.TexImage2D(TextureTarget.Texture2D, 0, PixelInternalFormat.Rgba,
+                    uploadW, uploadH, 0, PixelFormat.Rgba, PixelType.UnsignedByte,
                     pinned.AddrOfPinnedObject());
             }
             finally
             {
                 if (pinned.IsAllocated) pinned.Free();
-                gl.BindTexture(OpenGL.GL_TEXTURE_2D, 0);
+                GL.BindTexture(TextureTarget.Texture2D, 0);
             }
 
             return ids[0];

@@ -1,4 +1,4 @@
-using SharpGL;
+using OpenTK.Graphics.OpenGL;
 using System;
 
 namespace VisionNet.Controls
@@ -61,16 +61,16 @@ namespace VisionNet.Controls
             => zMin + index * (zMax - zMin) / TickDivisions;
 
         /// <inheritdoc/>
-        public override void Draw(OpenGL gl)
+        public override void Draw(CxGlContext gl)
         {
             if (_zMax - _zMin <= 0) return;
 
             int barWidth  = 20;
-            int viewportWidth = gl.RenderContextProvider.Width;
-            int viewportHeight = gl.RenderContextProvider.Height;
+            int viewportWidth = gl.Width;
+            int viewportHeight = gl.Height;
             int barHeight = viewportHeight / 2;
             int startX    = viewportWidth - barWidth - 10;
-            int startY    = (gl.RenderContextProvider.Height - barHeight) / 2;
+            int startY    = (gl.Height - barHeight) / 2;
 
             var renderer = ModernGLRenderer.For(gl);
             bool geometryChanged = !_hasCachedGeometry
@@ -122,11 +122,11 @@ namespace VisionNet.Controls
                 _cachedViewportHeight = viewportHeight;
                 _hasCachedGeometry = true;
             }
-            renderer.DrawScreenGeometryColored(gl, OpenGL.GL_TRIANGLE_STRIP,
+            renderer.DrawScreenGeometryColored(gl, PrimitiveType.TriangleStrip,
                 _barPositions, _barColors);
 
             // Draw tick marks and Z-value labels.
-            renderer.DrawScreenGeometry(gl, OpenGL.GL_LINES,
+            renderer.DrawScreenGeometry(gl, PrimitiveType.Lines,
                 _tickPositions, System.Drawing.Color.White);
 
             for (int i = 0; i <= TickDivisions; i++)

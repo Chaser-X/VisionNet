@@ -53,11 +53,14 @@
       <SpecificVersion>False</SpecificVersion>
       <HintPath>..\..\bin\Debug\kApiNet.dll</HintPath>
     </Reference>
-    <Reference Include="SharpGL, Version=3.1.1.0, Culture=neutral, PublicKeyToken=27fc851303210b27, processorArchitecture=MSIL">
+    <Reference Include="OpenTK, Version=3.3.3.0, Culture=neutral, PublicKeyToken=9273c65cd6c46e8e, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\..\3rd\SharpGL.dll</HintPath>
+      <HintPath>..\..\3rd\OpenTK.dll</HintPath>
     </Reference>
-    <Reference Include="SharpGL.WinForms, Version=3.1.1.0, Culture=neutral, PublicKeyToken=27fc851303210b27" />
+    <Reference Include="OpenTK.GLControl, Version=3.3.3.0, Culture=neutral, PublicKeyToken=9273c65cd6c46e8e, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\3rd\OpenTK.GLControl.dll</HintPath>
+    </Reference>
     <Reference Include="ScottPlot">
       <HintPath>..\..\3rd\ScottPlot.dll</HintPath>
     </Reference>

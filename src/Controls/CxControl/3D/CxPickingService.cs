@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-using SharpGL;
+using OpenTK.Graphics.OpenGL;
 using VisionNet.DataType;
 
 namespace VisionNet.Controls
@@ -19,7 +19,7 @@ namespace VisionNet.Controls
     {
         // Reused so a hover query allocates nothing before the synchronous ReadPixels.
         private readonly int[] _viewport = new int[4];
-        private readonly byte[] _depthBytes = new byte[4];
+        private readonly float[] _depth = new float[1];
         private readonly List<ICxObjRenderItem> _snapshot = new List<ICxObjRenderItem>();
 
         /// <summary>
@@ -29,14 +29,20 @@ namespace VisionNet.Controls
         /// <param name="gl">Active OpenGL context.</param>
         /// <param name="mouseX">Pixel X in control coordinates.</param>
         /// <param name="mouseY">Pixel Y in control coordinates (top-down).</param>
-        public CxPoint3D? ScreenToWorld(OpenGL gl, int mouseX, int mouseY)
+        public CxPoint3D? ScreenToWorld(CxGlContext gl, int mouseX, int mouseY)
         {
-            gl.GetInteger(OpenGL.GL_VIEWPORT, _viewport);
+            if (gl == null || !gl.IsValid) return null;
+            // OpenTK's GL entry points act on the current context and do not make it current
+            // implicitly (unlike the old SharpGL wrapper). A mouse handler may call this outside a
+            // frame, so bind the context first.
+            gl.MakeCurrent();
+
+            GL.GetInteger(GetPName.Viewport, _viewport);
             int adjustedY = _viewport[3] - mouseY;   // OpenGL Y is bottom-up.
 
-            gl.ReadPixels(mouseX, adjustedY, 1, 1,
-                OpenGL.GL_DEPTH_COMPONENT, OpenGL.GL_FLOAT, _depthBytes);
-            float depth = BitConverter.ToSingle(_depthBytes, 0);
+            GL.ReadPixels(mouseX, adjustedY, 1, 1,
+                PixelFormat.DepthComponent, PixelType.Float, _depth);
+            float depth = _depth[0];
 
             if (Math.Abs(depth - 1.0f) < 0.00001f) return null;
 
@@ -56,7 +62,7 @@ namespace VisionNet.Controls
         /// <param name="colorMode">Display colour mode; Diff selects diff values over intensity.</param>
         /// <returns>Nearest world-space location and its intensity, or <c>(null, null)</c> if no hit.</returns>
         public (CxPoint3D? Location, float? Intensity) FindNearest(CxItemRegistry registry,
-            OpenGL gl, int mouseX, int mouseY, SurfaceColorMode colorMode)
+            CxGlContext gl, int mouseX, int mouseY, SurfaceColorMode colorMode)
         {
             var world = ScreenToWorld(gl, mouseX, mouseY);
             return world.HasValue

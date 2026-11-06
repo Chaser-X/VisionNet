@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
-using SharpGL;
-using SharpGL.SceneGraph;
+using System.Windows.Forms;
+using OpenTK.Graphics.OpenGL;
 
 namespace VisionNet.Controls
 {
@@ -14,92 +14,69 @@ namespace VisionNet.Controls
         /// </summary>
         private const float InitialPointSize = 2.0f;
 
-        /// <inheritdoc/>
-        protected override void DoOpenGLInitialized()
-        {
-            base.DoOpenGLInitialized();
-            lock (_renderLock)
-            {
-                _fboWidth = _fboHeight = -1;
-                // A context can be recreated on the same OpenGL wrapper. Forget all names
-                // belonging to the old context and rebuild active items on the next frame.
-                _registry.ForEachPoolHandle(handle => handle.ResetForContextRecreate());
-                _registry.DropReleases();
-                ModernGLRenderer.ResetForContextRecreate(OpenGL);
-                OpenGL.ClearColor(_backColor.R / 255f, _backColor.G / 255f, _backColor.B / 255f, _backColor.A / 255f);
-                OpenGL.PointSize(InitialPointSize);
-            }
-        }
-
         /// <summary>
-        /// Main render callback invoked each frame. Releases deferred GL resources,
-        /// creates/updates new ones, then issues all draw calls.
+        /// Frame callback. The base control has already made the GL context current, so this draws
+        /// straight into the window's back buffer and presents it (no FBO round trip, no per-frame
+        /// readback). The GL state is (re)initialised by <c>InitializeGlState</c> when the handle —
+        /// and therefore the context — is created or recreated.
         /// </summary>
-        protected override void DoOpenGLDraw(RenderEventArgs e)
+        protected override void OnPaint(PaintEventArgs e)
         {
-            if (DesignMode) return;
+            if (DesignMode || _camera == null) { base.OnPaint(e); return; }
+
             lock (_renderLock)
             {
-                base.DoOpenGLDraw(e);
-
-                var rcp = OpenGL.RenderContextProvider;
-                if (rcp != null && Width > 0 && Height > 0)
+                var gl = _gl;
+                if (gl != null && gl.IsValid)
                 {
-                    if (_fboWidth != Width || _fboHeight != Height)
+                    gl.MakeCurrent();
+                    GL.Viewport(0, 0, Width, Height);
+                    GL.ClearColor(_backColor.R / 255f, _backColor.G / 255f, _backColor.B / 255f, _backColor.A / 255f);
+                    GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
+
+                    // 1. Release GL resources dequeued by Dispose/Replace on another thread.
+                    ProcessPendingRelease(gl);
+
+                    // 2. Create or update GL resources (full lock prevents concurrent Dispose).
+                    ProcessResourcePool(gl);
+
+                    GL.Enable(EnableCap.DepthTest);
+                    GL.DepthFunc(DepthFunction.Less);
+                    GL.Enable(EnableCap.Blend);
+                    GL.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
+                    float[] projection;
+                    float[] view;
+                    lock (_cameraLock)
+                        _camera.GetMatrices(Width, Height, out projection, out view);
+                    var overlayRenderer = ModernGLRenderer.For(gl);
+                    overlayRenderer.SetSceneMatrices(projection, view);
+                    overlayRenderer.BeginFrame(gl);
+                    try
                     {
-                        OpenGL.SetDimensions(Width, Height);
-                        _fboWidth = Width;
-                        _fboHeight = Height;
+                        // Selects the Mesh lighting model (and binds the IBL textures in Pbr mode)
+                        // for every built-in surface item of this frame.
+                        overlayRenderer.BeginSurfaceLighting(gl, _surfaceLightingMode, _environmentPreset,
+                            _iblIntensity, _pointImpostor, _environmentFollowsCamera);
+                        Render(gl);
                     }
-                    OpenGL.Viewport(0, 0, Width, Height);
+                    finally
+                    {
+                        overlayRenderer.EndFrame(gl);
+                    }
+
+                    GL.Disable(EnableCap.DepthTest);
+                    GL.Disable(EnableCap.Blend);
+                    gl.Present();
                 }
-
-                var gl = OpenGL;
-                gl.ClearColor(_backColor.R / 255f, _backColor.G / 255f, _backColor.B / 255f, _backColor.A / 255f);
-                gl.Clear(OpenGL.GL_COLOR_BUFFER_BIT | OpenGL.GL_DEPTH_BUFFER_BIT);
-
-                // 1. Release GL resources dequeued by Dispose/Replace on another thread.
-                ProcessPendingRelease(gl);
-
-                // 2. Create or update GL resources (full lock prevents concurrent Dispose).
-                ProcessResourcePool(gl);
-
-                gl.Enable(OpenGL.GL_DEPTH_TEST);
-                gl.DepthFunc(OpenGL.GL_LESS);
-                gl.Enable(OpenGL.GL_BLEND);
-                gl.BlendFunc(OpenGL.GL_SRC_ALPHA, OpenGL.GL_ONE_MINUS_SRC_ALPHA);
-                float[] projection;
-                float[] view;
-                lock (_cameraLock)
-                    _camera.GetMatrices(Width, Height, out projection, out view);
-                var overlayRenderer = ModernGLRenderer.For(gl);
-                overlayRenderer.SetSceneMatrices(projection, view);
-                overlayRenderer.BeginFrame(gl);
-                try
-                {
-                    // Selects the Mesh lighting model (and binds the IBL textures in Pbr mode)
-                    // for every built-in surface item of this frame.
-                    overlayRenderer.BeginSurfaceLighting(gl, _surfaceLightingMode, _environmentPreset,
-                        _iblIntensity, _pointImpostor, _environmentFollowsCamera);
-                    Render(gl);
-                }
-                finally
-                {
-                    overlayRenderer.EndFrame(gl);
-                }
-
-                gl.Disable(OpenGL.GL_DEPTH_TEST);
-                gl.Disable(OpenGL.GL_BLEND);
             }
+
+            base.OnPaint(e);
 
             // CoordinatesChanged is raised here, outside the render lock, so a handler may call back
             // into the display (the contract RenderItemFailed already documents). The tooltip was
             // already updated inside the frame, so it shows the same coordinates.
             RaisePendingCoordinatesChanged();
         }
-
-        /// <inheritdoc/>
-        protected override void DoGDIDraw(RenderEventArgs e) => base.DoGDIDraw(e);
 
         /// <inheritdoc/>
         protected override void OnResize(EventArgs e)
@@ -112,7 +89,7 @@ namespace VisionNet.Controls
         }
 
         /// <summary>Releases all GL resource handles waiting in the deferred-release queue.</summary>
-        private void ProcessPendingRelease(OpenGL gl)
+        private void ProcessPendingRelease(CxGlContext gl)
         {
             _registry.DrainReleases(handle => CxGLResourceManager.Release(gl, handle));
         }
@@ -121,7 +98,7 @@ namespace VisionNet.Controls
         /// Iterates the resource pool under full lock.
         /// Creates GL resources for new items and recreates them for items whose CPU data changed.
         /// </summary>
-        private void ProcessResourcePool(OpenGL gl)
+        private void ProcessResourcePool(CxGlContext gl)
         {
             _failedItems.Clear();
 
@@ -189,7 +166,7 @@ namespace VisionNet.Controls
         /// world-space coordinate system → surface items (unified Z range) →
         /// color bar → coord tag → overlay geometry → screen-space axes indicator.
         /// </summary>
-        private void Render(OpenGL gl)
+        private void Render(CxGlContext gl)
         {
             if (!_camera.Enable2DView && ShowCoordinateSystem)
                 _coordinationItem.Draw(gl);
@@ -300,7 +277,7 @@ namespace VisionNet.Controls
         /// settled frame. When nothing is translucent the order (and result) is unchanged.
         /// Returns whether at least one item was drawn.
         /// </summary>
-        private bool DrawSurfaceItems(OpenGL gl, List<ICxObjRenderItem> snapshot)
+        private bool DrawSurfaceItems(CxGlContext gl, List<ICxObjRenderItem> snapshot)
         {
             bool anyDrawn = false;
             for (int pass = 0; pass < 2; pass++)
@@ -324,7 +301,7 @@ namespace VisionNet.Controls
         }
 
         /// <summary>Phase 4 — overlay geometry (segments, points, polygons, etc.).</summary>
-        private void DrawOverlays(OpenGL gl)
+        private void DrawOverlays(CxGlContext gl)
         {
             _registry.CopyOverlayItemsInto(_overlaySnapshot);
             foreach (var item in _overlaySnapshot)
@@ -349,7 +326,7 @@ namespace VisionNet.Controls
         /// all scene and interactive geometry, so later depth-tested draws cannot cover their
         /// text or backgrounds.
         /// </summary>
-        private void DrawHud(OpenGL gl, bool anyDrawn, FrameRanges ranges)
+        private void DrawHud(CxGlContext gl, bool anyDrawn, FrameRanges ranges)
         {
             if (!anyDrawn) return;
 

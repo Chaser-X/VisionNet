@@ -1,6 +1,5 @@
 using System;
 using System.Drawing;
-using SharpGL;
 using VisionNet.DataType;
 
 namespace VisionNet.Controls
@@ -19,7 +18,7 @@ namespace VisionNet.Controls
 
         /// <summary>Issues all OpenGL draw calls for this item.</summary>
         /// <param name="gl">Active OpenGL context.</param>
-        void Draw(OpenGL gl);
+        void Draw(CxGlContext gl);
     }
 
     /// <summary>
@@ -128,14 +127,14 @@ namespace VisionNet.Controls
         /// Makes the item's model matrix available to the modern overlay renderer.
         /// Must be paired with <see cref="PopModelMatrix"/>.
         /// </summary>
-        protected void PushModelMatrix(OpenGL gl)
+        protected void PushModelMatrix(CxGlContext gl)
         {
             ModernGLRenderer.For(gl).PushModel(gl,
                 HasModelMatrix ? ModelMatrix : CxMatrix4X4.Identity());
         }
 
         /// <summary>Pops a matrix pushed by <see cref="PushModelMatrix"/>.</summary>
-        protected void PopModelMatrix(OpenGL gl)
+        protected void PopModelMatrix(CxGlContext gl)
         {
             ModernGLRenderer.For(gl).PopModel(gl);
         }
@@ -153,7 +152,7 @@ namespace VisionNet.Controls
         protected Color DrawColor => IsSelected ? SelectedColor : Color;
 
         /// <inheritdoc/>
-        public abstract void Draw(OpenGL gl);
+        public abstract void Draw(CxGlContext gl);
 
         // ── Active-object interaction ─────────────────────────────────────────────
 

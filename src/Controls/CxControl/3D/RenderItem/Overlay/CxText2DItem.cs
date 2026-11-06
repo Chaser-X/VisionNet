@@ -1,4 +1,3 @@
-using SharpGL;
 using System;
 using System.Drawing;
 using VisionNet.DataType;
@@ -28,11 +27,11 @@ namespace VisionNet.Controls
         }
 
         /// <inheritdoc/>
-        public override void Draw(OpenGL gl)
+        public override void Draw(CxGlContext gl)
         {
             if (TextItems == null || TextItems.Length == 0) return;
 
-            int vpHeight = gl.RenderContextProvider.Height;
+            int vpHeight = gl.Height;
             var renderer = ModernGLRenderer.For(gl);
             foreach (var item in TextItems)
             {

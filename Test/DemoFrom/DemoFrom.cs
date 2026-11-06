@@ -1,6 +1,5 @@
 using Lmi3d.GoSdk;
 using Lmi3d.GoSdk.Messages;
-using SharpGL;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -1992,12 +1991,10 @@ namespace DemoFrom
             panel.Controls.Add(Header("同步到主页面（3D 页两个 CxDisplay）"));
             panel.Controls.Add(Btn("两个都加载 Mesh", LoadLightingBothDemo));
 
-            // Live preview control. A code-created OpenGLControl needs the ISupportInitialize
-            // round-trip so its GL context is created (the designer normally emits this).
+            // Live preview control. The OpenTK GLControl creates its GL context when its handle is
+            // created (i.e. when it is added to the parent below), so no designer-style
+            // ISupportInitialize round-trip is needed any more.
             _cxDisplayPbr = new CxDisplay { Dock = DockStyle.Fill, Size = new Size(600, 600) };
-            var init = (System.ComponentModel.ISupportInitialize)_cxDisplayPbr;
-            init.BeginInit();
-            init.EndInit();
             // Default to the demo mesh data's convention (right-handed), like cxDisplay2. Use the
             // "左手系" toggle above to switch the preview to left-handed (mirrored) rendering; the
             // camera now mirrors its target/pivot accordingly, so framing and drag stay correct.

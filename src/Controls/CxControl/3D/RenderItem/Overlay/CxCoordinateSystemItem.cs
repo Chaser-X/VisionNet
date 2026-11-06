@@ -1,4 +1,4 @@
-using SharpGL;
+using OpenTK.Graphics.OpenGL;
 using System;
 using System.Collections.Generic;
 using System.Drawing;
@@ -39,7 +39,7 @@ namespace VisionNet.Controls
 
         public override bool SupportsGroupTransform => true;
 
-        public override void Draw(OpenGL gl)
+        public override void Draw(CxGlContext gl)
         {
             PushModelMatrix(gl);
             DrawAxis(gl, _xAxisMesh, _coordination.XAxis, Color.Red, "X");
@@ -48,7 +48,7 @@ namespace VisionNet.Controls
             PopModelMatrix(gl);
         }
 
-        public void DrawScreenPositionedAxes(OpenGL gl)
+        public void DrawScreenPositionedAxes(CxGlContext gl)
         {
             var renderer = ModernGLRenderer.For(gl);
             renderer.EnsureSceneMatrices(gl);
@@ -80,7 +80,7 @@ namespace VisionNet.Controls
             SetLineColor(colors, 3, Color.Lime);
             SetLineColor(colors, 4, Color.Blue);
             SetLineColor(colors, 5, Color.Blue);
-            renderer.DrawScreenGeometryColored(gl, OpenGL.GL_LINES, positions, colors, 2f);
+            renderer.DrawScreenGeometryColored(gl, PrimitiveType.Lines, positions, colors, 2f);
             renderer.DrawText(gl, (int)(ox + xX * length), (int)(oy + xY * length), Color.Red, 14, "X");
             renderer.DrawText(gl, (int)(ox + yX * length), (int)(oy + yY * length), Color.Lime, 14, "Y");
             renderer.DrawText(gl, (int)(ox + zX * length), (int)(oy + zY * length), Color.Blue, 14, "Z");
@@ -106,10 +106,10 @@ namespace VisionNet.Controls
             }
         }
 
-        private void DrawAxis(OpenGL gl, float[] mesh, CxVector3D direction, Color color, string label)
+        private void DrawAxis(CxGlContext gl, float[] mesh, CxVector3D direction, Color color, string label)
         {
             var renderer = ModernGLRenderer.For(gl);
-            renderer.Draw(gl, OpenGL.GL_TRIANGLES,
+            renderer.Draw(gl, PrimitiveType.Triangles,
                 mesh, color);
             var tip = Add(_coordination.Origin, Scale(direction, _axisLength));
             float sx, sy, sz;

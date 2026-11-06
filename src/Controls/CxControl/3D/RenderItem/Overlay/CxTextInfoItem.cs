@@ -1,4 +1,3 @@
-using SharpGL;
 using System.Drawing;
 using VisionNet.DataType;
 
@@ -27,7 +26,7 @@ namespace VisionNet.Controls
         public override bool SupportsGroupTransform => true;
 
         /// <inheritdoc/>
-        public override void Draw(OpenGL gl)
+        public override void Draw(CxGlContext gl)
         {
             if (TextInfos == null || TextInfos.Length == 0) return;
 
@@ -38,7 +37,7 @@ namespace VisionNet.Controls
                 float sx, sy, sz;
                 if (!renderer.Project(gl, info.Location.X, info.Location.Y, info.Location.Z,
                     out sx, out sy, out sz)) continue;
-                if (sx < 0 || sx > gl.RenderContextProvider.Width || sy < 0 || sy > gl.RenderContextProvider.Height)
+                if (sx < 0 || sx > gl.Width || sy < 0 || sy > gl.Height)
                     continue;
                 renderer.DrawText(gl, (int)sx, (int)sy, DrawColor, info.Size, info.Text);
             }

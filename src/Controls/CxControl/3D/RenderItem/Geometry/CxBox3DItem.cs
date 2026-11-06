@@ -1,4 +1,4 @@
-using SharpGL;
+using OpenTK.Graphics.OpenGL;
 using System;
 using System.Drawing;
 using VisionNet.DataType;
@@ -156,7 +156,7 @@ namespace VisionNet.Controls
         public override bool SupportsGroupTransform => true;
 
         /// <inheritdoc/>
-        public override void Draw(OpenGL gl)
+        public override void Draw(CxGlContext gl)
         {
             if (Box3Ds == null || Box3Ds.Length == 0) return;
 
@@ -188,18 +188,18 @@ namespace VisionNet.Controls
                     _edgesBuffer[edgeOffset++] = _vertexScratch[source + 2];
                 }
             }
-            renderer.Draw(gl, OpenGL.GL_TRIANGLES, _trianglesBuffer,
+            renderer.Draw(gl, PrimitiveType.Triangles, _trianglesBuffer,
                 Color.FromArgb(Color.A, Color.R, Color.G, Color.B));
             // The wireframe outline stays opaque even when the fill is translucent.
             Color opaque = Color.FromArgb(255, DrawColor.R, DrawColor.G, DrawColor.B);
-            renderer.Draw(gl, OpenGL.GL_LINES, _edgesBuffer, opaque, Size);
+            renderer.Draw(gl, PrimitiveType.Lines, _edgesBuffer, opaque, Size);
 
             // Vertex markers: show the 8 corners of the hit box when active and selected.
             if (IsActiveObj && IsSelected && _hitBoxIndex >= 0 && _hitBoxIndex < Box3Ds.Length)
             {
                 FillVertexScratch(Box3Ds[_hitBoxIndex]);
                 Array.Copy(_vertexScratch, _selectedBuffer, _vertexScratch.Length);
-                renderer.Draw(gl, OpenGL.GL_POINTS, _selectedBuffer, opaque, 10f);
+                renderer.Draw(gl, PrimitiveType.Points, _selectedBuffer, opaque, 10f);
             }
             PopModelMatrix(gl);
         }
