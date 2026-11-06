@@ -26,7 +26,7 @@
 
 - [ ] S5 线程与锁：registry 回调移出锁内、缩小 `_renderLock` 范围、`Dispose` 非 UI 线程改 `BeginInvoke`（`MakeCurrent` 纪律已由 `CxGlContext.RunOnContext` 收敛，见「已完成」）
 - [ ] S6 效能：色条/标签脏标记、Uniforms 强类型化、projection/view 每帧一次、overlay 合批、缓冲复用、遍历合并、拾取节流
-- [ ] 清理 `[Obsolete]` 代理（`CxDisplay.cs`：`SurfaceViewMode` / `IsLeftHanded`）与 `CxControl.csproj_bak`（需先确认无外部调用）
+- [ ] 清理 `[Obsolete]` 代理（`CxDisplay.cs`：`SurfaceViewMode` / `IsLeftHanded`，需先确认无外部调用）
 
 ### C. 渲染质量（未做）
 
@@ -46,6 +46,7 @@
 - [x] **迁移后加固（critic-in-the-loop 审计 P1/P2/P3/P5）**：`CxGlContext.RunOnContext` 收敛帧外 GL 绑定（P1）；删除残留 FFP 回退 `ReadCurrentGLMatrices` 与 `LookAtMatrix` 的矩阵栈段（P2）；`OnPaint` 改为先 `base.OnPaint` 再渲染（P3）；`CxGlContext` 单实例守卫（P5）；新增上下文能力日志，使「兼容 3.3 是否成立」可观测
 - [x] **内部重构：`ModernGLRenderer` 自持 `_gl`**，移除 45 个实例方法的冗余 `CxGlContext` 参数（另含 `ShaderProgramCompiler.CompileProgram` / `CxGLResourceManager.Release` / `GLResourceHandle.GetUniformLocation` / `CxDisplay.ProcessPendingRelease` / `DisposeResources`）；纯内部、无公共 API 变更
 - [x] **移除 SharpGL 残留**：删除 `3rd/SharpGL.dll` / `SharpGL.SceneGraph.dll` / `SharpGL.WinForms.dll`（已无任何引用）及 `bin` 下的陈旧副本
+- [x] **清理 SharpGL 时代遗留文件**：删除 `CxControl.csproj_bak` / `.CxControl.csproj.swp_bak`（旧 csproj 备份，无任何引用）；更新 `src/Controls/CxControl/README.md`（SharpGL / `OpenGLControl` → OpenTK / `GLControl`，并补齐新增核心文件）
 - [x] **工作区文档初始化**（2026-11-05）：创建 `Agents.md` / `Changlog.md` / `ToDo.md`，并合并 `CHANGELOG.md` 与两份 `TODO-CxDisplay-*.md` 后删除原文件
 - [x] **P1 逐顶点法线**：Mesh 光照改用真法线（提交 `be069ee`）
 - [x] **P2 PBR / IBL**：`SurfaceLightingMode` / `EnvironmentPreset` / `IblIntensity`；程序化 IBL（`ProceduralIbl`）；item 级 `Metallic` / `Roughness`（提交 `f98e426`）
@@ -63,7 +64,7 @@
 - [ ] **半透明对策 B（暂缓）**：若需「半透明互相透出且顺序正确」，需 ①按 item 距离排序 ②半透明不写深度 ③悬停帧 depth-only pass 供拾取。单深度缓冲下与「正确拾取」不可兼得
 - [x] ~~**P4 回读性能专项**~~：**已由 OpenTK 迁移解决**——`CxDisplay` 改为直绘 `SwapBuffers`，删除 FBO + 每帧全分辨率 `glReadPixels` + `BitBlt`（4K ≈ 33 MB/帧）；拾取仍按需 `ReadPixels` 单像素。见 `Changlog.md`「已提交」→ `3c61519`
 - [ ] **右键菜单照明模式开关**（`Enum.Parse` 依赖菜单 Text == 枚举名）
-- [ ] 清理 `[Obsolete]` 代理与 `CxControl.csproj_bak`（需先确认无外部调用）
+- [ ] 清理 `[Obsolete]` 代理（需先确认无外部调用）
 - [x] ~~`RotateCamera` / `PanCamera` 补偿 `IsLeftHanded`~~：**已试并回退**——分析性共轭实测无效；根因是 Demo **数据约定不匹配**（右手系 Mesh 用了左手渲染），非相机缺陷，库保持原样
 
 ---

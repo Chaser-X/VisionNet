@@ -1,47 +1,53 @@
-# CxControl ×é¼ş½á¹¹ÊáÀí
+# CxControl é¡¹ç›®ç»“æ„è¯´æ˜
 
-## 1. ×ÜÌå½á¹¹
-`CxControl` Ö÷ÒªÓÃÓÚ3D/2DµãÔÆ¡¢Íø¸ñ¡¢¼¸ºÎÌåµÈ¿ÉÊÓ»¯£¬»ùÓÚ OpenGL£¨SharpGL£©ÊµÏÖ¡£ºËĞÄ¿Ø¼şÎª `CxDisplay`£¬¸ºÔğäÖÈ¾¡¢½»»¥ºÍÊı¾İ¹ÜÀí¡£
+## 1. æ€»ä½“ç»“æ„
+`CxControl` ä¸»è¦åŒ…å« 3D/2D æ¸²æŸ“ã€ç½‘æ ¼ã€å‡ ä½•ä½“ç­‰å¯è§†åŒ–èƒ½åŠ›ï¼ŒåŸºäº OpenGLï¼ˆ**OpenTK 3.3.3**ï¼‰å®ç°ã€‚æ ¸å¿ƒæ§ä»¶ä¸º `CxDisplay`ï¼Œè´Ÿè´£æ¸²æŸ“ç®¡çº¿ä¸æ•°æ®ç®¡ç†ã€‚
 
-## 2. Ö÷ÒªÎÄ¼şÓëÖ°Ôğ
+## 2. ä¸»è¦æ–‡ä»¶ä¸èŒè´£
 
-- **CxDisplay.cs**  
-  Ö÷¿Ø¼ş£¬¼Ì³Ğ×Ô `OpenGLControl`£¬¸ºÔğäÖÈ¾Á÷³Ì¡¢Êı¾İ¹ÜÀí¡¢ÓÃ»§½»»¥£¨Êó±ê¡¢²Ëµ¥µÈ£©£¬²¢Ğ­µ÷¸÷ RenderItem µÄÏÔÊ¾¡£
+- **CxDisplay.cs / .Render.cs / .Input.cs / .Api.cs / .Group.cs / .Designer.cs**
+  æ ¸å¿ƒæ§ä»¶ã€‚æ´¾ç”Ÿè‡ª `OpenTK.GLControl`ï¼Œè´Ÿè´£æ¸²æŸ“ç®¡çº¿ï¼ˆç›´ç»˜ `OnPaint` + `SwapBuffers`ï¼‰ã€æ•°æ®ç®¡ç†ã€ç”¨æˆ·äº¤äº’ï¼ˆé¼ æ ‡ã€èœå•ç­‰ï¼‰ï¼Œå¹¶åè°ƒ RenderItem å±‚æ˜¾ç¤ºã€‚
 
-- **Camera/CxAdvancedTrackBallCamera.cs**  
-  ÏÖ´ú»¯3DÏà»ú£¬Ö§³ÖĞı×ª¡¢Ëõ·Å¡¢Æ½ÒÆ¡¢2D/3DÇĞ»»£¬¸ºÔğÊÓÍ¼¾ØÕóÉèÖÃ¡£
+- **CxGlContext.cs**
+  ç»‘å®šæ— å…³çš„ GL ä¸Šä¸‹æ–‡é—¨é¢ï¼šå¯¹å¤–åªæš´éœ² `Width` / `Height` / `IsValid`ï¼Œéšè— OpenTK ç±»å‹ï¼›`EnsureCurrent` / `RunOnContext` æ˜¯ã€Œå¸§å¤– GL å·¥ä½œã€çš„å”¯ä¸€å…¥å£ã€‚
 
-- **RenderItem/**  
-  äÖÈ¾ÔªËØ»ùÀàºÍ¸÷ÀàÍ¼Ôª£¨µã¡¢Ïß¡¢Ãæ¡¢Mesh¡¢Box¡¢ÎÄ±¾¡¢×ø±êÏµµÈ£©£º
-  - `CxSegment3DItem.cs`£º3DÏß¶Î
-  - `CxSurfaceItem.cs`£ºµãÔÆ/±íÃæ
-  - `CxMeshItem.cs`£ºÈı½ÇÍø¸ñ
-  - `CxColorBarItem.cs`£ºÉ«Ìõ
-  - `CxCoordinationTagItem.cs`£º×ø±ê±êÇ©
-  - `CxCoordinateSystemItem.cs`£º×ø±êÏµ
-  - `CxTextInfoItem.cs`£º3DÎÄ±¾
-  - `CxText2DItem.cs`£º2DÎÄ±¾
-  - `CxPoint3DItem.cs`£º3Dµã
-  - `CxBox3DItem.cs`£º3D°üÎ§ºĞ
+- **CxItemRegistry.cs**
+  å”¯ä¸€æŒæœ‰ surface / overlay é˜Ÿåˆ—ä¸ keyã€per-item GL èµ„æºæ± ä¸å»¶è¿Ÿé‡Šæ”¾é˜Ÿåˆ—ï¼ˆå«å®ˆæŠ¤å®ƒä»¬çš„é”ï¼‰ã€‚
 
-- **ICamera.cs**  
-  Ïà»ú½Ó¿Ú£¬¶¨ÒåÊÓÍ¼²Ù×÷¡£
+- **CxGroupManager.cs / CxGroup.cs**
+  ç»„æ‹“æ‰‘ã€æˆå‘˜å…³ç³»ä¸å§¿æ€ã€‚
 
-- **CxExtension.cs**  
-  À©Õ¹·½·¨¡¢¸¨Öú¹¤¾ß¡£
+- **CxGLResourceManager.cs**
+  VAO / VBO / ç´¢å¼•ç¼“å†² / çº¹ç† / shader çš„åˆ›å»ºä¸é‡Šæ”¾ï¼ˆé™æ€ã€æ— çŠ¶æ€ï¼‰ã€‚
 
-- **CxDisplay.Designer.cs / .resx**  
-  WinForms Éè¼ÆÆ÷×Ô¶¯Éú³ÉÎÄ¼ş¡£
+- **CxPickingService.cs**
+  æ·±åº¦è¯»å›ã€åæŠ•å½±ã€æœ€è¿‘æ›²é¢æœç´¢ï¼ˆUI çº¿ç¨‹ã€æ¸²æŸ“å¸§å†…ï¼‰ã€‚
 
-- **CxControl.csproj**  
-  ÏîÄ¿ÎÄ¼ş¡£
+- **Camera/**
+  `CxAdvancedTrackBallCamera.cs`ï¼šç°ä»£ 3D ç›¸æœºï¼Œæ”¯æŒæ—‹è½¬ã€ç¼©æ”¾ã€å¹³ç§»ã€2D/3D åˆ‡æ¢ä¸é¢„è®¾è§†å›¾ï¼›`CxTrackBallCamera.cs` ä¸ºé—ç•™å®ç°ï¼›`ICamera.cs` ä¸ºæ¥å£ã€‚
 
-## 3. ÍÆ¼öÊáÀí½¨Òé
+- **RenderItem/**
+  æ¸²æŸ“å…ƒç´ ï¼ˆç‚¹ã€çº¿ã€é¢ã€Meshã€Boxã€æ–‡æœ¬ã€åæ ‡ç³»ç­‰ï¼‰ï¼š
+  - `ComplexGeometry/`ï¼š`CxSurfaceItem.cs`ï¼ˆæ›²é¢ï¼‰ã€`CxPointCloudItem.cs`ï¼ˆç‚¹äº‘ï¼‰ã€`CxMeshItem.cs`ï¼ˆä¸‰è§’ç½‘æ ¼ï¼‰ï¼›`AbstractCxObjRenderItem.cs` ä¸ºå…±äº«åŸºç±»ã€‚
+  - `Geometry/`ï¼š`CxSegment3DItem.cs`ï¼ˆ3D çº¿æ®µï¼‰ã€`CxPoint3DItem.cs`ï¼ˆ3D ç‚¹ï¼‰ã€`CxBox3DItem.cs`ï¼ˆ3D åŒ…å›´ç›’ï¼‰ã€`CxPolygon3DItem.cs`ã€`CxPlane3DItem.cs`ã€‚
+  - `Overlay/`ï¼š`CxColorBarItem.cs`ï¼ˆè‰²æ¡ï¼‰ã€`CxCoordinationTagItem.cs`ï¼ˆåæ ‡æ ‡ç­¾ï¼‰ã€`CxCoordinateSystemItem.cs`ï¼ˆåæ ‡ç³»ï¼‰ã€`CxTextInfoItem.cs`ï¼ˆ3D æ–‡æœ¬ï¼‰ã€`CxText2DItem.cs`ï¼ˆ2D æ–‡æœ¬ï¼‰ã€‚
+  - `Shared/`ï¼š`ModernGLRenderer*.cs`ï¼ˆå…¨éƒ¨æ¸²æŸ“é¡¹å…±ç”¨çš„ per-context GL æœåŠ¡ï¼‰ã€`ShaderProgramCompiler.cs`ã€`ProceduralIbl.cs`ã€‚
 
-- ¸÷ RenderItem Ö»¸ºÔğ×ÔÉíÍ¼ÔªµÄäÖÈ¾Óë×ÊÔ´¹ÜÀí£¬±ãÓÚÀ©Õ¹¡£
-- `CxDisplay` Ö»¸ºÔğÊı¾İÁ÷×ª¡¢½»»¥ºÍäÖÈ¾µ÷¶È¡£
-- Ïà»úÓëäÖÈ¾½âñî£¬±ãÓÚºóĞøÖ§³Ö¶àÖÖÊÓÍ¼Ä£Ê½¡£
-- ´úÂëÄÚ½¨Òé²¹³ä XML ×¢ÊÍºÍ `#region`£¬ÌáÉı¿É¶ÁĞÔ¡£
-- ¿ÉÔÚ±¾ÎÄ¼ş³ÖĞø²¹³ä¼Ü¹¹¡¢ÓÃ·¨¡¢À©Õ¹ËµÃ÷¡£
+- **CxExtension.cs**
+  æ‰©å±•å·¥å…·ï¼ˆåŒ…å›´ç›’ã€é¢œè‰²æ˜ å°„ã€3D/2D æ–‡æœ¬ç»˜åˆ¶ã€OpenGL èƒ½åŠ›æ¢æµ‹ï¼‰ã€‚
+
+- **2D/**
+  `CxDisplay2D` åŠå…¶ RenderItemï¼ˆåŸºäº ScottPlot / SkiaSharpï¼‰ã€‚
+
+- **CxControl.csproj**
+  é¡¹ç›®æ–‡ä»¶ï¼ˆ.NET Framework 4.8ï¼›å¼•ç”¨ `3rd/OpenTK.dll` ä¸ `3rd/OpenTK.GLControl.dll`ï¼‰ã€‚
+
+## 3. æ¨èæ‰©å±•æ–¹å¼
+
+- æ–° RenderItem åªè´Ÿè´£å‡ ä½•ä¸æ¸²æŸ“ï¼ŒGL èµ„æºç”Ÿå‘½å‘¨æœŸäº¤ç»™ `CxDisplay`ã€‚
+- `CxDisplay` åªè´Ÿè´£ç›¸æœºã€ç»˜åˆ¶ä¸æ¸²æŸ“è°ƒåº¦ã€‚
+- å¤æ‚æ¸²æŸ“é¡¹ä¼˜å…ˆå¤ç”¨ `RenderItem/Shared/ModernGLRenderer` çš„å…±äº« program / VAOï¼Œä¸è¦å„è‡ªåˆ›å»º GL å¯¹è±¡ã€‚
+- å»ºè®®è¡¥å…¨ XML æ³¨é‡Šå’Œ `#region`ï¼Œæé«˜å¯è¯»æ€§ã€‚
+- æœ¬æ–‡æ¡£æ˜¯é¡¹ç›®å†…éƒ¨ç»“æ„è¯´æ˜ï¼›å¯¹å¤– API ä¸çº¿ç¨‹/é‡ç»˜çº¦å®šä»¥æ ¹ç›®å½• `README.md` ä¸ºå‡†ã€‚
 
 ---
