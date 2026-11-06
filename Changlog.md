@@ -2,9 +2,43 @@
 
 > 用途：记录影响**公共契约、渲染行为、架构边界**的变更，便于后续维护与交接。
 > 约定：新变更先写入「未发布」；提交后把条目移到「已提交」并补上提交哈希。
-> 相关文档：`README.md`（对外 API 说明）。
+> 相关文档：`README.md`（对外 API 说明）、[Agents.md](Agents.md)（接入说明）、[ToDo.md](ToDo.md)（任务清单）。
+>
+> 合并说明（2026-11-05）：本文件已并入原 `CHANGELOG.md` 的产品变更历史，以及工作区文档变更记录。
+> 原「架构现状与维护要点」已迁至 [Agents.md](Agents.md)；原「待验证（人工 GL 回归）」已迁至 [ToDo.md](ToDo.md)。
 
 ## 未发布（工作区，尚未提交）
+
+### 修复（库）：左手系（IsLeftHanded）下相机未随镜像世界 —— 初始不居中 / 拖动不自洽
+
+**现象**：Demo 光照/PBR 测试页预览切到左手系后，初始 Top 视图的 Mesh **不居中**（偏出画面），拖动手感也不自洽。
+
+**根因**：`IsLeftHanded` 在视图矩阵里镜像了**世界**（`LookAt(camera) · M`，`M = diag(1,-1,1,1)`），但相机自身的世界状态（`_target` / `_position` / 旋转支点）仍按**未镜像世界**设置。于是物体中心 `c` 被画到 `M c`，而相机盯着 `c` → 不在视轴 → 不居中；同理相机世界与屏幕显示的世界差一个 `M`，拖动也不自洽。`FocusOnPoint` 其实**早已**按此约定补偿（`if (_isLeftHanded) target.Y = -target.Y;`），但 `FitView` 与旋转支点漏了。
+
+**改动**（`CxAdvancedTrackBallCamera`）
+- 新增私有 `Mirror(v)`：`IsLeftHanded` 时返回 `(x, -y, z)`。
+- `FitView`：把预设算出的 `_target` 用 `Mirror` 映射到相机世界，`_position = _target + 逻辑偏移`；`_up` **不镜像**（镜像 up 会同时翻转屏幕 X 轴）。
+- `RotateCamera`：支点 `RotationPoint` / `_sceneCenter` 先 `Mirror` 再参与轨道旋转。
+- 与既有 `FocusOnPoint` 的约定保持一致。
+
+**Demo**：光照/PBR 测试页新增勾选框「左手系（镜像显示，仅预览）」——切换后自动 `FitView()` 重新取景（取景依赖手性）。
+
+- 验证：`CxControl` / `DemoFrom` 0 错误；`dotnet test` → **123/123 通过**。
+- **需本机目视确认**：勾选左手系后初始视图**居中**、拖动/平移方向自洽；取消勾选（右手系）无回归。
+
+### 修复（Demo）：光照/PBR 测试页预览拖动旋转反向 —— 手性约定不匹配
+
+**现象**：光照/PBR 测试页右侧预览 `CxDisplay` 加载 3D 对象后，鼠标拖动旋转方向与 3D 页（`cxDisplay2`）不一致，出现「反转 / 不跟手」。
+
+**根因（修正结论）**：**数据约定不匹配，不是相机 bug**。预览最初被配置为 `Camera.IsLeftHanded = true`（照抄 `cxDisplay1`），但预览加载的是 Demo 自建的 Mesh——它们按**右手系**约定构建。`IsLeftHanded` 会给视图矩阵追加一个世界 Y 镜像（`GetMatrices` 里 `view[1] / view[5] / view[9] / view[13]` 取反），于是**对象被镜像渲染**，拖动旋转的表观方向也随之反向。对照组全部自洽：`cxDisplay1`（左手渲染 + Gocator 左手数据）正常、`cxDisplay2`（右手渲染 + Demo 右手数据）正常——**渲染约定必须与数据约定一致**。
+
+**改动**
+- `Test/DemoFrom/DemoFrom.cs`：预览 `_cxDisplayPbr.Camera.IsLeftHanded` 由 `true` 改为 `false`，与数据约定（及 `cxDisplay2`）对齐。
+
+**已试并回退（库侧共轭）**：曾尝试在库侧对 `IsLeftHanded` 做旋转/平移共轭（`RotateCamera` 的 `R → M·R·M`、`PanCamera` 的 `offset → M·offset`），**实测无效**——因为"左手系本身是相机缺陷"这一前提不成立；若保留反而会破坏 `cxDisplay1` 这类"左手数据 + 左手渲染"的正确组合。已 `git restore` 回退 `CxAdvancedTrackBallCamera.cs`，**库保持原样**。
+
+- 验证：`CxControl` / `DemoFrom` 0 错误；`dotnet test` → **123/123 通过**。
+- **需本机目视确认**：预览对象不再被镜像、拖动旋转方向与 `cxDisplay2` 一致。
 
 ### 修复：半透明（Opacity < 1）物体无法拾取 / 无标签 / 深度错位
 
@@ -446,56 +480,19 @@
 - `33ad837`（2026-10-21）合并 Daily 分支更新（排除 Demo）。
 - `02f9933`（2026-10-21）增加 ply 导入导出。
 
-## 架构现状与维护要点（交接用）
+## 工作区文档变更
 
-**分层**
+> 按 Keep a Changelog 风格，ISO 日期，最新在上。记录工作区文档与协作层面的变更。
 
-- `CxDisplay`（partial）：渲染管线（`CxDisplay.Render.cs`）、GL 资源生命周期（`CxDisplay.GLResources.cs`）、表面与叠加层队列 / key / GL 池（全部收在 `CxItemRegistry` 内，见 `CxDisplay.cs` 的 `_registry`）、输入与拾取（`CxDisplay.Input.cs`）。
-- `CxItemRegistry`（`3D\CxItemRegistry.cs`）：**唯一**持有 surface 队列 + key、overlay 队列 + key、per-item GL 池与延迟释放队列，以及守护它们的锁；对外只暴露类型化方法，绕锁访问在编译期不可能。
-- `CxGroupManager`（经 `CxDisplay.Groups` 访问）：组拓扑 + 成员关系 + 姿态；surface 成员按 key 解析、overlay 按引用。
-- `CxGroup` / `CxGroupLeaf`：纯数据结构（叶子只存 key 或直接引用 + 局部姿态），遍历与姿态运算都在 manager 里。
-- RenderItem：`CxSurfaceItem` / `CxMeshItem` / `CxPointCloudItem`（`ICxObjRenderItem`）与 `AbstractRenderItem` 派生叠加项。
-- `3D\RenderItem\Shared\ModernGLRenderer`（6 个 partial 文件）：**全部渲染项共用**的 per-context GL 服务 —— GLSL 程序（geometry / text / surface / sphere）+ 可复用 VAO/VBO、文本纹理与字形图集缓存、GL 状态快照（`CaptureState` / `RestoreState`）、相机矩阵与模型栈、CPU 侧 project/unproject；`ShaderProgramCompiler` 是它的 shader 编译工具。（旧名 `ModernOverlayRenderer` 容易让人误以为只服务叠加层，已改名。）
+### 2026-11-05
 
-**线程与锁**
+**Added**
+- 初始化工作区文档：`Agents.md`（接入说明）、`Changlog.md`（本文件）、`ToDo.md`（任务清单）。
+- 合并既有文档到上述三个文件并删除原文件：
+  - `CHANGELOG.md` → 产品变更历史并入本文件；「架构现状与维护要点」并入 `Agents.md`；「待验证」并入 `ToDo.md`。
+  - `TODO-CxDisplay-refactor.md` → 并入 `ToDo.md` 的「重构专项（S0–S6）」。
+  - `TODO-CxDisplay-render-quality.md` → 并入 `ToDo.md` 的「渲染质量专项（P1–P4 / AA / 半透明）」。
 
-- 锁顺序恒为 `_renderLock → _resourceLock`；渲染为**按需刷新**（`SafeInvalidate()`，`RenderTrigger = Manual`，无渲染定时器）。
-- 渲染发生在 **UI 线程**（SharpGL 在 `OnPaint` 中绘制并 `MakeCurrent`），因此 `glReadPixels` / `glGetInteger` 等只能出现在渲染帧内 —— 悬停拾取为此改为帧内延迟执行（Phase 4b）。
-- 组 API 跨线程调用会 `BeginInvoke` 到 UI 线程（返回值按现有约定为 `false` / `null`）。
-- GL 删除只能在渲染帧内：surface 走 `_pendingRelease` 队列延迟释放；overlay 的 GL 对象由共享 `ModernGLRenderer` 持有（item 只持有托管数组）。
-
-**已知坑**
-
-- `Get*` 拿到 item 后**直接改底层数据不会更新**（CPU 缓存与 GPU 缓冲都不会重建）：必须重新 `Set*(..., key)`。只改姿态时用 `Set*Pose` / `Groups.SetMemberLocalTransform`，或改完自行触发重绘（`Invalidate()`）。
-- 直接改 `MaxPointCount` 不会重建采样；直接赋值 `ColorMin` / `ColorMax` 不生效（Draw 上传的是缓存 uniform，由显示层每帧聚合下发）。
-- overlay 成员无法重绑（没有 key 概念）；如需替换 overlay 成员，需要另加资源层 API。
-- 根目录 `end` 是历史 `git log` 转储文件（内容含旧 API 名，非代码），全仓库检索时注意排除。
-- `ModelMatrix` **视为不可变**：拾取用的逆矩阵只在属性赋值时失效，原地修改 `CxMatrix4X4.Data[...]` 会让缓存过期。请整体重新赋值（`Set*Pose` / `Groups.SetMemberLocalTransform`）。
-- `GetNearestSurfacePoint`（公开重载）与悬停拾取需要 GL 深度读回，**只能在 UI 线程调用**。
-
-**提交前检查清单（防文档漂移）**
-
-- 新增/删除枚举成员 → 同步 README「渲染模式」表，并确认右键菜单项的 `Text` 与枚举名一致（`UpdateMenuItems` / `Enum.Parse` 依赖它）。
-- 新增/删除公开成员 → 同步 README「API 参考」与 CHANGELOG「未发布」。
-- 改动渲染 / 线程行为 → 同步 README「线程安全与重绘」与本文件「架构现状」。
-- CHANGELOG：本次条目先留在「未发布」；**下一次**提交时移入「已提交」并补提交哈希（避免「未发布」段长期写着已提交内容）。
-
-## 待验证（无 OpenGL 环境、仓库无渲染测试）
-
-1. 组内替换：运行 Group Sim → 点击 "Replace Vehicle"，确认新载具出现在原位置、继续跟随平台/载具动画、相机不跳。
-2. 只 `RemoveSurfaceItem("Vehicle")` 后组内 leaf 被跳过（不绘制、不崩溃、动画继续）；同 key 再 `SetMesh(..., "Vehicle", ...)` 自动重绑并恢复原局部姿态。
-3. `ClearOverlayItems()` 摘除 overlay 成员但不影响表面对象与内置 HUD；选中项被清后继续点击/拖拽不崩溃。
-4. `ResetView(true)` 清空组与表面；`ResetView(false)` 保留表面对象。
-5. 3-Axis Stage（X / Y / Z 三组联动）行为不变。
-6. 着色器编译失败路径（`ShaderFailed`）与 Box 边线不透明表现。
-7. 字形图集排版保真度：坐标提示 / 色条标签与旧的"整串纹理"排版是否像素级一致（`Advance` / `LegacyLeftBearing` 为启发式）。
-8. 球体实例化：`Sphere` 模式外观与旧实现一致（半径 = `Size / 2`、模型矩阵直传）。
-9. 共享 surface 程序 + 上下文重建：GL 上下文重建后三个内建项正常绘制、无残留/重复释放的句柄。
-10. FBO 尺寸缓存：resize 路径（基类 `OnSizeChanged` 已 `SetDimensions`，首帧是否重复）行为正常。
-11. `Lit` 纯色模式：`SolidColor` 生效（Mesh 下保留光照立体感、PointCloud 下为纯平色），且纯色 Item 不再触发颜色条。
-12. 按需重绘（E1）：相机旋转/平移/缩放、数据加载、选中与拖拽、组变换、GL 上下文重建后画面是否都及时刷新（不再有 10 FPS 定时兜底）；后台线程准备完数据后未经过 `Set*` / `Redraw()` 时不刷新（预期行为，README 已注明）。
-13. 延迟拾取（E2）：悬停坐标标签是否随鼠标及时更新、与旧行为一致；`CoordinatesChanged` 现在在渲染帧内触发，处理器若用同步 `Invoke` 会卡帧。
-14. 半透明（M2）：`Opacity < 1` 的 Item 是否正确混合在不透明场景之上；全不透明场景的渲染结果与改动前逐像素一致；`CxBox3DItem` 等半透明 overlay 不再遮挡其后绘制的几何。
-15. 注册/替换/释放路径（M1 第 2/3 步）：
-    - **CPU 层已用临时脚本覆盖**（不新增项目、不进仓库）：驱动公开 API + 反射校验注册表内部不变量，55 项断言全过 —— 含新 key 注册、同 key 替换、改名保持槽位、跨类型替换、同实例重复 Set 为空操作、按 key 移除、清空、overlay 注册/替换/移除/清空、`Dispose` 后状态清空，以及渲染帧侧 API（`CopyFrameSnapshot` 索引对齐、`ForEachPoolEntry`、`GetKeyOf`、`MarkNeedsUpdate`、`DrainReleases` 恰好一次）。**该脚本只证明当前语义自洽，不能证明与重构前等价**（无 oracle）。
-    - **仍需 GL 侧人工回归**（脚本无 GL 上下文，不覆盖绘制与真实资源释放）：同 key 反复 `Set*`（含不同类型互替）后绘制顺序与画面正常；`Set*(otherKey, 已登记实例)` 不重复绘制；`RemoveSurfaceItem` / `ClearSurfaceItems` / `ClearOverlayItems` / `SetOverlayItem` 同 key 替换后无残留句柄；控件 `Dispose` 后无 GL 资源泄漏或异常；后台线程 Set 与渲染并发时不抛异常（脚本为单线程，未覆盖锁竞争）。
+**验证**
+- 三个文件均存在，相对链接可解析；除测试注释里的一处文档引用外未改动代码。
+- 未执行 Git 提交或推送。

@@ -14,7 +14,7 @@ namespace VisionNet.Controls.Tests
     ///
     /// This is a <b>baseline recorder</b>, not a regression gate: it asserts only real invariants
     /// of the measured code, never timings. Run with <c>-v n</c> to read the numbers, and record
-    /// them in <c>CHANGELOG.md</c> before and after a performance change.
+    /// them in <c>Changlog.md</c> before and after a performance change.
     /// </summary>
     public class CxDisplayCpuBenchmarkTests
     {
