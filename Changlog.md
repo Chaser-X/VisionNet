@@ -9,32 +9,6 @@
 
 ## 未发布（工作区，尚未提交）
 
-### 重构（库）：CxDisplay 渲染后端 SharpGL → OpenTK（直绘，去掉 FBO 回读）
-
-**动机**：SharpGL 已停止维护；其 FBO 渲染 + 每帧 `glReadPixels` + `BitBlt` 回读是性能大头（4K ≈ 33 MB/帧）。
-
-**约束**：OpenTK 4.x+ **不支持 .NET Framework 4.x**，故保持 **net48**，采用 **OpenTK 3.3.3 + OpenTK.GLControl 3.3.3**（放入 `3rd/`）。
-
-**改动**
-- 依赖：`CxControl.csproj` / `DemoFrom.csproj` / `CxControl.Tests.csproj` 移除 `SharpGL*`，改为 `OpenTK` + `OpenTK.GLControl`。
-- 新增绑定无关门面 `CxGlContext`（`3D/CxGlContext.cs`）：公共面只有 `Width` / `Height` / `IsValid`，不暴露任何 OpenTK 类型。
-- `CxDisplay` 基类 `OpenGLControl` → `OpenTK.GLControl`：`DoOpenGLInitialized` → `OnHandleCreated`（经 `InitializeGlState`）；`DoOpenGLDraw` / `DoGDIDraw` → `OnPaint` + `SwapBuffers`。**删除 FBO 路径**（`RenderContextType.FBO` / `SetDimensions` / `_fboWidth` / `_fboHeight`）。
-- GL 调用点机械迁移到 `OpenTK.Graphics.OpenGL.GL` 静态入口 + 强类型枚举；`ReadPixels` 改为 `float[]`；`GetBooleanv` → `GetBoolean`。
-- 相机 `LookAtMatrix` 的 FFP 段改用 `OpenTK.Matrix4` + `GL.LoadMatrix`；`ICamera.LookAtMatrix(CxGlContext)`。
-- 公共 API 去 SharpGL：`IRenderItem.Draw` / `ICxObjRenderItem.Draw` / `AbstractCxObjRenderItem.Draw` / `CxExtension.DrawTextLabel*` / 相机构造函数均改为 `CxGlContext`。
-- 请求 **兼容 profile 3.3**（`GraphicsMode(32bpp, 24 depth, 8 stencil, 0 samples, double-buffered)`），以保留 `LineWidth > 1` 与 point sprite 行为。
-- `CxExtension.IsOpenGLAvailable` / `GetOpenGLVersion` 改用一次性隐藏 `GameWindow` 探测。
-
-**破坏性变更（需知会使用方）**
-1. **透明背景不再支持**：直绘窗口无法与 WinForms 父容器做 alpha 合成；默认清屏色由透明黑改为**不透明黑**。
-2. `CxDisplay` 不再暴露 SharpGL 继承来的 `OpenGLVersion` / `DrawFPS` / `FrameRate` / `RenderTrigger` / `RenderContextType` / `OpenGL` 属性，也不再实现 `ISupportInitialize`。
-3. 实现 `IRenderItem` / `ICxObjRenderItem` / `ICamera` 的调用方需按新签名（`CxGlContext`）适配。
-
-**验证**
-- `CxControl` / `DemoFrom` 0 错误 0 警告；`CxControl.dll` 引用程序集仅 `OpenTK` / `OpenTK.GLControl`（无 SharpGL）。
-- `dotnet test` → **127/127 通过**（新增 4 项 `OpenTkMigrationTests`：不引用 SharpGL、引用 OpenTK、基类为 `OpenTK.GLControl`、公共 API 不暴露 SharpGL 类型）。
-- **需上机目视确认**：点云 impostor、Mesh PBR/IBL、色带、坐标轴、悬停 tooltip、选择拾取、半透明、resize、多控件、上下文重建；以及宽线/点精灵在目标驱动器的兼容 profile 下是否生效。
-
 ### 修复（库）：左手系（IsLeftHanded）下相机未随镜像世界 —— 初始不居中 / 拖动不自洽
 
 **现象**：Demo 光照/PBR 测试页预览切到左手系后，初始 Top 视图的 Mesh **不居中**（偏出画面），拖动手感也不自洽。
@@ -161,6 +135,32 @@
 - 未做（记入 TODO）：`CxDisplay` 右键菜单的照明模式开关（切换测试改在 `DemoFrom` 的「光照/PBR 测试」Tab 提供）；`SpecularIntensity` / per-item 覆盖。
 
 ## 已提交
+
+### 3c61519（2026-11-06）渲染后端迁移：CxDisplay 由 SharpGL 切换到 OpenTK（直绘，去掉 FBO 回读）
+
+**动机**：SharpGL 已停止维护；其 FBO 渲染 + 每帧 `glReadPixels` + `BitBlt` 回读是性能大头（4K ≈ 33 MB/帧）。
+
+**约束**：OpenTK 4.x+ **不支持 .NET Framework 4.x**，故保持 **net48**，采用 **OpenTK 3.3.3 + OpenTK.GLControl 3.3.3**（放入 `3rd/`）。
+
+**改动**
+- 依赖：`CxControl.csproj` / `DemoFrom.csproj` / `CxControl.Tests.csproj` 移除 `SharpGL*`，改为 `OpenTK` + `OpenTK.GLControl`。
+- 新增绑定无关门面 `CxGlContext`（`3D/CxGlContext.cs`）：公共面只有 `Width` / `Height` / `IsValid`，不暴露任何 OpenTK 类型。
+- `CxDisplay` 基类 `OpenGLControl` → `OpenTK.GLControl`：`DoOpenGLInitialized` → `OnHandleCreated`（经 `InitializeGlState`）；`DoOpenGLDraw` / `DoGDIDraw` → `OnPaint` + `SwapBuffers`。**删除 FBO 路径**（`RenderContextType.FBO` / `SetDimensions` / `_fboWidth` / `_fboHeight`）。
+- GL 调用点机械迁移到 `OpenTK.Graphics.OpenGL.GL` 静态入口 + 强类型枚举；`ReadPixels` 改为 `float[]`；`GetBooleanv` → `GetBoolean`。
+- 相机 `LookAtMatrix` 的 FFP 段改用 `OpenTK.Matrix4` + `GL.LoadMatrix`；`ICamera.LookAtMatrix(CxGlContext)`。
+- 公共 API 去 SharpGL：`IRenderItem.Draw` / `ICxObjRenderItem.Draw` / `AbstractCxObjRenderItem.Draw` / `CxExtension.DrawTextLabel*` / 相机构造函数均改为 `CxGlContext`。
+- 请求 **兼容 profile 3.3**（`GraphicsMode(32bpp, 24 depth, 8 stencil, 0 samples, double-buffered)`），以保留 `LineWidth > 1` 与 point sprite 行为。
+- `CxExtension.IsOpenGLAvailable` / `GetOpenGLVersion` 改用一次性隐藏 `GameWindow` 探测。
+
+**破坏性变更（需知会使用方）**
+1. **透明背景不再支持**：直绘窗口无法与 WinForms 父容器做 alpha 合成；默认清屏色由透明黑改为**不透明黑**。
+2. `CxDisplay` 不再暴露 SharpGL 继承来的 `OpenGLVersion` / `DrawFPS` / `FrameRate` / `RenderTrigger` / `RenderContextType` / `OpenGL` 属性，也不再实现 `ISupportInitialize`。
+3. 实现 `IRenderItem` / `ICxObjRenderItem` / `ICamera` 的调用方需按新签名（`CxGlContext`）适配。
+
+**验证**
+- `CxControl` / `DemoFrom` 0 错误 0 警告；`CxControl.dll` 引用程序集仅 `OpenTK` / `OpenTK.GLControl`（无 SharpGL）。
+- `dotnet test` → **127/127 通过**（新增 4 项 `OpenTkMigrationTests`：不引用 SharpGL、引用 OpenTK、基类为 `OpenTK.GLControl`、公共 API 不暴露 SharpGL 类型）。
+- **需上机目视确认**：点云 impostor、Mesh PBR/IBL、色带、坐标轴、悬停 tooltip、选择拾取、半透明、resize、多控件、上下文重建；以及宽线/点精灵在目标驱动器的兼容 profile 下是否生效。
 
 ### be069ee（2026-11-03）P1 逐顶点法线通道
 
