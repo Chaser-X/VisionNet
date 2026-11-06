@@ -9,7 +9,12 @@
 
 ## 未发布（工作区，尚未提交）
 
-（无）
+### 清理（库）：移除 SharpGL 残留 DLL
+
+- 删除 `3rd/SharpGL.dll` / `3rd/SharpGL.SceneGraph.dll` / `3rd/SharpGL.WinForms.dll`。自迁移提交 `3c61519` 起，三者已无任何 csproj / 源码引用，且 `OpenTkMigrationTests` 持续守卫「`CxControl.dll` 不引用 SharpGL、公共 API 不暴露 SharpGL 类型」。
+- 同步清理 `bin/Debug` 下由旧构建复制的陈旧副本（`bin/` 已被 `.gitignore`，不影响版本库）。
+
+**验证**：`CxControl` / `DemoFrom` 0 error 0 warning；`dotnet test` **127/127 通过**；`git ls-files "3rd/SharpGL*"` 为空；`bin` / `Test` 下无任何 SharpGL 文件残留。
 
 ## 已提交
 
