@@ -9,7 +9,12 @@
 
 ## 未发布（工作区，尚未提交）
 
-### 内部重构（库）：`ModernGLRenderer` 自持上下文，移除冗余的 `CxGlContext` 参数
+（无）
+
+## 已提交
+
+
+### 9562d55（2026-11-06）内部重构（库）：`ModernGLRenderer` 自持上下文，移除冗余的 `CxGlContext` 参数
 
 **背景（坏味道）**：迁移后 `CxGlContext` 被当作参数穿过大量方法，但其中 **45 个实例方法根本不用它** —— 只做 `GL.*` 静态调用，或继续往下一层转发。参数既噪声又误导（看起来"需要上下文"，其实不需要）。
 
@@ -26,7 +31,7 @@
 
 **验证**：`CxControl` / `DemoFrom` 0 error 0 warning；`dotnet test` **127/127 通过**；grep 复核：`ModernGLRenderer*.cs` 中 `CxGlContext gl` 仅剩私有构造 + 3 个静态入口。
 
-## 已提交
+
 
 
 ### 0648ba2（2026-11-06）加固（库）：迁移后审计修复 —— GL 绑定纪律 / 去 FFP / OnPaint 顺序 / 门面单例 + 兼容 3.3 可观测
