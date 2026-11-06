@@ -236,9 +236,11 @@ namespace VisionNet.Controls
         /// <param name="deltaY">Vertical mouse movement in pixels.</param>
         internal void RotateCamera(int deltaX, int deltaY)
         {
-            Vector3 pivot = RotationPoint.HasValue
+            // RotationPoint / _sceneCenter are in the caller's (logical) world; the camera orbits in
+            // its own (mirrored) world, so the pivot is mapped across the same way as the target.
+            Vector3 pivot = Mirror(RotationPoint.HasValue
                 ? new Vector3(RotationPoint.Value.X, RotationPoint.Value.Y, RotationPoint.Value.Z)
-                : _sceneCenter;
+                : _sceneCenter);
 
             Vector3 viewDir     = _position - pivot;
             Vector3 screenRight = Vector3.Normalize(Vector3.Cross(_up, viewDir));
@@ -334,6 +336,17 @@ namespace VisionNet.Controls
             _up = up ?? Vector3.UnitY;
         }
 
+        /// <summary>
+        /// Maps a point of the caller's (logical) world into the camera's own world. When
+        /// <see cref="IsLeftHanded"/> the view matrix mirrors the world in Y (see
+        /// <see cref="GetMatrices"/>), so the point actually rendered at a given camera target is
+        /// <c>Mirror(target)</c> — everything the camera compares against (its target and the
+        /// rotation pivot) must be mirrored too, otherwise the scene is not centred on fit and the
+        /// drag no longer matches the displayed world. The up-vector is deliberately <b>not</b>
+        /// mirrored (that would also flip the screen X axis); this matches <see cref="FocusOnPoint"/>.
+        /// </summary>
+        private Vector3 Mirror(Vector3 v) => _isLeftHanded ? new Vector3(v.X, -v.Y, v.Z) : v;
+
         /// <summary>Repositions the camera for the given preset view direction.</summary>
         private void SetViewMode(ViewMode viewMode)
         {
@@ -390,34 +403,42 @@ namespace VisionNet.Controls
 
             _sceneRadius = (float)Math.Sqrt(w * w + h * h + d * d) * 0.5f;
             _panSpeed    = _sceneRadius / 500f;
-            _target      = _sceneCenter;
             RotationPoint = new CxPoint3D(_sceneCenter.X, _sceneCenter.Y, _sceneCenter.Z);
 
             // Distance required so the scene fits inside the FOV.
             float dist = _sceneRadius / (float)Math.Tan(_fieldOfView * 0.5f * Math.PI / 180f);
 
+            // Build the preset in the caller's (logical) world, then re-target it into the camera's
+            // own world. When IsLeftHanded the view matrix mirrors the world in Y (see GetMatrices),
+            // so the point actually rendered at the viewport centre is Mirror(_target); the target
+            // must be mirrored too, otherwise the scene is not centred on fit. The offset and _up are
+            // kept as-is (mirroring _up would flip the screen X axis as well).
+            Vector3 logicalOffset;
             switch (ViewMode)
             {
                 case ViewMode.Front:
-                    _position = _target + new Vector3(0, -dist * 1.1f, 0);
+                    logicalOffset = new Vector3(0, -dist * 1.1f, 0);
                     _up = new Vector3(0, 0, 1);
                     break;
                 case ViewMode.Top:
-                    _position = _target + new Vector3(0, 0, dist * 1.1f);
+                    logicalOffset = new Vector3(0, 0, dist * 1.1f);
                     _up = Vector3.UnitY;
                     break;
                 case ViewMode.Left:
-                    _position = _target + new Vector3(-dist * 1.1f, 0, 0);
+                    logicalOffset = new Vector3(-dist * 1.1f, 0, 0);
                     _up = new Vector3(0, 0, 1);
                     break;
                 case ViewMode.Right:
-                    _position = _target + new Vector3(dist * 1.1f, 0, 0);
+                    logicalOffset = new Vector3(dist * 1.1f, 0, 0);
                     _up = new Vector3(0, 0, 1);
                     break;
                 default:
-                    _position = _target + new Vector3(0, 0, dist * 1.1f);
+                    logicalOffset = new Vector3(0, 0, dist * 1.1f);
                     break;
             }
+
+            _target   = Mirror(_sceneCenter);
+            _position = _target + logicalOffset;
         }
 
         /// <summary>

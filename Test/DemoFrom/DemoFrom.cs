@@ -1928,6 +1928,17 @@ namespace DemoFrom
             chkImpostor.CheckedChanged += (s, e) => ForEachDisplay(d => d.PointImpostor = chkImpostor.Checked);
             panel.Controls.Add(chkImpostor);
 
+            // Handedness toggle for the preview. Switching it must re-fit: the camera's target is
+            // mirrored in left-handed mode, so the framing depends on the handedness.
+            var chkLeftHanded = new CheckBox { Text = "左手系（镜像显示，仅预览）", AutoSize = true, Checked = false };
+            chkLeftHanded.CheckedChanged += (s, e) =>
+            {
+                if (_cxDisplayPbr == null) return;
+                _cxDisplayPbr.Camera.IsLeftHanded = chkLeftHanded.Checked;
+                _cxDisplayPbr.FitView();
+            };
+            panel.Controls.Add(chkLeftHanded);
+
             panel.Controls.Add(Header("纯色 / 透明度（测试）"));
             var chkSolid = new CheckBox { Text = "纯色模式（SurfaceColorMode = Lit）", AutoSize = true, Checked = false };
             chkSolid.CheckedChanged += (s, e) => ForEachDisplay(d =>
@@ -1987,7 +1998,10 @@ namespace DemoFrom
             var init = (System.ComponentModel.ISupportInitialize)_cxDisplayPbr;
             init.BeginInit();
             init.EndInit();
-            _cxDisplayPbr.Camera.IsLeftHanded = true;
+            // Default to the demo mesh data's convention (right-handed), like cxDisplay2. Use the
+            // "左手系" toggle above to switch the preview to left-handed (mirrored) rendering; the
+            // camera now mirrors its target/pivot accordingly, so framing and drag stay correct.
+            _cxDisplayPbr.Camera.IsLeftHanded = false;
             _cxDisplayPbr.SurfaceMode = SurfaceMode.Mesh;
             _cxDisplayPbr.ShowCoordinateSystem = false;
 
