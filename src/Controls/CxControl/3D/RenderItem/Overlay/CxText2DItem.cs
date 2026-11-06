@@ -37,7 +37,7 @@ namespace VisionNet.Controls
             {
                 // Convert Y from top-origin to bottom-origin (OpenGL convention).
                 int screenY = vpHeight - (int)item.Location.Y;
-                renderer.DrawText(gl, (int)item.Location.X, screenY, DrawColor, item.FontSize, item.Text);
+                renderer.DrawText((int)item.Location.X, screenY, DrawColor, item.FontSize, item.Text);
             }
         }
 

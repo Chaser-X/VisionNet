@@ -18,9 +18,9 @@ namespace VisionNet.Controls
         /// screen position. Public 3D text APIs pass point sizes, so the method keeps
         /// the historical 96-DPI point-to-pixel conversion.
         /// </summary>
-        internal void DrawText(CxGlContext gl, int x, int y, Color color, float fontSize, string text)
+        internal void DrawText(int x, int y, Color color, float fontSize, string text)
         {
-            if (string.IsNullOrEmpty(text) || gl == null || !gl.IsValid) return;
+            if (string.IsNullOrEmpty(text) || !_gl.IsValid) return;
             // The public 3D text APIs historically pass point sizes, whose
             // FontBitmaps implementation converts points to pixels using
             // 96 DPI (fontSize * 96 / 72). Keep that visual contract for the
@@ -28,23 +28,23 @@ namespace VisionNet.Controls
             float effectiveFontSize = Math.Max(1f, fontSize * 4f / 3f);
             if (CanUseNumericGlyphAtlas(text))
             {
-                DrawNumericGlyphText(gl, x, y, color, effectiveFontSize, text);
+                DrawNumericGlyphText(x, y, color, effectiveFontSize, text);
                 return;
             }
 
-            CachedText cached = GetOrCreateTextTexture(gl, effectiveFontSize, text);
+            CachedText cached = GetOrCreateTextTexture(effectiveFontSize, text);
             _textQuad[0] = x; _textQuad[1] = y; _textQuad[2] = 0; _textQuad[3] = 1;
             _textQuad[4] = x + cached.Width; _textQuad[5] = y; _textQuad[6] = 1; _textQuad[7] = 1;
             _textQuad[8] = x + cached.Width; _textQuad[9] = y + cached.Height;
             _textQuad[10] = 1; _textQuad[11] = 0;
             _textQuad[12] = x; _textQuad[13] = y + cached.Height;
             _textQuad[14] = 0; _textQuad[15] = 0;
-            DrawTextQuad(gl, _textQuad, cached.Texture, color);
+            DrawTextQuad(_textQuad, cached.Texture, color);
             if (!_frameStateCaptured)
             {
                 // Standalone callers do not have a BeginFrame/EndFrame scope, so
                 // enforce the same bounded cache after each independent draw.
-                TrimTextCache(gl, MaxCachedTextTextures);
+                TrimTextCache(MaxCachedTextTextures);
                 _textTexturesUsedThisFrame.Clear();
             }
         }
@@ -57,10 +57,10 @@ namespace VisionNet.Controls
             return true;
         }
 
-        private void DrawNumericGlyphText(CxGlContext gl, int x, int y, Color color,
+        private void DrawNumericGlyphText(int x, int y, Color color,
             float fontSize, string text)
         {
-            var atlas = GetOrCreateGlyphAtlas(gl, fontSize);
+            var atlas = GetOrCreateGlyphAtlas(fontSize);
             int quadWidth = Math.Max(1, atlas.CellWidth - 2);
             int quadHeight = Math.Max(1, atlas.CellHeight - 2);
             int cursor = x + atlas.LegacyLeftBearing + 1;
@@ -96,7 +96,7 @@ namespace VisionNet.Controls
             }
 
             if (vertexOffset > 0)
-                DrawTextTriangles(gl, _glyphTriangles, vertexOffset / 4,
+                DrawTextTriangles(_glyphTriangles, vertexOffset / 4,
                     atlas.Texture, color);
         }
 
@@ -109,7 +109,7 @@ namespace VisionNet.Controls
             vertices[offset++] = v;
         }
 
-        private GlyphAtlas GetOrCreateGlyphAtlas(CxGlContext gl, float fontSize)
+        private GlyphAtlas GetOrCreateGlyphAtlas(float fontSize)
         {
             string key = fontSize.ToString("R", CultureInfo.InvariantCulture);
             GlyphAtlas atlas;
@@ -179,7 +179,7 @@ namespace VisionNet.Controls
                         };
                     }
 
-                    atlas.Texture = UploadGlyph(gl, bitmap);
+                    atlas.Texture = UploadGlyph(bitmap);
                 }
             }
 
@@ -192,7 +192,7 @@ namespace VisionNet.Controls
         /// entries are recorded as active for the current frame and become eligible
         /// for deletion only after EndFrame has completed.
         /// </summary>
-        private CachedText GetOrCreateTextTexture(CxGlContext gl, float fontSize, string text)
+        private CachedText GetOrCreateTextTexture(float fontSize, string text)
         {
             string key = fontSize.ToString("R", CultureInfo.InvariantCulture) + "\0" + text;
             CachedText cached;
@@ -219,7 +219,7 @@ namespace VisionNet.Controls
 
                     cached = new CachedText
                     {
-                        Texture = UploadGlyph(gl, bitmap),
+                        Texture = UploadGlyph(bitmap),
                         Width = width,
                         Height = height,
                     };
@@ -232,7 +232,7 @@ namespace VisionNet.Controls
             return cached;
         }
 
-        private void TrimTextCache(CxGlContext gl, int targetCount)
+        private void TrimTextCache(int targetCount)
         {
             while (_textTextures.Count > targetCount && _textTextureOrder.Count > 0)
             {
@@ -258,17 +258,17 @@ namespace VisionNet.Controls
         /// matrix convention as the GLSL path. Returns false when the point is behind
         /// the camera or outside the normalized depth range.
         /// </summary>
-        internal bool Project(CxGlContext gl, float x, float y, float z, out float sx, out float sy, out float sz)
+        internal bool Project(float x, float y, float z, out float sx, out float sy, out float sz)
         {
             sx = sy = sz = 0f;
-            if (gl == null || !gl.IsValid) return false;
-            EnsureSceneMatrices(gl);
-            RefreshViewport(gl);
+            if (!_gl.IsValid) return false;
+            EnsureSceneMatrices();
+            RefreshViewport();
             // CxMatrix4X4 and the camera expose row-major matrices with column-vector
             // semantics. Keep CPU projection in the same convention as the GLSL
             // uniforms (uploaded with transpose=true); the previous column-major
             // multiply mirrored the projected X/Y coordinates for overlays and hit tests.
-            float[] model = CurrentModel(gl).Data;
+            float[] model = CurrentModel().Data;
             Multiply4x4(_view, model, _projectView);
             Multiply4x4(_projection, _projectView, _projectScene);
             float tx = _projectScene[0] * x + _projectScene[1] * y + _projectScene[2] * z + _projectScene[3];
@@ -288,11 +288,11 @@ namespace VisionNet.Controls
         /// Converts viewport pixels and a depth-buffer value back to world space by
         /// inverting the current projection/view product.
         /// </summary>
-        internal bool Unproject(CxGlContext gl, float sx, float sy, float depth, out CxPoint3D point)
+        internal bool Unproject(float sx, float sy, float depth, out CxPoint3D point)
         {
             point = new CxPoint3D();
-            if (gl == null || !gl.IsValid) return false;
-            RefreshViewport(gl);
+            if (!_gl.IsValid) return false;
+            RefreshViewport();
             if (_viewport[2] <= 0 || _viewport[3] <= 0) return false;
             float nx = (sx - _viewport[0]) / _viewport[2] * 2f - 1f;
             float ny = (sy - _viewport[1]) / _viewport[3] * 2f - 1f;
@@ -303,27 +303,27 @@ namespace VisionNet.Controls
         }
 
         /// <summary>Uploads one screen quad and composites a cached text alpha mask.</summary>
-        private void DrawTextQuad(CxGlContext gl, float[] quad, uint texture, Color color)
+        private void DrawTextQuad(float[] quad, uint texture, Color color)
         {
-            DrawTextVertices(gl, quad, 4, PrimitiveType.TriangleFan, texture, color);
+            DrawTextVertices(quad, 4, PrimitiveType.TriangleFan, texture, color);
         }
 
         /// <summary>Uploads a batched text triangle list and composites a cached text alpha mask.</summary>
-        private void DrawTextTriangles(CxGlContext gl, float[] vertices, int vertexCount,
+        private void DrawTextTriangles(float[] vertices, int vertexCount,
             uint texture, Color color)
         {
-            DrawTextVertices(gl, vertices, vertexCount, PrimitiveType.Triangles, texture, color);
+            DrawTextVertices(vertices, vertexCount, PrimitiveType.Triangles, texture, color);
         }
 
-        private void DrawTextVertices(CxGlContext gl, float[] vertices, int vertexCount,
+        private void DrawTextVertices(float[] vertices, int vertexCount,
             PrimitiveType primitive, uint texture, Color color)
         {
             if (vertices == null || vertexCount <= 0
                 || vertices.Length < vertexCount * 4)
                 return;
-            if (!EnsureTextProgram(gl)) return;
-            EnsureTextBuffers(gl);
-            RenderStateSnapshot previous = CaptureRenderState(gl);
+            if (!EnsureTextProgram()) return;
+            EnsureTextBuffers();
+            RenderStateSnapshot previous = CaptureRenderState();
             SetRenderState(false, true);
             GL.DepthMask(false);
             GL.BindVertexArray(_textVao);
@@ -345,7 +345,7 @@ namespace VisionNet.Controls
             GL.EnableVertexAttribArray(1);
             GL.UseProgram(_textProgram);
             GL.UniformMatrix4(_textProjection, 1, true,
-                Ortho(gl.Width, gl.Height));
+                Ortho(_gl.Width, _gl.Height));
             GL.Uniform4(_textColor,
                 color.R / 255f, color.G / 255f, color.B / 255f, color.A / 255f);
             GL.ActiveTexture(TextureUnit.Texture0);
@@ -365,7 +365,7 @@ namespace VisionNet.Controls
         /// Converts a GDI+ bitmap into an RGBA OpenGL texture. The source alpha is
         /// copied into all colour channels so the shader can sample the red channel.
         /// </summary>
-        private uint UploadGlyph(CxGlContext gl, Bitmap bitmap)
+        private uint UploadGlyph(Bitmap bitmap)
         {
             Rectangle rect = new Rectangle(0, 0, bitmap.Width, bitmap.Height);
             BitmapData bits = bitmap.LockBits(rect, ImageLockMode.ReadOnly, GdiPixelFormat.Format32bppArgb);

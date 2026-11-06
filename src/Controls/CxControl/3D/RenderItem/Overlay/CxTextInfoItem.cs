@@ -35,11 +35,11 @@ namespace VisionNet.Controls
             foreach (var info in TextInfos)
             {
                 float sx, sy, sz;
-                if (!renderer.Project(gl, info.Location.X, info.Location.Y, info.Location.Z,
+                if (!renderer.Project(info.Location.X, info.Location.Y, info.Location.Z,
                     out sx, out sy, out sz)) continue;
                 if (sx < 0 || sx > gl.Width || sy < 0 || sy > gl.Height)
                     continue;
-                renderer.DrawText(gl, (int)sx, (int)sy, DrawColor, info.Size, info.Text);
+                renderer.DrawText((int)sx, (int)sy, DrawColor, info.Size, info.Text);
             }
             PopModelMatrix(gl);
         }

@@ -44,7 +44,7 @@ namespace VisionNet.Controls
 
             var renderer = ModernGLRenderer.For(gl);
             float sx, sy, sz;
-            if (!renderer.Project(gl, Point.X, Point.Y, Point.Z, out sx, out sy, out sz)) return;
+            if (!renderer.Project(Point.X, Point.Y, Point.Z, out sx, out sy, out sz)) return;
             if (sx < 0 || sx > gl.Width || sy < 0 || sy > gl.Height)
                 return;
 
@@ -58,20 +58,20 @@ namespace VisionNet.Controls
             _backgroundPositions[6] = startX; _backgroundPositions[7] = startY;
             _backgroundPositions[8] = startX + rectWidth; _backgroundPositions[9] = startY - rectHeight;
             _backgroundPositions[10] = startX; _backgroundPositions[11] = startY - rectHeight;
-            renderer.DrawScreenGeometry(gl, PrimitiveType.Triangles, _backgroundPositions, Color.FromArgb(128, 0, 0, 0));
+            renderer.DrawScreenGeometry(PrimitiveType.Triangles, _backgroundPositions, Color.FromArgb(128, 0, 0, 0));
             _borderPositions[0] = startX - 1; _borderPositions[1] = startY + 1;
             _borderPositions[2] = startX + rectWidth + 1; _borderPositions[3] = startY + 1;
             _borderPositions[4] = startX + rectWidth + 1; _borderPositions[5] = startY - rectHeight - 1;
             _borderPositions[6] = startX - 1; _borderPositions[7] = startY - rectHeight - 1;
-            renderer.DrawScreenGeometry(gl, PrimitiveType.LineLoop, _borderPositions, Color.White);
+            renderer.DrawScreenGeometry(PrimitiveType.LineLoop, _borderPositions, Color.White);
 
             // Coordinate text labels.
             int   tx = startX + 10;
-            renderer.DrawText(gl, tx, startY - 20, TextColor, 12, $"X: {Point.X:F3}");
-            renderer.DrawText(gl, tx, startY - 40, TextColor, 12, $"Y: {Point.Y:F3}");
-            renderer.DrawText(gl, tx, startY - 60, TextColor, 12, $"Z: {Point.Z:F3}");
+            renderer.DrawText(tx, startY - 20, TextColor, 12, $"X: {Point.X:F3}");
+            renderer.DrawText(tx, startY - 40, TextColor, 12, $"Y: {Point.Y:F3}");
+            renderer.DrawText(tx, startY - 60, TextColor, 12, $"Z: {Point.Z:F3}");
             if (Intensity.HasValue)
-                renderer.DrawText(gl, tx, startY - 80, TextColor, 12, $"I: {Intensity.Value}");
+                renderer.DrawText(tx, startY - 80, TextColor, 12, $"I: {Intensity.Value}");
         }
     }
 }

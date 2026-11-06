@@ -129,14 +129,14 @@ namespace VisionNet.Controls
         /// </summary>
         protected void PushModelMatrix(CxGlContext gl)
         {
-            ModernGLRenderer.For(gl).PushModel(gl,
+            ModernGLRenderer.For(gl).PushModel(
                 HasModelMatrix ? ModelMatrix : CxMatrix4X4.Identity());
         }
 
         /// <summary>Pops a matrix pushed by <see cref="PushModelMatrix"/>.</summary>
         protected void PopModelMatrix(CxGlContext gl)
         {
-            ModernGLRenderer.For(gl).PopModel(gl);
+            ModernGLRenderer.For(gl).PopModel();
         }
 
         /// <inheritdoc/>

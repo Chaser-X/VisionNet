@@ -381,7 +381,7 @@ namespace VisionNet.Controls
                 var renderer = ModernGLRenderer.For(gl);
                 renderer.SetSceneMatrices(projection, view);
                 CxPoint3D world;
-                if (!renderer.Unproject(gl, mouseX, adjustedY, depth, out world)) return null;
+                if (!renderer.Unproject(mouseX, adjustedY, depth, out world)) return null;
                 return world;
             });
         }

@@ -11,7 +11,7 @@ namespace VisionNet.Controls
         /// Deletes programs, buffers, textures, and model-stack state owned by this
         /// renderer. The caller must have made the owning context current.
         /// </summary>
-        private void ReleasePrograms(CxGlContext gl)
+        private void ReleasePrograms()
         {
             GL.BindVertexArray(0);
             GL.BindBuffer(BufferTarget.ArrayBuffer, 0);
@@ -95,7 +95,7 @@ namespace VisionNet.Controls
                 if (atlas.Texture != 0)
                     GL.DeleteTextures(1, new[] { atlas.Texture });
             _glyphAtlases.Clear();
-            ReleaseIbl(gl);
+            ReleaseIbl();
             _state.Reset();
             _frameStateCaptured = false;
             _hasSceneMatrices = false;
@@ -114,7 +114,7 @@ namespace VisionNet.Controls
         /// under a core profile it silently produced an identity projection, so a missing pair is
         /// now reported once instead of failing invisibly.</para>
         /// </remarks>
-        internal void EnsureSceneMatrices(CxGlContext gl)
+        internal void EnsureSceneMatrices()
         {
             if (_hasSceneMatrices) return;
             if (_missingSceneMatricesLogged) return;
@@ -155,10 +155,10 @@ namespace VisionNet.Controls
                         + left[row * 4 + 3] * right[12 + col];
         }
 
-        private void RefreshViewport(CxGlContext gl)
+        private void RefreshViewport()
         {
-            int width = gl.Width;
-            int height = gl.Height;
+            int width = _gl.Width;
+            int height = _gl.Height;
             if (width == _viewportWidth && height == _viewportHeight) return;
             GL.GetInteger(GetPName.Viewport, _viewport);
             _viewportWidth = width;

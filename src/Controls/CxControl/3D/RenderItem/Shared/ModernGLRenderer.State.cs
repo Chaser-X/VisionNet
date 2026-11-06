@@ -6,9 +6,9 @@ namespace VisionNet.Controls
     {
 
         /// <summary>Reads mutable GL state that overlay draws temporarily change.</summary>
-        private RenderStateSnapshot CaptureRenderState(CxGlContext gl)
+        private RenderStateSnapshot CaptureRenderState()
         {
-            return _frameStateCaptured ? _frameState : CaptureRenderStateUncached(gl);
+            return _frameStateCaptured ? _frameState : CaptureRenderStateUncached();
         }
 
         /// <summary>
@@ -16,13 +16,13 @@ namespace VisionNet.Controls
         /// During a <see cref="BeginFrame"/> window this returns the frame-start snapshot, which
         /// is the state every item in the frame should observe; outside a frame it queries GL.
         /// </summary>
-        internal RenderStateSnapshot CaptureState(CxGlContext gl) => CaptureRenderState(gl);
+        internal RenderStateSnapshot CaptureState() => CaptureRenderState();
 
         /// <summary>Restores state captured by <see cref="CaptureState"/>.</summary>
-        internal void RestoreState(CxGlContext gl, RenderStateSnapshot state)
+        internal void RestoreState(RenderStateSnapshot state)
             => RestoreRenderState(state);
 
-        private RenderStateSnapshot CaptureRenderStateUncached(CxGlContext gl)
+        private RenderStateSnapshot CaptureRenderStateUncached()
         {
             GL.GetFloat(GetPName.PointSize, _pointSizeQuery);
             GL.GetFloat(GetPName.LineWidth, _lineWidthQuery);

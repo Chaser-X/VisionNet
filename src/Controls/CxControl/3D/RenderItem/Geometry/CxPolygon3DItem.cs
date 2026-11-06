@@ -135,7 +135,7 @@ namespace VisionNet.Controls
                     positions[i * 3 + 1] = polygon.Points[i].Y;
                     positions[i * 3 + 2] = polygon.Points[i].Z;
                 }
-                renderer.Draw(gl, polygon.IsClosed ? PrimitiveType.LineLoop : PrimitiveType.LineStrip,
+                renderer.Draw(polygon.IsClosed ? PrimitiveType.LineLoop : PrimitiveType.LineStrip,
                     positions, DrawColor, Size);
             }
 
@@ -153,7 +153,7 @@ namespace VisionNet.Controls
                         positions[i * 3 + 1] = pts[i].Y;
                         positions[i * 3 + 2] = pts[i].Z;
                     }
-                    renderer.Draw(gl, PrimitiveType.Points, positions, DrawColor, 10f);
+                    renderer.Draw(PrimitiveType.Points, positions, DrawColor, 10f);
                 }
             }
             PopModelMatrix(gl);

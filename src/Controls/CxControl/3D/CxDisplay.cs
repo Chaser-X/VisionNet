@@ -666,21 +666,21 @@ namespace VisionNet.Controls
         /// Releases all GL resources, surface items, and overlay items held by this control.
         /// Called by <see cref="Dispose(bool)"/> in Designer.cs.
         /// </summary>
-        private void DisposeResources(CxGlContext gl)
+        private void DisposeResources()
         {
             lock (_renderLock)
             {
                 // Deleting GL objects needs a current context. Dispose may run on any thread and
                 // OpenTK does not make the context current implicitly.
-                bool glValid = gl != null && gl.IsValid;
+                bool glValid = _gl != null && _gl.IsValid;
                 if (glValid)
                 {
-                    try { gl.EnsureCurrent(); }
+                    try { _gl.EnsureCurrent(); }
                     catch { glValid = false; }
                 }
 
                 if (glValid)
-                    _registry.DrainReleases(p => CxGLResourceManager.Release(gl, p));
+                    _registry.DrainReleases(p => CxGLResourceManager.Release(p));
 
                 Groups.Clear();
                 _registry.DisposeAll(
@@ -691,7 +691,7 @@ namespace VisionNet.Controls
 
                         // Disposal runs with the context current, so the handle is released directly
                         // instead of being queued for the render pass.
-                        if (glValid && handle != null) CxGLResourceManager.Release(gl, handle);
+                        if (glValid && handle != null) CxGLResourceManager.Release(handle);
                         item.Dispose();
                     },
                     overlay => overlay.Dispose());
@@ -700,7 +700,7 @@ namespace VisionNet.Controls
                 _handleSnapshot.Clear();
                 _overlaySnapshot.Clear();
 
-                if (glValid) ModernGLRenderer.Release(gl);
+                if (glValid) ModernGLRenderer.Release(_gl);
             }
         }
     }

@@ -33,14 +33,14 @@ namespace VisionNet.Controls
         /// binds the IBL textures to units 1–3. Called once per frame before the surface items are
         /// drawn; the uniform values persist in the shared program for every item of the frame.
         /// </summary>
-        internal void BeginSurfaceLighting(CxGlContext gl, SurfaceLightingMode mode,
+        internal void BeginSurfaceLighting(SurfaceLightingMode mode,
             SurfaceEnvironmentPreset preset, float iblIntensity, bool impostor,
             bool environmentFollowsCamera)
         {
-            if (!EnsureSurfaceProgram(gl)) return;
+            if (!EnsureSurfaceProgram()) return;
 
             if (mode == SurfaceLightingMode.Pbr)
-                EnsureIbl(gl, preset);
+                EnsureIbl(preset);
 
             // Point sprites must be enabled in a compatibility profile for gl_PointCoord to be
             // populated (core profiles always have them on).
@@ -91,19 +91,19 @@ namespace VisionNet.Controls
         }
 
         /// <summary>Generates and uploads the IBL textures for <paramref name="preset"/> if needed.</summary>
-        private void EnsureIbl(CxGlContext gl, SurfaceEnvironmentPreset preset)
+        private void EnsureIbl(SurfaceEnvironmentPreset preset)
         {
             if (_iblLoaded && _iblPreset == preset) return;
             if (_iblFailed && _iblPreset == preset) return;
 
-            ReleaseIbl(gl);
+            ReleaseIbl();
             try
             {
                 var data = ProceduralIbl.Get(preset);
-                _irradianceMap = UploadCubeLevel(gl, data.Irradiance,
+                _irradianceMap = UploadCubeLevel(data.Irradiance,
                     IblEnvironment.IrradianceSize, mipmapped: false);
-                _prefilterMap = UploadCubeChain(gl, data.Prefilter);
-                _brdfLut = UploadBrdfLut(gl, data.Brdf, IblEnvironment.BrdfSize);
+                _prefilterMap = UploadCubeChain(data.Prefilter);
+                _brdfLut = UploadBrdfLut(data.Brdf, IblEnvironment.BrdfSize);
                 _iblPreset = preset;
                 _iblLoaded = true;
                 _iblFailed = false;
@@ -111,7 +111,7 @@ namespace VisionNet.Controls
             catch (Exception ex)
             {
                 Debug.WriteLine("[CxControl] ModernGLRenderer.EnsureIbl failed: " + ex.Message);
-                ReleaseIbl(gl);
+                ReleaseIbl();
                 _iblPreset = preset;
                 _iblFailed = true;
             }
@@ -133,7 +133,7 @@ namespace VisionNet.Controls
             return tex;
         }
 
-        private static uint UploadCubeLevel(CxGlContext gl, float[] faces, int size, bool mipmapped)
+        private static uint UploadCubeLevel(float[] faces, int size, bool mipmapped)
         {
             uint tex = CreateCubeTexture(1, mipmapped);
             int faceLen = size * size * 3;
@@ -147,7 +147,7 @@ namespace VisionNet.Controls
             return tex;
         }
 
-        private static uint UploadCubeChain(CxGlContext gl, float[][] mips)
+        private static uint UploadCubeChain(float[][] mips)
         {
             uint tex = CreateCubeTexture(mips.Length, true);
             for (int mip = 0; mip < mips.Length; mip++)
@@ -166,7 +166,7 @@ namespace VisionNet.Controls
             return tex;
         }
 
-        private static uint UploadBrdfLut(CxGlContext gl, float[] lut, int size)
+        private static uint UploadBrdfLut(float[] lut, int size)
         {
             var ids = new uint[1];
             GL.GenTextures(1, ids);
@@ -183,7 +183,7 @@ namespace VisionNet.Controls
         }
 
         /// <summary>Deletes the IBL textures (must run with the owning context current).</summary>
-        private void ReleaseIbl(CxGlContext gl)
+        private void ReleaseIbl()
         {
             if (_irradianceMap != 0) { GL.DeleteTextures(1, new[] { _irradianceMap }); _irradianceMap = 0; }
             if (_prefilterMap != 0) { GL.DeleteTextures(1, new[] { _prefilterMap }); _prefilterMap = 0; }

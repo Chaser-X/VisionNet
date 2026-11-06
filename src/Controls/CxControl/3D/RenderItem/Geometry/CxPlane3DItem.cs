@@ -53,7 +53,7 @@ namespace VisionNet.Controls
                 WritePoint(ref offset, p0x, p0y, p0z); WritePoint(ref offset, p1x, p1y, p1z); WritePoint(ref offset, p2x, p2y, p2z);
                 WritePoint(ref offset, p0x, p0y, p0z); WritePoint(ref offset, p2x, p2y, p2z); WritePoint(ref offset, p3x, p3y, p3z);
             }
-            renderer.Draw(gl, PrimitiveType.Triangles, _positionsBuffer, DrawColor);
+            renderer.Draw(PrimitiveType.Triangles, _positionsBuffer, DrawColor);
             PopModelMatrix(gl);
         }
 

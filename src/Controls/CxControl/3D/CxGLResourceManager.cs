@@ -81,14 +81,14 @@ namespace VisionNet.Controls
                 if (sharedProgram)
                 {
                     var renderer = ModernGLRenderer.For(gl);
-                    if (renderer.EnsureSurfaceProgram(gl))
+                    if (renderer.EnsureSurfaceProgram())
                     {
                         handle.ShaderProgram = renderer.SurfaceProgram;
                     }
                 }
                 else
                 {
-                    handle.ShaderProgram = ShaderProgramCompiler.CompileProgram(gl,
+                    handle.ShaderProgram = ShaderProgramCompiler.CompileProgram(
                         data.ShaderSource.VertexSource, data.ShaderSource.FragmentSource);
                     handle.OwnsShader = true;
                 }
@@ -171,7 +171,7 @@ namespace VisionNet.Controls
         /// Deletes every GL object named by <paramref name="handle"/> and resets it to the
         /// "no resources" state. Safe to call on a handle that owns nothing.
         /// </summary>
-        public static void Release(CxGlContext gl, GLResourceHandle handle)
+        public static void Release(GLResourceHandle handle)
         {
             if (handle.VboCount > 0)
             {

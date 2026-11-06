@@ -56,7 +56,7 @@ namespace VisionNet.Controls
             if (Shape == PointShape.Point)
             {
                 PushModelMatrix(gl);
-                renderer.Draw(gl, PrimitiveType.Points, positions, DrawColor, Size);
+                renderer.Draw(PrimitiveType.Points, positions, DrawColor, Size);
                 PopModelMatrix(gl);
             }
             else
@@ -65,7 +65,7 @@ namespace VisionNet.Controls
                 // mesh and shader. Only the instance-position buffer is streamed per frame.
                 // The sphere path applies ModelMatrix through its own uniform, so it must not
                 // also push a model matrix onto the shared stack.
-                renderer.DrawSpheres(gl, positions, DrawColor, Size / 2f, ModelMatrix);
+                renderer.DrawSpheres(positions, DrawColor, Size / 2f, ModelMatrix);
             }
         }
 

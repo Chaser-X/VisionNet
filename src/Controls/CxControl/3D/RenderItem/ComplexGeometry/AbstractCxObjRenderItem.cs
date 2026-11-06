@@ -662,18 +662,18 @@ namespace VisionNet.Controls
             // point cloud -> point size) pay for the capture/restore round trip.
             bool changesState = IsTranslucent || _surfaceMode == SurfaceMode.PointCloud;
             ModernGLRenderer.RenderStateSnapshot previous = default;
-            if (changesState) previous = renderer.CaptureState(gl);
+            if (changesState) previous = renderer.CaptureState();
 
             GL.UseProgram(handle.ShaderProgram);
             GL.BindVertexArray(handle.VaoId);
 
-            renderer.UploadSceneMatrices(gl, handle, ModelMatrix);
+            renderer.UploadSceneMatrices(handle, ModelMatrix);
             // Reuses the cached pose inverse (also used by picking) instead of inverting again.
-            renderer.UploadNormalMatrix(gl, handle, ModelMatrixInverse);
+            renderer.UploadNormalMatrix(handle, ModelMatrixInverse);
 
             foreach (var kv in data.Uniforms)
             {
-                int loc = handle.GetUniformLocation(gl, kv.Key);
+                int loc = handle.GetUniformLocation(kv.Key);
                 if (kv.Value is float f) GL.Uniform1(loc, f);
                 else if (kv.Value is int i) GL.Uniform1(loc, i);
                 else if (kv.Value is Color c)
@@ -682,7 +682,7 @@ namespace VisionNet.Controls
 
             GL.ActiveTexture(TextureUnit.Texture0);
             GL.BindTexture(TextureTarget.Texture2D, handle.TextureId);
-            GL.Uniform1(handle.GetUniformLocation(gl, "intensityTexture"), 0);
+            GL.Uniform1(handle.GetUniformLocation("intensityTexture"), 0);
 
             // Translucent items write depth by default, so they stay part of the depth buffer
             // (depth-based picking and occlusion keep working). Opting out restores the historical
@@ -702,7 +702,7 @@ namespace VisionNet.Controls
             GL.BindTexture(TextureTarget.Texture2D, 0);
             GL.BindVertexArray(0);
             GL.UseProgram(0);
-            if (changesState) renderer.RestoreState(gl, previous);
+            if (changesState) renderer.RestoreState(previous);
         }
 
         public void SetGlobalZRange(float zMin, float zMax)

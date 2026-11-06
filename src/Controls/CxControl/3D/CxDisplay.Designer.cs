@@ -38,7 +38,7 @@ namespace VisionNet.Controls
                 if (disposing)
                 {
                     // GL resource release is encapsulated in DisposeResources() (CxDisplay.cs).
-                    DisposeResources(_gl);
+                    DisposeResources();
 
                     components?.Dispose();
                     _hoverPickThrottle?.Stop();

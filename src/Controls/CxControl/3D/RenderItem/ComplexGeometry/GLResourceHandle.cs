@@ -95,7 +95,7 @@ namespace VisionNet.Controls
         internal readonly Dictionary<string, int> UniformLocations
             = new Dictionary<string, int>(System.StringComparer.Ordinal);
 
-        internal int GetUniformLocation(CxGlContext gl, string name)
+        internal int GetUniformLocation(string name)
         {
             int location;
             if (!UniformLocations.TryGetValue(name, out location))

@@ -40,7 +40,7 @@ namespace VisionNet.Controls
                     GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
 
                     // 1. Release GL resources dequeued by Dispose/Replace on another thread.
-                    ProcessPendingRelease(gl);
+                    ProcessPendingRelease();
 
                     // 2. Create or update GL resources (full lock prevents concurrent Dispose).
                     ProcessResourcePool(gl);
@@ -55,18 +55,18 @@ namespace VisionNet.Controls
                         _camera.GetMatrices(Width, Height, out projection, out view);
                     var overlayRenderer = ModernGLRenderer.For(gl);
                     overlayRenderer.SetSceneMatrices(projection, view);
-                    overlayRenderer.BeginFrame(gl);
+                    overlayRenderer.BeginFrame();
                     try
                     {
                         // Selects the Mesh lighting model (and binds the IBL textures in Pbr mode)
                         // for every built-in surface item of this frame.
-                        overlayRenderer.BeginSurfaceLighting(gl, _surfaceLightingMode, _environmentPreset,
+                        overlayRenderer.BeginSurfaceLighting(_surfaceLightingMode, _environmentPreset,
                             _iblIntensity, _pointImpostor, _environmentFollowsCamera);
                         Render(gl);
                     }
                     finally
                     {
-                        overlayRenderer.EndFrame(gl);
+                        overlayRenderer.EndFrame();
                     }
 
                     GL.Disable(EnableCap.DepthTest);
@@ -92,9 +92,9 @@ namespace VisionNet.Controls
         }
 
         /// <summary>Releases all GL resource handles waiting in the deferred-release queue.</summary>
-        private void ProcessPendingRelease(CxGlContext gl)
+        private void ProcessPendingRelease()
         {
-            _registry.DrainReleases(handle => CxGLResourceManager.Release(gl, handle));
+            _registry.DrainReleases(handle => CxGLResourceManager.Release(handle));
         }
 
         /// <summary>
@@ -116,7 +116,7 @@ namespace VisionNet.Controls
                 if (!handle.IsValid || handle.NeedsUpdate)
                 {
                     if (handle.IsValid)
-                        CxGLResourceManager.Release(gl, handle);
+                        CxGLResourceManager.Release(handle);
 
                     // A failed shader compile is reported once the lock has been released.
                     if (!CxGLResourceManager.Create(gl, item, handle))

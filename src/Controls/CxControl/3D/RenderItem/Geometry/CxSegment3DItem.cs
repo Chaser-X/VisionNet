@@ -127,7 +127,7 @@ namespace VisionNet.Controls
                 positions[offset++] = seg.End.X; positions[offset++] = seg.End.Y; positions[offset++] = seg.End.Z;
             }
             var renderer = ModernGLRenderer.For(gl);
-            renderer.Draw(gl, PrimitiveType.Lines, positions, DrawColor, Size);
+            renderer.Draw(PrimitiveType.Lines, positions, DrawColor, Size);
 
             // Endpoint markers on the hit segment when active and selected.
             if (IsActiveObj && IsSelected && _hitSegIndex >= 0 && _hitSegIndex < Segment3Ds.Length)
@@ -135,7 +135,7 @@ namespace VisionNet.Controls
                 var s = Segment3Ds[_hitSegIndex];
                 _endpointBuffer[0] = s.Start.X; _endpointBuffer[1] = s.Start.Y; _endpointBuffer[2] = s.Start.Z;
                 _endpointBuffer[3] = s.End.X; _endpointBuffer[4] = s.End.Y; _endpointBuffer[5] = s.End.Z;
-                renderer.Draw(gl, PrimitiveType.Points, _endpointBuffer, DrawColor, 10f);
+                renderer.Draw(PrimitiveType.Points, _endpointBuffer, DrawColor, 10f);
             }
             PopModelMatrix(gl);
         }

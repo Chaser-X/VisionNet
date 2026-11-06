@@ -46,7 +46,7 @@ namespace VisionNet.Controls
                 if (Math.Abs(depth - 1.0f) < 0.00001f) return null;
 
                 CxPoint3D world;
-                if (!ModernGLRenderer.For(gl).Unproject(gl, mouseX, adjustedY, depth, out world))
+                if (!ModernGLRenderer.For(gl).Unproject(mouseX, adjustedY, depth, out world))
                     return null;
                 return world;
             });

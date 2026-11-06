@@ -45,6 +45,7 @@
 
 - [x] **OpenTK 迁移**：`CxDisplay` 渲染后端 SharpGL → OpenTK 3.3.3（直绘，去掉 FBO 回读）（提交 `3c61519`，归档 `07e0ec2`）
 - [x] **迁移后加固（critic-in-the-loop 审计 P1/P2/P3/P5）**：`CxGlContext.RunOnContext` 收敛帧外 GL 绑定（P1）；删除残留 FFP 回退 `ReadCurrentGLMatrices` 与 `LookAtMatrix` 的矩阵栈段（P2）；`OnPaint` 改为先 `base.OnPaint` 再渲染（P3）；`CxGlContext` 单实例守卫（P5）；新增上下文能力日志，使「兼容 3.3 是否成立」可观测
+- [x] **内部重构：`ModernGLRenderer` 自持 `_gl`**，移除 45 个实例方法的冗余 `CxGlContext` 参数（另含 `ShaderProgramCompiler.CompileProgram` / `CxGLResourceManager.Release` / `GLResourceHandle.GetUniformLocation` / `CxDisplay.ProcessPendingRelease` / `DisposeResources`）；纯内部、无公共 API 变更
 - [x] **工作区文档初始化**（2026-11-05）：创建 `Agents.md` / `Changlog.md` / `ToDo.md`，并合并 `CHANGELOG.md` 与两份 `TODO-CxDisplay-*.md` 后删除原文件
 - [x] **P1 逐顶点法线**：Mesh 光照改用真法线（提交 `be069ee`）
 - [x] **P2 PBR / IBL**：`SurfaceLightingMode` / `EnvironmentPreset` / `IblIntensity`；程序化 IBL（`ProceduralIbl`）；item 级 `Metallic` / `Roughness`（提交 `f98e426`）

@@ -7,7 +7,7 @@ namespace VisionNet.Controls
     /// <summary>Compiles and links GLSL programs for the modern 3D renderers.</summary>
     internal static class ShaderProgramCompiler
     {
-        internal static uint CompileProgram(CxGlContext gl, string vertexSource, string fragmentSource)
+        internal static uint CompileProgram(string vertexSource, string fragmentSource)
         {
             if (string.IsNullOrEmpty(vertexSource) || string.IsNullOrEmpty(fragmentSource))
                 return 0;

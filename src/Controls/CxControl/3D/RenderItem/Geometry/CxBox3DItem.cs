@@ -188,18 +188,18 @@ namespace VisionNet.Controls
                     _edgesBuffer[edgeOffset++] = _vertexScratch[source + 2];
                 }
             }
-            renderer.Draw(gl, PrimitiveType.Triangles, _trianglesBuffer,
+            renderer.Draw(PrimitiveType.Triangles, _trianglesBuffer,
                 Color.FromArgb(Color.A, Color.R, Color.G, Color.B));
             // The wireframe outline stays opaque even when the fill is translucent.
             Color opaque = Color.FromArgb(255, DrawColor.R, DrawColor.G, DrawColor.B);
-            renderer.Draw(gl, PrimitiveType.Lines, _edgesBuffer, opaque, Size);
+            renderer.Draw(PrimitiveType.Lines, _edgesBuffer, opaque, Size);
 
             // Vertex markers: show the 8 corners of the hit box when active and selected.
             if (IsActiveObj && IsSelected && _hitBoxIndex >= 0 && _hitBoxIndex < Box3Ds.Length)
             {
                 FillVertexScratch(Box3Ds[_hitBoxIndex]);
                 Array.Copy(_vertexScratch, _selectedBuffer, _vertexScratch.Length);
-                renderer.Draw(gl, PrimitiveType.Points, _selectedBuffer, opaque, 10f);
+                renderer.Draw(PrimitiveType.Points, _selectedBuffer, opaque, 10f);
             }
             PopModelMatrix(gl);
         }

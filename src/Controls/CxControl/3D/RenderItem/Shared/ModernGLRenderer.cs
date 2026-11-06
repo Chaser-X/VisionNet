@@ -60,7 +60,12 @@ namespace VisionNet.Controls
         private static readonly Dictionary<CxGlContext, ModernGLRenderer> Instances
             = new Dictionary<CxGlContext, ModernGLRenderer>();
 
-        // One renderer instance already exists per OpenGL wrapper (see For), so the model stack
+        // The context this renderer belongs to. Every GL object it owns lives in that context,
+        // and all of its methods run with it current, so the context is captured once here
+        // instead of being threaded through every call.
+        private readonly CxGlContext _gl;
+
+        // One renderer instance already exists per context (see For), so the model stack
         // needs no further per-context indirection: a single State field is context-scoped
         // by construction.
         private readonly State _state = new State();
@@ -231,7 +236,7 @@ void main() { FragColor = vertexColor; }";
 
         // Instances are created through For so a caller cannot accidentally share
         // GL handles between unrelated contexts.
-        private ModernGLRenderer() { }
+        private ModernGLRenderer(CxGlContext gl) { _gl = gl; }
 
         /// <summary>
         /// Returns the renderer associated with <paramref name="gl"/>, creating it
@@ -244,7 +249,7 @@ void main() { FragColor = vertexColor; }";
                 ModernGLRenderer renderer;
                 if (!Instances.TryGetValue(gl, out renderer))
                 {
-                    renderer = new ModernGLRenderer();
+                    renderer = new ModernGLRenderer(gl);
                     Instances.Add(gl, renderer);
                 }
                 return renderer;
@@ -293,26 +298,26 @@ void main() { FragColor = vertexColor; }";
                         + ex.Message);
                     return;
                 }
-                renderer.ReleasePrograms(gl);
+                renderer.ReleasePrograms();
             }
         }
 
         /// <summary>Pushes the current overlay model matrix and selects <paramref name="model"/>.</summary>
-        internal void PushModel(CxGlContext gl, CxMatrix4X4 model)
+        internal void PushModel(CxMatrix4X4 model)
         {
             _state.Models.Push(_state.Current);
             _state.Current = model ?? CxMatrix4X4.Identity();
         }
 
         /// <summary>Restores the model matrix saved by the matching <see cref="PushModel"/> call.</summary>
-        internal void PopModel(CxGlContext gl)
+        internal void PopModel()
         {
             _state.Current = _state.Models.Count == 0
                 ? CxMatrix4X4.Identity() : _state.Models.Pop();
         }
 
         /// <summary>Gets the model matrix currently applied to world-space overlay vertices.</summary>
-        internal CxMatrix4X4 CurrentModel(CxGlContext gl) => _state.Current;
+        internal CxMatrix4X4 CurrentModel() => _state.Current;
 
         /// <summary>
         /// Stores the camera matrices for subsequent world-space draws and CPU-side
@@ -333,11 +338,11 @@ void main() { FragColor = vertexColor; }";
         /// current frame are kept together so a scene with slightly more than the
         /// nominal cache size does not evict its own working set while it is drawn.
         /// </summary>
-        internal void BeginFrame(CxGlContext gl)
+        internal void BeginFrame()
         {
-            _frameState = CaptureRenderStateUncached(gl);
+            _frameState = CaptureRenderStateUncached();
             _frameStateCaptured = true;
-            RefreshViewport(gl);
+            RefreshViewport();
             _textTexturesUsedThisFrame.Clear();
         }
 
@@ -346,10 +351,10 @@ void main() { FragColor = vertexColor; }";
         /// frame working set is allowed to exceed the nominal limit; only entries
         /// not used by this frame are evicted.
         /// </summary>
-        internal void EndFrame(CxGlContext gl)
+        internal void EndFrame()
         {
             int targetCount = Math.Max(MaxCachedTextTextures, _textTexturesUsedThisFrame.Count);
-            TrimTextCache(gl, targetCount);
+            TrimTextCache(targetCount);
             _textTexturesUsedThisFrame.Clear();
             if (_frameStateCaptured)
             {

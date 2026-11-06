@@ -15,9 +15,9 @@ namespace VisionNet.Controls
         private const int SphereStacks = 10;
 
         /// <summary>Uploads camera matrices and one item model matrix to a shader program.</summary>
-        internal void UploadSceneMatrices(CxGlContext gl, uint program, CxMatrix4X4 model)
+        internal void UploadSceneMatrices(uint program, CxMatrix4X4 model)
         {
-            EnsureSceneMatrices(gl);
+            EnsureSceneMatrices();
             GL.UniformMatrix4(GL.GetUniformLocation(program, "projection"), 1, true, _projection);
             GL.UniformMatrix4(GL.GetUniformLocation(program, "view"), 1, true, _view);
             GL.UniformMatrix4(GL.GetUniformLocation(program, "model"), 1, true,
@@ -25,12 +25,12 @@ namespace VisionNet.Controls
         }
 
         /// <summary>Uploads scene matrices using locations cached with the resource handle.</summary>
-        internal void UploadSceneMatrices(CxGlContext gl, GLResourceHandle handle, CxMatrix4X4 model)
+        internal void UploadSceneMatrices(GLResourceHandle handle, CxMatrix4X4 model)
         {
-            EnsureSceneMatrices(gl);
-            GL.UniformMatrix4(handle.GetUniformLocation(gl, "projection"), 1, true, _projection);
-            GL.UniformMatrix4(handle.GetUniformLocation(gl, "view"), 1, true, _view);
-            GL.UniformMatrix4(handle.GetUniformLocation(gl, "model"), 1, true,
+            EnsureSceneMatrices();
+            GL.UniformMatrix4(handle.GetUniformLocation("projection"), 1, true, _projection);
+            GL.UniformMatrix4(handle.GetUniformLocation("view"), 1, true, _view);
+            GL.UniformMatrix4(handle.GetUniformLocation("model"), 1, true,
                 (model ?? CxMatrix4X4.Identity()).Data);
         }
 
@@ -40,26 +40,25 @@ namespace VisionNet.Controls
         /// <b>inverse</b> so no extra inversion happens here; the array is transposed into the
         /// row-major layout the other matrices use.
         /// </summary>
-        internal void UploadNormalMatrix(CxGlContext gl, GLResourceHandle handle, CxMatrix4X4 modelInverse)
+        internal void UploadNormalMatrix(GLResourceHandle handle, CxMatrix4X4 modelInverse)
         {
             var inv = (modelInverse ?? CxMatrix4X4.Identity()).Data;
             _normalMatrix[0] = inv[0]; _normalMatrix[1] = inv[4]; _normalMatrix[2] = inv[8];
             _normalMatrix[3] = inv[1]; _normalMatrix[4] = inv[5]; _normalMatrix[5] = inv[9];
             _normalMatrix[6] = inv[2]; _normalMatrix[7] = inv[6]; _normalMatrix[8] = inv[10];
-            GL.UniformMatrix3(handle.GetUniformLocation(gl, "normalMatrix"), 1, true, _normalMatrix);
+            GL.UniformMatrix3(handle.GetUniformLocation("normalMatrix"), 1, true, _normalMatrix);
         }
 
         /// <summary>Gets the context-owned shader shared by the built-in surface items.</summary>
         internal uint SurfaceProgram => _surfaceProgram;
 
         /// <summary>Compiles the built-in surface shader once per GL context.</summary>
-        internal bool EnsureSurfaceProgram(CxGlContext gl)
+        internal bool EnsureSurfaceProgram()
         {
             if (_surfaceProgram != 0) return true;
             if (_surfaceProgramFailed) return false;
 
             _surfaceProgram = ShaderProgramCompiler.CompileProgram(
-                gl,
                 AbstractCxObjRenderItem.SharedVertexShaderSource,
                 AbstractCxObjRenderItem.SharedFragmentShaderSource);
             if (_surfaceProgram == 0)
@@ -74,14 +73,14 @@ namespace VisionNet.Controls
         /// Draws instanced unit spheres for a point overlay. The sphere mesh and shader are
         /// context-owned; only the instance positions are streamed for each draw.
         /// </summary>
-        internal void DrawSpheres(CxGlContext gl, float[] positions, Color color, float radius,
+        internal void DrawSpheres(float[] positions, Color color, float radius,
             CxMatrix4X4 model)
         {
             if (positions == null || positions.Length < 3) return;
-            if (!EnsureSphereProgram(gl)) return;
-            EnsureSphereBuffers(gl);
+            if (!EnsureSphereProgram()) return;
+            EnsureSphereBuffers();
 
-            EnsureSceneMatrices(gl);
+            EnsureSceneMatrices();
             GL.BindVertexArray(_sphereVao);
             GL.BindBuffer(BufferTarget.ArrayBuffer, _sphereInstanceVbo);
             GL.BufferData(BufferTarget.ArrayBuffer, positions.Length * sizeof(float),
@@ -103,12 +102,12 @@ namespace VisionNet.Controls
             GL.UseProgram(0);
         }
 
-        private bool EnsureSphereProgram(CxGlContext gl)
+        private bool EnsureSphereProgram()
         {
             if (_sphereProgram != 0) return true;
             if (_sphereProgramFailed) return false;
 
-            _sphereProgram = ShaderProgramCompiler.CompileProgram(gl, SphereVertex, SphereFragment);
+            _sphereProgram = ShaderProgramCompiler.CompileProgram(SphereVertex, SphereFragment);
             if (_sphereProgram == 0)
             {
                 _sphereProgramFailed = true;
@@ -122,7 +121,7 @@ namespace VisionNet.Controls
             return true;
         }
 
-        private void EnsureSphereBuffers(CxGlContext gl)
+        private void EnsureSphereBuffers()
         {
             if (_sphereVao != 0) return;
 
@@ -197,11 +196,11 @@ namespace VisionNet.Controls
         }
 
         /// <summary>Compiles the shared geometry program once per GL context.</summary>
-        private bool EnsureGeometryProgram(CxGlContext gl)
+        private bool EnsureGeometryProgram()
         {
             if (_geometryProgram != 0) return true;
             if (_geometryProgramFailed) return false;
-            _geometryProgram = ShaderProgramCompiler.CompileProgram(gl, GeometryVertex, GeometryFragment);
+            _geometryProgram = ShaderProgramCompiler.CompileProgram(GeometryVertex, GeometryFragment);
             if (_geometryProgram == 0)
             {
                 _geometryProgramFailed = true;
@@ -216,7 +215,7 @@ namespace VisionNet.Controls
         }
 
         /// <summary>Allocates the reusable geometry VAO/VBO on first use.</summary>
-        private void EnsureGeometryBuffers(CxGlContext gl)
+        private void EnsureGeometryBuffers()
         {
             if (_geometryVao == 0)
             {
@@ -233,11 +232,11 @@ namespace VisionNet.Controls
         }
 
         /// <summary>Compiles the screen-text program once per GL context.</summary>
-        private bool EnsureTextProgram(CxGlContext gl)
+        private bool EnsureTextProgram()
         {
             if (_textProgram != 0) return true;
             if (_textProgramFailed) return false;
-            _textProgram = ShaderProgramCompiler.CompileProgram(gl, TextVertex, TextFragment);
+            _textProgram = ShaderProgramCompiler.CompileProgram(TextVertex, TextFragment);
             if (_textProgram == 0)
             {
                 _textProgramFailed = true;
@@ -250,7 +249,7 @@ namespace VisionNet.Controls
         }
 
         /// <summary>Allocates the reusable text quad VAO/VBO on first use.</summary>
-        private void EnsureTextBuffers(CxGlContext gl)
+        private void EnsureTextBuffers()
         {
             if (_textVao == 0)
             {

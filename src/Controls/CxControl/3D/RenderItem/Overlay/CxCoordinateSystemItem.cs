@@ -51,7 +51,7 @@ namespace VisionNet.Controls
         public void DrawScreenPositionedAxes(CxGlContext gl)
         {
             var renderer = ModernGLRenderer.For(gl);
-            renderer.EnsureSceneMatrices(gl);
+            renderer.EnsureSceneMatrices();
             float[] mv = renderer.SceneView;
             const float ox = 50f, oy = 50f, length = 42f;
             // SceneView is row-major. Transforming each world basis vector gives
@@ -80,10 +80,10 @@ namespace VisionNet.Controls
             SetLineColor(colors, 3, Color.Lime);
             SetLineColor(colors, 4, Color.Blue);
             SetLineColor(colors, 5, Color.Blue);
-            renderer.DrawScreenGeometryColored(gl, PrimitiveType.Lines, positions, colors, 2f);
-            renderer.DrawText(gl, (int)(ox + xX * length), (int)(oy + xY * length), Color.Red, 14, "X");
-            renderer.DrawText(gl, (int)(ox + yX * length), (int)(oy + yY * length), Color.Lime, 14, "Y");
-            renderer.DrawText(gl, (int)(ox + zX * length), (int)(oy + zY * length), Color.Blue, 14, "Z");
+            renderer.DrawScreenGeometryColored(PrimitiveType.Lines, positions, colors, 2f);
+            renderer.DrawText((int)(ox + xX * length), (int)(oy + xY * length), Color.Red, 14, "X");
+            renderer.DrawText((int)(ox + yX * length), (int)(oy + yY * length), Color.Lime, 14, "Y");
+            renderer.DrawText((int)(ox + zX * length), (int)(oy + zY * length), Color.Blue, 14, "Z");
         }
 
         private static void SetLineColor(float[] colors, int vertex, Color color)
@@ -109,12 +109,12 @@ namespace VisionNet.Controls
         private void DrawAxis(CxGlContext gl, float[] mesh, CxVector3D direction, Color color, string label)
         {
             var renderer = ModernGLRenderer.For(gl);
-            renderer.Draw(gl, PrimitiveType.Triangles,
+            renderer.Draw(PrimitiveType.Triangles,
                 mesh, color);
             var tip = Add(_coordination.Origin, Scale(direction, _axisLength));
             float sx, sy, sz;
-            if (renderer.Project(gl, tip.X, tip.Y, tip.Z, out sx, out sy, out sz))
-                renderer.DrawText(gl, (int)sx, (int)sy, color, 16, label);
+            if (renderer.Project(tip.X, tip.Y, tip.Z, out sx, out sy, out sz))
+                renderer.DrawText((int)sx, (int)sy, color, 16, label);
         }
 
         private static float[] BuildAxisMesh(CxPoint3D origin, CxVector3D direction,

@@ -9,7 +9,22 @@
 
 ## 未发布（工作区，尚未提交）
 
-（无）
+### 内部重构（库）：`ModernGLRenderer` 自持上下文，移除冗余的 `CxGlContext` 参数
+
+**背景（坏味道）**：迁移后 `CxGlContext` 被当作参数穿过大量方法，但其中 **45 个实例方法根本不用它** —— 只做 `GL.*` 静态调用，或继续往下一层转发。参数既噪声又误导（看起来"需要上下文"，其实不需要）。
+
+**改动**
+- `ModernGLRenderer` 新增 `private readonly CxGlContext _gl`（私有构造注入；`For(gl)` 创建实例时传入）。该类本就是 per-context 的（`For` 以 `CxGlContext` 为键），"自持上下文"是事实的自然表达。
+- **移除 45 个实例方法的 `CxGlContext gl` 参数**；原先读 `gl.Width` / `gl.Height` / `gl.IsValid` 的 7 处改用 `_gl`。保留参数的仅剩 3 个静态入口 `For` / `ResetForContextRecreate` / `Release`（需要它作为字典键；`Release` 还要 `IsValid` / `EnsureCurrent`）。
+- 一并移除（同样完全不用该参数）：`ShaderProgramCompiler.CompileProgram`、`CxGLResourceManager.Release`、`GLResourceHandle.GetUniformLocation`、`CxDisplay.ProcessPendingRelease`。
+- `CxDisplay.DisposeResources` 改用 `_gl` 字段，去掉参数。
+- 调用点同步简化，例如 `renderer.Draw(gl, PrimitiveType.Triangles, …)` → `renderer.Draw(PrimitiveType.Triangles, …)`。
+
+**未改（并说明理由）**：item 的 `Draw(CxGlContext)`（`IRenderItem` / `ICxObjRenderItem` / `AbstractRenderItem` / `AbstractCxObjRenderItem` / 10 个 item）**保留** —— 它是获取 `ModernGLRenderer.For(gl)` 的唯一途径，去掉就得把内部类型放进公共接口签名。`CxDisplay` 的私有帧方法（`Render` / `DrawSurfaceItems` / `DrawOverlays` / `DrawHud` / `ProcessResourcePool`）同样保留：它们把 `gl` 转发给 item `Draw`。
+
+**影响**：纯内部重构，**无公共 API 变更**（`ModernGLRenderer` / `ShaderProgramCompiler` / `CxGLResourceManager` 为 `internal`；`GLResourceHandle.GetUniformLocation` 为 `internal`；帧方法为 `private`）；行为不变（只删参数与转发，不改任何 GL 调用顺序或状态语义）。
+
+**验证**：`CxControl` / `DemoFrom` 0 error 0 warning；`dotnet test` **127/127 通过**；grep 复核：`ModernGLRenderer*.cs` 中 `CxGlContext gl` 仅剩私有构造 + 3 个静态入口。
 
 ## 已提交
 

@@ -11,13 +11,13 @@ namespace VisionNet.Controls
         /// Draws world-space positions with the shared geometry shader. The current
         /// model matrix is combined with the camera matrices before the draw.
         /// </summary>
-        internal void Draw(CxGlContext gl, PrimitiveType primitive, float[] positions, Color color,
+        internal void Draw(PrimitiveType primitive, float[] positions, Color color,
             float size = 1f, bool depthTest = true)
         {
             if (positions == null || positions.Length < 3) return;
-            EnsureSceneMatrices(gl);
+            EnsureSceneMatrices();
             RenderStateSnapshot previous;
-            if (!BeginGeometryDraw(gl, out previous)) return;
+            if (!BeginGeometryDraw(out previous)) return;
             SetRenderState(depthTest, color.A < 255);
 
             GL.BindVertexArray(_geometryVao);
@@ -30,7 +30,7 @@ namespace VisionNet.Controls
             GL.UseProgram(_geometryProgram);
             GL.UniformMatrix4(_geometryProjection, 1, true, _projection);
             GL.UniformMatrix4(_geometryView, 1, true, _view);
-            GL.UniformMatrix4(_geometryModel, 1, true, CurrentModel(gl).Data);
+            GL.UniformMatrix4(_geometryModel, 1, true, CurrentModel().Data);
             GL.Uniform1(_geometryUseVertexColor, 0);
             GL.Uniform4(_geometryColor,
                 color.R / 255f, color.G / 255f, color.B / 255f, color.A / 255f);
@@ -39,7 +39,7 @@ namespace VisionNet.Controls
             if (primitive == PrimitiveType.Points) GL.PointSize(Math.Max(1f, size));
             GL.DrawArrays(primitive, 0, positions.Length / 3);
 
-            EndGeometryDraw(gl, previous, vertexColorAttribute: false);
+            EndGeometryDraw(previous, vertexColorAttribute: false);
         }
 
         /// <summary>
@@ -48,12 +48,12 @@ namespace VisionNet.Controls
         /// Returns <c>false</c> when the program is unavailable, in which case nothing was bound
         /// and nothing needs restoring.
         /// </summary>
-        private bool BeginGeometryDraw(CxGlContext gl, out RenderStateSnapshot previous)
+        private bool BeginGeometryDraw(out RenderStateSnapshot previous)
         {
             previous = default(RenderStateSnapshot);
-            if (!EnsureGeometryProgram(gl)) return false;
-            EnsureGeometryBuffers(gl);
-            previous = CaptureRenderState(gl);
+            if (!EnsureGeometryProgram()) return false;
+            EnsureGeometryBuffers();
+            previous = CaptureRenderState();
             return true;
         }
 
@@ -64,7 +64,7 @@ namespace VisionNet.Controls
         /// <param name="vertexColorAttribute">
         /// <c>true</c> when the draw enabled attribute 1 for per-vertex colours.
         /// </param>
-        private void EndGeometryDraw(CxGlContext gl, RenderStateSnapshot previous, bool vertexColorAttribute)
+        private void EndGeometryDraw(RenderStateSnapshot previous, bool vertexColorAttribute)
         {
             if (vertexColorAttribute) GL.DisableVertexAttribArray(1);
             GL.DisableVertexAttribArray(0);
@@ -78,12 +78,12 @@ namespace VisionNet.Controls
         /// Draws 2D pixel coordinates using an orthographic projection. Depth testing
         /// and depth writes are disabled for the call, then restored to their prior state.
         /// </summary>
-        internal void DrawScreenGeometry(CxGlContext gl, PrimitiveType primitive, float[] positions,
+        internal void DrawScreenGeometry(PrimitiveType primitive, float[] positions,
             Color color, float width = 1f)
         {
             if (positions == null || positions.Length < 2) return;
             RenderStateSnapshot previous;
-            if (!BeginGeometryDraw(gl, out previous)) return;
+            if (!BeginGeometryDraw(out previous)) return;
             SetRenderState(false, color.A < 255);
             GL.DepthMask(false);
 
@@ -95,7 +95,7 @@ namespace VisionNet.Controls
             GL.VertexAttribPointer(0, 3, VertexAttribPointerType.Float, false, 3 * sizeof(float), IntPtr.Zero);
             GL.EnableVertexAttribArray(0);
             GL.UseProgram(_geometryProgram);
-            float[] projection = Ortho(gl.Width, gl.Height);
+            float[] projection = Ortho(_gl.Width, _gl.Height);
             GL.UniformMatrix4(_geometryProjection, 1, true, projection);
             GL.UniformMatrix4(_geometryView, 1, true, _identity);
             GL.UniformMatrix4(_geometryModel, 1, true, _identity);
@@ -106,21 +106,21 @@ namespace VisionNet.Controls
                 primitive == PrimitiveType.LineLoop) GL.LineWidth(Math.Max(1f, width));
             GL.DrawArrays(primitive, 0, positions.Length / 2);
 
-            EndGeometryDraw(gl, previous, vertexColorAttribute: false);
+            EndGeometryDraw(previous, vertexColorAttribute: false);
         }
 
         /// <summary>
         /// Draws screen-space geometry with a per-vertex RGBA colour. The interleaved
         /// position/colour data is uploaded to the shared geometry VBO for one draw.
         /// </summary>
-        internal void DrawScreenGeometryColored(CxGlContext gl, PrimitiveType primitive, float[] positions,
+        internal void DrawScreenGeometryColored(PrimitiveType primitive, float[] positions,
             float[] colors, float width = 1f)
         {
             if (positions == null || positions.Length < 2 || colors == null
                 || colors.Length < (positions.Length / 2) * 4) return;
 
             RenderStateSnapshot previous;
-            if (!BeginGeometryDraw(gl, out previous)) return;
+            if (!BeginGeometryDraw(out previous)) return;
             SetRenderState(false, true);
             GL.DepthMask(false);
 
@@ -149,7 +149,7 @@ namespace VisionNet.Controls
             GL.EnableVertexAttribArray(1);
 
             GL.UseProgram(_geometryProgram);
-            float[] projection = Ortho(gl.Width, gl.Height);
+            float[] projection = Ortho(_gl.Width, _gl.Height);
             GL.UniformMatrix4(_geometryProjection, 1, true, projection);
             GL.UniformMatrix4(_geometryView, 1, true, _identity);
             GL.UniformMatrix4(_geometryModel, 1, true, _identity);
@@ -161,7 +161,7 @@ namespace VisionNet.Controls
             GL.DrawArrays(primitive, 0, vertexCount);
             GL.Uniform1(_geometryUseVertexColor, 0);
 
-            EndGeometryDraw(gl, previous, vertexColorAttribute: true);
+            EndGeometryDraw(previous, vertexColorAttribute: true);
         }
     }
 }

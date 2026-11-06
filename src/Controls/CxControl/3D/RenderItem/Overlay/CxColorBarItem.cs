@@ -122,18 +122,18 @@ namespace VisionNet.Controls
                 _cachedViewportHeight = viewportHeight;
                 _hasCachedGeometry = true;
             }
-            renderer.DrawScreenGeometryColored(gl, PrimitiveType.TriangleStrip,
+            renderer.DrawScreenGeometryColored(PrimitiveType.TriangleStrip,
                 _barPositions, _barColors);
 
             // Draw tick marks and Z-value labels.
-            renderer.DrawScreenGeometry(gl, PrimitiveType.Lines,
+            renderer.DrawScreenGeometry(PrimitiveType.Lines,
                 _tickPositions, System.Drawing.Color.White);
 
             for (int i = 0; i <= TickDivisions; i++)
             {
                 int tickY = TickY(i, startY, barHeight);
                 double zValue = TickZValue(i, _zMin, _zMax);
-                renderer.DrawText(gl, startX - 45, tickY - 5, System.Drawing.Color.White, 10, $"{zValue:F2}");
+                renderer.DrawText(startX - 45, tickY - 5, System.Drawing.Color.White, 10, $"{zValue:F2}");
             }
         }
     }

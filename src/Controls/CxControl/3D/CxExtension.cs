@@ -467,8 +467,8 @@ namespace VisionNet.Controls
             {
                 var renderer = ModernGLRenderer.For(gl);
                 float sx, sy, sz;
-                if (!renderer.Project(gl, x, y, z, out sx, out sy, out sz)) return;
-                renderer.DrawText(gl, (int)sx, (int)sy, System.Drawing.Color.White,
+                if (!renderer.Project(x, y, z, out sx, out sy, out sz)) return;
+                renderer.DrawText((int)sx, (int)sy, System.Drawing.Color.White,
                     size * (1f + sz), text);
             });
         }
@@ -495,8 +495,8 @@ namespace VisionNet.Controls
             {
                 var renderer = ModernGLRenderer.For(gl);
                 float sx, sy, sz;
-                if (!renderer.Project(gl, x, y, z, out sx, out sy, out sz)) return;
-                renderer.DrawText(gl, (int)sx, (int)sy, System.Drawing.Color.White, size, text);
+                if (!renderer.Project(x, y, z, out sx, out sy, out sz)) return;
+                renderer.DrawText((int)sx, (int)sy, System.Drawing.Color.White, size, text);
             });
         }
 
