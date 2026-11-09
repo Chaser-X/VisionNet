@@ -9,7 +9,12 @@
 
 ## 未发布（工作区，尚未提交）
 
-### 渲染（库）：离屏 4× MSAA 渲染目标 + 深度拾取改为异步 PBO 回读
+（无）
+
+## 已提交
+
+
+### d929066（2026-11-09）渲染（库）：离屏 4× MSAA 渲染目标 + 深度拾取改为异步 PBO 回读
 
 **背景**：MSAA 与深度拾取原本互斥 —— 多重采样深度缓冲不能用 `glReadPixels` 读回（边缘像素读到的是"某个样本"，不可靠）。本次把两者解耦：画面走离屏多重采样目标，拾取读该目标的**单采样 resolve**，并用 PBO 异步回读消除 UI 阻塞。
 
@@ -32,7 +37,7 @@
 
 - **需上机目视确认**：① DEBUG 日志 `[CxControl] MSAA render target: … samples=N` 是否为 4（驱动未授予则为 0，功能不崩、只是无 AA）；② Mesh / 线框边缘是否平滑、点云圆盘应无变化；③ hover 时 UI 是否不再随鼠标移动卡顿；④ 悬停坐标标签是否正常（含双击聚焦）。
 
-### 新增（库）：`CxDisplayDefaults` —— 渲染 / 光照默认值集中管理 + 显示级 `PointSize`
+### d929066（2026-11-09）新增（库）：`CxDisplayDefaults` —— 渲染 / 光照默认值集中管理 + 显示级 `PointSize`
 
 **背景**：默认值原先散落在三处（`CxDisplay` 字段初始化、`AbstractCxObjRenderItem` 字段初始化、Demo 光照页硬编码的 `20/50/130/100`）；「点云点大小」只有 item 级 `PointSize`、不传播也不被新 item 继承，且默认值出现漂移（item `3f` / `InitialPointSize` `2` / README `2`）。
 
@@ -52,8 +57,6 @@
 **验证**：`CxControl` / `DemoFrom` 0 error 0 warning；`dotnet test` **128/128**。
 
 - **需上机目视确认**：Demo 光照页默认观感不变（仅多一个「点大小」滑块）；拖动该滑块能实时改变点云点尺寸。
-
-## 已提交
 
 
 ### 2bc721d（2026-11-06）清理（库）：删除 SharpGL 时代的遗留文件 + 更新嵌套 README
