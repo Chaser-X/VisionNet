@@ -87,6 +87,7 @@
     <Compile Include="3D\CxDisplay.cs">
       <SubType>UserControl</SubType>
     </Compile>
+    <Compile Include="3D\CxDisplayDefaults.cs" />
     <Compile Include="3D\CxDisplay.Api.cs">
       <DependentUpon>CxDisplay.cs</DependentUpon>
       <SubType>UserControl</SubType>
@@ -144,6 +145,7 @@
     <Compile Include="3D\RenderItem\Overlay\CxTextInfoItem.cs" />
     <Compile Include="3D\CxExtension.cs" />
     <Compile Include="3D\CxGlContext.cs" />
+    <Compile Include="3D\CxMsaaRenderTarget.cs" />
     <Compile Include="3D\CxGLResourceManager.cs" />
     <Compile Include="3D\CxGroup.cs" />
     <Compile Include="3D\CxGroupManager.cs" />

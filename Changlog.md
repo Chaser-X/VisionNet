@@ -9,7 +9,49 @@
 
 ## 未发布（工作区，尚未提交）
 
-（无）
+### 渲染（库）：离屏 4× MSAA 渲染目标 + 深度拾取改为异步 PBO 回读
+
+**背景**：MSAA 与深度拾取原本互斥 —— 多重采样深度缓冲不能用 `glReadPixels` 读回（边缘像素读到的是"某个样本"，不可靠）。本次把两者解耦：画面走离屏多重采样目标，拾取读该目标的**单采样 resolve**，并用 PBO 异步回读消除 UI 阻塞。
+
+**改动**
+- 新增 `3D/CxMsaaRenderTarget.cs`：离屏 **MSAA FBO**（`RGBA8` 颜色 + `DEPTH_COMPONENT24` 深度，`RenderbufferStorageMultisample`，请求 4×、按 `GL_MAX_SAMPLES` 钳制）→ 每帧 `glBlitFramebuffer` resolve 颜色到窗口；另有 **1×1 单采样深度 FBO** 供拾取。
+- **拾取深度源**：从 `MSAA FBO` 用 `glBlitFramebuffer` 抠出 **1×1 深度**（深度 resolve 取单样本）到单采样 FBO 再读。**场景仍只画一遍**（不是重绘第二遍）。
+- **异步回读**：`CxPickingService` 的 hover 路径改为 `BeginDepthRead`（`glReadPixels` 进 `GL_PIXEL_PACK_BUFFER`，立即返回）+ 隔帧 `TryEndDepthRead`（`glFenceSync`/`glClientWaitSync(0)` 轮询后 `glGetBufferSubData`）。**UI 线程不再等 GPU 画完**。点击路径仍走同步读（每次点击一次，可接受）。
+- `CxGlContext.DepthTarget` + `CxMsaaRenderTarget.ReadDepthAtPixel`：把"读某像素深度"收敛为**唯一入口**，两个相机的双击聚焦也改用它（否则会读到窗口缓冲的空深度）。
+- `CxDisplay.OnPaint`：绑定 MSAA FBO 渲染 → resolve 到窗口 → `Present`；无可用 FBO 时回退直绘窗口。
+- **新增开关 `CxDisplay.MsaaEnabled`（默认 `true`）**：关闭后**直接绘制窗口**（不建离屏目标、不做 resolve blit），拾取回退读窗口深度；Demo 的「3D 显示」页与「光照/PBR 测试」页各加勾选框。
+- **修复 hover 帧率失控**：异步拾取的补帧改为经 hover 节流（`RequestHoverPickRepaint`），不再直接 `SafeInvalidate` —— 此前鼠标持续移动时"每帧发起一次读 → 又立刻排下一帧"，绕过了 `HoverPickMinIntervalMs`，帧率变成"GPU 画多快画多快"，GPU 打满 100%（也因此看不出 MSAA 开关的差别）。
+- **节流**：`HoverPickMinIntervalMs = 33` 现在同时约束 hover 重绘与异步拾取补帧，把 hover 帧率钳在 ≈30fps（如需更省电可调大）。
+
+**行为变化**
+- 显示走 FBO + blit；窗口帧缓冲不再承担深度拾取（拾取源是离屏目标的单采样深度）。
+- MSAA 只平滑 **Mesh / 线框** 边缘；点云圆盘由片元 `discard` 裁出，**MSAA 对其无效**（与 A0 一致）。
+- 深度 resolve 取单个样本，边缘像素的取舍仍由既有 5×5 邻域搜索兜底；精度与迁移前一致。
+
+**验证**：`VisionNet` / `CxControl` / `DemoFrom` 0 error 0 warning；`dotnet test` **128/128**（新增 `FarPlaneDepth_ReportsNoHit`）。
+
+- **需上机目视确认**：① DEBUG 日志 `[CxControl] MSAA render target: … samples=N` 是否为 4（驱动未授予则为 0，功能不崩、只是无 AA）；② Mesh / 线框边缘是否平滑、点云圆盘应无变化；③ hover 时 UI 是否不再随鼠标移动卡顿；④ 悬停坐标标签是否正常（含双击聚焦）。
+
+### 新增（库）：`CxDisplayDefaults` —— 渲染 / 光照默认值集中管理 + 显示级 `PointSize`
+
+**背景**：默认值原先散落在三处（`CxDisplay` 字段初始化、`AbstractCxObjRenderItem` 字段初始化、Demo 光照页硬编码的 `20/50/130/100`）；「点云点大小」只有 item 级 `PointSize`、不传播也不被新 item 继承，且默认值出现漂移（item `3f` / `InitialPointSize` `2` / README `2`）。
+
+**改动**（移植自 `feature/cxdisplay-modern-pipeline` 的 `fc2dc50`，并按本分支适配）
+- 新增静态类 `CxDisplayDefaults`（`src/Controls/CxControl/3D/CxDisplayDefaults.cs`，已加入 csproj）：集中所有默认值（`ViewMode` / `IsLeftHanded` / `ShowCoordinateSystem` / `IsColorBarVisible` / `SurfaceMode` / `SurfaceColorMode` / `SurfaceLightingMode` / `EnvironmentPreset` / `IblIntensity` / `EnvironmentFollowsCamera` / `PbrMetallic` / `PbrRoughness` / `PointImpostor` / `PointSize` / `MsaaEnabled` / `SolidColor` / `Opacity` / `TranslucentWritesDepth`），并提供 `Reset()` 与 `ApplyTo(CxDisplay)`。
+- `CxDisplay`：字段初始化改引用 `CxDisplayDefaults.*`；无参构造链到 `this(CxDisplayDefaults.ViewMode, CxDisplayDefaults.SurfaceMode, CxDisplayDefaults.SurfaceColorMode)`。
+- **新增显示级 `CxDisplay.PointSize`**：下发到所有 item；`SetSurfaceItem` 的新 item 继承。
+- `AbstractCxObjRenderItem`：材质 / 颜色 / 透明 / 点大小字段默认值改引用 `CxDisplayDefaults.*`；`PointSize` 默认统一为 `3`。
+- `CxDisplay.Render.cs`：`InitialPointSize` 由 `const 2.0f` 改为 `static readonly = CxDisplayDefaults.PointSize`。
+- Demo 光照页：滑块 / 勾选框初值改读 `CxDisplayDefaults`（去掉硬编码 `20/50/130/100`），并新增「点大小」滑块。
+- README / ToDo 同步。
+
+**本分支适配**：把本分支新增的显示级开关 `MsaaEnabled` 也纳入 `CxDisplayDefaults`（`Reset()` / `ApplyTo` 一并覆盖）；Demo 的「MSAA 抗锯齿」勾选框初值改读默认值。
+
+**语义**：`CxDisplay`（及 item）**构造时读一次**静态默认值；改静态值只影响之后创建的控件，已存在的控件用 `CxDisplayDefaults.ApplyTo(display)` 下发。
+
+**验证**：`CxControl` / `DemoFrom` 0 error 0 warning；`dotnet test` **128/128**。
+
+- **需上机目视确认**：Demo 光照页默认观感不变（仅多一个「点大小」滑块）；拖动该滑块能实时改变点云点尺寸。
 
 ## 已提交
 

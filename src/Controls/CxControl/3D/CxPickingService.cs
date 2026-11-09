@@ -1,30 +1,35 @@
 using System;
 using System.Collections.Generic;
-using OpenTK.Graphics.OpenGL;
 using VisionNet.DataType;
 
 namespace VisionNet.Controls
 {
     /// <summary>
-    /// Answers picking queries for <see cref="CxDisplay"/>: un-projects a screen pixel through the
-    /// depth buffer and finds the surface point nearest to it across the registered items.
+    /// Answers picking queries for <see cref="CxDisplay"/>: turns a screen pixel into a world-space
+    /// point through the depth buffer and finds the surface point nearest to it across the
+    /// registered items.
     /// </summary>
     /// <remarks>
-    /// Split out of <see cref="CxDisplay"/> so the picking maths is independent of the control's
-    /// frame pipeline and event plumbing. Holds per-query scratch buffers, so an instance is not
-    /// thread-safe: the depth readback needs the GL context to be current, which makes every
-    /// method <b>UI-thread only</b> and valid only inside a frame.
+    /// <para>
+    /// The depth value comes from <see cref="CxMsaaRenderTarget"/> — a single-sample resolve of the
+    /// multisampled scene, so MSAA on the display does not corrupt it. When no render target is
+    /// available (fallback path) the window's own depth buffer is read instead.
+    /// </para>
+    /// <para>
+    /// Reading depth needs the GL context to be current, which makes the read methods
+    /// <b>UI-thread only</b> and valid only while the context is bound (inside a frame, or wrapped
+    /// in <see cref="CxGlContext.RunOnContext{T}"/>). <see cref="FindNearest(CxItemRegistry, CxPoint3D, SurfaceColorMode)"/>
+    /// is pure CPU and has no such restriction.
+    /// </para>
     /// </remarks>
     internal sealed class CxPickingService
     {
-        // Reused so a hover query allocates nothing before the synchronous ReadPixels.
-        private readonly int[] _viewport = new int[4];
-        private readonly float[] _depth = new float[1];
+        // Reused so a query allocates nothing.
         private readonly List<ICxObjRenderItem> _snapshot = new List<ICxObjRenderItem>();
 
         /// <summary>
-        /// Reads the depth buffer at the given screen pixel and un-projects it to a world-space
-        /// point. Returns <c>null</c> when the pixel hits the far plane (no geometry present).
+        /// Reads the depth at the given screen pixel and un-projects it to a world-space point.
+        /// Returns <c>null</c> when the pixel hits the far plane (no geometry present).
         /// </summary>
         /// <param name="gl">Active OpenGL context.</param>
         /// <param name="mouseX">Pixel X in control coordinates.</param>
@@ -36,31 +41,14 @@ namespace VisionNet.Controls
             // bound explicitly (OpenTK does not make it current implicitly).
             return gl.RunOnContext<CxPoint3D?>(() =>
             {
-                GL.GetInteger(GetPName.Viewport, _viewport);
-                int adjustedY = _viewport[3] - mouseY;   // OpenGL Y is bottom-up.
-
-                GL.ReadPixels(mouseX, adjustedY, 1, 1,
-                    PixelFormat.DepthComponent, PixelType.Float, _depth);
-                float depth = _depth[0];
-
-                if (Math.Abs(depth - 1.0f) < 0.00001f) return null;
-
-                CxPoint3D world;
-                if (!ModernGLRenderer.For(gl).Unproject(mouseX, adjustedY, depth, out world))
-                    return null;
-                return world;
+                float? depth = CxMsaaRenderTarget.ReadDepthAtPixel(gl, mouseX, mouseY);
+                return depth.HasValue ? WorldFromDepth(gl, mouseX, mouseY, depth.Value) : null;
             });
         }
 
         /// <summary>
         /// Finds the surface point nearest to the given screen pixel across all active surface items.
         /// </summary>
-        /// <param name="registry">Registry holding the items to search.</param>
-        /// <param name="gl">Active OpenGL context.</param>
-        /// <param name="mouseX">Pixel X in control coordinates.</param>
-        /// <param name="mouseY">Pixel Y in control coordinates (top-down).</param>
-        /// <param name="colorMode">Display colour mode; Diff selects diff values over intensity.</param>
-        /// <returns>Nearest world-space location and its intensity, or <c>(null, null)</c> if no hit.</returns>
         public (CxPoint3D? Location, float? Intensity) FindNearest(CxItemRegistry registry,
             CxGlContext gl, int mouseX, int mouseY, SurfaceColorMode colorMode)
         {
@@ -71,8 +59,20 @@ namespace VisionNet.Controls
         }
 
         /// <summary>
-        /// Finds the surface point nearest to an already-unprojected world position, so a caller
-        /// that has already paid for the depth readback at this pixel does not repeat it.
+        /// Same as the pixel overload but with the depth value already read (e.g. from the
+        /// asynchronous pixel-pack read), so no second readback is needed.
+        /// </summary>
+        public (CxPoint3D? Location, float? Intensity) FindNearestFromDepth(CxItemRegistry registry,
+            CxGlContext gl, int mouseX, int mouseY, float depth, SurfaceColorMode colorMode)
+        {
+            var world = WorldFromDepth(gl, mouseX, mouseY, depth);
+            return world.HasValue
+                ? FindNearest(registry, world.Value, colorMode)
+                : (null, null);
+        }
+
+        /// <summary>
+        /// Finds the surface point nearest to an already-unprojected world position.
         /// </summary>
         /// <remarks>
         /// Structured surfaces use a 5×5 neighbourhood grid search; mesh-type items and unordered
@@ -111,6 +111,24 @@ namespace VisionNet.Controls
             // Do not keep references to (possibly disposed) items in the scratch buffer.
             _snapshot.Clear();
             return (bestPoint, bestIntensity);
+        }
+
+        /// <summary>
+        /// Un-projects a depth-buffer value at a control-space pixel to world space. Returns
+        /// <c>null</c> at the far plane.
+        /// </summary>
+        private static CxPoint3D? WorldFromDepth(CxGlContext gl, int mouseX, int mouseY, float depth)
+        {
+            if (Math.Abs(depth - 1.0f) < 0.00001f) return null;
+
+            // Control space is top-down; GL viewport space is bottom-up. Use the pixel centre so the
+            // un-projection matches the texel that was read.
+            int glY = gl.Height - 1 - mouseY;
+
+            CxPoint3D world;
+            if (!ModernGLRenderer.For(gl).Unproject(mouseX + 0.5f, glY + 0.5f, depth, out world))
+                return null;
+            return world;
         }
     }
 }

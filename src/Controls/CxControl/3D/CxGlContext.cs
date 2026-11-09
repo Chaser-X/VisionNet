@@ -118,6 +118,13 @@ namespace VisionNet.Controls
         /// </summary>
         internal System.Windows.Forms.Control Host => _control;
 
+        /// <summary>
+        /// Off-screen depth source the owning <see cref="CxDisplay"/> renders into, or <c>null</c>
+        /// when it draws straight to the window. Depth-based helpers (picking, camera focus) read
+        /// the resolved single-sample depth from here so display MSAA does not corrupt it.
+        /// </summary>
+        internal CxMsaaRenderTarget DepthTarget { get; set; }
+
         private bool IsContextCurrent()
         {
             if (_control.IsDisposed || !_control.HasValidContext) return false;

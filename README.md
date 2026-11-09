@@ -239,6 +239,7 @@ VisionNet/
 - **PBR / IBL 光照**：`CxDisplay.SurfaceLightingMode` 默认 `Pbr`——Mesh 走 split-sum 图像光照，环境由 `ProceduralIbl` **程序化生成**（`EnvironmentPreset` = `Studio` / `Neutral`，进程级缓存，不依赖外部资产文件），经余弦卷积 irradiance、GGX 预滤波 specular 与 BRDF LUT 合成；材质由 `Metallic` / `Roughness` 控制，`IblIntensity` 调整体亮度，`EnvironmentFollowsCamera` 控制环境是否随相机旋转（默认 `true`）。设 `Legacy` 回到原 Blinn-Phong 观感；点云模式不受光照影响（见上方点云高光球）。
 - **纯色 / 透明度**：`CxDisplay.SolidColor`（配合 `SurfaceColorMode.Lit`）与 `CxDisplay.Opacity`（< 1 时走半透明 pass）会应用到所有表面 item，新加入的 item 自动继承。`CxDisplay.TranslucentWritesDepth`（默认 `true`）决定半透明是否写深度：写 → 深度拾取（选中 / 坐标标签）与遮挡正确，但半透明之间不互相透出；不写 → 半透明按绘制顺序互相混合，但对拾取不可见。
 - **数据预算**：`Set*` / `Add*` 默认按最多 200 万个顶点采样后上传；可通过 `maxPointCount` 调整 Surface 和 PointCloud 的预算。
+- **全局默认值**：静态类 `CxDisplayDefaults` 集中管理新建 `CxDisplay` 及其 item 的默认值（`ViewMode` / `IsLeftHanded` / `ShowCoordinateSystem` / `IsColorBarVisible` / `SurfaceMode` / `SurfaceColorMode` / `SurfaceLightingMode` / `EnvironmentPreset` / `IblIntensity` / `EnvironmentFollowsCamera` / `PbrMetallic` / `PbrRoughness` / `PointImpostor` / `PointSize` / `MsaaEnabled` / `SolidColor` / `Opacity` / `TranslucentWritesDepth`）。`CxDisplay` 在**构造时**读取一次；改静态值只影响之后创建的控件（item 同理，新加入时继承显示级当前值），对已存在的控件可用 `CxDisplayDefaults.ApplyTo(display)` 下发。`CxDisplayDefaults.Reset()` 恢复库默认。
 
 #### CxDisplay2D（2D，ScottPlot）
 
@@ -644,7 +645,7 @@ VisionOperator.DestroyLib();
 | ---------------------- | ---------------------------------------- | ------- |
 | `SurfaceMode`          | `PointCloud` `Mesh`                      | 点云或三角面片 |
 | `SurfaceColorMode`     | `Color` `Intensity` `ColorWithIntensity` `Diff` `Lit` | 颜色来源；`Diff` 为每顶点差分彩虹伪彩，`Lit` 为纯色 |
-| `PointSize`（Item 属性） | `float`，默认 `2`                        | `PointCloud` 模式的点大小（像素），`Mesh` 模式忽略 |
+| `PointSize`（显示级）    | `float`，默认 `3`                        | `PointCloud` 模式的点大小（像素）；会下发到所有 item，`Mesh` 模式忽略 |
 | `Opacity`（Item 属性）   | `float`，取值 `0..1`，默认 `1`            | 不透明度；小于 1 时走半透明通道（见下） |
 | `SurfaceViewMode`      | `Top` `Front` `Left` `Right` `None`      | 预设视角    |
 | `ShowCoordinateSystem` | `bool`                                   | 显示世界坐标轴 |
@@ -762,7 +763,7 @@ display2D.SetBackgroundColor(Color.Black);
 > **叠加层 key 与交互事件**
 > 叠加层的 `key` 与 surface 的 key 是**两个独立命名空间**：`key == null` 保持"追加"语义（向后兼容），传入 key 则按 key 原位替换并释放旧 Item；用 `GetOverlayItem` / `RemoveOverlayItem` 查询与移除，`ClearOverlayItems` 全清。
 > 同一实例只会登记一次：对已登记实例再次 `SetOverlayItem` / `SetSurfaceItem` 视为**改 key**（保持原队列位置），不会重复登记。
-> `SelectionChanged`（UI 线程）在选中项变化时触发（`null` = 取消选中）；`CoordinatesChanged`（UI 线程）在**渲染帧内**解析：鼠标移动只记录位置，每帧最多做一次深度读回并触发一次（`null` = 未命中几何；同一像素的连续移动会被合并）；`RenderItemFailed`（渲染帧内，在资源锁释放后触发，可安全回调 display）在 Item 上传失败（如 shader 编译失败）时触发。二者都发生在渲染帧内，**WinForms 控件请用 `BeginInvoke` 更新，不要用同步 `Invoke`**（会卡住渲染帧）。
+> `SelectionChanged`（UI 线程）在选中项变化时触发（`null` = 取消选中）；`CoordinatesChanged`（UI 线程）在**渲染帧内**解析：鼠标移动只记录位置，每帧最多发起一次**异步**深度读回（PBO，结果下一帧取回）并触发一次（`null` = 未命中几何；同一像素的连续移动会被合并）；`RenderItemFailed`（渲染帧内，在资源锁释放后触发，可安全回调 display）在 Item 上传失败（如 shader 编译失败）时触发。二者都发生在渲染帧内，**WinForms 控件请用 `BeginInvoke` 更新，不要用同步 `Invoke`**（会卡住渲染帧）。
 > `Get*` 返回的 Item 修改底层数据仍需重新 `Set*`；只改姿态 / 颜色模式后调用 `Redraw()` 即可看到效果。
 
 > **多 Item 颜色一致性**
@@ -770,10 +771,14 @@ display2D.SetBackgroundColor(Color.Black);
 > Diff 模式 Item 使用差分范围而非 Z 范围；混合场景（Diff + 非 Diff 共存）时颜色条自动隐藏。
 
 > **线程安全与重绘**
-> `SetPointCloud` 等数据设置 API 可在后台线程调用；GL 资源的创建与释放由 `CxDisplay` 在**渲染帧内**完成（WinForms 的 UI 线程 —— OpenTK 的 `GLControl` 在 `OnPaint` 中绘制并 `SwapBuffers`，`glReadPixels` 等调用因此必须发生在渲染帧内）。
+> `SetPointCloud` 等数据设置 API 可在后台线程调用；GL 资源的创建与释放由 `CxDisplay` 在**渲染帧内**完成（WinForms 的 UI 线程 —— OpenTK 的 `GLControl` 在 `OnPaint` 中绘制并 `SwapBuffers`，深度读回等 GL 调用因此必须发生在渲染帧内）。
 > 渲染为**按需重绘**：`GLControl` 只在 `Invalidate()` 时重绘，即**没有渲染定时器**；数据 / 相机 / 选中 / 叠加层变化时由 `SafeInvalidate()`（线程安全）触发重绘。
 > ⚠ 因此若在后台线程准备好数据后**没有**经过 `Set*` / `Redraw()` 等会触发重绘的入口，画面不会自动更新 —— 请显式调用 `Redraw()`。
-> ⚠ 渲染直接输出到窗口（无 FBO 回读），**不再支持透明背景**：默认清屏色为不透明黑。
+> ⚠ 渲染为**离屏多重采样 FBO → resolve 到窗口**；窗口帧缓冲不再承担深度拾取。**不再支持透明背景**：默认清屏色为不透明黑。
+
+> **抗锯齿与拾取**
+> MSAA 开（`CxDisplay.MsaaEnabled`，默认 `true`）：显示走离屏 **4× MSAA** 渲染目标（`RenderbufferStorageMultisample`，按 `GL_MAX_SAMPLES` 钳制），每帧 `glBlitFramebuffer` resolve 到窗口；只平滑 **Mesh / 线框**边缘，点云圆盘由片元 `discard` 裁出、**MSAA 对其无效**。MSAA 关：**直接绘制窗口**（不建离屏目标、无 resolve blit）。
+> 拾取读当前深度源的单采样深度（MSAA 开时用 `glBlitFramebuffer` 抠出 1×1 深度到单采样 FBO；关时直接读窗口深度），因此 MSAA 不会污染拾取。**hover 走 PBO 异步回读**（不阻塞 UI，结果下一帧取回），**点击走同步读**。**hover 帧率由 `HoverPickMinIntervalMs`（33ms）钳制** —— 异步补帧也走同一节流，避免鼠标移动时帧率失控打满 GPU。实测样本数见 DEBUG 日志 `[CxControl] MSAA render target: … samples=N`（0 = 驱动未授予）。
 
 ---
 

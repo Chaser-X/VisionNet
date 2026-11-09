@@ -6,10 +6,16 @@
 ## 2. 主要文件与职责
 
 - **CxDisplay.cs / .Render.cs / .Input.cs / .Api.cs / .Group.cs / .Designer.cs**
-  核心控件。派生自 `OpenTK.GLControl`，负责渲染管线（直绘 `OnPaint` + `SwapBuffers`）、数据管理、用户交互（鼠标、菜单等），并协调 RenderItem 层显示。
+  核心控件。派生自 `OpenTK.GLControl`，负责渲染管线（渲染到离屏 MSAA 目标 → resolve 到窗口 → `SwapBuffers`）、数据管理、用户交互（鼠标、菜单等），并协调 RenderItem 层显示。
+
+- **CxDisplayDefaults.cs**
+  静态类：集中管理新建 `CxDisplay` 及其 item 的渲染 / 光照默认值（含显示级 `PointSize` / `MsaaEnabled`），提供 `Reset()` 与 `ApplyTo(CxDisplay)`。
 
 - **CxGlContext.cs**
-  绑定无关的 GL 上下文门面：对外只暴露 `Width` / `Height` / `IsValid`，隐藏 OpenTK 类型；`EnsureCurrent` / `RunOnContext` 是「帧外 GL 工作」的唯一入口。
+  绑定无关的 GL 上下文门面：对外只暴露 `Width` / `Height` / `IsValid`，隐藏 OpenTK 类型；`EnsureCurrent` / `RunOnContext` 是「帧外 GL 工作」的唯一入口；`DepthTarget` 指向离屏深度源。
+
+- **CxMsaaRenderTarget.cs**
+  离屏 **MSAA** 渲染目标（`RGBA8` 颜色 + `DEPTH_COMPONENT24` 深度）+ **1×1 单采样深度目标**（供拾取）+ **PBO**（异步 1 像素深度回读）。画面 resolve 到窗口；拾取读单采样深度，与显示 MSAA 解耦。
 
 - **CxItemRegistry.cs**
   唯一持有 surface / overlay 队列与 key、per-item GL 资源池与延迟释放队列（含守护它们的锁）。
@@ -21,7 +27,7 @@
   VAO / VBO / 索引缓冲 / 纹理 / shader 的创建与释放（静态、无状态）。
 
 - **CxPickingService.cs**
-  深度读回、反投影、最近曲面搜索（UI 线程、渲染帧内）。
+  深度读回（hover 走 PBO 异步、点击同步）、反投影、最近曲面搜索（UI 线程、渲染帧内）。
 
 - **Camera/**
   `CxAdvancedTrackBallCamera.cs`：现代 3D 相机，支持旋转、缩放、平移、2D/3D 切换与预设视图；`CxTrackBallCamera.cs` 为遗留实现；`ICamera.cs` 为接口。

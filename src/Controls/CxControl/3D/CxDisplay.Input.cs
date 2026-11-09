@@ -21,6 +21,14 @@ namespace VisionNet.Controls
         private int _pendingPickX;
         private int _pendingPickY;
 
+        // Asynchronous depth read: the frame starts it (BeginDepthRead) and a later frame consumes
+        // it (TryEndDepthRead), so the UI thread never blocks on the GPU. _readX/_readY are the
+        // pixel the in-flight read belongs to.
+        private bool _hasPendingRead;
+        private int _readX;
+        private int _readY;
+        private bool _requestRepaintForPick;
+
         // Result of the pick resolved during the last frame. CoordinatesChanged is raised after the
         // frame lock has been released (see RaisePendingCoordinatesChanged), so a handler may call
         // back into the display.
@@ -235,13 +243,12 @@ namespace VisionNet.Controls
         }
 
         /// <summary>
-        /// Resolves the hover pick requested by <see cref="OnMouseMove"/>. Called inside the
-        /// render pass, after the scene has been drawn (so the depth buffer is valid and the GL
-        /// context is current), before the tooltip is drawn.
+        /// Applies a resolved hover pick: updates the tooltip item and stashes the result so
+        /// <see cref="CoordinatesChanged"/> can be raised after the render lock has been released.
+        /// Called inside the render pass, before the tooltip is drawn (Phase 5).
         /// </summary>
-        private void ApplyPendingPick()
+        private void ApplyPickResult((CxPoint3D? Location, float? Intensity) pos)
         {
-            var pos = GetNearestSurfacePoint(_pendingPickX, _pendingPickY);
             bool hasHit = pos.Location.HasValue;
             _coordTagItem.Visible = hasHit;
             if (hasHit)
@@ -275,6 +282,16 @@ namespace VisionNet.Controls
         {
             _hasPendingPick = false;
             _hasCoordinatesResult = false;
+
+            // Drop an in-flight asynchronous read too; its GL sync object belongs to the context, so
+            // bind it before releasing it.
+            if (_hasPendingRead)
+            {
+                _hasPendingRead = false;
+                if (_gl != null && _gl.IsValid)
+                    _gl.RunOnContext(() => _renderTarget.CancelDepthRead());
+            }
+
             // A queued throttle tick would otherwise re-arm a repaint for a pick that no longer
             // exists.
             _hoverPickThrottle?.Stop();

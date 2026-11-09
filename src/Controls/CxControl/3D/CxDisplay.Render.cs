@@ -12,13 +12,16 @@ namespace VisionNet.Controls
         /// Point size the context starts with. Every overlay point draw sets its own size, so this
         /// only governs anything drawn before the first item runs.
         /// </summary>
-        private const float InitialPointSize = 2.0f;
+        private static readonly float InitialPointSize = CxDisplayDefaults.PointSize;
 
         /// <summary>
-        /// Frame callback. The base control has already made the GL context current, so this draws
-        /// straight into the window's back buffer and presents it (no FBO round trip, no per-frame
-        /// readback). The GL state is (re)initialised by <c>InitializeGlState</c> when the handle —
-        /// and therefore the context — is created or recreated.
+        /// Frame callback. The base control has already made the GL context current. The scene is
+        /// drawn into the off-screen multisampled <see cref="CxMsaaRenderTarget"/> and then resolved
+        /// to the window's back buffer, which is what gives MSAA on mesh/line edges while keeping a
+        /// single-sample depth buffer available for picking. When the target cannot be built the
+        /// frame falls back to drawing straight into the window. The GL state is (re)initialised by
+        /// <c>InitializeGlState</c> when the handle — and therefore the context — is created or
+        /// recreated.
         /// </summary>
         protected override void OnPaint(PaintEventArgs e)
         {
@@ -29,13 +32,30 @@ namespace VisionNet.Controls
             // uses the context rather than after the frame has drawn into the old one.
             base.OnPaint(e);
 
+            bool useTarget = false;
             lock (_renderLock)
             {
                 var gl = _gl;
                 if (gl != null && gl.IsValid)
                 {
                     gl.EnsureCurrent();
-                    GL.Viewport(0, 0, Width, Height);
+
+                    // MSAA on: render into the off-screen multisampled target and resolve to the
+                    // window. MSAA off: draw straight to the window (no FBO, no resolve blit), and
+                    // the depth read falls back to the window buffer. Also falls back to direct
+                    // rendering when the target cannot be built.
+                    useTarget = _msaaEnabled && _renderTarget.EnsureCreated(Width, Height);
+                    if (useTarget)
+                    {
+                        _renderTarget.BindForRender();
+                    }
+                    else
+                    {
+                        if (_renderTarget.IsCreated) _renderTarget.Release();
+                        GL.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
+                        GL.Viewport(0, 0, Width, Height);
+                    }
+
                     GL.ClearColor(_backColor.R / 255f, _backColor.G / 255f, _backColor.B / 255f, _backColor.A / 255f);
                     GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
 
@@ -71,6 +91,10 @@ namespace VisionNet.Controls
 
                     GL.Disable(EnableCap.DepthTest);
                     GL.Disable(EnableCap.Blend);
+
+                    if (useTarget)
+                        _renderTarget.ResolveToDefault();
+
                     gl.Present();
                 }
             }
@@ -79,6 +103,16 @@ namespace VisionNet.Controls
             // into the display (the contract RenderItemFailed already documents). The tooltip was
             // already updated inside the frame, so it shows the same coordinates.
             RaisePendingCoordinatesChanged();
+
+            // A pending asynchronous pick needs one more frame to consume its result; route the
+            // request through the hover throttle so the async pick cannot drive an unbounded render
+            // loop (a frame per pick would run back-to-back while the mouse moves and saturate the
+            // GPU). Requested after the lock so the repaint is not raised from inside the paint.
+            if (_requestRepaintForPick)
+            {
+                _requestRepaintForPick = false;
+                RequestHoverPickRepaint();
+            }
         }
 
         /// <inheritdoc/>
@@ -312,16 +346,50 @@ namespace VisionNet.Controls
         }
 
         /// <summary>
-        /// Phase 4b — resolves a pending hover pick. It is deferred from the mouse handler so
-        /// the depth readback happens at most once per frame, with the scene already drawn
-        /// and the GL context guaranteed current. Phase 5 draws the tooltip, so it shows
-        /// the coordinates resolved here.
+        /// Phase 4b — advances the hover pick. The scene has just been drawn into the multisampled
+        /// target, so a 1-pixel depth read can be started (or a previously started one consumed)
+        /// with the GL context current. The read is asynchronous: this frame starts it and a later
+        /// frame consumes the result, so the UI thread never waits on the GPU. Phase 5 then draws
+        /// the tooltip from the coordinates resolved here.
         /// </summary>
         private void ResolvePendingPick()
         {
-            if (!_hasPendingPick) return;
-            _hasPendingPick = false;
-            ApplyPendingPick();
+            // Consume a result the GPU has already produced.
+            if (_hasPendingRead)
+            {
+                if (_renderTarget.TryEndDepthRead(out float depth))
+                {
+                    _hasPendingRead = false;
+                    ApplyPickResult(_picking.FindNearestFromDepth(
+                        _registry, _gl, _readX, _readY, depth, SurfaceColorMode));
+                }
+                else
+                {
+                    // Not ready yet: ask for one more frame to poll it.
+                    _requestRepaintForPick = true;
+                }
+            }
+
+            // Start a read for a freshly requested pick.
+            if (_hasPendingPick && !_hasPendingRead)
+            {
+                _hasPendingPick = false;
+                _readX = _pendingPickX;
+                _readY = _pendingPickY;
+
+                if (_renderTarget.IsCreated && _renderTarget.BeginDepthRead(_readX, _readY))
+                {
+                    _hasPendingRead = true;
+                    _requestRepaintForPick = true;
+                }
+                else
+                {
+                    // Fallback (no render target) or the pixel is outside the drawable: resolve it
+                    // synchronously so a pick is never silently dropped.
+                    ApplyPickResult(_picking.FindNearest(
+                        _registry, _gl, _readX, _readY, SurfaceColorMode));
+                }
+            }
         }
 
         /// <summary>

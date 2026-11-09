@@ -46,6 +46,7 @@ namespace DemoFrom
             cxDisplay1.Camera.IsLeftHanded = true;
             cxDisplay1.Camera.Enable2DView = false;
             BuildGroupSimButton();
+            Build3DRenderOptions();
             BuildLightingTab();
         }
         CxSurface surface = null;
@@ -1351,6 +1352,27 @@ namespace DemoFrom
         private Button _btnReplaceVehicle;
         private CxMeshItem _vehicleItem;
 
+        /// <summary>
+        /// Adds the 3D page's render-quality toggle (MSAA on/off) to the right-hand control column.
+        /// MSAA only smooths mesh/line edges; depth picking is unaffected either way.
+        /// </summary>
+        private void Build3DRenderOptions()
+        {
+            var chkMsaa = new CheckBox
+            {
+                Text = "MSAA 抗锯齿",
+                AutoSize = true,
+                Checked = true,
+                Location = new Point(160, 490),
+            };
+            chkMsaa.CheckedChanged += (s, e) =>
+            {
+                cxDisplay1.MsaaEnabled = chkMsaa.Checked;
+                cxDisplay2.MsaaEnabled = chkMsaa.Checked;
+            };
+            splitContainer1.Panel2.Controls.Add(chkMsaa);
+        }
+
         private void BuildGroupSimButton()
         {
             _btnGroupSim = new Button
@@ -1901,31 +1923,59 @@ namespace DemoFrom
 
             panel.Controls.Add(Header("Mesh 光照模式（本页 + 两个主 CxDisplay）"));
             var rbLegacy = new RadioButton { Text = "Legacy（Blinn-Phong）", AutoSize = true };
-            var rbPbr = new RadioButton { Text = "PBR / IBL（默认）", AutoSize = true, Checked = true };
+            var rbPbr = new RadioButton { Text = "PBR / IBL（默认）", AutoSize = true,
+                Checked = CxDisplayDefaults.SurfaceLightingMode == SurfaceLightingMode.Pbr };
+            rbLegacy.Checked = !rbPbr.Checked;
             panel.Controls.Add(RadioGroup(rbLegacy, rbPbr));
 
             panel.Controls.Add(Header("环境 / 材质 / 强度（仅 PBR 生效）"));
             var rbStudio = new RadioButton { Text = "Studio", AutoSize = true };
-            var rbNeutral = new RadioButton { Text = "Neutral（默认）", AutoSize = true, Checked = true };
+            var rbNeutral = new RadioButton { Text = "Neutral（默认）", AutoSize = true };
+            rbStudio.Checked = CxDisplayDefaults.EnvironmentPreset == SurfaceEnvironmentPreset.Studio;
+            rbNeutral.Checked = !rbStudio.Checked;
             rbStudio.CheckedChanged += (s, e) => { if (rbStudio.Checked) ApplyEnvironment(SurfaceEnvironmentPreset.Studio); };
             rbNeutral.CheckedChanged += (s, e) => { if (rbNeutral.Checked) ApplyEnvironment(SurfaceEnvironmentPreset.Neutral); };
             panel.Controls.Add(RadioGroup(rbStudio, rbNeutral));
             pbrOnly.Add(rbStudio);
             pbrOnly.Add(rbNeutral);
 
-            // Initial slider positions mirror the library defaults (0.2 / 0.5 / 1.3).
-            pbrOnly.AddRange(AddSlider("Metallic", 0, 100, 20, v => ForEachDisplay(d => d.PbrMetallic = v)));
-            pbrOnly.AddRange(AddSlider("Roughness", 0, 100, 50, v => ForEachDisplay(d => d.PbrRoughness = v)));
-            pbrOnly.AddRange(AddSlider("IBL 强度", 0, 300, 130, v => ForEachDisplay(d => d.IblIntensity = v)));
+            // Initial slider positions mirror CxDisplayDefaults (the single source of truth).
+            int Pct(float v) => (int)Math.Round(v * 100f);
+            pbrOnly.AddRange(AddSlider("Metallic", 0, 100, Pct(CxDisplayDefaults.PbrMetallic), v => ForEachDisplay(d => d.PbrMetallic = v)));
+            pbrOnly.AddRange(AddSlider("Roughness", 0, 100, Pct(CxDisplayDefaults.PbrRoughness), v => ForEachDisplay(d => d.PbrRoughness = v)));
+            pbrOnly.AddRange(AddSlider("IBL 强度", 0, 300, Pct(CxDisplayDefaults.IblIntensity), v => ForEachDisplay(d => d.IblIntensity = v)));
 
-            var chkEnvFollows = new CheckBox { Text = "环境跟随相机（旋转视角时重新打光，仅 PBR）", AutoSize = true, Checked = true };
+            var chkEnvFollows = new CheckBox { Text = "环境跟随相机（旋转视角时重新打光，仅 PBR）", AutoSize = true, Checked = CxDisplayDefaults.EnvironmentFollowsCamera };
             chkEnvFollows.CheckedChanged += (s, e) => ForEachDisplay(d => d.EnvironmentFollowsCamera = chkEnvFollows.Checked);
             panel.Controls.Add(chkEnvFollows);
             pbrOnly.Add(chkEnvFollows);
 
-            var chkImpostor = new CheckBox { Text = "点云伪 3D 高光球（Point Impostor，两种模式都生效）", AutoSize = true, Checked = true };
+            var chkImpostor = new CheckBox { Text = "点云伪 3D 高光球（Point Impostor，两种模式都生效）", AutoSize = true, Checked = CxDisplayDefaults.PointImpostor };
             chkImpostor.CheckedChanged += (s, e) => ForEachDisplay(d => d.PointImpostor = chkImpostor.Checked);
             panel.Controls.Add(chkImpostor);
+
+            var chkMsaa = new CheckBox { Text = "MSAA 抗锯齿（4×，仅平滑 Mesh / 线框边缘；默认开）", AutoSize = true, Checked = CxDisplayDefaults.MsaaEnabled };
+            chkMsaa.CheckedChanged += (s, e) => ForEachDisplay(d => d.MsaaEnabled = chkMsaa.Checked);
+            panel.Controls.Add(chkMsaa);
+
+            // Point size (pixels) for point-cloud mode (PointSize is a display-level default now).
+            var lblPointSize = new Label { Text = $"点大小（PointSize）：{CxDisplayDefaults.PointSize:F0}", AutoSize = true };
+            var trkPointSize = new TrackBar
+            {
+                Minimum = 1,
+                Maximum = 20,
+                Value = Math.Max(1, Math.Min(20, (int)Math.Round(CxDisplayDefaults.PointSize))),
+                TickFrequency = 3,
+                Width = 320,
+                Height = 34,
+            };
+            trkPointSize.ValueChanged += (s, e) =>
+            {
+                lblPointSize.Text = $"点大小（PointSize）：{trkPointSize.Value}";
+                ForEachDisplay(d => d.PointSize = trkPointSize.Value);
+            };
+            panel.Controls.Add(lblPointSize);
+            panel.Controls.Add(trkPointSize);
 
             // Handedness toggle for the preview. Switching it must re-fit: the camera's target is
             // mirrored in left-handed mode, so the framing depends on the handedness.
@@ -1939,7 +1989,8 @@ namespace DemoFrom
             panel.Controls.Add(chkLeftHanded);
 
             panel.Controls.Add(Header("纯色 / 透明度（测试）"));
-            var chkSolid = new CheckBox { Text = "纯色模式（SurfaceColorMode = Lit）", AutoSize = true, Checked = false };
+            var chkSolid = new CheckBox { Text = "纯色模式（SurfaceColorMode = Lit）", AutoSize = true,
+                Checked = CxDisplayDefaults.SurfaceColorMode == SurfaceColorMode.Lit };
             chkSolid.CheckedChanged += (s, e) => ForEachDisplay(d =>
                 d.SurfaceColorMode = chkSolid.Checked ? SurfaceColorMode.Lit : SurfaceColorMode.ColorWithIntensity);
             panel.Controls.Add(chkSolid);
@@ -1948,7 +1999,7 @@ namespace DemoFrom
             {
                 Text = "选择纯色…（SolidColor）",
                 AutoSize = true,
-                BackColor = Color.FromArgb(217, 217, 217),
+                BackColor = CxDisplayDefaults.SolidColor,
             };
             btnSolidColor.Click += (s, e) =>
             {
@@ -1961,10 +2012,10 @@ namespace DemoFrom
             };
             panel.Controls.Add(btnSolidColor);
 
-            // Initial value mirrors the library default (1.0).
-            AddSlider("Opacity", 0, 100, 100, v => ForEachDisplay(d => d.Opacity = v));
+            // Initial value mirrors CxDisplayDefaults.
+            AddSlider("Opacity", 0, 100, Pct(CxDisplayDefaults.Opacity), v => ForEachDisplay(d => d.Opacity = v));
 
-            var chkTranslucentDepth = new CheckBox { Text = "半透明写深度（拾取 / 标签可用，默认开）", AutoSize = true, Checked = true };
+            var chkTranslucentDepth = new CheckBox { Text = "半透明写深度（拾取 / 标签可用，默认开）", AutoSize = true, Checked = CxDisplayDefaults.TranslucentWritesDepth };
             chkTranslucentDepth.CheckedChanged += (s, e) => ForEachDisplay(d => d.TranslucentWritesDepth = chkTranslucentDepth.Checked);
             panel.Controls.Add(chkTranslucentDepth);
 
@@ -1980,7 +2031,7 @@ namespace DemoFrom
                 ApplyLighting(SurfaceLightingMode.Pbr);
                 foreach (var c in pbrOnly) c.Enabled = true;
             };
-            foreach (var c in pbrOnly) c.Enabled = true;   // library default is PBR
+            foreach (var c in pbrOnly) c.Enabled = CxDisplayDefaults.SurfaceLightingMode == SurfaceLightingMode.Pbr;
 
             panel.Controls.Add(Header("本页预览（右侧 CxDisplay）"));
             panel.Controls.Add(Btn("Mesh 预览（斜置板）", LoadLightingMeshDemo));

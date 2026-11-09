@@ -365,23 +365,17 @@ namespace VisionNet.Controls
             // Runs from a mouse handler, outside the render frame.
             return gl.RunOnContext<CxPoint3D?>(() =>
             {
-                int[] viewport = new int[4];
-                GL.GetInteger(GetPName.Viewport, viewport);
-                int adjustedY = viewport[3] - mouseY;
-
-                float[] depthBytes = new float[1];
-                GL.ReadPixels(mouseX, adjustedY, 1, 1,
-                    PixelFormat.DepthComponent, PixelType.Float, depthBytes);
-                float depth = depthBytes[0];
-
-                if (Math.Abs(depth - 1.0f) < 0.00001f) return null;
+                float? depth = CxMsaaRenderTarget.ReadDepthAtPixel(gl, mouseX, mouseY);
+                if (!depth.HasValue || Math.Abs(depth.Value - 1.0f) < 0.00001f) return null;
 
                 float[] projection, view;
                 GetMatrices(_gl.Width, _gl.Height, out projection, out view);
                 var renderer = ModernGLRenderer.For(gl);
                 renderer.SetSceneMatrices(projection, view);
+
+                int glY = _gl.Height - 1 - mouseY;
                 CxPoint3D world;
-                if (!renderer.Unproject(mouseX, adjustedY, depth, out world)) return null;
+                if (!renderer.Unproject(mouseX + 0.5f, glY + 0.5f, depth.Value, out world)) return null;
                 return world;
             });
         }

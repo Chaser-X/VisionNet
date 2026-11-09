@@ -103,7 +103,7 @@ namespace VisionNet.Controls
             if (item == null)
                 throw new ArgumentNullException(nameof(item));
 
-            // Newly added items inherit the display's current material / opacity.
+            // Newly added items inherit the display's current material / opacity / point size.
             if (item is AbstractCxObjRenderItem material)
             {
                 material.Metallic = _pbrMetallic;
@@ -111,6 +111,7 @@ namespace VisionNet.Controls
                 material.SolidColor = _solidColor;
                 material.Opacity = _opacity;
                 material.TranslucentWritesDepth = _translucentWritesDepth;
+                material.PointSize = _pointSize;
             }
 
             CxBox3D? combined = null;

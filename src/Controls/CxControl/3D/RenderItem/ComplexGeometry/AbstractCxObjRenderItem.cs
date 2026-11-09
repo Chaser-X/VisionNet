@@ -188,7 +188,7 @@ namespace VisionNet.Controls
         /// </summary>
         protected int EffectiveColorMode => (int)_surfaceColorMode;
 
-        private Color _solidColor = Color.FromArgb(217, 217, 217);
+        private Color _solidColor = CxDisplayDefaults.SolidColor;
 
         /// <summary>
         /// Gets or sets the flat colour used by <see cref="SurfaceColorMode.Lit"/>. In
@@ -209,7 +209,7 @@ namespace VisionNet.Controls
             }
         }
 
-        private float _metallic = 0.2f;
+        private float _metallic = CxDisplayDefaults.PbrMetallic;
 
         /// <summary>
         /// Gets or sets the PBR metallic factor in the range [0, 1] (clamped; <see cref="float.NaN"/>
@@ -230,7 +230,7 @@ namespace VisionNet.Controls
             }
         }
 
-        private float _roughness = 0.5f;
+        private float _roughness = CxDisplayDefaults.PbrRoughness;
 
         /// <summary>
         /// Gets or sets the PBR roughness factor in the range [0, 1] (clamped; <see cref="float.NaN"/>
@@ -253,7 +253,7 @@ namespace VisionNet.Controls
         private static float ClampUnit(float value, float nanFallback)
             => float.IsNaN(value) ? nanFallback : (value < 0f ? 0f : (value > 1f ? 1f : value));
 
-        private float _opacity = 1f;
+        private float _opacity = CxDisplayDefaults.Opacity;
 
         /// <summary>
         /// Gets or sets the item's opacity in the range [0, 1] (values outside are clamped, and
@@ -290,7 +290,7 @@ namespace VisionNet.Controls
         /// <summary>True when this item must be drawn in the translucent pass.</summary>
         protected bool IsTranslucent => _opacity < 1f;
 
-        private bool _translucentWritesDepth = true;
+        private bool _translucentWritesDepth = CxDisplayDefaults.TranslucentWritesDepth;
 
         /// <summary>
         /// Gets or sets whether a translucent item (<see cref="Opacity"/> below 1) still writes the
@@ -306,12 +306,12 @@ namespace VisionNet.Controls
             set => _translucentWritesDepth = value;
         }
 
-        private float _pointSize = 3f;
+        private float _pointSize = CxDisplayDefaults.PointSize;
 
         /// <summary>
         /// Gets or sets the point size in pixels used when <see cref="SurfaceMode.PointCloud"/>
-        /// is active. Default <c>2</c> (values below 1 are clamped at draw time). Ignored in
-        /// <see cref="SurfaceMode.Mesh"/>.
+        /// is active. Default from <see cref="CxDisplayDefaults.PointSize"/> (<c>3</c>); values below
+        /// 1 are clamped at draw time. Ignored in <see cref="SurfaceMode.Mesh"/>.
         /// </summary>
         public float PointSize
         {

@@ -30,7 +30,7 @@
 
 ### C. 渲染质量（未做）
 
-- [ ] **抗锯齿 AA-1（SSAA 2×）/ AA-2（MSAA 4×）**：迁移到 OpenTK 3.3.3 后 `glBlitFramebuffer` 与多重采样 renderbuffer 已可用，可重新评估；需自建离屏 FBO + resolve pass 并动拾取链路
+- [x] **抗锯齿 AA-2（MSAA 4×）已落地**：离屏多重采样渲染目标 + resolve 到窗口；拾取改读该目标的**单采样**深度 + PBO 异步回读（见「已完成」）。**点云圆盘仍未 AA**（由片元 `discard` 裁出，MSAA 平滑不到）；如需圆盘也平滑，再评估 AA-1 SSAA 2×。
 - [ ] **半透明对策 B**：按 item 距离排序 + 不写深度 + 悬停帧 depth-only pass（单深度缓冲下与「正确拾取」不可兼得）
 - [ ] P2 未做：右键菜单照明模式开关（`Enum.Parse` 依赖菜单 Text == 枚举名）；`SpecularIntensity` / per-item 覆盖
 - [ ] P3.5 未做：`gl_FragDepth` 球面深度修正（会关 early-Z）；大点超驱动尺寸上限时降级为实例化 quad
@@ -43,6 +43,7 @@
 ## 已完成
 
 - [x] **OpenTK 迁移**：`CxDisplay` 渲染后端 SharpGL → OpenTK 3.3.3（直绘，去掉 FBO 回读）（提交 `3c61519`，归档 `07e0ec2`）
+- [x] **离屏 4× MSAA + 深度拾取异步 PBO 回读**（2026-11-06）：新增 `CxMsaaRenderTarget`（MSAA FBO + 1×1 单采样深度 FBO + PBO 环）；`OnPaint` 渲染到 FBO 再 `glBlitFramebuffer` resolve 到窗口；拾取读该目标的**单采样**深度（MSAA 不再污染），hover 走 **PBO 异步**、点击同步；`CxGlContext.DepthTarget` + `ReadDepthAtPixel` 统一深度读入口（两个相机双击聚焦一并切换）。**节流保留**（职责是限制 hover 重绘频率，与回读无关）。开关：`CxDisplay.MsaaEnabled`（默认 `true`，**关时直接绘窗口、无 FBO/blit**）+ Demo「3D 显示」页与「光照/PBR 测试」页勾选框。**修复**：异步拾取补帧改走 hover 节流（`RequestHoverPickRepaint`），此前直接 `SafeInvalidate` 会绕过 33ms 节流，鼠标移动时帧率失控 → GPU 打满 100%（也看不出 MSAA 开关差别）
 - [x] **迁移后加固（critic-in-the-loop 审计 P1/P2/P3/P5）**：`CxGlContext.RunOnContext` 收敛帧外 GL 绑定（P1）；删除残留 FFP 回退 `ReadCurrentGLMatrices` 与 `LookAtMatrix` 的矩阵栈段（P2）；`OnPaint` 改为先 `base.OnPaint` 再渲染（P3）；`CxGlContext` 单实例守卫（P5）；新增上下文能力日志，使「兼容 3.3 是否成立」可观测
 - [x] **内部重构：`ModernGLRenderer` 自持 `_gl`**，移除 45 个实例方法的冗余 `CxGlContext` 参数（另含 `ShaderProgramCompiler.CompileProgram` / `CxGLResourceManager.Release` / `GLResourceHandle.GetUniformLocation` / `CxDisplay.ProcessPendingRelease` / `DisposeResources`）；纯内部、无公共 API 变更
 - [x] **移除 SharpGL 残留**：删除 `3rd/SharpGL.dll` / `SharpGL.SceneGraph.dll` / `SharpGL.WinForms.dll`（已无任何引用）及 `bin` 下的陈旧副本
@@ -60,7 +61,7 @@
 
 ## 阻塞 / 待确认
 
-- [ ] **抗锯齿 AA-1 / AA-2（暂缓）**：AA-0（逐点 rim alpha）已试并回撤（小点云变虚）；SSAA 2× / MSAA 4× 已评估未做。约束：原 SharpGL 后端无 `glBlitFramebuffer` / MSAA provider；**迁移到 OpenTK 3.3.3 后这些限制已解除**，AA 可重新评估。详见 「渲染质量专项」 的「抗锯齿（AA）」
+- [x] **抗锯齿（MSAA 4×）已落地**：见「已完成」。点云圆盘仍无 AA（由片元 `discard` 裁出，MSAA 平滑不到）。
 - [ ] **半透明对策 B（暂缓）**：若需「半透明互相透出且顺序正确」，需 ①按 item 距离排序 ②半透明不写深度 ③悬停帧 depth-only pass 供拾取。单深度缓冲下与「正确拾取」不可兼得
 - [x] ~~**P4 回读性能专项**~~：**已由 OpenTK 迁移解决**——`CxDisplay` 改为直绘 `SwapBuffers`，删除 FBO + 每帧全分辨率 `glReadPixels` + `BitBlt`（4K ≈ 33 MB/帧）；拾取仍按需 `ReadPixels` 单像素。见 `Changlog.md`「已提交」→ `3c61519`
 - [ ] **右键菜单照明模式开关**（`Enum.Parse` 依赖菜单 Text == 枚举名）
@@ -128,7 +129,7 @@
 > - 允许光照/高光调制数据映射颜色（`Color` / `Intensity` / `Diff`）。
 > - **不做 EDL**（点云是有序的，且高光球已提供立体感，边际收益不足）。
 > - IBL 资产**离线预烘焙**并随程序分发（不引入运行期预滤波与 HDR/DDS 解码器）。
-> - 结论（2026-11-06 更新）：迁移到 OpenTK 后渲染目标为**窗口默认帧缓冲（直绘）**；AA 等需要离屏 pass 的能力已具备（见「抗锯齿（AA）」）。
+> - 结论（2026-11-06 更新）：渲染目标为**离屏多重采样 FBO → resolve 到窗口**；拾取读其**单采样**深度，与显示 MSAA 解耦（见「抗锯齿（AA）」）。
 
 ### 背景（现状基线）
 
@@ -213,12 +214,13 @@
 
 ### 抗锯齿（AA）
 
+- [x] **AA-2 MSAA 4× 已落地**（2026-11-06）：离屏 MSAA 渲染目标（`RenderbufferStorageMultisample`，请求 4×、按 `GL_MAX_SAMPLES` 钳制）+ 每帧 `glBlitFramebuffer` resolve 到窗口。**拾取解耦**：读该目标 resolve 出的**单采样**深度（`glBlitFramebuffer` 抠 1×1 深度 → 单采样 FBO），MSAA 不再污染拾取。**hover 走 PBO 异步回读**（`glReadPixels` 进 `GL_PIXEL_PACK_BUFFER` + `glFenceSync`/`glClientWaitSync(0)` 轮询），点击走同步读。
+  - **仍未做**：点云圆盘的 AA（`discard` 裁出，MSAA 平滑不到）；如需要，用 AA-1 SSAA 2× 或 A0′（impostor 边缘输出 ≤1 样本覆盖率 alpha + `GL_SAMPLE_ALPHA_TO_COVERAGE`）。
 - [x] **AA-0 已试 → 已回撤**：点云高光球边缘按 `fwidth(r)` 做覆盖率 alpha（约 1 像素）软化。
   - **结论：效果变差，已 `git restore` 回撤（未提交）**。原因：默认 `PointSize = 3` 时 `fwidth(r) ≈ 0.67`，`smoothstep(1 - fw, 1, r)` 的软化区覆盖了半径外侧约 **2/3**，点被糊开、整体变暗、密集点云互相混合发虚。
   - **教训**：按像素的**逐点 rim AA 不适合小点云**。若以后再做，应窄化到 ~0.35 像素，或仅当点足够大（`fwidth(r)` 足够小，如 ≥ ~7px）才启用。
 - [ ] **AA-1 SSAA 2×**：**已评估，暂不做**（决定）。真超采样，不会让点发虚；代价 fill ×4 + 自建离屏 FBO + 下采样 pass + 拾取坐标 ×2。
-- [ ] **AA-2 MSAA 4×**：自建多重采样 FBO（`TexStorage2DMultisample` + `RenderbufferStorageMultisampleEXT`）+ `sampler2DMS` resolve + `GL_SAMPLE_ALPHA_TO_COVERAGE`；**风险**：MS 附件深度不能用 `glReadPixels` 直接读，拾取需解析深度。
-- **约束备忘（已更新）**：迁移到 OpenTK 3.3.3 后，`glBlitFramebuffer` 与多重采样 renderbuffer 均可用；渲染目标改为**窗口默认帧缓冲（直绘）**，不再有每帧 `glReadPixels` + `BitBlt`。AA 若要恢复，需自建离屏 FBO + resolve pass，并动拾取链路。
+- **约束备忘（已更新）**：渲染目标为**离屏多重采样 FBO → resolve 到窗口**；拾取读其单采样深度，与显示 MSAA 解耦。`glBlitFramebuffer` / 多重采样 renderbuffer 均可用（OpenTK 3.3.3）。
 
 ### P4（独立专项）回读性能
 
@@ -251,3 +253,4 @@
 15. 注册/替换/释放路径（M1 第 2/3 步）：
     - **CPU 层已用临时脚本覆盖**（不新增项目、不进仓库）：驱动公开 API + 反射校验注册表内部不变量，55 项断言全过 —— 含新 key 注册、同 key 替换、改名保持槽位、跨类型替换、同实例重复 Set 为空操作、按 key 移除、清空、overlay 注册/替换/移除/清空、`Dispose` 后状态清空，以及渲染帧侧 API（`CopyFrameSnapshot` 索引对齐、`ForEachPoolEntry`、`GetKeyOf`、`MarkNeedsUpdate`、`DrainReleases` 恰好一次）。**该脚本只证明当前语义自洽，不能证明与重构前等价**（无 oracle）。
     - **仍需 GL 侧人工回归**（脚本无 GL 上下文，不覆盖绘制与真实资源释放）：同 key 反复 `Set*`（含不同类型互替）后绘制顺序与画面正常；`Set*(otherKey, 已登记实例)` 不重复绘制；`RemoveSurfaceItem` / `ClearSurfaceItems` / `ClearOverlayItems` / `SetOverlayItem` 同 key 替换后无残留句柄；控件 `Dispose` 后无 GL 资源泄漏或异常；后台线程 Set 与渲染并发时不抛异常（脚本为单线程，未覆盖锁竞争）。
+16. `CxDisplayDefaults`（默认值集中管理）：Demo 光照页默认观感与改动前一致（仅多一个「点大小」滑块）；拖动「点大小」滑块实时改变点云点尺寸；`CxDisplayDefaults.ApplyTo(display)` 能一次性下发全部默认值（含 `PointSize` / `MsaaEnabled`）；`CxDisplayDefaults.Reset()` 恢复库默认。

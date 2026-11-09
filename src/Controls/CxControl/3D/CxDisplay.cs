@@ -23,6 +23,11 @@ namespace VisionNet.Controls
         // concrete OpenTK binding from the rest of the control and from its public surface.
         private readonly CxGlContext _gl;
 
+        // Off-screen multisampled render target (display) plus its 1-pixel depth readback (picking).
+        // Created lazily inside the frame; falls back to drawing straight to the window when the
+        // driver cannot provide a complete framebuffer.
+        private readonly CxMsaaRenderTarget _renderTarget = new CxMsaaRenderTarget();
+
         // ── Camera & interaction state ───────────────────────────────────────────
         private CxAdvancedTrackBallCamera _camera;
         private bool _isMouseDown;
@@ -62,22 +67,23 @@ namespace VisionNet.Controls
         private CxCoordinationTagItem  _coordTagItem     = new CxCoordinationTagItem();
 
         // ── Mode backing fields ──────────────────────────────────────────────────
-        private SurfaceMode      _surfaceMode      = SurfaceMode.PointCloud;
-        private SurfaceColorMode _surfaceColorMode = SurfaceColorMode.ColorWithIntensity;
+        // All defaults are read once from CxDisplayDefaults at construction; see CxDisplayDefaults.
+        private SurfaceMode      _surfaceMode      = CxDisplayDefaults.SurfaceMode;
+        private SurfaceColorMode _surfaceColorMode = CxDisplayDefaults.SurfaceColorMode;
 
         // Frame-global lighting model and IBL environment (P2). Unlike the surface/colour modes
         // these are not propagated per item: they are applied once per frame to the shared
         // surface program, so every built-in item picks them up.
-        private SurfaceLightingMode      _surfaceLightingMode = SurfaceLightingMode.Pbr;
-        private SurfaceEnvironmentPreset _environmentPreset   = SurfaceEnvironmentPreset.Neutral;
-        private float                    _iblIntensity        = 1.3f;
-        private bool                     _pointImpostor       = true;
-        private bool                     _environmentFollowsCamera = true;
+        private SurfaceLightingMode      _surfaceLightingMode = CxDisplayDefaults.SurfaceLightingMode;
+        private SurfaceEnvironmentPreset _environmentPreset   = CxDisplayDefaults.EnvironmentPreset;
+        private float                    _iblIntensity        = CxDisplayDefaults.IblIntensity;
+        private bool                     _pointImpostor       = CxDisplayDefaults.PointImpostor;
+        private bool                     _environmentFollowsCamera = CxDisplayDefaults.EnvironmentFollowsCamera;
 
         // ── Render background colour (OpenGL clear colour); default: opaque black ──
-        // The control renders straight to the window (no FBO round trip), so the window itself is
-        // opaque: the alpha component is no longer composited with the parent. Default changed from
-        // transparent black to opaque black as part of the OpenTK migration.
+        // The control resolves its off-screen multisampled scene into the window, so the window
+        // itself is opaque: the alpha component is no longer composited with the parent. Default
+        // changed from transparent black to opaque black as part of the OpenTK migration.
         private Color _backColor = Color.FromArgb(255, 0, 0, 0);
 
         // ── Manual colour / diff display ranges (override the per-frame auto-aggregated ranges) ──
@@ -239,7 +245,46 @@ namespace VisionNet.Controls
             }
         }
 
-        private float _pbrMetallic = 0.2f;
+        private bool _msaaEnabled = CxDisplayDefaults.MsaaEnabled;
+
+        /// <summary>
+        /// Gets or sets whether the off-screen render target uses MSAA (default <c>true</c>).
+        /// When enabled, mesh and line edges are smoothed by up to 4× multisampling; point-cloud
+        /// impostor discs (cut out with <c>discard</c>) are <b>not</b> affected. Turning it off
+        /// renders straight to the window instead (no off-screen target, no resolve blit). Depth
+        /// picking is unaffected either way, because it reads whichever depth buffer holds the
+        /// scene. Takes effect on the next frame.
+        /// </summary>
+        public bool MsaaEnabled
+        {
+            get => _msaaEnabled;
+            set
+            {
+                if (_msaaEnabled == value) return;
+                _msaaEnabled = value;
+                SafeInvalidate();
+            }
+        }
+
+        private float _pointSize = CxDisplayDefaults.PointSize;
+
+        /// <summary>
+        /// Gets or sets the point size in pixels applied to every surface item (clamped at draw time
+        /// to &gt;= 1). Default from <see cref="CxDisplayDefaults.PointSize"/> (<c>3</c>). Only used by
+        /// <see cref="SurfaceMode.PointCloud"/>; newly added items inherit the current value.
+        /// </summary>
+        public float PointSize
+        {
+            get => _pointSize;
+            set
+            {
+                if (_pointSize == value) return;
+                _pointSize = value;
+                ApplyToItems(o => o.PointSize = value);
+            }
+        }
+
+        private float _pbrMetallic = CxDisplayDefaults.PbrMetallic;
 
         /// <summary>
         /// Gets or sets the PBR metallic factor applied to every surface item (clamped to [0, 1];
@@ -258,7 +303,7 @@ namespace VisionNet.Controls
             }
         }
 
-        private float _pbrRoughness = 0.5f;
+        private float _pbrRoughness = CxDisplayDefaults.PbrRoughness;
 
         /// <summary>
         /// Gets or sets the PBR roughness factor applied to every surface item (clamped to [0, 1];
@@ -291,7 +336,7 @@ namespace VisionNet.Controls
             SafeInvalidate();
         }
 
-        private Color _solidColor = Color.FromArgb(217, 217, 217);
+        private Color _solidColor = CxDisplayDefaults.SolidColor;
 
         /// <summary>
         /// Gets or sets the flat colour used by <see cref="SurfaceColorMode.Lit"/> on every surface
@@ -309,7 +354,7 @@ namespace VisionNet.Controls
             }
         }
 
-        private float _opacity = 1f;
+        private float _opacity = CxDisplayDefaults.Opacity;
 
         /// <summary>
         /// Gets or sets the opacity applied to every surface item (clamped to [0, 1];
@@ -329,7 +374,7 @@ namespace VisionNet.Controls
             }
         }
 
-        private bool _translucentWritesDepth = true;
+        private bool _translucentWritesDepth = CxDisplayDefaults.TranslucentWritesDepth;
 
         /// <summary>
         /// Gets or sets whether translucent items (<see cref="Opacity"/> below 1) still write the
@@ -368,9 +413,9 @@ namespace VisionNet.Controls
         }
 
         /// <summary>Gets or sets whether the 3D coordinate system axes are shown in world space.</summary>
-        public bool ShowCoordinateSystem { get; set; }
+        public bool ShowCoordinateSystem { get; set; } = CxDisplayDefaults.ShowCoordinateSystem;
 
-        private bool _isColorBarVisible = true;
+        private bool _isColorBarVisible = CxDisplayDefaults.IsColorBarVisible;
 
         /// <summary>
         /// Gets or sets whether the colour bar HUD overlay is drawn.
@@ -407,8 +452,8 @@ namespace VisionNet.Controls
 
         // ── Constructors ─────────────────────────────────────────────────────────
 
-        /// <summary>Initializes a new instance with default settings.</summary>
-        public CxDisplay() : this(ViewMode.Top, SurfaceMode.PointCloud, SurfaceColorMode.ColorWithIntensity) { }
+        /// <summary>Initializes a new instance with the defaults from <see cref="CxDisplayDefaults"/>.</summary>
+        public CxDisplay() : this(CxDisplayDefaults.ViewMode, CxDisplayDefaults.SurfaceMode, CxDisplayDefaults.SurfaceColorMode) { }
 
         /// <summary>
         /// Initializes a new instance with the specified view mode and surface rendering settings.
@@ -422,6 +467,7 @@ namespace VisionNet.Controls
             : base(CreateGraphicsMode(), 3, 3, GraphicsContextFlags.Default)
         {
             _gl = new CxGlContext(this);
+            _gl.DepthTarget = _renderTarget;
             // On-demand rendering: do not let SwapBuffers block on the display refresh.
             VSync = false;
 
@@ -456,10 +502,13 @@ namespace VisionNet.Controls
         }
 
         /// <summary>
-        /// Requests a double-buffered 32-bit colour / 24-bit depth context with no MSAA, so
-        /// depth-based picking and occlusion keep their precision. The context is created as a
-        /// <b>compatibility</b> profile 3.3 context: the shared shaders are <c>#version 330 core</c>,
-        /// while wide lines and point sprites still rely on compatibility-profile behaviour.
+        /// Requests a double-buffered 32-bit colour / 24-bit depth context with no MSAA on the
+        /// <b>window</b> framebuffer: the scene is drawn into an off-screen multisampled target
+        /// (see <see cref="CxMsaaRenderTarget"/>) and resolved to the window, so the window itself
+        /// does not need multisampling and depth-based picking stays exact. The context is created
+        /// as a <b>compatibility</b> profile 3.3 context: the shared shaders are
+        /// <c>#version 330 core</c>, while wide lines and point sprites still rely on
+        /// compatibility-profile behaviour.
         /// </summary>
         private static GraphicsMode CreateGraphicsMode()
             => new GraphicsMode(new ColorFormat(32), 24, 8, 0, new ColorFormat(0), 2);
@@ -506,12 +555,13 @@ namespace VisionNet.Controls
             try
             {
                 GL.GetFloat(GetPName.AliasedLineWidthRange, _lineWidthRange);
+                int maxSamples = GL.GetInteger(GetPName.MaxSamples);
                 Debug.WriteLine(string.Format(
-                    "[CxControl] GL context: {0} | renderer: {1} | shading language: {2} | aliased line width: [{3}, {4}]",
+                    "[CxControl] GL context: {0} | renderer: {1} | shading language: {2} | aliased line width: [{3}, {4}] | max MSAA samples: {5}",
                     GL.GetString(StringName.Version) ?? "?",
                     GL.GetString(StringName.Renderer) ?? "?",
                     GL.GetString(StringName.ShadingLanguageVersion) ?? "?",
-                    _lineWidthRange[0], _lineWidthRange[1]));
+                    _lineWidthRange[0], _lineWidthRange[1], maxSamples));
             }
             catch (Exception ex)
             {
@@ -700,7 +750,11 @@ namespace VisionNet.Controls
                 _handleSnapshot.Clear();
                 _overlaySnapshot.Clear();
 
-                if (glValid) ModernGLRenderer.Release(_gl);
+                if (glValid)
+                {
+                    _renderTarget.Dispose();
+                    ModernGLRenderer.Release(_gl);
+                }
             }
         }
     }

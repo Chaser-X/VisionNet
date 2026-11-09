@@ -135,6 +135,24 @@ namespace VisionNet.Controls.Tests
         }
 
         [Fact]
+        public void FarPlaneDepth_ReportsNoHit()
+        {
+            // The asynchronous hover path feeds an already-resolved depth straight into this method.
+            // A depth of 1 means the pixel hit the far plane, so it must report a miss; that branch
+            // returns before the un-projection, so no live GL context is needed.
+            using (var item = SurfaceItem(zOffset: 5f))
+            {
+                var service = new CxPickingService();
+                var registry = RegistryWith(("s", item));
+
+                var result = service.FindNearestFromDepth(registry, null, 10, 10, 1f, SurfaceColorMode.Color);
+
+                Assert.Null(result.Location);
+                Assert.Null(result.Intensity);
+            }
+        }
+
+        [Fact]
         public void RepeatedQueries_ReuseTheScratchBufferWithoutLeakingItems()
         {
             // The service clears its snapshot on both exit paths; a second query must see the same
