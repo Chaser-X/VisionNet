@@ -1,4 +1,5 @@
 using OpenTK.Graphics.OpenGL;
+using System;
 using System.Drawing;
 using VisionNet.DataType;
 
@@ -48,8 +49,23 @@ namespace VisionNet.Controls
             if (sx < 0 || sx > gl.Width || sy < 0 || sy > gl.Height)
                 return;
 
-            int rectWidth  = 80;
-            int rectHeight = Intensity.HasValue ? 90 : 80;
+            const int fontSize = 9;
+            const int lineSpacing = 18;
+            const int paddingX = 10;
+            const int paddingTop = 16;
+            const int paddingBottom = 10;
+
+            // Build the lines first so the box can be sized to the widest one (never overflows).
+            string[] lines = Intensity.HasValue
+                ? new[] { $"X: {Point.X:F3}", $"Y: {Point.Y:F3}", $"Z: {Point.Z:F3}", $"I: {Intensity.Value}" }
+                : new[] { $"X: {Point.X:F3}", $"Y: {Point.Y:F3}", $"Z: {Point.Z:F3}" };
+
+            int textWidth = 0;
+            foreach (string line in lines)
+                textWidth = Math.Max(textWidth, renderer.MeasureText(fontSize, line));
+
+            int rectWidth  = Math.Max(80, textWidth + paddingX * 2);
+            int rectHeight = paddingTop + paddingBottom + lineSpacing * (lines.Length - 1);
             int startX = (int)sx;
             int startY = (int)sy - 10;
             _backgroundPositions[0] = startX; _backgroundPositions[1] = startY;
@@ -66,12 +82,9 @@ namespace VisionNet.Controls
             renderer.DrawScreenGeometry(PrimitiveType.LineLoop, _borderPositions, Color.White);
 
             // Coordinate text labels.
-            int   tx = startX + 10;
-            renderer.DrawText(tx, startY - 20, TextColor, 12, $"X: {Point.X:F3}");
-            renderer.DrawText(tx, startY - 40, TextColor, 12, $"Y: {Point.Y:F3}");
-            renderer.DrawText(tx, startY - 60, TextColor, 12, $"Z: {Point.Z:F3}");
-            if (Intensity.HasValue)
-                renderer.DrawText(tx, startY - 80, TextColor, 12, $"I: {Intensity.Value}");
+            int tx = startX + paddingX;
+            for (int i = 0; i < lines.Length; i++)
+                renderer.DrawText(tx, startY - paddingTop - lineSpacing * i, TextColor, fontSize, lines[i]);
         }
     }
 }

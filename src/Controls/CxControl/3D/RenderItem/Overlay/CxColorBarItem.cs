@@ -129,11 +129,15 @@ namespace VisionNet.Controls
             renderer.DrawScreenGeometry(PrimitiveType.Lines,
                 _tickPositions, System.Drawing.Color.White);
 
+            // Z-value labels, right-aligned just left of the bar so they never cover it.
+            const int labelFont = 8;
             for (int i = 0; i <= TickDivisions; i++)
             {
                 int tickY = TickY(i, startY, barHeight);
                 double zValue = TickZValue(i, _zMin, _zMax);
-                renderer.DrawText(startX - 45, tickY - 5, System.Drawing.Color.White, 10, $"{zValue:F2}");
+                string label = $"{zValue:F2}";
+                int labelX = startX - 8 - renderer.MeasureText(labelFont, label);
+                renderer.DrawText(labelX, tickY - 5, System.Drawing.Color.White, labelFont, label);
             }
         }
     }

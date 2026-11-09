@@ -57,6 +57,32 @@ namespace VisionNet.Controls
             return true;
         }
 
+        /// <summary>
+        /// Measures the pixel width of <paramref name="text"/> as <see cref="DrawText"/> would draw
+        /// it at <paramref name="fontSize"/> (point size, converted to pixels at 96 DPI). Used by the
+        /// HUD overlays to right-align a label or size a background box to its content.
+        /// </summary>
+        internal int MeasureText(float fontSize, string text)
+        {
+            if (string.IsNullOrEmpty(text) || !_gl.IsValid) return 0;
+
+            float effectiveFontSize = Math.Max(1f, fontSize * 4f / 3f);
+            if (CanUseNumericGlyphAtlas(text))
+            {
+                GlyphAtlas atlas = GetOrCreateGlyphAtlas(effectiveFontSize);
+                int width = atlas.LegacyLeftBearing + 1;
+                foreach (char ch in text)
+                {
+                    GlyphCell cell;
+                    if (atlas.Cells.TryGetValue(ch, out cell))
+                        width += Math.Max(1, cell.Advance);
+                }
+                return width;
+            }
+
+            return GetOrCreateTextTexture(effectiveFontSize, text).Width;
+        }
+
         private void DrawNumericGlyphText(int x, int y, Color color,
             float fontSize, string text)
         {

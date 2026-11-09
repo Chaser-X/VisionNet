@@ -9,7 +9,18 @@
 
 ## 未发布（工作区，尚未提交）
 
-（无）
+### 修复（库）：HUD 字体过大 —— 色条标签压条 / 坐标标签溢出
+
+**现象**：色条刻度标签与位置标签字号偏大 —— 色条标签（字号 10）从左向右延伸，数字位数多时压到色条上；位置标签（字号 12）文字超出 80px 的框。
+
+**改动**
+- `ModernGLRenderer.Text.cs`：新增 `internal int MeasureText(float fontSize, string text)`（字形图集路径累加 `Advance`，否则用字符串纹理宽度），供 HUD 右对齐 / 按内容定框宽。
+- `CxColorBarItem`：刻度标签字号 `10` → `8`，并**右对齐**（右端固定在色条左侧 `startX - 8`），不再压条。
+- `CxCoordinationTagItem`：坐标字号 `12` → `9`；框宽按最宽行 `MeasureText` 计算（`max(80, 宽 + 20)`），框高按行数 × 行距（18）计算 —— 文字不再溢出。
+
+**验证**：`CxControl` / `DemoFrom` 0 error 0 warning；`dotnet test` **128/128**（`CxColorBarTickTests` 只测刻度值/位置，不受字号影响）。
+
+- **需上机目视确认**：色条标签不再压条、多位数右对齐；坐标标签文字落在框内、不溢出。
 
 ## 已提交
 
