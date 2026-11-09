@@ -54,6 +54,13 @@ namespace VisionNet.Controls
         public bool IsCreated => _fbo != 0;
 
         /// <summary>
+        /// <c>true</c> while an asynchronous 1-pixel depth read can be started. True whenever the
+        /// pack buffer exists, which is independent of whether the multisampled framebuffer is
+        /// currently in use (it stays available when MSAA is off, reading the window's depth buffer).
+        /// </summary>
+        public bool CanReadDepth => _pbo != 0;
+
+        /// <summary>
         /// Resolves the scene depth at a control-space pixel: from the control's off-screen target
         /// when one exists, otherwise from the window framebuffer. This is the single depth source
         /// used by picking and the camera's click-to-focus. Requires the GL context to be current.
@@ -191,18 +198,42 @@ namespace VisionNet.Controls
 
         /// <summary>
         /// Blits the resolved depth at a control-space pixel into the 1×1 target and starts an
-        /// asynchronous read of it into the pack buffer. Returns <c>false</c> when a read is
-        /// already in flight or the pixel is outside the drawable.
+        /// asynchronous read of it into the pack buffer. When the multisampled framebuffer is not in
+        /// use (MSAA off) the read is taken straight from the window's depth buffer instead, so the
+        /// asynchronous path is available in both modes. Returns <c>false</c> when a read is already
+        /// in flight or the pixel is outside the drawable.
         /// </summary>
-        public bool BeginDepthRead(int controlX, int controlY)
+        /// <param name="controlX">Pixel X in control coordinates.</param>
+        /// <param name="controlY">Pixel Y in control coordinates (top-down).</param>
+        /// <param name="viewportWidth">Drawable width, for the window-fallback bounds check.</param>
+        /// <param name="viewportHeight">Drawable height, for the window-fallback bounds check.</param>
+        public bool BeginDepthRead(int controlX, int controlY, int viewportWidth, int viewportHeight)
         {
-            if (_readPending || !BlitDepthToPick(controlX, controlY)) return false;
+            if (_readPending || _pbo == 0) return false;
+
+            int readX, readY;
+            if (_fbo != 0)
+            {
+                if (!BlitDepthToPick(controlX, controlY)) return false;
+                readX = 0;
+                readY = 0;   // the 1×1 pick framebuffer
+            }
+            else
+            {
+                // No off-screen target: read the window's own depth buffer.
+                int glY = viewportHeight - 1 - controlY;
+                if (controlX < 0 || controlX >= viewportWidth || glY < 0 || glY >= viewportHeight)
+                    return false;
+                GL.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
+                readX = controlX;
+                readY = glY;
+            }
 
             GL.BindBuffer(BufferTarget.PixelPackBuffer, _pbo);
-            GL.ReadPixels(0, 0, 1, 1, PixelFormat.DepthComponent, PixelType.Float, IntPtr.Zero);
+            GL.ReadPixels(readX, readY, 1, 1, PixelFormat.DepthComponent, PixelType.Float, IntPtr.Zero);
             _fence = GL.FenceSync(SyncCondition.SyncGpuCommandsComplete, WaitSyncFlags.None);
             GL.BindBuffer(BufferTarget.PixelPackBuffer, 0);
-            GL.BindFramebuffer(FramebufferTarget.Framebuffer, _fbo);
+            if (_fbo != 0) GL.BindFramebuffer(FramebufferTarget.Framebuffer, _fbo);
             _readPending = true;
             return true;
         }
@@ -264,10 +295,20 @@ namespace VisionNet.Controls
         public void Dispose() => Destroy();
 
         /// <summary>
-        /// Releases the off-screen target. Used when the control renders straight to the window
-        /// (MSAA off): dropping the target makes the depth read fall back to the window buffer.
+        /// Destroys the multisampled framebuffer and its attachments but keeps the pack buffer, so
+        /// the asynchronous depth read keeps working against the window's depth buffer. Used when the
+        /// control renders straight to the window (MSAA off).
         /// </summary>
-        public void Release() => Destroy();
+        public void ReleaseFramebuffer()
+        {
+            if (_pickDepthRbo != 0) { GL.DeleteRenderbuffer(_pickDepthRbo); _pickDepthRbo = 0; }
+            if (_pickFbo != 0) { GL.DeleteFramebuffer(_pickFbo); _pickFbo = 0; }
+            if (_depthRbo != 0) { GL.DeleteRenderbuffer(_depthRbo); _depthRbo = 0; }
+            if (_colorRbo != 0) { GL.DeleteRenderbuffer(_colorRbo); _colorRbo = 0; }
+            if (_fbo != 0) { GL.DeleteFramebuffer(_fbo); _fbo = 0; }
+            _samples = 0;
+            _width = _height = 0;
+        }
 
         private void Destroy()
         {

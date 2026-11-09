@@ -9,7 +9,21 @@
 
 ## 未发布（工作区，尚未提交）
 
-（无）
+### 修复（库）：MSAA 关时 hover 拾取也走 PBO（回读与 FBO 解耦）
+
+**背景**：上一轮把 MSAA 关改为直绘窗口，但同时 `Release()` 把整个 `CxMsaaRenderTarget`（含 PBO）销毁，`ResolvePendingPick` 遂退回**同步**窗口深度读 —— MSAA 关时 hover 又会阻塞 UI 线程。
+
+**改动**
+- `CxMsaaRenderTarget`：`Release()` 拆为 `ReleaseFramebuffer()`（只销毁多重采样 FBO 及其颜色 / 深度 / 1×1 附件，**保留 PBO**）与 `Dispose()`（全销毁）；新增 `CanReadDepth => _pbo != 0`。
+- `BeginDepthRead(x, y, viewportWidth, viewportHeight)` 分两路：MSAA FBO 在 → 抠 1×1 深度后从该 FBO 读；否则绑 FB0 从窗口深度读。
+- `CxDisplay.OnPaint`：MSAA 关时调 `ReleaseFramebuffer()`（而非 `Release()`）。
+- `CxDisplay.Render.cs`：`ResolvePendingPick` 的异步判据由 `_renderTarget.IsCreated` 改为 `_renderTarget.CanReadDepth`。
+
+**行为变化**：MSAA 开 / 关两种模式 hover 拾取都异步（PBO），不再阻塞 UI；点击与相机双击聚焦仍同步（每次一次）。
+
+**验证**：`CxControl` / `DemoFrom` 0 error 0 warning；`dotnet test` **128/128**。
+
+- **需上机目视确认**：MSAA 关时 hover 坐标标签是否与开时一样跟手、无卡顿。
 
 ## 已提交
 

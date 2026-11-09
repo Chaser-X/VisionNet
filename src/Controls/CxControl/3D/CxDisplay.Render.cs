@@ -51,7 +51,7 @@ namespace VisionNet.Controls
                     }
                     else
                     {
-                        if (_renderTarget.IsCreated) _renderTarget.Release();
+                        if (_renderTarget.IsCreated) _renderTarget.ReleaseFramebuffer();
                         GL.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
                         GL.Viewport(0, 0, Width, Height);
                     }
@@ -377,7 +377,7 @@ namespace VisionNet.Controls
                 _readX = _pendingPickX;
                 _readY = _pendingPickY;
 
-                if (_renderTarget.IsCreated && _renderTarget.BeginDepthRead(_readX, _readY))
+                if (_renderTarget.CanReadDepth && _renderTarget.BeginDepthRead(_readX, _readY, Width, Height))
                 {
                     _hasPendingRead = true;
                     _requestRepaintForPick = true;
