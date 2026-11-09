@@ -9,7 +9,12 @@
 
 ## 未发布（工作区，尚未提交）
 
-### 修复（库）：MSAA 关时 hover 拾取也走 PBO（回读与 FBO 解耦）
+（无）
+
+## 已提交
+
+
+### b9a18b3（2026-11-09）修复（库）：MSAA 关时 hover 拾取也走 PBO（回读与 FBO 解耦）
 
 **背景**：上一轮把 MSAA 关改为直绘窗口，但同时 `Release()` 把整个 `CxMsaaRenderTarget`（含 PBO）销毁，`ResolvePendingPick` 遂退回**同步**窗口深度读 —— MSAA 关时 hover 又会阻塞 UI 线程。
 
@@ -24,8 +29,6 @@
 **验证**：`CxControl` / `DemoFrom` 0 error 0 warning；`dotnet test` **128/128**。
 
 - **需上机目视确认**：MSAA 关时 hover 坐标标签是否与开时一样跟手、无卡顿。
-
-## 已提交
 
 
 ### d929066（2026-11-09）渲染（库）：离屏 4× MSAA 渲染目标 + 深度拾取改为异步 PBO 回读
