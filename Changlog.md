@@ -9,7 +9,12 @@
 
 ## 未发布（工作区，尚未提交）
 
-### 重构（库）：`3D/` 目录归类 —— 顶层只保留 `CxDisplay` 本体
+（无）
+
+## 已提交
+
+
+### 0ad9a10（2026-11-10）重构（库）：`3D/` 目录归类 —— 顶层只保留 `CxDisplay` 本体
 
 **背景**：`3D/` 顶层原先散落 11 个非控件文件。按职责归入子目录（**纯物理移动，不改命名空间**，仍为 `VisionNet.Controls`）。
 
@@ -26,7 +31,7 @@
 
 **验证**：`VisionNet` / `CxControl` / `DemoFrom` 0 error 0 warning；`dotnet test` **128/128**。
 
-### 变更（库）：移除遗留 `CxTrackBallCamera`，`CxAdvancedTrackBallCamera` 重命名为 `CxTrackBallCamera`
+### 0ad9a10（2026-11-10）变更（库）：移除遗留 `CxTrackBallCamera`，`CxAdvancedTrackBallCamera` 重命名为 `CxTrackBallCamera`
 
 **背景**：相机有两个类 —— 现代实现 `CxAdvancedTrackBallCamera`（`CxDisplay` 使用）与"仅作参考"的遗留 `CxTrackBallCamera`（无代码引用）。本次合并为单一类，统一命名为 `CxTrackBallCamera`。
 
@@ -38,8 +43,6 @@
 **破坏性变更**：`CxAdvancedTrackBallCamera` 类型名不再存在（`CxDisplay.Camera` 的返回类型随之改名）；遗留 `CxTrackBallCamera`（旧实现）移除。二者原本无代码引用（除 csproj / 文档），影响面仅限显式使用旧类型名的外部调用方。
 
 **验证**：`VisionNet` / `CxControl` / `DemoFrom` 0 error 0 warning；`dotnet test` **128/128**。
-
-## 已提交
 
 
 ### ee99993（2026-11-10）变更（库）：背景 API 合并为 `CxBackground` + 纳入 `CxDisplayDefaults`
