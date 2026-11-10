@@ -187,18 +187,22 @@ VisionNet/
 │   └── Controls/
 │       └── CxControl/              # 渲染控件库
 │           ├── 3D/                 # 3D 渲染（OpenGL）
-│           │   ├── Camera/         # ICamera, CxAdvancedTrackBallCamera
+│           │   ├── CxDisplay.cs    # 控件本体（部分类）
+│           │   │   ├── CxDisplay.Api.cs
+│           │   │   ├── CxDisplay.Render.cs
+│           │   │   ├── CxDisplay.Input.cs
+│           │   │   ├── CxDisplay.Group.cs
+│           │   │   └── CxDisplay.Designer.cs
+│           │   ├── Camera/         # ICamera, CxTrackBallCamera
 │           │   ├── RenderItem/     # 渲染项与共享 GL 管线
 │           │   │   ├── ComplexGeometry/  # ICxObjRenderItem / AbstractCxObjRenderItem / CxSurfaceItem / CxPointCloudItem / CxMeshItem / RenderData / GLResourceHandle / Enums
 │           │   │   ├── Geometry/   # Point / Segment / Polygon / Plane / Box
 │           │   │   ├── Overlay/    # ColorBar, CoordinateSystem, Tag, Text
 │           │   │   └── Shared/     # ModernGLRenderer（全部渲染项共用的 GLSL 程序 / 缓冲 / 文本图集 / 状态快照 / 矩阵）与 ShaderProgramCompiler
-│           │   └── CxDisplay.cs   # 状态 / 初始化 / 框架
-│           │       ├── CxDisplay.Api.cs
-│           │       ├── CxDisplay.Render.cs
-│           │       ├── CxDisplay.GLResources.cs
-│           │       ├── CxDisplay.Input.cs
-│           │       └── CxDisplay.Designer.cs
+│           │   ├── GL/             # CxGlContext / CxGLResourceManager / CxMsaaRenderTarget
+│           │   ├── Scene/          # CxItemRegistry / CxGroup / CxGroupManager / IDisplayHost
+│           │   ├── Interaction/    # CxPickingService
+│           │   └── Common/         # CxExtension / CxDisplayDefaults / CxBackground
 │           └── 2D/                 # 2D 渲染（ScottPlot）
 │               ├── CxDisplay2D.cs           # 2D 控件状态 / 渲染
 │               ├── CxDisplay2D.Api.cs       # 公共 API（Set* / Add* / 视图管理）

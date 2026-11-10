@@ -9,7 +9,35 @@
 
 ## 未发布（工作区，尚未提交）
 
-（无）
+### 重构（库）：`3D/` 目录归类 —— 顶层只保留 `CxDisplay` 本体
+
+**背景**：`3D/` 顶层原先散落 11 个非控件文件。按职责归入子目录（**纯物理移动，不改命名空间**，仍为 `VisionNet.Controls`）。
+
+**改动**
+- 新增 `3D/GL/`：`CxGlContext.cs`、`CxGLResourceManager.cs`、`CxMsaaRenderTarget.cs`。
+- 新增 `3D/Scene/`：`CxItemRegistry.cs`、`CxGroup.cs`、`CxGroupManager.cs`、`IDisplayHost.cs`。
+- 新增 `3D/Interaction/`：`CxPickingService.cs`。
+- 新增 `3D/Common/`：`CxExtension.cs`、`CxDisplayDefaults.cs`、`CxBackground.cs`。
+- `3D/` 顶层只剩 `CxDisplay.*`（`.cs` / `.Api` / `.Render` / `.Input` / `.Group` / `.Designer`）+ `CxDisplay.resx`。
+- `CxControl.csproj`：`Compile Include` 路径按新目录更新（并按目录分组）。
+- `README.md` / `src/Controls/CxControl/README.md`：目录树与结构说明同步。
+
+**无 API 变更**（命名空间与类型名均不变）；纯文件路径调整。
+
+**验证**：`VisionNet` / `CxControl` / `DemoFrom` 0 error 0 warning；`dotnet test` **128/128**。
+
+### 变更（库）：移除遗留 `CxTrackBallCamera`，`CxAdvancedTrackBallCamera` 重命名为 `CxTrackBallCamera`
+
+**背景**：相机有两个类 —— 现代实现 `CxAdvancedTrackBallCamera`（`CxDisplay` 使用）与"仅作参考"的遗留 `CxTrackBallCamera`（无代码引用）。本次合并为单一类，统一命名为 `CxTrackBallCamera`。
+
+**改动**
+- 删除遗留 `3D/Camera/CxTrackBallCamera.cs`。
+- `3D/Camera/CxAdvancedTrackBallCamera.cs` → **重命名**为 `3D/Camera/CxTrackBallCamera.cs`，类名 `CxAdvancedTrackBallCamera` → `CxTrackBallCamera`（含构造函数与终结器）。
+- 更新引用：`CxDisplay`（字段 / `Camera` 属性 / 构造）；`CxControl.csproj`（两条 `Compile` → 一条）；`README.md` / `src/Controls/CxControl/README.md`。
+
+**破坏性变更**：`CxAdvancedTrackBallCamera` 类型名不再存在（`CxDisplay.Camera` 的返回类型随之改名）；遗留 `CxTrackBallCamera`（旧实现）移除。二者原本无代码引用（除 csproj / 文档），影响面仅限显式使用旧类型名的外部调用方。
+
+**验证**：`VisionNet` / `CxControl` / `DemoFrom` 0 error 0 warning；`dotnet test` **128/128**。
 
 ## 已提交
 

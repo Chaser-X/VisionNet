@@ -29,7 +29,7 @@ namespace VisionNet.Controls
         private readonly CxMsaaRenderTarget _renderTarget = new CxMsaaRenderTarget();
 
         // ── Camera & interaction state ───────────────────────────────────────────
-        private CxAdvancedTrackBallCamera _camera;
+        private CxTrackBallCamera _camera;
         private bool _isMouseDown;
 
         // ── Active-object selection state ────────────────────────────────────────
@@ -99,7 +99,7 @@ namespace VisionNet.Controls
         // ── Public properties ────────────────────────────────────────────────────
 
         /// <summary>Gets the trackball camera controlling the 3D view.</summary>
-        public CxAdvancedTrackBallCamera Camera => _camera;
+        public CxTrackBallCamera Camera => _camera;
 
         /// <summary>
         /// Gets or sets whether the right-click context menu is shown.
@@ -445,7 +445,7 @@ namespace VisionNet.Controls
 
         /// <summary>
         /// Gets or sets whether the coordinate system is left-handed.
-        /// Delegates to <see cref="CxAdvancedTrackBallCamera.IsLeftHanded"/>.
+        /// Delegates to <see cref="CxTrackBallCamera.IsLeftHanded"/>.
         /// </summary>
         [Obsolete("Use Camera.IsLeftHanded instead.")]
         public bool IsLeftHanded
@@ -484,7 +484,7 @@ namespace VisionNet.Controls
             if (!DesignMode)
             {
                 InitializeComponent();
-                _camera = new CxAdvancedTrackBallCamera(_gl);
+                _camera = new CxTrackBallCamera(_gl);
                 _camera.ViewMode = viewMode;
                 SurfaceMode      = surfaceMode;
                 SurfaceColorMode = surfaceColorMode;

@@ -87,8 +87,6 @@
     <Compile Include="3D\CxDisplay.cs">
       <SubType>UserControl</SubType>
     </Compile>
-    <Compile Include="3D\CxDisplayDefaults.cs" />
-    <Compile Include="3D\CxBackground.cs" />
     <Compile Include="3D\CxDisplay.Api.cs">
       <DependentUpon>CxDisplay.cs</DependentUpon>
       <SubType>UserControl</SubType>
@@ -112,7 +110,6 @@
       <DependentUpon>CxDisplay.cs</DependentUpon>
     </EmbeddedResource>
     <Compile Include="3D\Camera\ICamera.cs" />
-    <Compile Include="3D\Camera\CxAdvancedTrackBallCamera.cs" />
     <Compile Include="3D\Camera\CxTrackBallCamera.cs" />
     <Compile Include="3D\RenderItem\IRenderItem.cs" />
     <Compile Include="3D\RenderItem\ICxPoseable.cs" />
@@ -144,15 +141,21 @@
     <Compile Include="3D\RenderItem\Overlay\CxCoordinationTagItem.cs" />
     <Compile Include="3D\RenderItem\Overlay\CxText2DItem.cs" />
     <Compile Include="3D\RenderItem\Overlay\CxTextInfoItem.cs" />
-    <Compile Include="3D\CxExtension.cs" />
-    <Compile Include="3D\CxGlContext.cs" />
-    <Compile Include="3D\CxMsaaRenderTarget.cs" />
-    <Compile Include="3D\CxGLResourceManager.cs" />
-    <Compile Include="3D\CxGroup.cs" />
-    <Compile Include="3D\CxGroupManager.cs" />
-    <Compile Include="3D\CxItemRegistry.cs" />
-    <Compile Include="3D\CxPickingService.cs" />
-    <Compile Include="3D\IDisplayHost.cs" />
+    <!-- GL backend -->
+    <Compile Include="3D\GL\CxGlContext.cs" />
+    <Compile Include="3D\GL\CxGLResourceManager.cs" />
+    <Compile Include="3D\GL\CxMsaaRenderTarget.cs" />
+    <!-- Scene model -->
+    <Compile Include="3D\Scene\CxItemRegistry.cs" />
+    <Compile Include="3D\Scene\CxGroup.cs" />
+    <Compile Include="3D\Scene\CxGroupManager.cs" />
+    <Compile Include="3D\Scene\IDisplayHost.cs" />
+    <!-- Interaction -->
+    <Compile Include="3D\Interaction\CxPickingService.cs" />
+    <!-- Common -->
+    <Compile Include="3D\Common\CxExtension.cs" />
+    <Compile Include="3D\Common\CxDisplayDefaults.cs" />
+    <Compile Include="3D\Common\CxBackground.cs" />
     <!-- 2D display control -->
     <Compile Include="2D\CxDisplay2D.cs">
       <SubType>UserControl</SubType>

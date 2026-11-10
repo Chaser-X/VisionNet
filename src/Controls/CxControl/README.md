@@ -5,42 +5,32 @@
 
 ## 2. 主要文件与职责
 
-- **CxDisplay.cs / .Render.cs / .Input.cs / .Api.cs / .Group.cs / .Designer.cs**
+`3D/` 顶层只保留 `CxDisplay` 本体（`.cs` / `.Render` / `.Input` / `.Api` / `.Group` / `.Designer` + `.resx`），其余按职责归入子目录：
+
+- **3D/CxDisplay.*（控件本体）**
   核心控件。派生自 `OpenTK.GLControl`，负责渲染管线（渲染到离屏 MSAA 目标 → resolve 到窗口 → `SwapBuffers`）、数据管理、用户交互（鼠标、菜单等），并协调 RenderItem 层显示。
 
-- **CxDisplayDefaults.cs**
-  静态类：集中管理新建 `CxDisplay` 及其 item 的渲染 / 光照默认值（含显示级 `PointSize` / `MsaaEnabled`），提供 `Reset()` 与 `ApplyTo(CxDisplay)`。
+- **3D/Camera/**
+  `CxTrackBallCamera.cs`：3D 相机，支持旋转、缩放、平移、2D/3D 切换与预设视图；`ICamera.cs` 为接口。
 
-- **CxGlContext.cs**
-  绑定无关的 GL 上下文门面：对外只暴露 `Width` / `Height` / `IsValid`，隐藏 OpenTK 类型；`EnsureCurrent` / `RunOnContext` 是「帧外 GL 工作」的唯一入口；`DepthTarget` 指向离屏深度源。
-
-- **CxMsaaRenderTarget.cs**
-  离屏 **MSAA** 渲染目标（`RGBA8` 颜色 + `DEPTH_COMPONENT24` 深度）+ **1×1 单采样深度目标**（供拾取）+ **PBO**（异步 1 像素深度回读）。画面 resolve 到窗口；拾取读单采样深度，与显示 MSAA 解耦。
-
-- **CxItemRegistry.cs**
-  唯一持有 surface / overlay 队列与 key、per-item GL 资源池与延迟释放队列（含守护它们的锁）。
-
-- **CxGroupManager.cs / CxGroup.cs**
-  组拓扑、成员关系与姿态。
-
-- **CxGLResourceManager.cs**
-  VAO / VBO / 索引缓冲 / 纹理 / shader 的创建与释放（静态、无状态）。
-
-- **CxPickingService.cs**
-  深度读回（hover 走 PBO 异步、点击同步）、反投影、最近曲面搜索（UI 线程、渲染帧内）。
-
-- **Camera/**
-  `CxAdvancedTrackBallCamera.cs`：现代 3D 相机，支持旋转、缩放、平移、2D/3D 切换与预设视图；`CxTrackBallCamera.cs` 为遗留实现；`ICamera.cs` 为接口。
-
-- **RenderItem/**
+- **3D/RenderItem/**
   渲染元素（点、线、面、Mesh、Box、文本、坐标系等）：
   - `ComplexGeometry/`：`CxSurfaceItem.cs`（曲面）、`CxPointCloudItem.cs`（点云）、`CxMeshItem.cs`（三角网格）；`AbstractCxObjRenderItem.cs` 为共享基类。
   - `Geometry/`：`CxSegment3DItem.cs`（3D 线段）、`CxPoint3DItem.cs`（3D 点）、`CxBox3DItem.cs`（3D 包围盒）、`CxPolygon3DItem.cs`、`CxPlane3DItem.cs`。
   - `Overlay/`：`CxColorBarItem.cs`（色条）、`CxCoordinationTagItem.cs`（坐标标签）、`CxCoordinateSystemItem.cs`（坐标系）、`CxTextInfoItem.cs`（3D 文本）、`CxText2DItem.cs`（2D 文本）。
   - `Shared/`：`ModernGLRenderer*.cs`（全部渲染项共用的 per-context GL 服务）、`ShaderProgramCompiler.cs`、`ProceduralIbl.cs`。
 
-- **CxExtension.cs**
-  扩展工具（包围盒、颜色映射、3D/2D 文本绘制、OpenGL 能力探测）。
+- **3D/GL/**
+  GL 后端基础设施：`CxGlContext.cs`（绑定无关的上下文门面；`EnsureCurrent` / `RunOnContext` 是「帧外 GL 工作」的唯一入口；`DepthTarget` 指向离屏深度源）、`CxGLResourceManager.cs`（VAO / VBO / 索引 / 纹理 / shader 的创建与释放）、`CxMsaaRenderTarget.cs`（离屏 MSAA 渲染目标 + 1×1 单采样深度目标 + PBO 异步回读）。
+
+- **3D/Scene/**
+  场景模型：`CxItemRegistry.cs`（唯一持有 surface / overlay 队列与 key、per-item GL 资源池与延迟释放队列）、`CxGroup.cs` / `CxGroupManager.cs`（组拓扑、成员关系与姿态）、`IDisplayHost.cs`（display ↔ 组管理器的窄接口）。
+
+- **3D/Interaction/**
+  `CxPickingService.cs`：深度读回（hover 走 PBO 异步、点击同步）、反投影、最近曲面搜索（UI 线程、渲染帧内）。
+
+- **3D/Common/**
+  公共类型与工具：`CxExtension.cs`（包围盒、颜色映射、3D/2D 文本绘制、OpenGL 能力探测）、`CxDisplayDefaults.cs`（新建 `CxDisplay` 及其 item 的默认值集中管理，含 `PointSize` / `MsaaEnabled` / `Background`）、`CxBackground.cs`（背景值类型：纯色 / 垂直渐变）。
 
 - **2D/**
   `CxDisplay2D` 及其 RenderItem（基于 ScottPlot / SkiaSharp）。
