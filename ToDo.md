@@ -2,13 +2,13 @@
 
 > 本文件是工作区任务的**汇总视图**，已合并原 「重构专项」（重构 S0–S6）与 「渲染质量专项」（渲染质量 P1–P4 / AA / 半透明）。
 > 接入说明见 [Agents.md](Agents.md)，变更记录见 [Changlog.md](Changlog.md)。
-> 快照日期：**2026-11-09** · 分支：`feature/cxdisplay-opentk-port`（OpenTK 迁移基线，自 `feature/cxdisplay-modern-pipeline` 拉出）
+> 快照日期：**2026-11-10** · 分支：`feature/cxdisplay-opentk-port`（OpenTK 迁移基线，自 `feature/cxdisplay-modern-pipeline` 拉出）
 
 ## 待办（当前活跃）
 
 ### A. 上机验证（本机无 OpenGL 环境，`dotnet test` 不覆盖任何渲染）
 
-> **2026-11-09：上机验证通过**（悬停 tooltip / 选择拖拽 / MSAA 开关 / `CxDisplayDefaults`）。据此勾选下列迁移回归项。
+> **2026-11-09：上机验证通过**（悬停 tooltip / 选择拖拽 / MSAA 开关 / `CxDisplayDefaults`）。**2026-11-10：HUD 字体修正上机确认通过**。据此勾选下列迁移回归项。
 
 - [x] **OpenTK 迁移回归**（见 `Changlog.md` → `3c61519`）：
   - [x] **兼容 profile 3.3 成立** —— `LineWidth > 1`（Box 边线 / 多边形）与 point sprite 生效（上下文创建时 DEBUG 输出 `[CxControl] GL context: <version> | renderer: … | aliased line width: [min, max]`）
@@ -51,6 +51,7 @@
 - [x] **离屏 4× MSAA + 深度拾取异步 PBO 回读**（2026-11-06）：新增 `CxMsaaRenderTarget`（MSAA FBO + 1×1 单采样深度 FBO + PBO 环）；`OnPaint` 渲染到 FBO 再 `glBlitFramebuffer` resolve 到窗口；拾取读该目标的**单采样**深度（MSAA 不再污染），hover 走 **PBO 异步**、点击同步；`CxGlContext.DepthTarget` + `ReadDepthAtPixel` 统一深度读入口（两个相机双击聚焦一并切换）。**节流保留**（职责是限制 hover 重绘频率，与回读无关）。开关：`CxDisplay.MsaaEnabled`（默认 `true`，**关时直接绘窗口、无 FBO/blit**）+ Demo「3D 显示」页与「光照/PBR 测试」页勾选框。**修复**：异步拾取补帧改走 hover 节流（`RequestHoverPickRepaint`），此前直接 `SafeInvalidate` 会绕过 33ms 节流，鼠标移动时帧率失控 → GPU 打满 100%（也看不出 MSAA 开关差别）
 - [x] **MSAA 关时 hover 拾取也走 PBO**（2026-11-09）：把「回读(PBO)」与「FBO(MSAA)」解耦 —— `CxMsaaRenderTarget.ReleaseFramebuffer()` 只销毁多重采样 FBO、保留 PBO；`BeginDepthRead` 在无 FBO 时直接读窗口深度；`ResolvePendingPick` 判据由 `IsCreated` 改为 `CanReadDepth`。两模式 hover 拾取均异步、不阻塞 UI
 - [x] **`CxDisplayDefaults`（默认值集中管理）+ 显示级 `CxDisplay.PointSize`**（2026-11-09）：移植自 `feature/cxdisplay-modern-pipeline` 的 `fc2dc50` 并适配本分支（`MsaaEnabled` 一并纳入）；`Reset()` / `ApplyTo(display)`；Demo 光照页初值改读默认值 + 新增「点大小」滑块
+- [x] **HUD 字体修正**（2026-11-10，已上机确认）：`ModernGLRenderer.MeasureText`；色条刻度标签字号 10→8 且右对齐（不再压条）；坐标标签字号 12→9、框宽按最宽行自动计算（不再溢出）
 - [x] **迁移后加固（critic-in-the-loop 审计 P1/P2/P3/P5）**：`CxGlContext.RunOnContext` 收敛帧外 GL 绑定（P1）；删除残留 FFP 回退 `ReadCurrentGLMatrices` 与 `LookAtMatrix` 的矩阵栈段（P2）；`OnPaint` 改为先 `base.OnPaint` 再渲染（P3）；`CxGlContext` 单实例守卫（P5）；新增上下文能力日志，使「兼容 3.3 是否成立」可观测
 - [x] **内部重构：`ModernGLRenderer` 自持 `_gl`**，移除 45 个实例方法的冗余 `CxGlContext` 参数（另含 `ShaderProgramCompiler.CompileProgram` / `CxGLResourceManager.Release` / `GLResourceHandle.GetUniformLocation` / `CxDisplay.ProcessPendingRelease` / `DisposeResources`）；纯内部、无公共 API 变更
 - [x] **移除 SharpGL 残留**：删除 `3rd/SharpGL.dll` / `SharpGL.SceneGraph.dll` / `SharpGL.WinForms.dll`（已无任何引用）及 `bin` 下的陈旧副本
