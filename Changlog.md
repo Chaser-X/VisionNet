@@ -9,7 +9,12 @@
 
 ## 未发布（工作区，尚未提交）
 
-### 变更（库）：背景 API 合并为 `CxBackground` + 纳入 `CxDisplayDefaults`
+（无）
+
+## 已提交
+
+
+### ee99993（2026-11-10）变更（库）：背景 API 合并为 `CxBackground` + 纳入 `CxDisplayDefaults`
 
 **背景**：上一提交把背景拆成 `SetBackgroundColor`（纯色）与 `BackgroundGradient`（渐变）两个入口。本次合并为**一个属性** `CxDisplay.Background`（类型 `CxBackground`），并纳入 `CxDisplayDefaults`。
 
@@ -25,10 +30,9 @@
 
 - **需上机目视确认**：默认即蓝→黑垂直渐变；取消勾选切回纯黑正常。
 
-## 已提交
-
 
 ### b8d3d4c（2026-11-10）新增（库）：视口渐变背景（`CxDisplay.BackgroundGradient`）
+> 该 API 后于 `ee99993` 合并为 `CxDisplay.Background`（`CxBackground`）。
 
 **背景**：视口背景此前只能是纯色（`SetBackgroundColor`）。为衬托渲染对象，新增可选的**垂直渐变背景**（业内通用做法，参考 CloudCompare：顶部深蓝 → 底部黑）。
 
