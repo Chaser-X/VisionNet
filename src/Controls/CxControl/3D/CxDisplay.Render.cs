@@ -57,7 +57,7 @@ namespace VisionNet.Controls
                         GL.Viewport(0, 0, Width, Height);
                     }
 
-                    GL.ClearColor(_backColor.R / 255f, _backColor.G / 255f, _backColor.B / 255f, _backColor.A / 255f);
+                    ApplyClearColor();
                     GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
 
                     // 1. Release GL resources dequeued by Dispose/Replace on another thread.
@@ -233,18 +233,20 @@ namespace VisionNet.Controls
         }
 
         /// <summary>
-        /// Fills the viewport with the configured vertical background gradient (top → bottom), when
-        /// one is set. Drawn first with depth test/write off, so the scene renders on top of it.
+        /// Fills the viewport with the configured vertical background gradient (top → bottom) when
+        /// the background is a gradient. Drawn first with depth test/write off, so the scene renders
+        /// on top of it. A solid background needs no quad — the clear colour already covers it.
         /// </summary>
         private void DrawBackgroundGradient(CxGlContext gl)
         {
-            if (!_backgroundGradient.HasValue) return;
+            if (!_background.IsGradient) return;
 
             int width = Width;
             int height = Height;
             if (width <= 0 || height <= 0) return;
 
-            var (top, bottom) = _backgroundGradient.Value;
+            Color top = _background.Top;
+            Color bottom = _background.Bottom;
 
             // Full-viewport quad; screen geometry uses (0,0) as the lower-left corner.
             _backgroundGradientPositions[0] = 0;     _backgroundGradientPositions[1] = 0;
@@ -267,6 +269,16 @@ namespace VisionNet.Controls
             _backgroundGradientColors[vertex * 4 + 1] = color.G / 255f;
             _backgroundGradientColors[vertex * 4 + 2] = color.B / 255f;
             _backgroundGradientColors[vertex * 4 + 3] = color.A / 255f;
+        }
+
+        /// <summary>
+        /// Sets the GL clear colour to the background's bottom colour. For a solid background this is
+        /// the whole colour; for a gradient it is the fallback behind the gradient quad.
+        /// </summary>
+        private void ApplyClearColor()
+        {
+            Color bg = _background.Bottom;
+            GL.ClearColor(bg.R / 255f, bg.G / 255f, bg.B / 255f, bg.A / 255f);
         }
 
         /// <summary>

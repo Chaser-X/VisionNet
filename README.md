@@ -775,7 +775,7 @@ display2D.SetBackgroundColor(Color.Black);
 > 渲染为**按需重绘**：`GLControl` 只在 `Invalidate()` 时重绘，即**没有渲染定时器**；数据 / 相机 / 选中 / 叠加层变化时由 `SafeInvalidate()`（线程安全）触发重绘。
 > ⚠ 因此若在后台线程准备好数据后**没有**经过 `Set*` / `Redraw()` 等会触发重绘的入口，画面不会自动更新 —— 请显式调用 `Redraw()`。
 > ⚠ 渲染为**离屏多重采样 FBO → resolve 到窗口**；窗口帧缓冲不再承担深度拾取。**不再支持透明背景**：默认清屏色为不透明黑。
-> **背景**：默认不透明纯黑（`SetBackgroundColor` 改纯色）；也可设 `CxDisplay.BackgroundGradient = (Color Top, Color Bottom)?` 得到垂直渐变背景（`null` = 纯色）。渐变在场景之前铺满视口，不影响对象 / HUD / 拾取。
+> **背景**：`CxDisplay.Background`（类型 `CxBackground`）—— `CxBackground.Solid(color)` 为纯色，`CxBackground.Gradient(top, bottom)` 为垂直渐变；**默认是蓝 `RGB(10,102,151)` → 黑 的垂直渐变**（`CxDisplayDefaults.Background`）。渐变在场景之前铺满视口，不影响对象 / HUD / 拾取。
 
 > **抗锯齿与拾取**
 > MSAA 开（`CxDisplay.MsaaEnabled`，默认 `true`）：显示走离屏 **4× MSAA** 渲染目标（`RenderbufferStorageMultisample`，按 `GL_MAX_SAMPLES` 钳制），每帧 `glBlitFramebuffer` resolve 到窗口；只平滑 **Mesh / 线框**边缘，点云圆盘由片元 `discard` 裁出、**MSAA 对其无效**。MSAA 关：**直接绘制窗口**（不建离屏目标、无 resolve blit）。

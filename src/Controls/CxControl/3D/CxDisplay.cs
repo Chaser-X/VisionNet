@@ -80,15 +80,13 @@ namespace VisionNet.Controls
         private bool                     _pointImpostor       = CxDisplayDefaults.PointImpostor;
         private bool                     _environmentFollowsCamera = CxDisplayDefaults.EnvironmentFollowsCamera;
 
-        // ── Render background colour (OpenGL clear colour); default: opaque black ──
+        // ── Render background; default from CxDisplayDefaults (opaque black, solid) ──
         // The control resolves its off-screen multisampled scene into the window, so the window
         // itself is opaque: the alpha component is no longer composited with the parent. Default
         // changed from transparent black to opaque black as part of the OpenTK migration.
-        private Color _backColor = Color.FromArgb(255, 0, 0, 0);
+        private CxBackground _background = CxDisplayDefaults.Background;
 
-        // Optional vertical background gradient (top → bottom). null = the solid clear colour above.
         // Reused buffers so a gradient frame allocates nothing.
-        private (Color Top, Color Bottom)? _backgroundGradient;
         private readonly float[] _backgroundGradientPositions = new float[8];
         private readonly float[] _backgroundGradientColors = new float[16];
 
@@ -538,7 +536,7 @@ namespace VisionNet.Controls
                 _registry.ForEachPoolHandle(handle => handle.ResetForContextRecreate());
                 _registry.DropReleases();
                 ModernGLRenderer.ResetForContextRecreate(_gl);
-                GL.ClearColor(_backColor.R / 255f, _backColor.G / 255f, _backColor.B / 255f, _backColor.A / 255f);
+                ApplyClearColor();
                 GL.PointSize(InitialPointSize);
                 LogContextCapabilities();
             }

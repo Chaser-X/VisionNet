@@ -1979,13 +1979,13 @@ namespace DemoFrom
 
             // Background gradient (CloudCompare-style: blue top -> black bottom) — a viewer backdrop
             // that lifts the rendered object off the background. Off by default (solid black).
-            var chkGradient = new CheckBox { Text = "渐变背景（CloudCompare 蓝→黑）", AutoSize = true, Checked = false };
+            var chkGradient = new CheckBox { Text = "渐变背景（蓝→黑）", AutoSize = true, Checked = CxDisplayDefaults.Background.IsGradient };
             chkGradient.CheckedChanged += (s, e) =>
             {
-                (Color Top, Color Bottom)? gradient = null;
-                if (chkGradient.Checked)
-                    gradient = (Color.FromArgb(10, 102, 151), Color.Black);
-                ForEachDisplay(d => d.BackgroundGradient = gradient);
+                CxBackground background = chkGradient.Checked
+                    ? CxBackground.Gradient(Color.FromArgb(10, 102, 151), Color.Black)
+                    : CxBackground.Solid(Color.Black);
+                ForEachDisplay(d => d.Background = background);
             };
             panel.Controls.Add(chkGradient);
 

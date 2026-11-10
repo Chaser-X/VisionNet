@@ -87,6 +87,16 @@ namespace VisionNet.Controls
         /// </summary>
         public static bool MsaaEnabled { get; set; } = true;
 
+        // ── Background ───────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Viewport background. Default a vertical gradient (blue <c>RGB(10,102,151)</c> at the top →
+        /// black at the bottom) that lifts the rendered object off the background. Set
+        /// <see cref="CxBackground.Solid"/> for a flat colour.
+        /// </summary>
+        public static CxBackground Background { get; set; }
+            = CxBackground.Gradient(Color.FromArgb(10, 102, 151), Color.Black);
+
         // ── Colour / opacity ─────────────────────────────────────────────────────
 
         /// <summary>Flat colour for <see cref="SurfaceColorMode.Lit"/>. Default <c>RGB(217,217,217)</c>.</summary>
@@ -123,6 +133,7 @@ namespace VisionNet.Controls
             PointSize = 3f;
 
             MsaaEnabled = true;
+            Background = CxBackground.Gradient(Color.FromArgb(10, 102, 151), Color.Black);
 
             SolidColor = Color.FromArgb(217, 217, 217);
             Opacity = 1f;
@@ -160,6 +171,7 @@ namespace VisionNet.Controls
             display.PointSize = PointSize;
 
             display.MsaaEnabled = MsaaEnabled;
+            display.Background = Background;
 
             display.SolidColor = SolidColor;
             display.Opacity = Opacity;

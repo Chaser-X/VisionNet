@@ -88,6 +88,7 @@
       <SubType>UserControl</SubType>
     </Compile>
     <Compile Include="3D\CxDisplayDefaults.cs" />
+    <Compile Include="3D\CxBackground.cs" />
     <Compile Include="3D\CxDisplay.Api.cs">
       <DependentUpon>CxDisplay.cs</DependentUpon>
       <SubType>UserControl</SubType>

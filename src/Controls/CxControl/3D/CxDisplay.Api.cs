@@ -697,28 +697,17 @@ namespace VisionNet.Controls
         #region Background (背景色)
 
         /// <summary>
-        /// Sets the rendering background colour (OpenGL clear colour), preserving alpha.
-        /// The colour is applied on the GL render thread each frame, so it is safe to call
-        /// from any thread and survives GL context recreation.
+        /// Gets or sets the viewport background: a solid colour, or a vertical gradient
+        /// (top → bottom). Default from <see cref="CxDisplayDefaults.Background"/> (opaque black).
+        /// The background is drawn behind the scene, so the rendered object is lifted off it.
+        /// Takes effect on the next frame.
         /// </summary>
-        public void SetBackgroundColor(Color color)
+        public CxBackground Background
         {
-            _backColor = color;
-            SafeInvalidate();
-        }
-
-        /// <summary>
-        /// Gets or sets a vertical background gradient (top → bottom), or <c>null</c> for the solid
-        /// clear colour set by <see cref="SetBackgroundColor"/> (default: opaque black). When set,
-        /// the viewport is filled with the gradient before the scene — the common "viewer" backdrop
-        /// that lifts the rendered object off the background. Takes effect on the next frame.
-        /// </summary>
-        public (Color Top, Color Bottom)? BackgroundGradient
-        {
-            get => _backgroundGradient;
+            get => _background;
             set
             {
-                _backgroundGradient = value;
+                _background = value;
                 SafeInvalidate();
             }
         }

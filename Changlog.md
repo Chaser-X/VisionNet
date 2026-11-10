@@ -9,7 +9,21 @@
 
 ## 未发布（工作区，尚未提交）
 
-（无）
+### 变更（库）：背景 API 合并为 `CxBackground` + 纳入 `CxDisplayDefaults`
+
+**背景**：上一提交把背景拆成 `SetBackgroundColor`（纯色）与 `BackgroundGradient`（渐变）两个入口。本次合并为**一个属性** `CxDisplay.Background`（类型 `CxBackground`），并纳入 `CxDisplayDefaults`。
+
+**改动**
+- 新增公共只读结构 `CxBackground`（`3D/CxBackground.cs`）：`Top` / `Bottom` / `IsGradient` + 工厂 `Solid(color)` / `Gradient(top, bottom)`。
+- `CxDisplay.Background`（`CxBackground`，默认 `CxDisplayDefaults.Background` = 蓝 `RGB(10,102,151)` → 黑 的垂直渐变）：一个属性同时表达纯色与渐变。
+- **移除** `CxDisplay.SetBackgroundColor(Color)` 与 `CxDisplay.BackgroundGradient`（后者为上一提交刚加、未发布）。**破坏性变更**：`SetBackgroundColor(c)` → `Background = CxBackground.Solid(c)`。（`CxDisplay2D.SetBackgroundColor` 不受影响。）
+- `CxDisplayDefaults`：新增 `Background`（`CxBackground`），`Reset()` / `ApplyTo()` 一并覆盖。
+- 渲染：清颜色用 `Background.Bottom`；仅当 `IsGradient` 时画铺满视口的渐变四边形。
+- Demo 光照页勾选框改用新 API。
+
+**验证**：`CxControl` / `DemoFrom` 0 error 0 warning；`dotnet test` **128/128**。
+
+- **需上机目视确认**：默认即蓝→黑垂直渐变；取消勾选切回纯黑正常。
 
 ## 已提交
 
