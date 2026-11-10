@@ -86,6 +86,12 @@ namespace VisionNet.Controls
         // changed from transparent black to opaque black as part of the OpenTK migration.
         private Color _backColor = Color.FromArgb(255, 0, 0, 0);
 
+        // Optional vertical background gradient (top → bottom). null = the solid clear colour above.
+        // Reused buffers so a gradient frame allocates nothing.
+        private (Color Top, Color Bottom)? _backgroundGradient;
+        private readonly float[] _backgroundGradientPositions = new float[8];
+        private readonly float[] _backgroundGradientColors = new float[16];
+
         // ── Manual colour / diff display ranges (override the per-frame auto-aggregated ranges) ──
         // When non-null, the renderer propagates the range to every item instead of the
         // auto-aggregated global range, and the colour bar uses it. null = auto.

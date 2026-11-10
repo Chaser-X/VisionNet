@@ -706,6 +706,22 @@ namespace VisionNet.Controls
             _backColor = color;
             SafeInvalidate();
         }
+
+        /// <summary>
+        /// Gets or sets a vertical background gradient (top → bottom), or <c>null</c> for the solid
+        /// clear colour set by <see cref="SetBackgroundColor"/> (default: opaque black). When set,
+        /// the viewport is filled with the gradient before the scene — the common "viewer" backdrop
+        /// that lifts the rendered object off the background. Takes effect on the next frame.
+        /// </summary>
+        public (Color Top, Color Bottom)? BackgroundGradient
+        {
+            get => _backgroundGradient;
+            set
+            {
+                _backgroundGradient = value;
+                SafeInvalidate();
+            }
+        }
         #endregion Background (背景色)
 
         #region View management (视图管理)

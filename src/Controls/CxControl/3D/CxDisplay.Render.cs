@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Drawing;
 using System.Windows.Forms;
 using OpenTK.Graphics.OpenGL;
 
@@ -205,6 +206,8 @@ namespace VisionNet.Controls
         /// </summary>
         private void Render(CxGlContext gl)
         {
+            DrawBackgroundGradient(gl);
+
             if (!_camera.Enable2DView && ShowCoordinateSystem)
                 _coordinationItem.Draw(gl);
 
@@ -227,6 +230,43 @@ namespace VisionNet.Controls
             ResolvePendingPick();
 
             DrawHud(gl, anyDrawn, ranges);
+        }
+
+        /// <summary>
+        /// Fills the viewport with the configured vertical background gradient (top → bottom), when
+        /// one is set. Drawn first with depth test/write off, so the scene renders on top of it.
+        /// </summary>
+        private void DrawBackgroundGradient(CxGlContext gl)
+        {
+            if (!_backgroundGradient.HasValue) return;
+
+            int width = Width;
+            int height = Height;
+            if (width <= 0 || height <= 0) return;
+
+            var (top, bottom) = _backgroundGradient.Value;
+
+            // Full-viewport quad; screen geometry uses (0,0) as the lower-left corner.
+            _backgroundGradientPositions[0] = 0;     _backgroundGradientPositions[1] = 0;
+            _backgroundGradientPositions[2] = width; _backgroundGradientPositions[3] = 0;
+            _backgroundGradientPositions[4] = 0;     _backgroundGradientPositions[5] = height;
+            _backgroundGradientPositions[6] = width; _backgroundGradientPositions[7] = height;
+            WriteGradientColor(0, bottom);
+            WriteGradientColor(1, bottom);
+            WriteGradientColor(2, top);
+            WriteGradientColor(3, top);
+
+            ModernGLRenderer.For(gl).DrawScreenGeometryColored(
+                PrimitiveType.TriangleStrip, _backgroundGradientPositions, _backgroundGradientColors);
+        }
+
+        /// <summary>Writes one vertex's normalised RGBA into the gradient colour buffer.</summary>
+        private void WriteGradientColor(int vertex, Color color)
+        {
+            _backgroundGradientColors[vertex * 4]     = color.R / 255f;
+            _backgroundGradientColors[vertex * 4 + 1] = color.G / 255f;
+            _backgroundGradientColors[vertex * 4 + 2] = color.B / 255f;
+            _backgroundGradientColors[vertex * 4 + 3] = color.A / 255f;
         }
 
         /// <summary>

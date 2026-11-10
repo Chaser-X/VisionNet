@@ -1977,6 +1977,18 @@ namespace DemoFrom
             panel.Controls.Add(lblPointSize);
             panel.Controls.Add(trkPointSize);
 
+            // Background gradient (CloudCompare-style: blue top -> black bottom) — a viewer backdrop
+            // that lifts the rendered object off the background. Off by default (solid black).
+            var chkGradient = new CheckBox { Text = "渐变背景（CloudCompare 蓝→黑）", AutoSize = true, Checked = false };
+            chkGradient.CheckedChanged += (s, e) =>
+            {
+                (Color Top, Color Bottom)? gradient = null;
+                if (chkGradient.Checked)
+                    gradient = (Color.FromArgb(10, 102, 151), Color.Black);
+                ForEachDisplay(d => d.BackgroundGradient = gradient);
+            };
+            panel.Controls.Add(chkGradient);
+
             // Handedness toggle for the preview. Switching it must re-fit: the camera's target is
             // mirrored in left-handed mode, so the framing depends on the handedness.
             var chkLeftHanded = new CheckBox { Text = "左手系（镜像显示，仅预览）", AutoSize = true, Checked = false };

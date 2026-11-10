@@ -9,7 +9,18 @@
 
 ## 未发布（工作区，尚未提交）
 
-（无）
+### 新增（库）：视口渐变背景（`CxDisplay.BackgroundGradient`）
+
+**背景**：视口背景此前只能是纯色（`SetBackgroundColor`）。为衬托渲染对象，新增可选的**垂直渐变背景**（业内通用做法，参考 CloudCompare：顶部深蓝 → 底部黑）。
+
+**改动**
+- `CxDisplay.BackgroundGradient`（`(Color Top, Color Bottom)?`，默认 `null` = 纯色）：设置后在场景之前用一张铺满视口的四边形插值出垂直渐变。
+- 复用 `ModernGLRenderer.DrawScreenGeometryColored`（无需新 shader）；深度照常清、渐变只填背景层，对象 / HUD / 拾取不受影响。
+- Demo 光照页新增「渐变背景（CloudCompare 蓝→黑）」勾选框（默认关；CloudCompare 配色 `#0A6697 → #000000`）。
+
+**验证**：`CxControl` / `DemoFrom` 0 error 0 warning；`dotnet test` **128/128**。
+
+- **需上机目视确认**：勾选后背景为蓝→黑垂直渐变、对象浮于其上；取消后恢复纯黑；resize 后渐变仍铺满。
 
 ## 已提交
 
