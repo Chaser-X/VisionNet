@@ -54,9 +54,13 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="DataType\Geometry3D\CxPoint3D.cs" />
+    <Compile Include="DataType\Geometry3D\CxDPoint3D.cs" />
     <Compile Include="DataType\Geometry3D\CxVector3D.cs" />
+    <Compile Include="DataType\Geometry3D\CxDVector3D.cs" />
     <Compile Include="DataType\Geometry3D\CxSize3D.cs" />
+    <Compile Include="DataType\Geometry3D\CxDSize3D.cs" />
     <Compile Include="DataType\Geometry3D\CxBox3D.cs" />
+    <Compile Include="DataType\Geometry3D\CxDBox3D.cs" />
     <Compile Include="DataType\Geometry3D\CxPlane3D.cs" />
     <Compile Include="DataType\Geometry3D\CxSphere.cs" />
     <Compile Include="DataType\Geometry3D\CxCircle3D.cs" />
@@ -64,16 +68,23 @@
     <Compile Include="DataType\Geometry3D\CxLine3D.cs" />
     <Compile Include="DataType\Geometry3D\CxPolygon3D.cs" />
     <Compile Include="DataType\Geometry3D\CxCoordination3D.cs" />
+    <Compile Include="DataType\Geometry3D\CxDCoordination3D.cs" />
     <Compile Include="DataType\Geometry3D\CxTextInfo.cs" />
     <Compile Include="DataType\Geometry2D\CxCoordination2D.cs" />
+    <Compile Include="DataType\Geometry2D\CxDCoordination2D.cs" />
     <Compile Include="DataType\Geometry2D\CxMatrix3X3.cs" />
+    <Compile Include="DataType\Geometry2D\CxDMatrix3X3.cs" />
     <Compile Include="DataType\Geometry2D\CxPoint2D.cs" />
+    <Compile Include="DataType\Geometry2D\CxDPoint2D.cs" />
     <Compile Include="DataType\Geometry2D\CxVector2D.cs" />
+    <Compile Include="DataType\Geometry2D\CxDVector2D.cs" />
     <Compile Include="DataType\Geometry2D\CxSegment2D.cs" />
     <Compile Include="DataType\Geometry2D\CxPolygon2D.cs" />
     <Compile Include="DataType\Geometry2D\CxCircle2D.cs" />
     <Compile Include="DataType\Geometry2D\CxSize2D.cs" />
+    <Compile Include="DataType\Geometry2D\CxDSize2D.cs" />
     <Compile Include="DataType\Geometry2D\CxBox2D.cs" />
+    <Compile Include="DataType\Geometry2D\CxDBox2D.cs" />
     <Compile Include="DataType\Geometry2D\CxText2D.cs" />
     <Compile Include="DataType\Geometry2D\CxLine2D.cs" />
     <Compile Include="DataType\Geometry2D\CxArc2D.cs" />
@@ -88,7 +99,9 @@
     <Compile Include="DataType\Models\CxMesh.cs" />
     <Compile Include="DataType\Models\CxImage.cs" />
     <Compile Include="DataType\Geometry3D\CxMatrix4X4.cs" />
+    <Compile Include="DataType\Geometry3D\CxDMatrix4X4.cs" />
     <Compile Include="DataType\Geometry3D\CxPose3D.cs" />
+    <Compile Include="DataType\Geometry3D\CxDPose3D.cs" />
     <Compile Include="DataType\CxEmunType.cs" />
     <Compile Include="Compute\OpenCLEnvironment.cs" />
     <Compile Include="Compute\CxUniformSurface.cs" />
