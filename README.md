@@ -649,7 +649,7 @@ VisionOperator.DestroyLib();
 | ---------------------- | ---------------------------------------- | ------- |
 | `SurfaceMode`          | `PointCloud` `Mesh`                      | 点云或三角面片 |
 | `SurfaceColorMode`     | `Color` `Intensity` `ColorWithIntensity` `Diff` | 颜色来源；Diff 为每顶点差分彩虹伪彩 |
-| `SurfaceViewMode`      | `Top` `Front` `Left` `Right` `None`      | 预设视角    |
+| `SurfaceViewMode`      | `Top` `Front` `Back` `Left` `Right` `None` | 预设视角    |
 | `ShowCoordinateSystem` | `bool`                                   | 显示世界坐标轴 |
 | `IsLeftHanded`         | `bool`                                   | 左手坐标系（默认 `false`） |
 

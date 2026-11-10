@@ -216,6 +216,7 @@ namespace VisionNet.Controls
             switch (ViewMode)
             {
                 case ViewMode.Front: UpdateRotationMatrix(90, 0);  break;
+                case ViewMode.Back:  UpdateRotationMatrix(90, 180); break;
                 case ViewMode.Left:  UpdateRotationMatrix(0, -90); break;
                 case ViewMode.Right: UpdateRotationMatrix(0,  90); break;
             }
