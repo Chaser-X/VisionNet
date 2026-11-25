@@ -61,31 +61,50 @@ namespace VisionNet.DataType
         /// Extracts a 6-DOF pose from a 4×4 transformation matrix.
         /// Translation is taken from the rightmost column;
         /// rotation (Rx, Ry, Rz) is extracted from the upper-left 3×3 submatrix
-        /// using the Z-Y-X convention with gimbal-lock handling, in degrees.
+        /// using the Z-Y-X convention, in degrees.
+        /// <para>
+        /// The gimbal-lock branch is taken only when <c>|cos(Ry)| ≤ 1e-9</c>, where
+        /// <c>Rx</c> is genuinely unobservable and is pinned to 0. Poses that are merely
+        /// <i>close</i> to lock keep all three angles.
+        /// </para>
         /// </summary>
         public static CxDPose3D FromMatrix(CxDMatrix4X4 matrix)
         {
-            double tx = matrix.Data[3];
-            double ty = matrix.Data[7];
-            double tz = matrix.Data[11];
+            double[] d = matrix.Data;
 
-            double a20 = matrix.Data[8];
-            double ry = Math.Asin(-a20);
+            // Row-major; translation lives in the last column.
+            double x = d[3], y = d[7], z = d[11];
 
+            // |cos(Ry)| straight from the first column: near the lock d[8] has already
+            // saturated to ±1, so sqrt(1 - d[8]^2) would cancel catastrophically, while the
+            // first column keeps full resolution.
+            double cy = Math.Sqrt(d[0] * d[0] + d[4] * d[4]);
+
+            // Avoids Asin amplifying quantisation error as its input approaches ±1.
+            double ry = Math.Atan2(-d[8], cy);
             double rx, rz;
-            if (Math.Abs(a20) < 1.0 - 1e-12)
+
+            // True gimbal lock is cos(Ry) == 0, tested on the cosine scale. Double's balance
+            // point sits about four orders of magnitude lower than float's, hence 1e-9.
+            if (cy > 1e-9)
             {
-                rx = Math.Atan2(matrix.Data[9],  matrix.Data[10]);
-                rz = Math.Atan2(matrix.Data[4],  matrix.Data[0]);
+                // Z-Y-X: R = Rz * Ry * Rx.
+                rx = Math.Atan2(d[9], d[10]);
+                rz = Math.Atan2(d[4], d[0]);
             }
             else
             {
-                rx = 0;
-                rz = Math.Atan2(-matrix.Data[1], matrix.Data[5]);
+                // Right at the lock, fall back to the equivalent representation with Rx = 0.
+                rx = 0.0;
+                rz = Math.Atan2(-d[1], d[5]);
             }
 
-            const double rad2deg = 180.0 / Math.PI;
-            return new CxDPose3D(tx, ty, tz, rx * rad2deg, ry * rad2deg, rz * rad2deg);
+            const double RadToDeg = 180.0 / Math.PI;
+            return new CxDPose3D(
+                x, y, z,
+                rx * RadToDeg,
+                ry * RadToDeg,
+                rz * RadToDeg);
         }
 
         // ── Accessors ───────────────────────────────────────────────────────────

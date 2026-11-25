@@ -60,31 +60,54 @@ namespace VisionNet.DataType
         /// Extracts a 6-DOF pose from a 4×4 transformation matrix.
         /// Translation is taken from the rightmost column;
         /// rotation (Rx, Ry, Rz) is extracted from the upper-left 3×3 submatrix
-        /// using the Z-Y-X convention with gimbal-lock handling, in degrees.
+        /// using the Z-Y-X convention, in degrees.
+        /// <para>
+        /// The gimbal-lock branch is taken only when <c>|cos(Ry)| ≤ 1e-6</c>, where
+        /// <c>Rx</c> is genuinely unobservable and is pinned to 0. Poses that are merely
+        /// <i>close</i> to lock keep all three angles.
+        /// </para>
         /// </summary>
         public static CxPose3D FromMatrix(CxMatrix4X4 matrix)
         {
-            float tx = matrix.Data[3];
-            float ty = matrix.Data[7];
-            float tz = matrix.Data[11];
+            float[] d = matrix.Data;
 
-            float a20 = matrix.Data[8];
-            float ry = (float)Math.Asin(-a20);
+            // Row-major; translation lives in the last column.
+            float x = d[3], y = d[7], z = d[11];
 
-            float rx, rz;
-            if (Math.Abs(a20) < 1.0f - 1e-6f)
+            // Compute in double and take |cos(Ry)| straight from the first column.
+            // Not sqrt(1 - a20^2): near the lock a20 has already saturated to ±1, so that
+            // subtraction cancels catastrophically, while the first column still carries
+            // cos(Ry) at full resolution.
+            double cy = Math.Sqrt(
+                (double)d[0] * d[0] +
+                (double)d[4] * d[4]);
+
+            // Avoids Asin amplifying float quantisation error as its input approaches ±1.
+            double ry = Math.Atan2(-(double)d[8], cy);
+            double rx, rz;
+
+            // True gimbal lock is cos(Ry) == 0, so the threshold must be tested on the cosine
+            // scale: cy > 1e-6 degenerates only within 5.7e-5 degrees of 90. The old
+            // |a20| >= 0.999999 misclassified every pose with Ry >= 89.92 deg as locked.
+            if (cy > 1e-6)
             {
-                rx = (float)Math.Atan2(matrix.Data[9],  matrix.Data[10]);
-                rz = (float)Math.Atan2(matrix.Data[4],  matrix.Data[0]);
+                // Z-Y-X: R = Rz * Ry * Rx.
+                rx = Math.Atan2(d[9], d[10]);
+                rz = Math.Atan2(d[4], d[0]);
             }
             else
             {
-                rx = 0f;
-                rz = (float)Math.Atan2(-matrix.Data[1], matrix.Data[5]);
+                // Right at the lock, fall back to the equivalent representation with Rx = 0.
+                rx = 0.0;
+                rz = Math.Atan2(-(double)d[1], d[5]);
             }
 
-            const float rad2deg = 180f / (float)Math.PI;
-            return new CxPose3D(tx, ty, tz, rx * rad2deg, ry * rad2deg, rz * rad2deg);
+            const double RadToDeg = 180.0 / Math.PI;
+            return new CxPose3D(
+                x, y, z,
+                (float)(rx * RadToDeg),
+                (float)(ry * RadToDeg),
+                (float)(rz * RadToDeg));
         }
 
         // ── Accessors ───────────────────────────────────────────────────────────
