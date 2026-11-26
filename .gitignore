@@ -367,3 +367,5 @@ FodyWeavers.xsd
 
 # OpenCode instruction files
 AGENTS.md
+/Changlog.md
+/ToDo.md
