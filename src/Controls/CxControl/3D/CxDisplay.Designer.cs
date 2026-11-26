@@ -15,6 +15,7 @@ namespace VisionNet.Controls
         private ToolStripMenuItem orthographicToolStripMenuItem;
         private ToolStripMenuItem topToolStripMenuItem1;
         private ToolStripMenuItem frontToolStripMenuItem;
+        private ToolStripMenuItem backToolStripMenuItem;
         private ToolStripMenuItem leftToolStripMenuItem;
         private ToolStripMenuItem rightToolStripMenuItem;
         private ToolStripMenuItem surfaceColorModeToolStripMenuItem;
@@ -64,6 +65,7 @@ namespace VisionNet.Controls
             this.orthographicToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.topToolStripMenuItem1 = new System.Windows.Forms.ToolStripMenuItem();
             this.frontToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.backToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.leftToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.rightToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.surfaceModeToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
@@ -98,6 +100,7 @@ namespace VisionNet.Controls
                 this.orthographicToolStripMenuItem,
                 this.topToolStripMenuItem1,
                 this.frontToolStripMenuItem,
+                this.backToolStripMenuItem,
                 this.leftToolStripMenuItem,
                 this.rightToolStripMenuItem});
             this.viewModeToolStripMenuItem.Name = "viewModeToolStripMenuItem";
@@ -120,6 +123,11 @@ namespace VisionNet.Controls
             this.frontToolStripMenuItem.Size = new System.Drawing.Size(108, 22);
             this.frontToolStripMenuItem.Text = "Front";
             this.frontToolStripMenuItem.Click += new System.EventHandler(this.toolStripMenuItem_ViewModeClick);
+
+            this.backToolStripMenuItem.Name = "backToolStripMenuItem";
+            this.backToolStripMenuItem.Size = new System.Drawing.Size(108, 22);
+            this.backToolStripMenuItem.Text = "Back";
+            this.backToolStripMenuItem.Click += new System.EventHandler(this.toolStripMenuItem_ViewModeClick);
 
             this.leftToolStripMenuItem.Name = "leftToolStripMenuItem";
             this.leftToolStripMenuItem.Size = new System.Drawing.Size(108, 22);

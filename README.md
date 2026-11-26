@@ -273,6 +273,17 @@ VisionNet/
 | `CxCoordination3D` | 3D 坐标系（Origin + XAxis + YAxis + ZAxis）               |
 | `CxPose3D`         | 6-DOF 位姿（X/Y/Z + Rx/Ry/Rz，旋转为度，外在 Z-Y-X 约定）     |
 | `CxTextInfo`       | 世界坐标锚定文本标签（Location + Text + Size）                   |
+| `CxDMatrix4X4`     | **double 版** `CxMatrix4X4`（变换/求逆/`LookAt`/`Solve3x3`，API 对齐） |
+| `CxDPoint3D` / `CxDVector3D` | **double 版** 3D 点 / 向量（`StructLayout` 偏移 0/8/16）      |
+| `CxDSize3D` / `CxDBox3D` | **double 版** 3D 尺寸 / 包围盒                            |
+| `CxDCoordination3D` | **double 版** 3D 坐标系                                  |
+| `CxDPose3D`        | **double 版** 6-DOF 位姿（`ToMatrix`/`FromMatrix` ↔ `CxDMatrix4X4`） |
+
+> **double 精度版本（`CxD*`）**：矩阵变换相关的核心类型均提供 double 版，API 与对应 float 版一致。
+> float→double 为**隐式**转换（无损），double→float 为**显式**转换（有损）：
+> `CxDVector3D dv = fv;` / `CxVector3D fv = (CxVector3D)dv;`。
+> 涉及类型：`CxDMatrix4X4`、`CxDPoint3D`、`CxDVector3D`、`CxDPose3D`、`CxDSize3D`、`CxDBox3D`、
+> `CxDCoordination3D`、`CxDMatrix3X3`、`CxDPoint2D`、`CxDVector2D`、`CxDSize2D`、`CxDBox2D`、`CxDCoordination2D`。
 
 </details>
 
@@ -295,6 +306,10 @@ VisionNet/
 | `CxSegment2DFittingField` / `CxArc2DFittingField` / `CxPolygon2DFittingField` / `CxCircle2DFittingField` | 边缘查找拟合场（ROI 带 + 宽度，供寻边算子使用） |
 | `CxSize2D`                 | 2D 尺寸（Width + Height）                |
 | `CxText2D`                  | 屏幕空间文本（Location + Text + FontSize） |
+| `CxDMatrix3X3`             | **double 版** `CxMatrix3X3`（2D 仿射变换，API 对齐） |
+| `CxDPoint2D` / `CxDVector2D` | **double 版** 2D 点 / 向量             |
+| `CxDSize2D` / `CxDBox2D`   | **double 版** 2D 尺寸 / 包围盒             |
+| `CxDCoordination2D`        | **double 版** 2D 坐标系                    |
 
 </details>
 
@@ -649,7 +664,7 @@ VisionOperator.DestroyLib();
 | ---------------------- | ---------------------------------------- | ------- |
 | `SurfaceMode`          | `PointCloud` `Mesh`                      | 点云或三角面片 |
 | `SurfaceColorMode`     | `Color` `Intensity` `ColorWithIntensity` `Diff` | 颜色来源；Diff 为每顶点差分彩虹伪彩 |
-| `SurfaceViewMode`      | `Top` `Front` `Left` `Right` `None`      | 预设视角    |
+| `SurfaceViewMode`      | `Top` `Front` `Back` `Left` `Right` `None` | 预设视角    |
 | `ShowCoordinateSystem` | `bool`                                   | 显示世界坐标轴 |
 | `IsLeftHanded`         | `bool`                                   | 左手坐标系（默认 `false`） |
 

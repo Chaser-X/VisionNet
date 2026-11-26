@@ -19,7 +19,20 @@ namespace VisionNet.DataType
         public float Y;
 
         /// <summary>Gets the Euclidean length of the vector.</summary>
-        public float Length => (float)Math.Sqrt(X * X + Y * Y);
+        public float Length
+        {
+            get
+            {
+                // Scale before squaring to avoid overflow/underflow; keep zero and non-finite results.
+                float scale = Math.Max(Math.Abs(X), Math.Abs(Y));
+                if (scale == 0f || float.IsNaN(scale) || float.IsInfinity(scale))
+                    return (float)Math.Sqrt(X * X + Y * Y);
+
+                float sx = X / scale;
+                float sy = Y / scale;
+                return scale * (float)Math.Sqrt(sx * sx + sy * sy);
+            }
+        }
 
         /// <summary>Returns the component-wise sum of two vectors.</summary>
         public static CxVector2D operator +(CxVector2D a, CxVector2D b) => new CxVector2D(a.X + b.X, a.Y + b.Y);
@@ -40,7 +53,19 @@ namespace VisionNet.DataType
         public float Dot(CxVector2D other) => X * other.X + Y * other.Y;
 
         /// <summary>Returns a unit vector in the same direction. Behaviour is undefined if length is zero.</summary>
-        public CxVector2D Normalize() => new CxVector2D(X / Length, Y / Length);
+        public CxVector2D Normalize()
+        {
+            // Normalise the scaled components rather than dividing by Length: the raw length can
+            // overflow or underflow for a direction that is itself perfectly representable.
+            float scale = Math.Max(Math.Abs(X), Math.Abs(Y));
+            if (scale == 0f || float.IsNaN(scale) || float.IsInfinity(scale))
+                return new CxVector2D(X / Length, Y / Length);
+
+            float sx = X / scale;
+            float sy = Y / scale;
+            float norm = (float)Math.Sqrt(sx * sx + sy * sy);
+            return new CxVector2D(sx / norm, sy / norm);
+        }
 
         /// <summary>Creates a unit vector from an angle in degrees (measured from +X axis).</summary>
         public static CxVector2D FromPolar(float angleDeg) =>

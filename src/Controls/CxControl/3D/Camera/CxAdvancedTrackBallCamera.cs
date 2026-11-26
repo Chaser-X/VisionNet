@@ -329,6 +329,10 @@ namespace VisionNet.Controls
                     _position = _target + new Vector3(0, 0, distance);
                     _up = Vector3.UnitY;
                     break;
+                case ViewMode.Back:
+                    _position = _target + new Vector3(0, 0, -distance);
+                    _up = Vector3.UnitY;
+                    break;
                 case ViewMode.Top:
                     _position = _target + new Vector3(0, distance, 0);
                     _up = new Vector3(0, 0, -1);
@@ -383,6 +387,10 @@ namespace VisionNet.Controls
             {
                 case ViewMode.Front:
                     _position = _target + new Vector3(0, -dist * 1.1f, 0);
+                    _up = new Vector3(0, 0, 1);
+                    break;
+                case ViewMode.Back:
+                    _position = _target + new Vector3(0, dist * 1.1f, 0);
                     _up = new Vector3(0, 0, 1);
                     break;
                 case ViewMode.Top:

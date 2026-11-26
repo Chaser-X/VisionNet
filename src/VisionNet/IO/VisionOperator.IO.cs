@@ -542,7 +542,10 @@ namespace VisionNet
         /// present. The interchange formats (<c>.obj</c>/<c>.stl</c>/<c>.stla</c>) write geometry
         /// only (intensity/UV/diff are not exported). The <c>.ply</c> format writes geometry plus
         /// optional <see cref="CxMesh.Intensity"/> and <see cref="CxMesh.UVs"/> when present
-        /// (<see cref="CxMesh.Diff"/> is not exported).</remarks>
+        /// (<see cref="CxMesh.Diff"/> is not exported). When <see cref="CxMesh.Intensity"/> is a
+        /// texture (<see cref="CxMesh.TextureWidth"/>×<see cref="CxMesh.TextureHeight"/>) rather
+        /// than a per-vertex array, the <c>.ply</c> writer samples it per vertex through
+        /// <see cref="CxMesh.UVs"/> so the intensity channel is not lost.</remarks>
         /// <exception cref="ArgumentNullException"><paramref name="mesh"/> is null.</exception>
         /// <exception cref="IOException">An I/O error occurred while writing the file.</exception>
         public static void SaveMesh(CxMesh mesh, string filePath)
@@ -1061,9 +1064,11 @@ namespace VisionNet
             int vertexCount = vertices.Length;
             int triCount    = indices.Length / 3;
 
-            bool hasIntensity = mesh.Intensity != null && mesh.Intensity.Length == vertexCount;
             bool hasUVs       = mesh.UVs != null && mesh.UVs.Length == vertexCount;
             var inv = CultureInfo.InvariantCulture;
+
+            byte[] perVertexIntensity = ResolvePerVertexIntensity(mesh);
+            bool hasIntensity = perVertexIntensity != null;
 
             using (var writer = new StreamWriter(filePath, append: false, new UTF8Encoding(false)))
             {
@@ -1093,7 +1098,7 @@ namespace VisionNet
                     sb.Append(v.Y.ToString("G9", inv)).Append(' ');
                     sb.Append(v.Z.ToString("G9", inv));
                     if (hasIntensity)
-                        sb.Append(' ').Append(mesh.Intensity[i].ToString(inv));
+                        sb.Append(' ').Append(perVertexIntensity[i].ToString(inv));
                     if (hasUVs)
                     {
                         sb.Append(' ').Append(mesh.UVs[i].X.ToString("G9", inv));
@@ -1112,6 +1117,46 @@ namespace VisionNet
                     writer.WriteLine(indices[t * 3 + 2].ToString(inv));
                 }
             }
+        }
+
+        /// <summary>Resolves the per-vertex intensity channel for PLY export.
+        /// Returns a <see cref="byte"/> array whose length equals the vertex count, or
+        /// <c>null</c> when no usable intensity is available.</summary>
+        /// <remarks>When <see cref="CxMesh.Intensity"/> is already per-vertex it is returned
+        /// as-is. When it is an intensity texture
+        /// (<see cref="CxMesh.TextureWidth"/>×<see cref="CxMesh.TextureHeight"/>), it is sampled
+        /// per vertex through <see cref="CxMesh.UVs"/> using the same rule as the renderer
+        /// (<c>CxMeshItem</c>), with texture coordinates clamped to range. If the texture cannot
+        /// be sampled (missing UVs or dimensions), <c>null</c> is returned so the caller skips the
+        /// channel rather than emitting misleading values.</remarks>
+        private static byte[] ResolvePerVertexIntensity(CxMesh mesh)
+        {
+            var intensity = mesh.Intensity;
+            if (intensity == null || intensity.Length == 0)
+                return null;
+
+            int vertexCount = mesh.Vertices?.Length ?? 0;
+            if (intensity.Length == vertexCount)
+                return intensity;
+
+            int w = mesh.TextureWidth;
+            int h = mesh.TextureHeight;
+            var uvs = mesh.UVs;
+            if (uvs != null && uvs.Length >= vertexCount && w > 0 && h > 0 && intensity.Length >= w * h)
+            {
+                var sampled = new byte[vertexCount];
+                for (int i = 0; i < vertexCount; i++)
+                {
+                    int tx = (int)(uvs[i].X * (w - 1) + 0.5f);
+                    int ty = (int)(uvs[i].Y * (h - 1) + 0.5f);
+                    if (tx < 0) tx = 0; else if (tx >= w) tx = w - 1;
+                    if (ty < 0) ty = 0; else if (ty >= h) ty = h - 1;
+                    sampled[i] = intensity[ty * w + tx];
+                }
+                return sampled;
+            }
+
+            return null;
         }
 
         private static CxMesh LoadMeshFromPly(string filePath)
@@ -1299,6 +1344,7 @@ namespace VisionNet
                 bool isFace = string.Equals(el.Name, "face", StringComparison.OrdinalIgnoreCase);
 
                 int ix = -1, iy = -1, iz = -1, ii = -1, iu = -1, iv = -1;
+                string intensityType = null;
                 int faceListIdx = -1;
 
                 if (isVertex)
@@ -1311,7 +1357,12 @@ namespace VisionNet
                         if (n == "x") ix = k;
                         else if (n == "y") iy = k;
                         else if (n == "z") iz = k;
-                        else if (n == "intensity") ii = k;
+                        else if (n == "intensity" || n == "grey" || n == "gray"
+                                 || n == "value" || n == "scalar" || n == "quality")
+                        {
+                            ii = k;
+                            intensityType = pr.ItemType;
+                        }
                         else if (n == "u" || n == "s" || n == "texture_u") iu = k;
                         else if (n == "v" || n == "t" || n == "texture_v") iv = k;
                     }
@@ -1353,7 +1404,7 @@ namespace VisionNet
 
                         vertices.Add(new CxPoint3D((float)vals[ix], (float)vals[iy], (float)vals[iz]));
                         if (hasIntensity)
-                            intensity.Add((byte)Math.Max(0, Math.Min(255, (int)Math.Round(vals[ii]))));
+                            intensity.Add(ToIntensityByte(vals[ii], intensityType));
                         if (hasUVs)
                             uvs.Add(new CxPoint2D((float)vals[iu], (float)vals[iv]));
                     }
@@ -1399,12 +1450,33 @@ namespace VisionNet
             {
                 Vertices = vertices.ToArray(),
                 Indices = indices.ToArray(),
+                // PLY carries no intensity-texture dimensions: intensity is always read
+                // back per vertex, so the texture fields stay at their defaults.
+                TextureWidth  = 0,
+                TextureHeight = 0,
             };
             if (hasIntensity && intensity.Count == vertices.Count)
                 mesh.Intensity = intensity.ToArray();
             if (hasUVs && uvs.Count == vertices.Count)
                 mesh.UVs = uvs.ToArray();
             return mesh;
+        }
+
+        /// <summary>Converts a PLY intensity scalar to a 0–255 <see cref="byte"/>.</summary>
+        /// <remarks>Floating-point properties carrying normalized values in [0,1] (common in
+        /// external tools such as MeshLab) are scaled to 0–255; all other values are rounded and
+        /// clamped to range.</remarks>
+        private static byte ToIntensityByte(double value, string type)
+        {
+            if (PlyIsFloatType(type) && value >= 0.0 && value <= 1.0)
+                value *= 255.0;
+            return (byte)Math.Max(0, Math.Min(255, (int)Math.Round(value)));
+        }
+
+        /// <summary>Returns whether a PLY property type name denotes a floating-point scalar.</summary>
+        private static bool PlyIsFloatType(string t)
+        {
+            return t == "float" || t == "float32" || t == "double" || t == "float64";
         }
 
         private static int PlyTypeSize(string t)

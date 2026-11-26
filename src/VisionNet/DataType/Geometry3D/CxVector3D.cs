@@ -24,7 +24,21 @@ namespace VisionNet.DataType
         public float Z;
 
         /// <summary>Gets the Euclidean length of the vector.</summary>
-        public float Length => (float)Math.Sqrt(X * X + Y * Y + Z * Z);
+        public float Length
+        {
+            get
+            {
+                // Scale before squaring to avoid overflow/underflow; keep zero and non-finite results.
+                float scale = Math.Max(Math.Abs(X), Math.Max(Math.Abs(Y), Math.Abs(Z)));
+                if (scale == 0f || float.IsNaN(scale) || float.IsInfinity(scale))
+                    return (float)Math.Sqrt(X * X + Y * Y + Z * Z);
+
+                float sx = X / scale;
+                float sy = Y / scale;
+                float sz = Z / scale;
+                return scale * (float)Math.Sqrt(sx * sx + sy * sy + sz * sz);
+            }
+        }
 
         /// <summary>Returns the component-wise sum of two vectors.</summary>
         public static CxVector3D operator +(CxVector3D a, CxVector3D b) => new CxVector3D(a.X + b.X, a.Y + b.Y, a.Z + b.Z);
@@ -46,7 +60,20 @@ namespace VisionNet.DataType
             new CxVector3D(Y * other.Z - Z * other.Y, Z * other.X - X * other.Z, X * other.Y - Y * other.X);
 
         /// <summary>Returns a unit vector in the same direction. Behaviour is undefined if length is zero.</summary>
-        public CxVector3D Normalize() => new CxVector3D(X / Length, Y / Length, Z / Length);
+        public CxVector3D Normalize()
+        {
+            // Normalise the scaled components rather than dividing by Length: the raw length can
+            // overflow or underflow for a direction that is itself perfectly representable.
+            float scale = Math.Max(Math.Abs(X), Math.Max(Math.Abs(Y), Math.Abs(Z)));
+            if (scale == 0f || float.IsNaN(scale) || float.IsInfinity(scale))
+                return new CxVector3D(X / Length, Y / Length, Z / Length);
+
+            float sx = X / scale;
+            float sy = Y / scale;
+            float sz = Z / scale;
+            float norm = (float)Math.Sqrt(sx * sx + sy * sy + sz * sz);
+            return new CxVector3D(sx / norm, sy / norm, sz / norm);
+        }
 
         /// <summary>
         /// Creates a unit direction vector from spherical coordinates (standard math convention).

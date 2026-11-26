@@ -16,6 +16,9 @@ namespace VisionNet.Controls
         /// <summary>Front view (looking along the +Y axis).</summary>
         Front,
 
+        /// <summary>Back / rear view (opposite of <see cref="Front"/>; looking along the −Y axis).</summary>
+        Back,
+
         /// <summary>Left-side view (looking along the +X axis).</summary>
         Left,
 
