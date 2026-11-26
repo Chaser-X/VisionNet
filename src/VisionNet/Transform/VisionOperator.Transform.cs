@@ -17,16 +17,8 @@ namespace VisionNet
         /// </summary>
         public static CxPoint3D TransformPoint3D(CxPoint3D point, CxMatrix4X4 matrix)
         {
-            float[] m = matrix.Data;
-            float x = point.X, y = point.Y, z = point.Z;
-
-            float tx = m[0] * x + m[1] * y + m[2]  * z + m[3];
-            float ty = m[4] * x + m[5] * y + m[6]  * z + m[7];
-            float tz = m[8] * x + m[9] * y + m[10] * z + m[11];
-            float tw = m[12]* x + m[13]* y + m[14] * z + m[15];
-
-            if (Math.Abs(tw) > 1e-6f) { tx /= tw; ty /= tw; tz /= tw; }
-            return new CxPoint3D(tx, ty, tz);
+            // Keep single-point transforms consistent with the matrix implementation.
+            return matrix.TransformPoint3D(point);
         }
 
         /// <summary>

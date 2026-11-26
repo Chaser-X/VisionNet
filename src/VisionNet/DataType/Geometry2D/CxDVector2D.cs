@@ -20,7 +20,20 @@ namespace VisionNet.DataType
         public double Y;
 
         /// <summary>Gets the Euclidean length of the vector.</summary>
-        public double Length => Math.Sqrt(X * X + Y * Y);
+        public double Length
+        {
+            get
+            {
+                // Scale before squaring to avoid overflow/underflow; keep zero and non-finite results.
+                double scale = Math.Max(Math.Abs(X), Math.Abs(Y));
+                if (scale == 0.0 || double.IsNaN(scale) || double.IsInfinity(scale))
+                    return Math.Sqrt(X * X + Y * Y);
+
+                double sx = X / scale;
+                double sy = Y / scale;
+                return scale * Math.Sqrt(sx * sx + sy * sy);
+            }
+        }
 
         /// <summary>Returns the component-wise sum of two vectors.</summary>
         public static CxDVector2D operator +(CxDVector2D a, CxDVector2D b) => new CxDVector2D(a.X + b.X, a.Y + b.Y);
@@ -41,7 +54,19 @@ namespace VisionNet.DataType
         public double Dot(CxDVector2D other) => X * other.X + Y * other.Y;
 
         /// <summary>Returns a unit vector in the same direction. Behaviour is undefined if length is zero.</summary>
-        public CxDVector2D Normalize() => new CxDVector2D(X / Length, Y / Length);
+        public CxDVector2D Normalize()
+        {
+            // Normalise the scaled components rather than dividing by Length: the raw length can
+            // overflow or underflow for a direction that is itself perfectly representable.
+            double scale = Math.Max(Math.Abs(X), Math.Abs(Y));
+            if (scale == 0.0 || double.IsNaN(scale) || double.IsInfinity(scale))
+                return new CxDVector2D(X / Length, Y / Length);
+
+            double sx = X / scale;
+            double sy = Y / scale;
+            double norm = Math.Sqrt(sx * sx + sy * sy);
+            return new CxDVector2D(sx / norm, sy / norm);
+        }
 
         /// <summary>Creates a unit vector from an angle in degrees (measured from +X axis).</summary>
         public static CxDVector2D FromPolar(double angleDeg) =>
